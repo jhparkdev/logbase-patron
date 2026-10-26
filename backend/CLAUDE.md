@@ -1,6 +1,6 @@
 # 백엔드 지침
 
-`backend/**` 작업에 적용한다. 루트 `CLAUDE.md`의 규칙 위에 더해지는 지침이다. 스택은 Python 3.14, uv, FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2.x(async, asyncpg), Alembic, httpx, Ruff, pytest(pytest-asyncio)다.
+`backend/**` 작업에 적용한다. 루트 `CLAUDE.md`의 규칙 위에 더해지는 지침이다. 스택은 Python 3.14, uv, FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2.x(async, psycopg 3), Alembic, httpx, Ruff, pytest(pytest-asyncio)다.
 
 ## 도구
 - 의존성은 uv로만 관리한다. `uv add`, `uv remove`로 `pyproject.toml`과 `uv.lock`을 함께 갱신하고 `pip install`을 직접 쓰지 않는다. 개발 전용 도구는 `uv add --dev`로 넣는다.
