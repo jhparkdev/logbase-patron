@@ -31,6 +31,9 @@ credentials*.json
 alembic_schema.sql
 design_schema.sql
 
+# DB 구축 가이드 (개인 참고용, 커밋하지 않음)
+docs/DB/
+
 # 에디터 (추천 확장 목록만 공유)
 .vscode/*
 !.vscode/extensions.json
