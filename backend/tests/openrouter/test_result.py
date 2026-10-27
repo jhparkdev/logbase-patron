@@ -33,7 +33,7 @@ def test_비용_상태가_UNKNOWN이면_금액은_비어_있다() -> None:
 
 def test_비용_상태가_UNKNOWN인데_금액이_있으면_거절한다() -> None:
     with pytest.raises(ValidationError):
-        make_result(cost_status=CostStatus.UNKNOWN, cost_usd=Decimal("0"))
+        make_result(cost_status=CostStatus.UNKNOWN, cost_usd=Decimal(0))
 
 
 def test_비용_상태가_CONFIRMED인데_금액이_없으면_거절한다() -> None:
@@ -44,10 +44,10 @@ def test_비용_상태가_CONFIRMED인데_금액이_없으면_거절한다() -> 
 def test_비용_상태가_CONFIRMED이면_금액이_0이어도_받는다() -> None:
     result = make_result(
         cost_status=CostStatus.CONFIRMED,
-        cost_usd=Decimal("0"),
+        cost_usd=Decimal(0),
         cost_source=CostSource.API_RESPONSE,
     )
-    assert result.cost_usd == Decimal("0")
+    assert result.cost_usd == Decimal(0)
 
 
 # ---------------------------------------------------------------

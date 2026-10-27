@@ -110,7 +110,7 @@ def test_비용이_0이면_실제_0원이라서_CONFIRMED다() -> None:
     result = build(body)
 
     assert result.cost_status == CostStatus.CONFIRMED
-    assert result.cost_usd == Decimal("0")
+    assert result.cost_usd == Decimal(0)
 
 
 def test_float으로_온_비용도_Decimal로_바꿔_받는다() -> None:
@@ -138,7 +138,7 @@ def test_비용이_없는_정상_응답은_SUCCESS와_UNKNOWN이다() -> None:
     assert result.cost_source is None
 
 
-@pytest.mark.parametrize("bad_cost", [None, "abc", "0.1", True, Decimal("-1"), -1])
+@pytest.mark.parametrize("bad_cost", [None, "abc", "0.1", True, Decimal(-1), -1])
 def test_비용이_숫자가_아니거나_음수면_UNKNOWN이다(bad_cost: object) -> None:
     body = make_body()
     body["usage"]["cost"] = bad_cost
