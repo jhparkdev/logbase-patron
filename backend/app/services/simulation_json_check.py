@@ -19,6 +19,8 @@ class JsonCheck:
 
     json_valid: bool | None
     schema_check: SchemaCheck
+    # Schema 의 required 를 어긴 경우만 True. 검사하지 않았으면 None 이다
+    required_missing: bool | None = None
 
 
 def check_json_output(
@@ -36,8 +38,9 @@ def check_json_output(
         return JsonCheck(json_valid=False, schema_check=SchemaCheck.FAILED)
 
     # JSON 으로 올바른 것과 Schema 를 지키는 것은 별개라서 json_valid 는 항상 True 다
-    follows_schema = validator_for(schema)(schema).is_valid(parsed)
+    errors = list(validator_for(schema)(schema).iter_errors(parsed))
     return JsonCheck(
         json_valid=True,
-        schema_check=SchemaCheck.PASSED if follows_schema else SchemaCheck.FAILED,
+        schema_check=SchemaCheck.FAILED if errors else SchemaCheck.PASSED,
+        required_missing=any(error.validator == "required" for error in errors),
     )
