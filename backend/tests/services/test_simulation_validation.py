@@ -10,8 +10,9 @@ from app.services.simulation_validation import (
     validate_model_selection,
 )
 
-GPT = "openai/gpt-x"
-CLAUDE = "anthropic/claude-x"
+# models 표의 model_id(숫자)
+GPT = 1
+CLAUDE = 2
 
 
 def test_limits_are_two_to_four() -> None:
@@ -31,8 +32,16 @@ def test_count_outside_range_is_rejected(count: int) -> None:
     assert error.value.count == count
 
 
+def test_provider_is_required_for_every_selection() -> None:
+    # simulation_results.execution_provider 는 NOT NULL 이다 (자동 라우팅 없음)
+    with pytest.raises(TypeError):
+        ModelSelection(GPT)  # type: ignore[call-arg]
+
+
 def test_different_models_are_accepted() -> None:
-    validate_model_selection([ModelSelection(GPT), ModelSelection(CLAUDE)])
+    validate_model_selection(
+        [ModelSelection(GPT, "openai"), ModelSelection(CLAUDE, "anthropic")]
+    )
 
 
 def test_same_model_with_different_providers_is_accepted() -> None:
@@ -45,18 +54,10 @@ def test_same_model_with_different_providers_is_accepted() -> None:
 def test_same_model_with_same_provider_is_rejected() -> None:
     duplicated = ModelSelection(GPT, "openai")
     with pytest.raises(DuplicateModelSelectionError) as error:
-        validate_model_selection([ModelSelection(CLAUDE), duplicated, duplicated])
+        validate_model_selection(
+            [ModelSelection(CLAUDE, "anthropic"), duplicated, duplicated]
+        )
     assert error.value.selection == duplicated
-
-
-def test_same_model_without_provider_twice_is_rejected() -> None:
-    # Provider 를 둘 다 지정하지 않았다면 같은 조건으로 두 번 실행하는 것이다
-    with pytest.raises(DuplicateModelSelectionError):
-        validate_model_selection([ModelSelection(GPT), ModelSelection(GPT)])
-
-
-def test_same_model_with_and_without_provider_is_accepted() -> None:
-    validate_model_selection([ModelSelection(GPT), ModelSelection(GPT, "openai")])
 
 
 def test_same_provider_with_different_models_is_accepted() -> None:
@@ -73,7 +74,7 @@ def test_four_selections_of_one_model_with_four_providers_are_accepted() -> None
 def test_count_is_checked_before_duplicates() -> None:
     # 1개 선택, 5개 선택은 중복 여부와 상관없이 개수 오류가 먼저다 (T-19)
     with pytest.raises(ModelCountError):
-        validate_model_selection([ModelSelection(GPT)])
+        validate_model_selection([ModelSelection(GPT, "openai")])
     five_duplicates = [ModelSelection(GPT, "openai")] * 5
     with pytest.raises(ModelCountError):
         validate_model_selection(five_duplicates)
@@ -82,10 +83,10 @@ def test_count_is_checked_before_duplicates() -> None:
 def test_duplicate_is_found_even_at_the_upper_limit() -> None:
     selections = [
         ModelSelection(GPT, "openai"),
-        ModelSelection(CLAUDE),
+        ModelSelection(CLAUDE, "anthropic"),
         ModelSelection(GPT, "azure"),
-        ModelSelection(CLAUDE),
+        ModelSelection(CLAUDE, "anthropic"),
     ]
     with pytest.raises(DuplicateModelSelectionError) as error:
         validate_model_selection(selections)
-    assert error.value.selection == ModelSelection(CLAUDE)
+    assert error.value.selection == ModelSelection(CLAUDE, "anthropic")

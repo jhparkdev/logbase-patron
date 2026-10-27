@@ -7,10 +7,10 @@ MAX_MODEL_COUNT = 4
 
 @dataclass(frozen=True)
 class ModelSelection:
-    """비교 실행에서 고른 모델 하나. provider 가 None 이면 지정하지 않은 것이다."""
+    """비교 실행에서 고른 모델 하나. 필드 이름은 simulation_results 컬럼과 같은 의미다."""
 
-    model_id: str
-    provider: str | None = None
+    model_id: int  # models 표의 model_id
+    provider: str  # 실행 Provider. 자동 라우팅 없이 반드시 지정한다
 
 
 class DuplicateModelSelectionError(ValueError):
