@@ -7,6 +7,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.config import get_settings
+from app.models import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -29,8 +30,8 @@ if not config.get_main_option("sqlalchemy.url"):
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-# app/models.py를 만들 때 Base.metadata로 연결한다. 그전까지 autogenerate는 비교할 모델이 없다.
-target_metadata = None
+# autogenerate와 alembic check는 app/models.py의 모델(Base.metadata)과 실제 DB를 비교한다.
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
