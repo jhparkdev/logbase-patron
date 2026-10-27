@@ -1,0 +1,73 @@
+# 로컬과 CI가 같은 명령을 돌린다.
+# 프론트엔드 job은 frontend/package.json이 생긴 뒤에 추가한다.
+name: CI
+
+# 지금은 feature 브랜치에서 dev로 가는 PR만 검사한다.
+on:
+  pull_request:
+    branches: [dev]
+
+# 같은 브랜치에 새 push가 오면 진행 중인 이전 실행을 취소한다.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-24.04
+
+    # 테스트는 실제 PostgreSQL을 쓴다(backend/CLAUDE.md). docker-compose 대신 Actions 서비스 컨테이너로 띄운다.
+    # 이 DB는 runner 안에서 job 동안만 존재하고 밖에서 접근할 수 없다. 비밀번호는 고정 리터럴을 피하려고 실행 ID로 만든다.
+    # CI는 실제 키가 필요한 일을 하지 않으므로 GitHub Secrets를 쓰지 않는다.
+    services:
+      db:
+        image: postgres:18
+        env:
+          POSTGRES_USER: patron
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}
+          POSTGRES_DB: patron_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U patron -d patron_test"
+          --health-interval 5s
+          --health-retries 10
+
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+psycopg://patron:ci-${{ github.run_id }}@localhost:5432/patron_test
+      TEST_DATABASE_URL: postgresql+psycopg://patron:ci-${{ github.run_id }}@localhost:5432/patron_test
+      # 테스트는 OpenRouter를 호출하지 않으므로 실제 키를 넣지 않는다.
+      OPENROUTER_API_KEY: not-a-real-key
+      INGEST_TOKEN: not-a-real-token
+      ALLOWED_ORIGIN: http://localhost:5173
+      OPENROUTER_TIMEOUT_SECONDS: "60"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: "0.12.3"
+          enable-cache: true
+          working-directory: backend
+
+      - name: Python 설치 (backend/.python-version)
+        run: uv --directory backend python install
+
+      - name: 의존성 설치
+        # --locked: uv.lock이 pyproject.toml과 어긋나면 실패시켜 lock 미갱신 커밋을 잡는다.
+        run: uv --directory backend sync --locked --dev
+
+      - name: 린트
+        run: uv --directory backend run ruff check
+
+      - name: 포매팅 검사
+        run: uv --directory backend run ruff format --check
+
+      - name: 테스트
+        run: uv --directory backend run pytest -q
