@@ -27,6 +27,18 @@ ROUTING_STEP_ERROR_TYPES = {
     "Filter by Parameters": ErrorType.UNSUPPORTED_INPUT,
 }
 
+# 화면에 보여 줄 문구. Key, Prompt, 내부 예외 문구는 넣지 않는다.
+USER_MESSAGES = {
+    ErrorType.AUTH_ERROR: "OpenRouter 인증에 실패했습니다.",
+    ErrorType.RATE_LIMIT: "호출이 너무 많아 잠시 제한되었습니다.",
+    ErrorType.TIMEOUT_ERROR: "응답 시간이 초과되었습니다.",
+    ErrorType.PROVIDER_ERROR: "모델을 제공하는 업체에서 오류가 발생했습니다.",
+    ErrorType.NETWORK_ERROR: "OpenRouter에 연결하지 못했습니다.",
+    ErrorType.INVALID_RESPONSE: "OpenRouter 응답에 필요한 정보가 없습니다.",
+    ErrorType.UNSUPPORTED_INPUT: "선택한 모델이 이 입력이나 형식을 지원하지 않습니다.",
+    ErrorType.UNKNOWN_ERROR: "알 수 없는 오류가 발생했습니다.",
+}
+
 SERVER_ERROR_STATUS_CODES = range(500, 600)
 
 

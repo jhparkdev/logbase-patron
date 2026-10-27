@@ -4,7 +4,13 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from app.openrouter.result import CallResult, CallStatus, CostSource, CostStatus
+from app.openrouter.result import (
+    CallResult,
+    CallStatus,
+    CostSource,
+    CostStatus,
+    elapsed_ms,
+)
 
 STARTED_AT = datetime(2026, 10, 27, 1, 0, 0, tzinfo=UTC)
 FINISHED_AT = datetime(2026, 10, 27, 1, 0, 1, tzinfo=UTC)
@@ -66,3 +72,21 @@ def test_finish_reason이_length이면_답이_잘린_것이다(
 ) -> None:
     result = make_result(finish_reason=finish_reason)
     assert result.truncated is expected
+
+
+# ---------------------------------------------------------------
+# 걸린 시간은 밀리초로 계산한다
+# ---------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("seconds", "microseconds", "expected"),
+    [
+        (0, 0, 0),
+        (1, 500000, 1500),
+        (2, 0, 2000),
+    ],
+)
+def test_걸린_시간을_밀리초로_계산한다(
+    seconds: int, microseconds: int, expected: int
+) -> None:
+    finished_at = STARTED_AT.replace(second=seconds, microsecond=microseconds)
+    assert elapsed_ms(STARTED_AT, finished_at) == expected

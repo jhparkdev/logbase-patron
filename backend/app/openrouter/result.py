@@ -13,6 +13,13 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from app.openrouter.errors import ErrorType
 
 TRUNCATED_FINISH_REASON = "length"
+MILLISECONDS_PER_SECOND = 1000
+
+
+def elapsed_ms(started_at: datetime, finished_at: datetime) -> int:
+    """두 시각 사이의 시간을 밀리초로 돌려준다."""
+    seconds = (finished_at - started_at).total_seconds()
+    return int(seconds * MILLISECONDS_PER_SECOND)
 
 
 class CallStatus(StrEnum):

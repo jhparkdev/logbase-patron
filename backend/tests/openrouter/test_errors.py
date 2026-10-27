@@ -1,6 +1,7 @@
 import pytest
 
 from app.openrouter.errors import (
+    USER_MESSAGES,
     ErrorType,
     classify_http_error,
     get_failed_routing_step,
@@ -127,3 +128,11 @@ def test_본문에서_라우팅_실패_단계를_꺼낸다() -> None:
 )
 def test_모양이_다른_본문에서는_None을_돌려준다(body: object) -> None:
     assert get_failed_routing_step(body) is None  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------
+# 화면에 보여 줄 문구는 오류 유형마다 있어야 한다
+# ---------------------------------------------------------------
+@pytest.mark.parametrize("error_type", list(ErrorType))
+def test_모든_오류_유형에_사용자용_문구가_있다(error_type: ErrorType) -> None:
+    assert USER_MESSAGES[error_type]

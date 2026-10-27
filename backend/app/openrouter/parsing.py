@@ -8,11 +8,14 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from app.openrouter.errors import ErrorType
-from app.openrouter.result import CallResult, CallStatus, CostSource, CostStatus
-
-MILLISECONDS_PER_SECOND = 1000
-INVALID_RESPONSE_MESSAGE = "OpenRouter 응답에 필요한 정보가 없습니다."
+from app.openrouter.errors import USER_MESSAGES, ErrorType
+from app.openrouter.result import (
+    CallResult,
+    CallStatus,
+    CostSource,
+    CostStatus,
+    elapsed_ms,
+)
 
 
 def loads_decimal(text: str) -> Any:
@@ -83,7 +86,6 @@ def build_result_from_chat_body(
     prompt_tokens = _get_int(usage, "prompt_tokens")
     completion_tokens = _get_int(usage, "completion_tokens")
 
-    latency = (finished_at - started_at).total_seconds()
     common_fields: dict[str, Any] = {
         "http_status": http_status,
         "content": content,
@@ -101,7 +103,7 @@ def build_result_from_chat_body(
         "raw_response": body,
         "started_at": started_at,
         "finished_at": finished_at,
-        "latency_ms": int(latency * MILLISECONDS_PER_SECOND),
+        "latency_ms": elapsed_ms(started_at, finished_at),
     }
 
     # 본문, 실제 모델, 토큰 수 중 하나라도 없으면 성공으로 보지 않는다.
@@ -117,7 +119,7 @@ def build_result_from_chat_body(
             **common_fields,
             status=CallStatus.FAILED,
             error_type=ErrorType.INVALID_RESPONSE,
-            error_message=INVALID_RESPONSE_MESSAGE,
+            error_message=USER_MESSAGES[ErrorType.INVALID_RESPONSE],
             cost_status=CostStatus.UNKNOWN,
         )
 
