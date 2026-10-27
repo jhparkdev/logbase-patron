@@ -1,5 +1,24 @@
+from collections.abc import Sequence
+from dataclasses import dataclass
+
 MIN_MODEL_COUNT = 2
 MAX_MODEL_COUNT = 4
+
+
+@dataclass(frozen=True)
+class ModelSelection:
+    """비교 실행에서 고른 모델 하나. provider 가 None 이면 지정하지 않은 것이다."""
+
+    model_id: str
+    provider: str | None = None
+
+
+class DuplicateModelSelectionError(ValueError):
+    """같은 모델을 같은 Provider 로 두 번 골랐다."""
+
+    def __init__(self, selection: ModelSelection) -> None:
+        super().__init__("같은 모델을 같은 Provider 로 중복 선택할 수 없다")
+        self.selection = selection
 
 
 class ModelCountError(ValueError):
@@ -19,3 +38,14 @@ def validate_model_count(count: int) -> None:
     """
     if not MIN_MODEL_COUNT <= count <= MAX_MODEL_COUNT:
         raise ModelCountError(count)
+
+
+def validate_model_selection(selections: Sequence[ModelSelection]) -> None:
+    """선택한 모델 목록의 개수(2~4개)와 중복(같은 모델 + 같은 Provider)을 검사한다."""
+    validate_model_count(len(selections))
+
+    seen: set[ModelSelection] = set()
+    for selection in selections:
+        if selection in seen:
+            raise DuplicateModelSelectionError(selection)
+        seen.add(selection)
