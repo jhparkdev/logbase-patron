@@ -1,25 +1,50 @@
+# frontend (Vite · TypeScript · pnpm)
 node_modules/
-tsconfig.tsbuildinfo
 dist/
+*.tsbuildinfo
+.vite/
+.eslintcache
+.pnpm-store/
 frontend/coverage/
 
-# python
+# python (uv)
 .venv/
 __pycache__/
+*.py[cod]
 .pytest_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 
 # secrets (예시 파일은 커밋)
 .env
 .env.*
 !.env*.example
+*.pem
+*.key
+*service-account*.json
+credentials*.json
 
+# DB: Alembic 스키마 비교용 덤프
+alembic_schema.sql
+design_schema.sql
+
+# 에디터 (추천 확장 목록만 공유)
+.vscode/*
+!.vscode/extensions.json
+.history/
+.idea/
+
+# OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # 로그
 *.log
 
-# Claude Code 개인 설정 (공용 settings.json은 커밋)
+# Claude Code 개인 설정 (공용 settings.json, CLAUDE.md는 커밋)
 .claude/settings.local.json
-
+CLAUDE.local.md
