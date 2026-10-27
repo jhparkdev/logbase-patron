@@ -73,7 +73,7 @@ tests/                 # 구현 코드와 분리한다. app/ 폴더 구조를 �
 - 로그인·health·기록 API를 뺀 모든 `/api` 라우트에 `CurrentUserDep`을 건다. 기록 API는 `X-Patron-Ingest-Token`을 `hmac.compare_digest`로 비교하고, 없거나 틀리면 401이다.
 - 상태를 바꾸는 요청(POST/PUT/PATCH/DELETE)은 `Origin` 헤더가 `ALLOWED_ORIGIN`과 같을 때만 받는다. 기록 API는 쿠키를 쓰지 않으므로 제외한다. CORS 미들웨어는 켜지 않는다.
 - 계정 존재 여부를 드러내지 않는다. 계정 없음과 비밀번호 틀림은 같은 상태 코드와 같은 문구로 돌려주고, 계정이 없어도 더미 해시로 검증을 한 번 수행해 응답 시간을 맞춘다. 새 인증 경로를 만들 때는 이 경로가 계정 존재 여부를 드러내는지 먼저 확인한다.
-- 인증 방식(세션 쿠키 대 Bearer 토큰, 역할 유무)은 API 명세서와 차이가 있어 검토 중이다. 바꾸려면 사용자 확인을 받는다.
+- 인증 방식(세션 쿠키 대 Bearer 토큰, 역할 유무)은 검토 중이다. 바꾸려면 사용자 확인을 받는다.
 
 ## OpenRouter 호출
 - `openrouter/client.py`만 OpenRouter를 부른다. `httpx.AsyncClient`를 앱 수명 동안 하나 만들어 재사용하고, 모든 호출에 timeout을 명시한다.

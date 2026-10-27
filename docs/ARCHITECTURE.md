@@ -1,7 +1,7 @@
 # 아키텍처
 
 ## 디렉토리 구조
-파일 단위 구성은 기능을 구현하면서 정한다. 어느 모듈이 어떤 규칙을 책임지는지는 CLAUDE.md와 backend/CLAUDE.md를 따른다.
+아래는 목표 구조이고, 각 항목은 기능 브랜치에서 구현하면서 추가한다. 파일 단위 구성은 기능을 구현하면서 정한다. 어느 모듈이 어떤 규칙을 책임지는지는 CLAUDE.md와 backend/CLAUDE.md를 따른다.
 ```
 backend/                    # Python · FastAPI 서버 (uv 프로젝트)
 ├── pyproject.toml          # uv 프로젝트 설정과 의존성
@@ -28,15 +28,15 @@ frontend/                   # React 19 · Vite · TypeScript SPA (pnpm). 화면 
         ├── components/ui/  # 공용 UI primitive(버튼, 입력, 표, 상태 배지, 비용 표시, 상세 패널)
         ├── api/            # 생성된 API 타입과 공용 fetch 클라이언트
         └── lib/            # KST 날짜·USD 금액·비용 상태 포맷 함수
-docker-compose.yml          # db(PostgreSQL 16), backend, frontend. 평소 개발은 db만 띄운다 (dev 브랜치에서 추가)
-db/init/                    # db 컨테이너 첫 실행 시 테스트 DB(patron_test)를 만드는 스크립트 (dev 브랜치에서 추가)
+docker-compose.yml          # db(PostgreSQL 18), backend, frontend. 평소 개발은 db만 띄운다
+db/init/                    # db 컨테이너 첫 실행 시 테스트 DB(patron_test)를 만드는 스크립트
 .env.example                # 필요한 환경변수 목록 (값 없음)
 deploy/                     # GCP 최초 준비 절차 (README.md)
 .github/workflows/          # ci.yml(린트·테스트·빌드), deploy.yml(dev·main 배포)
 ```
 
 ## 데이터 흐름
-아래 경로 이름은 API 명세서 확정 전의 설계안이다. 최종 경로와 요청·응답 형태는 API 명세서를 따른다.
+아래 경로 이름은 설계안이다. 최종 경로와 요청·응답 형태는 백엔드 Pydantic 모델을 정본으로 구현하면서 확정한다.
 ```
 [시뮬레이션]
 P-04 화면 → POST /api/simulations → services/simulation

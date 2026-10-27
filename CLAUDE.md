@@ -5,14 +5,13 @@
 ## 기준 문서
 - 구조와 데이터 흐름은 `docs/ARCHITECTURE.md`다.
 - 협업 규칙과 테스트 배치는 `CONTRIBUTING.md`다.
-- 기능 명세서·API 명세서(`files/`)는 팀 공통 기준이다. `docs/`와 다른 점이 있으면 임의로 한쪽을 고르지 않고 사용자에게 확인한다.
 - 외부 라이브러리와 API의 동작은 프로젝트가 실제로 쓰는 버전의 공식 문서로 확인한다. 기억에 의존해 옛 버전의 사용법을 쓰지 않는다.
 
 ## 기술 스택
 - 백엔드: Python 3.14, uv, FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2.x(async), Alembic, httpx(async), Ruff, pytest(실제 PostgreSQL)
 - 프론트엔드: Node.js LTS(24 이상), pnpm, React 19, React Compiler, TypeScript, Vite, TanStack Router, TanStack Query, React Hook Form, Zod 4, Tailwind CSS v4, Recharts, Biome, Vitest
 - 디자인: 토스 디자인 원칙과 토스 디자인 시스템(TDS)을 적용한다. 세부 규칙은 `frontend/CLAUDE.md`를 따른다.
-- DB: PostgreSQL 16. AI 연동: OpenRouter API
+- DB: PostgreSQL 18. AI 연동: OpenRouter API
 - 인프라: Docker, docker compose, GCP(Cloud Run·Cloud SQL·Artifact Registry·Secret Manager), GitHub Actions
 - 새 의존성, 새 패키지, 폴더 구조 변경, 배포 설정 변경은 사용자 승인 후 진행한다.
 

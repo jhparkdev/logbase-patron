@@ -153,7 +153,6 @@ feature/*  →  Pull Request  →  dev
 ## 9. 올리지 않는 파일
 
 - 모델 파일, 대용량 데이터 파일
-- `Files/` 폴더 (기획 원본 문서)
 - `.venv/`, `node_modules/`, 빌드 결과물, 캐시
 
 ---
