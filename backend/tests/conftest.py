@@ -4,25 +4,36 @@
 1. test_database_url: .env의 TEST_DATABASE_URL을 읽고, patron_test가 아니면 거부한다.
 2. migrated_database: 테스트 시작 시 한 번, 마이그레이션으로 patron_test에 테이블을 만든다.
 3. db_session: 테스트마다 트랜잭션을 열고, 테스트가 끝나면 롤백해 흔적을 남기지 않는다.
+4. client: 실제 앱에 db_session과 고정 시각(now)을 끼워 넣은 HTTP 테스트 클라이언트.
 """
 
 import asyncio
 from collections.abc import AsyncIterator, Callable
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.api.deps import get_now
 from app.config import get_settings
-from tests.db_helpers import Factory
+from app.db import get_session
+from app.main import create_app
+from tests.db_helpers import T0, Factory
 
 # 테스트가 접속해도 되는 유일한 DB 이름. 개발 DB(patron)를 실수로 지우지 않기 위한 안전장치다.
 TEST_DATABASE_NAME = "patron_test"
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
+# https로 두어야 Secure 쿠키를 클라이언트가 저장하고 다시 보낸다.
+TEST_BASE_URL = "https://test"
+# 화면과 API가 같은 주소에서 제공되는 배포 구성처럼, 허용 Origin을 API 주소와 같게 둔다.
+TEST_ORIGIN = TEST_BASE_URL
 
 
 def pytest_asyncio_loop_factories(
@@ -116,3 +127,44 @@ async def db_session(migrated_database: URL) -> AsyncIterator[AsyncSession]:
 def factory(db_session: AsyncSession) -> Factory:
     """테스트 행 생성기. db_session 안에서 만들므로 테스트가 끝나면 함께 롤백된다."""
     return Factory(db_session)
+
+
+@pytest.fixture
+def now() -> datetime:
+    """API가 현재 시각으로 받는 고정 시각. 테스트에서 다른 값으로 바꿔 경계를 재현한다."""
+    return T0
+
+
+@pytest.fixture
+def app(db_session: AsyncSession, now: datetime) -> FastAPI:
+    """테스트용 앱. 요청은 db_session(롤백됨)과 고정 시각을 쓴다.
+
+    로컬 .env 값과 관계없이 배포와 같은 설정(Secure 쿠키, 허용 Origin)으로 검사한다.
+    테스트에서 overrides를 더 바꿀 수 있다.
+    """
+    app = create_app()
+
+    async def override_session() -> AsyncSession:
+        return db_session
+
+    settings = get_settings().model_copy(
+        update={"session_cookie_secure": True, "allowed_origin": TEST_ORIGIN}
+    )
+    app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_now] = lambda: now
+    app.dependency_overrides[get_settings] = lambda: settings
+    return app
+
+
+@pytest.fixture
+async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
+    """실제 앱을 호출하는 HTTP 클라이언트. 받은 쿠키를 저장해 다음 요청에 보낸다.
+
+    브라우저처럼 허용된 Origin 헤더를 기본으로 붙인다.
+    """
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url=TEST_BASE_URL,
+        headers={"Origin": TEST_ORIGIN},
+    ) as client:
+        yield client

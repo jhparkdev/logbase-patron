@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     test_database_url: SecretStr | None = None
     # 실행 환경 이름. "production"이면 seed 같은 위험한 명령에 확인 옵션을 요구한다.
     app_env: str = "development"
+    # 세션 쿠키를 HTTPS에서만 보낸다. dev·운영 배포 모두 HTTPS라 기본값은 켬이고,
+    # http로 띄우는 로컬 개발에서만 .env에 SESSION_COOKIE_SECURE=false로 끈다.
+    session_cookie_secure: bool = True
+    # 상태를 바꾸는 요청(POST 등)을 받을 화면 주소. 예: http://localhost:5173 (끝에 / 없음)
+    # 비어 있으면 그런 요청을 모두 거절한다.
+    allowed_origin: str | None = None
 
 
 @lru_cache

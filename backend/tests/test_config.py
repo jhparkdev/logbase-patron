@@ -21,6 +21,8 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
     monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("SESSION_COOKIE_SECURE", raising=False)
+    monkeypatch.delenv("ALLOWED_ORIGIN", raising=False)
     return monkeypatch
 
 
@@ -37,6 +39,37 @@ def test_reads_app_env_from_environment(clean_env: pytest.MonkeyPatch) -> None:
     clean_env.setenv("APP_ENV", "production")
 
     assert Settings(_env_file=None).app_env == "production"
+
+
+def test_session_cookie_is_secure_by_default(clean_env: pytest.MonkeyPatch) -> None:
+    """설정을 빠뜨린 배포 환경에서도 세션 쿠키가 HTTPS로만 전송되게 기본값은 켬이다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+
+    assert Settings(_env_file=None).session_cookie_secure is True
+
+
+def test_session_cookie_secure_can_be_turned_off(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """http로 띄우는 로컬 개발 환경에서는 끌 수 있다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("SESSION_COOKIE_SECURE", "false")
+
+    assert Settings(_env_file=None).session_cookie_secure is False
+
+
+def test_allowed_origin_is_empty_by_default(clean_env: pytest.MonkeyPatch) -> None:
+    """값이 없으면 None이다. 이때 상태를 바꾸는 요청은 모두 거절된다(app/api/deps.py)."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+
+    assert Settings(_env_file=None).allowed_origin is None
+
+
+def test_reads_allowed_origin_from_environment(clean_env: pytest.MonkeyPatch) -> None:
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("ALLOWED_ORIGIN", "http://localhost:5173")
+
+    assert Settings(_env_file=None).allowed_origin == "http://localhost:5173"
 
 
 def test_reads_database_url_from_environment(clean_env: pytest.MonkeyPatch) -> None:
