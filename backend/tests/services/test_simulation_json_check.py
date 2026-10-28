@@ -1,23 +1,10 @@
 import pytest
 
-from app.services.simulation_json_check import (
-    JsonCheck,
-    ValidationStatus,
-    check_json_output,
-)
+from app.models import ValidationStatus
+from app.services.simulation_json_check import JsonCheck, check_json_output
 
 V = ValidationStatus
 SCHEMA = {"type": "object", "required": ["title", "price"]}
-
-
-def test_status_values_match_the_db_enum() -> None:
-    # models.py 의 ValidationStatus 와 값이 같아야 DB 제약에 걸리지 않는다
-    assert {status.value for status in ValidationStatus} == {
-        "PASSED",
-        "FAILED",
-        "NOT_APPLICABLE",
-        "NOT_EXECUTED",
-    }
 
 
 @pytest.mark.parametrize("text", [None, "", "일반 문장 응답", '{"title": "a"}'])

@@ -1,7 +1,7 @@
 import pytest
 
+from app.models import RequestStatus
 from app.services.simulation_cancel import CancelDecision, decide_request_cancel
-from app.services.simulation_status import RequestStatus
 
 R = RequestStatus
 D = CancelDecision

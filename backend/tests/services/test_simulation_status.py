@@ -1,10 +1,7 @@
 import pytest
 
-from app.services.simulation_status import (
-    RequestStatus,
-    SimulationStatus,
-    compute_overall_status,
-)
+from app.models import RequestStatus, SimulationStatus
+from app.services.simulation_status import compute_overall_status
 
 R = RequestStatus
 S = SimulationStatus

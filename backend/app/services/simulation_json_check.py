@@ -1,18 +1,11 @@
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import StrEnum
 
 from jsonschema.exceptions import ValidationError
 from jsonschema.validators import validator_for
 
-
-# TODO: models.py 의 ValidationStatus 가 dev 에 들어오면 이 정의를 지우고 가져온다
-class ValidationStatus(StrEnum):
-    PASSED = "PASSED"
-    FAILED = "FAILED"
-    NOT_APPLICABLE = "NOT_APPLICABLE"
-    NOT_EXECUTED = "NOT_EXECUTED"
+from app.models import ValidationStatus
 
 
 @dataclass(frozen=True)

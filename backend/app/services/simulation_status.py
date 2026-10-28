@@ -1,24 +1,6 @@
 from collections.abc import Sequence
-from enum import StrEnum
 
-
-class RequestStatus(StrEnum):
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    SUCCESS = "SUCCESS"
-    FAILED = "FAILED"
-    TIMEOUT = "TIMEOUT"
-    CANCELLED = "CANCELLED"
-
-
-class SimulationStatus(StrEnum):
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    SUCCESS = "SUCCESS"
-    PARTIAL_SUCCESS = "PARTIAL_SUCCESS"
-    CANCELLED = "CANCELLED"
-    FAILED = "FAILED"
-
+from app.models import RequestStatus, SimulationStatus
 
 _NOT_FINISHED = {RequestStatus.PENDING, RequestStatus.RUNNING}
 

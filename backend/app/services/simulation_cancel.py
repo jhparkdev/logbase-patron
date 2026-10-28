@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from app.services.simulation_status import RequestStatus
+from app.models import RequestStatus
 
 
 class CancelDecision(StrEnum):
