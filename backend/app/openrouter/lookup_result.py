@@ -1,0 +1,75 @@
+"""비용이 없는 조회 함수들의 결과 모양.
+
+조회도 실패해도 예외를 던지지 않고 오류 유형이 담긴 결과를 돌려준다.
+"""
+
+from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.openrouter.errors import ErrorType
+
+
+@dataclass(frozen=True)
+class LookupResult[T]:
+    data: T | None = None
+    error_type: ErrorType | None = None
+    error_message: str | None = None
+    http_status: int | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.error_type is None
+
+
+class ModelInfo(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    model_id: str
+    # 모델 대표 가격(토큰당 USD). 실제 처리 업체의 단가와 다를 수 있다.
+    pricing: dict[str, Decimal]
+    input_modalities: list[str]
+    supported_parameters: list[str]
+    context_length: int | None = None
+    expiration_date: date | None = None
+
+
+class GenerationInfo(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    # 404이면 False. 아직 기록이 생기기 전일 수도 있어 오류로 보지 않는다.
+    found: bool
+    total_cost: Decimal | None = None
+    # 비용과 맞는 토큰 수. tokens_prompt 계열은 비용과 맞지 않아 쓰지 않는다.
+    native_tokens_prompt: int | None = None
+    native_tokens_completion: int | None = None
+    provider: str | None = None
+    cancelled: bool | None = None
+    provider_statuses: list[int] = Field(default_factory=list)
+
+
+class KeyUsage(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    usage: Decimal | None = None
+    usage_daily: Decimal | None = None
+    usage_weekly: Decimal | None = None
+    usage_monthly: Decimal | None = None
+    limit: Decimal | None = None
+    limit_remaining: Decimal | None = None
+
+
+class KeyInfo(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    name: str | None = None
+    disabled: bool | None = None
+    limit: Decimal | None = None
+    usage: Decimal | None = None
+    workspace_id: str | None = None
+    created_at: datetime | None = None
+    last_used_at: datetime | None = None
+    # 서버 안에서 Key를 구분할 때만 쓴다. 출력, 직렬화, 로그에 나오지 않게 막아 둔다.
+    key_hash: str | None = Field(default=None, repr=False, exclude=True)

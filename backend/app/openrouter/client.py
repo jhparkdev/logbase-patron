@@ -1,12 +1,14 @@
 """OpenRouter를 부르는 유일한 곳.
 
 call_model은 실패해도 예외를 던지지 않고 실패 결과(CallResult)를 돌려준다.
+조회 함수(list_models 등)도 오류 유형이 담긴 LookupResult를 돌려준다.
 """
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from http import HTTPStatus
 from typing import Any
 from uuid import UUID
 
@@ -14,17 +16,39 @@ import httpx
 
 from app.openrouter.cancellation import run_unless_cancelled
 from app.openrouter.errors import (
+    USER_MESSAGES,
     ErrorType,
     classify_http_error,
     get_failed_routing_step,
 )
 from app.openrouter.failures import build_cancelled_result, build_failure_result
+from app.openrouter.lookup_parsing import (
+    parse_generation,
+    parse_key_usage,
+    parse_keys,
+    parse_models,
+)
+from app.openrouter.lookup_result import (
+    GenerationInfo,
+    KeyInfo,
+    KeyUsage,
+    LookupResult,
+    ModelInfo,
+)
 from app.openrouter.parsing import build_result_from_chat_body, loads_decimal
 from app.openrouter.request import build_request_body
 from app.openrouter.result import CallResult, CallStatus
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 CHAT_COMPLETIONS_URL = f"{OPENROUTER_BASE_URL}/chat/completions"
+
+# 비용이 없는 조회는 네트워크 오류일 때만 다시 보낸다.
+# 횟수와 간격은 아직 정해지지 않아(U-08) 임시 값이다.
+LOOKUP_MAX_ATTEMPTS = 3
+LOOKUP_RETRY_DELAY_SECONDS = 0.5
+LOOKUP_TIMEOUT_SECONDS = 10.0
+
+MANAGEMENT_KEY_MISSING_MESSAGE = "Management Key가 설정되어 있지 않습니다."
 
 logger = logging.getLogger(__name__)
 
@@ -41,17 +65,48 @@ def _read_json(response: httpx.Response) -> Any:
         return None
 
 
+def _lookup_failure(
+    error_type: ErrorType, http_status: int | None = None
+) -> LookupResult[Any]:
+    return LookupResult(
+        error_type=error_type,
+        error_message=USER_MESSAGES[error_type],
+        http_status=http_status,
+    )
+
+
+def _convert[T](
+    fetched: LookupResult[dict[str, Any]],
+    parser: Callable[[dict[str, Any]], T | None],
+) -> LookupResult[T]:
+    """받아 온 JSON을 결과 모양으로 바꾼다. 실패는 그대로 넘기고, 구조가 틀리면 INVALID_RESPONSE다."""
+    if fetched.data is None:
+        return LookupResult(
+            error_type=fetched.error_type,
+            error_message=fetched.error_message,
+            http_status=fetched.http_status,
+        )
+    parsed = parser(fetched.data)
+    if parsed is None:
+        return _lookup_failure(ErrorType.INVALID_RESPONSE, fetched.http_status)
+    return LookupResult(data=parsed, http_status=fetched.http_status)
+
+
 class OpenRouterClient:
     def __init__(
         self,
         *,
         http_client: httpx.AsyncClient,
         api_key: str,
+        management_key: str | None = None,
         clock: Callable[[], datetime] = utc_now,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._http_client = http_client
         self._api_key = api_key
+        self._management_key = management_key
         self._clock = clock
+        self._sleep = sleep
 
     async def call_model(
         self,
@@ -94,6 +149,97 @@ class OpenRouterClient:
             "openrouter call finished request_id=%s status=%s http_status=%s",
             request_id,
             result.status,
+            result.http_status,
+        )
+        return result
+
+    async def list_models(self) -> LookupResult[list[ModelInfo]]:
+        """모델 목록과 가격을 가져온다. 공개 엔드포인트라 Key를 보내지 않는다."""
+        fetched = await self._get_json("/models", token=None)
+        return _convert(fetched, parse_models)
+
+    async def get_generation(self, generation_id: str) -> LookupResult[GenerationInfo]:
+        """호출 하나의 실제 비용을 조회한다. 비용 대조에 쓴다."""
+        fetched = await self._get_json(
+            "/generation", token=self._api_key, params={"id": generation_id}
+        )
+        if fetched.http_status == HTTPStatus.NOT_FOUND:
+            # 404는 오류가 아니라 "아직 없거나 없는 호출"이다.
+            # 시간을 두고 다시 조회할지는 대조 작업이 정한다.
+            return LookupResult(
+                data=GenerationInfo(found=False), http_status=fetched.http_status
+            )
+        return _convert(fetched, parse_generation)
+
+    async def get_key_usage(self) -> LookupResult[KeyUsage]:
+        """호출에 쓰는 Key의 사용량과 한도를 조회한다."""
+        fetched = await self._get_json("/key", token=self._api_key)
+        return _convert(fetched, parse_key_usage)
+
+    async def list_keys(self, workspace_id: str) -> LookupResult[list[KeyInfo]]:
+        """workspace의 Key 목록을 조회한다. Management Key가 필요하다."""
+        if self._management_key is None:
+            return LookupResult(
+                error_type=ErrorType.AUTH_ERROR,
+                error_message=MANAGEMENT_KEY_MISSING_MESSAGE,
+            )
+        fetched = await self._get_json(
+            "/keys",
+            token=self._management_key,
+            params={"workspace_id": workspace_id},
+        )
+        return _convert(fetched, parse_keys)
+
+    async def _get_json(
+        self,
+        path: str,
+        *,
+        token: str | None,
+        params: dict[str, str] | None = None,
+    ) -> LookupResult[dict[str, Any]]:
+        """GET 조회를 보낸다. 네트워크 오류일 때만 다시 보낸다."""
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                response = await self._http_client.get(
+                    f"{OPENROUTER_BASE_URL}{path}",
+                    params=params,
+                    headers=headers,
+                    timeout=LOOKUP_TIMEOUT_SECONDS,
+                )
+                break
+            except httpx.RequestError as error:
+                if attempt >= LOOKUP_MAX_ATTEMPTS:
+                    error_type = (
+                        ErrorType.TIMEOUT_ERROR
+                        if isinstance(error, httpx.TimeoutException)
+                        else ErrorType.NETWORK_ERROR
+                    )
+                    return self._finish_lookup(path, _lookup_failure(error_type))
+                await self._sleep(LOOKUP_RETRY_DELAY_SECONDS)
+
+        body = _read_json(response)
+        if not response.is_success:
+            error_body = body if isinstance(body, dict) else None
+            error_type = classify_http_error(response.status_code, error_body)
+            result = _lookup_failure(error_type, response.status_code)
+        elif isinstance(body, dict):
+            result = LookupResult(data=body, http_status=response.status_code)
+        else:
+            result = _lookup_failure(ErrorType.INVALID_RESPONSE, response.status_code)
+        return self._finish_lookup(path, result)
+
+    def _finish_lookup(
+        self, path: str, result: LookupResult[dict[str, Any]]
+    ) -> LookupResult[dict[str, Any]]:
+        # 로그에는 경로와 결과만 남긴다. Key와 조회 값은 쓰지 않는다.
+        logger.info(
+            "openrouter lookup path=%s ok=%s http_status=%s",
+            path,
+            result.ok,
             result.http_status,
         )
         return result

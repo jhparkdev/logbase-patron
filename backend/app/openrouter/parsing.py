@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Any
 
 from app.openrouter.errors import USER_MESSAGES, ErrorType
+from app.openrouter.json_access import get_dict, get_int, get_number, get_str
 from app.openrouter.result import (
     CallResult,
     CallStatus,
@@ -23,28 +24,6 @@ def loads_decimal(text: str) -> Any:
     return json.loads(text, parse_float=Decimal)
 
 
-def _get_dict(parent: dict[str, Any], key: str) -> dict[str, Any]:
-    value = parent.get(key)
-    if isinstance(value, dict):
-        return value
-    return {}
-
-
-def _get_str(parent: dict[str, Any], key: str) -> str | None:
-    value = parent.get(key)
-    if isinstance(value, str):
-        return value
-    return None
-
-
-def _get_int(parent: dict[str, Any], key: str) -> int | None:
-    value = parent.get(key)
-    # True/False는 파이썬에서 int이므로 따로 걸러낸다.
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
-
-
 def _get_first_choice(body: dict[str, Any]) -> dict[str, Any]:
     choices = body.get("choices")
     if isinstance(choices, list) and choices and isinstance(choices[0], dict):
@@ -54,16 +33,10 @@ def _get_first_choice(body: dict[str, Any]) -> dict[str, Any]:
 
 def _get_cost(usage: dict[str, Any]) -> Decimal | None:
     """usage.cost를 Decimal로 돌려준다. 없거나 믿을 수 없으면 None."""
-    cost = usage.get("cost")
-    if isinstance(cost, bool) or not isinstance(cost, (int, float, Decimal)):
+    cost = get_number(usage, "cost")
+    if cost is None or cost < 0:
         return None
-    # float이 와도 문자열을 거쳐 Decimal로 바꾼다. float로 계산하지는 않는다.
-    if isinstance(cost, float):
-        cost = Decimal(str(cost))
-    value = Decimal(cost)
-    if value < 0:
-        return None
-    return value
+    return cost
 
 
 def build_result_from_chat_body(
@@ -76,30 +49,30 @@ def build_result_from_chat_body(
 ) -> CallResult:
     """HTTP 200으로 온 응답 본문을 CallResult로 바꾼다."""
     choice = _get_first_choice(body)
-    message = _get_dict(choice, "message")
-    usage = _get_dict(body, "usage")
-    prompt_details = _get_dict(usage, "prompt_tokens_details")
-    completion_details = _get_dict(usage, "completion_tokens_details")
+    message = get_dict(choice, "message")
+    usage = get_dict(body, "usage")
+    prompt_details = get_dict(usage, "prompt_tokens_details")
+    completion_details = get_dict(usage, "completion_tokens_details")
 
-    content = _get_str(message, "content")
-    actual_model = _get_str(body, "model")
-    prompt_tokens = _get_int(usage, "prompt_tokens")
-    completion_tokens = _get_int(usage, "completion_tokens")
+    content = get_str(message, "content")
+    actual_model = get_str(body, "model")
+    prompt_tokens = get_int(usage, "prompt_tokens")
+    completion_tokens = get_int(usage, "completion_tokens")
 
     common_fields: dict[str, Any] = {
         "http_status": http_status,
         "content": content,
-        "finish_reason": _get_str(choice, "finish_reason"),
+        "finish_reason": get_str(choice, "finish_reason"),
         "requested_model": requested_model,
         "actual_model": actual_model,
-        "provider": _get_str(body, "provider"),
-        "generation_id": _get_str(body, "id"),
+        "provider": get_str(body, "provider"),
+        "generation_id": get_str(body, "id"),
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
-        "total_tokens": _get_int(usage, "total_tokens"),
-        "cached_tokens": _get_int(prompt_details, "cached_tokens"),
-        "cache_write_tokens": _get_int(prompt_details, "cache_write_tokens"),
-        "reasoning_tokens": _get_int(completion_details, "reasoning_tokens"),
+        "total_tokens": get_int(usage, "total_tokens"),
+        "cached_tokens": get_int(prompt_details, "cached_tokens"),
+        "cache_write_tokens": get_int(prompt_details, "cache_write_tokens"),
+        "reasoning_tokens": get_int(completion_details, "reasoning_tokens"),
         "raw_response": body,
         "started_at": started_at,
         "finished_at": finished_at,
