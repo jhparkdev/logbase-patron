@@ -1,4 +1,5 @@
 from typing import Annotated, Self
+from uuid import UUID
 
 from jsonschema.exceptions import SchemaError
 from jsonschema.validators import validator_for
@@ -91,6 +92,8 @@ class SimulationCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     test_type: TestType
+    # 재실행이면 원본 실행의 ID. 원본이 실제로 있는지는 DB 가 필요해 서비스가 확인한다
+    rerun_of_simulation_id: UUID | None = None
     scenario_id: int | None = None  # test_scenarios 표의 scenario_id
     # 실행 당시 원문이라 다듬지 않는다. 공백뿐인 값만 거절한다(\S = 공백이 아닌 글자 하나 이상)
     prompt_text: Annotated[str, Field(pattern=r"\S")]

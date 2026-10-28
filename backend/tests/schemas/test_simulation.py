@@ -244,6 +244,26 @@ def test_routing_policy_rejects_unknown_keys() -> None:
         SimulationCreateRequest(**create_body(routing_policy={"order": ["DeepInfra"]}))
 
 
+PAST_RUN_ID = "0192a3c4-0000-7000-8000-000000000001"
+
+
+def test_request_is_not_a_rerun_by_default() -> None:
+    assert SimulationCreateRequest(**create_body()).rerun_of_simulation_id is None
+
+
+def test_rerun_request_names_the_original_run() -> None:
+    request = SimulationCreateRequest(**create_body(rerun_of_simulation_id=PAST_RUN_ID))
+
+    assert str(request.rerun_of_simulation_id) == PAST_RUN_ID
+
+
+@pytest.mark.parametrize("value", ["", "not-a-uuid", 12345])
+def test_rerun_of_must_be_a_run_id(value: object) -> None:
+    # 번호 형식이 틀린 값이 DB 까지 가서 500 이 되지 않도록 입구에서 막는다
+    with pytest.raises(ValidationError):
+        SimulationCreateRequest(**create_body(rerun_of_simulation_id=value))
+
+
 def test_openapi_lists_test_type_values_and_forbids_extra_fields() -> None:
     # 프론트엔드는 test_type 값을 따로 외우지 않고 OpenAPI 문서에서 받는다
     schema = SimulationCreateRequest.model_json_schema()
