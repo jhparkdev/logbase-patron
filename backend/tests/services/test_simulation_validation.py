@@ -90,3 +90,9 @@ def test_duplicate_is_found_even_at_the_upper_limit() -> None:
     with pytest.raises(DuplicateModelSelectionError) as error:
         validate_model_selection(selections)
     assert error.value.selection == ModelSelection(CLAUDE, "anthropic")
+
+
+def test_selection_fields_are_named_after_the_db_columns() -> None:
+    # simulation_results 의 model_id, execution_provider 와 이름이 같아야 한다
+    selection = ModelSelection(GPT, "openai")
+    assert (selection.model_id, selection.execution_provider) == (GPT, "openai")

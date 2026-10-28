@@ -3,12 +3,15 @@ from enum import StrEnum
 
 
 class SortColumn(StrEnum):
-    STARTED_AT = "started_at"
+    """이력 목록의 정렬 열. 값은 v_simulation_summary 의 열 이름을 따른다."""
+
+    REQUESTED_AT = "requested_at"
     SIMULATION_ID = "simulation_id"
-    SCENARIO = "scenario"
+    SCENARIO_CODE = "scenario_code"
     MODEL_COUNT = "model_count"
-    OVERALL_STATUS = "overall_status"
-    COST_STATUS = "cost_status"
+    STATUS = "status"
+    COST_CHECK_STATUS = "cost_check_status"
+    # 뷰에는 확정·추정 비용이 따로 있고 합계 열이 없어서 DB 담당 확인 전까지 임시 이름이다
     TOTAL_COST = "total_cost"
 
 
@@ -17,7 +20,7 @@ class SortDirection(StrEnum):
     DESC = "desc"
 
 
-DEFAULT_SORT_COLUMN = SortColumn.STARTED_AT
+DEFAULT_SORT_COLUMN = SortColumn.REQUESTED_AT
 DEFAULT_SORT_DIRECTION = SortDirection.DESC
 
 
