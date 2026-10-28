@@ -1,1 +1,30 @@
 @import "tailwindcss";
+
+/* 토큰별 쓰임은 docs/design/tokens.md. 기본 색 팔레트를 꺼서 아래 토큰만 쓰게 한다. */
+@theme {
+  --color-*: initial;
+
+  --color-white: #ffffff;
+  --color-surface: #f8f9ff;
+  --color-field: #eff4ff;
+  --color-line: #e5eeff;
+  --color-line-strong: #dce9ff;
+
+  --color-ink: #0b1c30;
+  --color-ink-muted: #3f4945;
+  --color-ink-subtle: #707975;
+
+  --color-brand-strong: #00342b;
+  --color-brand: #006c49;
+  --color-brand-soft: #6ffbbe;
+  --color-brand-ink: #002113;
+  --color-brand-muted: #94d3c1;
+
+  --color-estimate: #00476e;
+  --color-warning: #92400e;
+  --color-warning-soft: #fef3c7;
+  --color-warning-surface: #fffbeb;
+
+  --color-chart-jobs: #2563eb;
+  --color-chart-estimate: #8b5cf6;
+}
