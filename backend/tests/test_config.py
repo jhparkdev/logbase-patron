@@ -20,7 +20,23 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     """
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
+    monkeypatch.delenv("APP_ENV", raising=False)
     return monkeypatch
+
+
+def test_app_env_defaults_to_development(clean_env: pytest.MonkeyPatch) -> None:
+    """APP_ENV가 없으면 개발 환경으로 본다(운영 보호 장치가 운영에서만 걸리도록)."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+
+    assert Settings(_env_file=None).app_env == "development"
+
+
+def test_reads_app_env_from_environment(clean_env: pytest.MonkeyPatch) -> None:
+    """APP_ENV 환경변수가 app_env 필드로 들어온다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("APP_ENV", "production")
+
+    assert Settings(_env_file=None).app_env == "production"
 
 
 def test_reads_database_url_from_environment(clean_env: pytest.MonkeyPatch) -> None:

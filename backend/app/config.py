@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     database_url: SecretStr
     # 테스트 전용 patron_test DB (테스트에서만 사용)
     test_database_url: SecretStr | None = None
+    # 실행 환경 이름. "production"이면 seed 같은 위험한 명령에 확인 옵션을 요구한다.
+    app_env: str = "development"
 
 
 @lru_cache
