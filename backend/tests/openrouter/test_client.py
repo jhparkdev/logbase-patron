@@ -1,6 +1,7 @@
+import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -11,6 +12,7 @@ import pytest
 
 from app.openrouter.client import CHAT_COMPLETIONS_URL, OpenRouterClient
 from app.openrouter.errors import USER_MESSAGES, ErrorType
+from app.openrouter.failures import CANCELLED_MESSAGE
 from app.openrouter.result import CallResult, CallStatus, CostStatus
 
 FAKE_API_KEY = "sk-or-v1-fake-key-for-tests"
@@ -30,8 +32,11 @@ SUCCESS_BODY_TEXT = json.dumps(
     }
 )
 
+HANG_SECONDS = 3600
+
 Handler = Callable[[httpx.Request], httpx.Response]
-ClientFactory = Callable[[Handler], OpenRouterClient]
+AsyncHandler = Callable[[httpx.Request], Awaitable[httpx.Response]]
+ClientFactory = Callable[[Handler | AsyncHandler], OpenRouterClient]
 
 
 @pytest.fixture
@@ -39,7 +44,7 @@ async def make_client() -> AsyncIterator[ClientFactory]:
     """가짜 서버(MockTransport)에 연결된 OpenRouterClient를 만들어 주는 함수."""
     http_clients: list[httpx.AsyncClient] = []
 
-    def factory(handler: Handler) -> OpenRouterClient:
+    def factory(handler: Handler | AsyncHandler) -> OpenRouterClient:
         http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
         http_clients.append(http_client)
         times = iter([STARTED_AT, FINISHED_AT])
@@ -342,5 +347,120 @@ async def test_로그에는_request_id와_결과_상태만_남긴다(
 
     assert str(REQUEST_ID) in caplog.text
     assert "SUCCESS" in caplog.text
+    assert SECRET_PROMPT not in caplog.text
+    assert FAKE_API_KEY not in caplog.text
+
+
+# ---------------------------------------------------------------
+# 취소
+# ---------------------------------------------------------------
+class HangingServer:
+    """응답을 주지 않고 기다리는 가짜 서버. 연결이 끊기면 그 사실을 기록한다."""
+
+    def __init__(self) -> None:
+        self.request_received = asyncio.Event()
+        self.was_cancelled = False
+        self.call_count = 0
+
+    async def handler(self, request: httpx.Request) -> httpx.Response:
+        self.call_count += 1
+        self.request_received.set()
+        try:
+            await asyncio.sleep(HANG_SECONDS)
+        except asyncio.CancelledError:
+            self.was_cancelled = True
+            raise
+        return respond_success(request)
+
+
+async def test_보내기_전에_취소_신호가_켜져_있으면_요청을_보내지_않는다(
+    make_client: ClientFactory,
+) -> None:
+    call_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        return respond_success(request)
+
+    cancel = asyncio.Event()
+    cancel.set()
+
+    result = await call(make_client(handler), cancel=cancel)
+
+    assert call_count == 0
+    assert result.status == CallStatus.CANCELLED
+    assert result.error_type is None
+    assert result.error_message == CANCELLED_MESSAGE
+    assert result.cost_status == CostStatus.UNKNOWN
+    assert result.cost_usd is None
+    assert result.http_status is None
+
+
+async def test_응답을_기다리는_중_취소하면_연결을_끊고_CANCELLED로_돌려준다(
+    make_client: ClientFactory,
+) -> None:
+    server = HangingServer()
+    cancel = asyncio.Event()
+    client = make_client(server.handler)
+
+    task = asyncio.create_task(call(client, cancel=cancel))
+    await server.request_received.wait()
+    cancel.set()
+    result = await task
+
+    assert result.status == CallStatus.CANCELLED
+    assert result.error_type is None
+    assert result.cost_status == CostStatus.UNKNOWN
+    assert result.cost_usd is None
+    assert result.latency_ms == 1500
+    assert server.was_cancelled is True
+    assert server.call_count == 1
+
+
+async def test_취소_신호가_켜진_순간에_응답이_도착했으면_받은_결과를_돌려준다(
+    make_client: ClientFactory,
+) -> None:
+    cancel = asyncio.Event()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        cancel.set()
+        return respond_success(request)
+
+    result = await call(make_client(handler), cancel=cancel)
+
+    assert result.status == CallStatus.SUCCESS
+    assert result.cost_status == CostStatus.CONFIRMED
+
+
+@pytest.mark.parametrize("use_cancel_signal", [False, True])
+async def test_바깥에서_작업이_취소되면_CancelledError를_삼키지_않는다(
+    make_client: ClientFactory, use_cancel_signal: bool
+) -> None:
+    server = HangingServer()
+    client = make_client(server.handler)
+    cancel = asyncio.Event() if use_cancel_signal else None
+
+    task = asyncio.create_task(call(client, cancel=cancel))
+    await server.request_received.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert server.was_cancelled is True
+
+
+async def test_취소되어도_로그에는_상태만_남는다(
+    make_client: ClientFactory, caplog: pytest.LogCaptureFixture
+) -> None:
+    cancel = asyncio.Event()
+    cancel.set()
+    caplog.set_level(logging.INFO)
+
+    await call(make_client(respond_success), cancel=cancel)
+
+    assert str(REQUEST_ID) in caplog.text
+    assert "CANCELLED" in caplog.text
     assert SECRET_PROMPT not in caplog.text
     assert FAKE_API_KEY not in caplog.text
