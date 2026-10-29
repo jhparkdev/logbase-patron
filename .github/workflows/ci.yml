@@ -1,10 +1,10 @@
 # 로컬과 CI가 같은 명령을 돌린다.
 name: CI
 
-# 지금은 feature 브랜치에서 dev로 가는 PR만 검사한다.
+# 기능 브랜치에서 dev로 가는 PR과, 운영 배포 전 dev에서 main으로 가는 PR을 검사한다.
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, main]
 
 # 같은 브랜치에 새 push가 오면 진행 중인 이전 실행을 취소한다.
 concurrency:
