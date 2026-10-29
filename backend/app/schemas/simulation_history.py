@@ -72,9 +72,8 @@ class RerunModel(BaseModel):
     # 현재 값. 실행 당시 이름·상태(결과 조회 응답)와 다를 수 있다
     current_display_name: str
     current_status: ModelStatus
-    selectable: (
-        bool  # 지금 일반 실행에서 고를 수 있는가. 판단은 is_model_selectable 이 한다
-    )
+    # 지금 일반 실행에서 고를 수 있는가. 판단은 is_model_selectable 이 한다
+    selectable: bool
 
 
 class SimulationRerunDraft(BaseModel):

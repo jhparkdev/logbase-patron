@@ -71,33 +71,35 @@ def check_json_output(
     )
 
 
+def _path(error: ValidationError) -> str:
+    """오류가 난 위치의 점 표기(예: "items.0.name"). 문서 전체에 대한 오류는 빈 문자열이다."""
+    return ".".join(str(part) for part in error.absolute_path)
+
+
+def _join_path(parent: str, name: str) -> str:
+    return f"{parent}.{name}" if parent else name
+
+
 def _missing_required_fields(errors: list[ValidationError]) -> list[str]:
     missing: set[str] = set()
     for error in errors:
         if error.validator != "required":
             continue
-        parent = [str(part) for part in error.absolute_path]
-        missing.update(
-            ".".join([*parent, name])
-            for name in error.validator_value
-            if name not in error.instance
-        )
+        # required 오류는 부모 객체에서 나므로 빠진 이름을 부모 경로 뒤에 붙인다
+        for name in error.validator_value:
+            if name not in error.instance:
+                missing.add(_join_path(_path(error), name))
     return sorted(missing)
 
 
 def _schema_errors(errors: list[ValidationError]) -> ValidationErrors | None:
     if not errors:
         return None
-    # 같은 응답이면 같은 순서로 저장되도록 (경로, 규칙) 순으로 정렬한 뒤 상한만큼 자른다
-    keyed = sorted(
-        (
-            ".".join(str(part) for part in error.absolute_path),
-            str(error.validator),
-            error.message,
-        )
-        for error in errors
+    # 같은 응답이면 같은 순서로 저장되도록 (경로, 규칙, 문구) 순으로 정렬한 뒤 상한만큼 자른다
+    ordered = sorted(
+        errors, key=lambda error: (_path(error), str(error.validator), error.message)
     )
-    return _validation_errors([_sentence(path, message) for path, _, message in keyed])
+    return _validation_errors([_sentence(_path(e), e.message) for e in ordered])
 
 
 def _sentence(path: str, message: str) -> str:

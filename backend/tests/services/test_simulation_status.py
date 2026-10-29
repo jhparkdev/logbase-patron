@@ -1,7 +1,7 @@
 import pytest
 
 from app.models import RequestStatus, SimulationStatus
-from app.services.simulation_status import compute_overall_status
+from app.services.simulation_status import compute_overall_status, is_run_finished
 
 R = RequestStatus
 S = SimulationStatus
@@ -40,3 +40,27 @@ def test_compute_overall_status(statuses: list[R], expected: S) -> None:
 def test_empty_statuses_is_rejected() -> None:
     with pytest.raises(ValueError):
         compute_overall_status([])
+
+
+@pytest.mark.parametrize("status", [S.PENDING, S.RUNNING])
+def test_a_run_with_open_slots_is_not_finished(status: S) -> None:
+    assert not is_run_finished(status)
+
+
+@pytest.mark.parametrize(
+    "status", [S.SUCCESS, S.PARTIAL_SUCCESS, S.FAILED, S.CANCELLED]
+)
+def test_every_other_status_means_the_run_is_finished(status: S) -> None:
+    assert is_run_finished(status)
+
+
+def test_every_run_status_is_classified() -> None:
+    # 상태 값이 새로 생기면 끝난 것인지 아닌지 이 테스트에서 다시 정하게 한다
+    assert {
+        S.PENDING,
+        S.RUNNING,
+        S.SUCCESS,
+        S.PARTIAL_SUCCESS,
+        S.FAILED,
+        S.CANCELLED,
+    } == set(S)

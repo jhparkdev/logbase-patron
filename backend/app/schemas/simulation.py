@@ -87,6 +87,12 @@ MAX_TOKENS_LIMIT = 4096
 MIN_TEMPERATURE = 0.0
 MAX_TEMPERATURE = 2.0
 
+Temperature = Annotated[
+    float, Field(ge=MIN_TEMPERATURE, le=MAX_TEMPERATURE, allow_inf_nan=False)
+]
+# strict: 512.5 나 "512" 처럼 정수가 아닌 값은 변환하지 않고 거절한다
+MaxTokens = Annotated[int, Field(strict=True, ge=1, le=MAX_TOKENS_LIMIT)]
+
 
 class ExecutionConfig(BaseModel):
     """모델 실행 설정. 시나리오 기본 실행 설정(test_scenarios.default_execution_config)과 같은 항목이다.
@@ -97,16 +103,8 @@ class ExecutionConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    temperature: (
-        Annotated[
-            float, Field(ge=MIN_TEMPERATURE, le=MAX_TEMPERATURE, allow_inf_nan=False)
-        ]
-        | None
-    ) = None
-    # strict: 512.5 나 "512" 처럼 정수가 아닌 값은 변환하지 않고 거절한다
-    max_tokens: Annotated[int, Field(strict=True, ge=1, le=MAX_TOKENS_LIMIT)] | None = (
-        None
-    )
+    temperature: Temperature | None = None
+    max_tokens: MaxTokens | None = None
 
 
 class SimulationCreateRequest(BaseModel):

@@ -19,7 +19,7 @@ from app.services.simulation_ports import (
     SlotPlan,
 )
 from app.services.simulation_registry import CancelRegistry
-from app.services.simulation_status import compute_overall_status
+from app.services.simulation_status import compute_overall_status, is_run_finished
 
 # 로그에는 request_id 와 상태, 예외 종류만 남긴다. 프롬프트·응답·예외 메시지(키가 들어갈 수 있음)는 남기지 않는다
 logger = logging.getLogger(__name__)
@@ -58,35 +58,21 @@ async def run_simulation(
     heartbeat = asyncio.create_task(
         _beat(deps.store, job.simulation_id, deps.now, heartbeat_interval_seconds)
     )
+    slot_runs = [
+        _run_slot(slot, job, deps, _cancel_signal(events, slot), timeout_seconds)
+        for slot in job.slots
+    ]
     try:
-        outcomes = await asyncio.gather(
-            *(
-                _run_slot(
-                    slot,
-                    job,
-                    deps,
-                    events.get(slot.request_id) or asyncio.Event(),
-                    timeout_seconds,
-                )
-                for slot in job.slots
-            ),
-            return_exceptions=True,
-        )
+        # return_exceptions: 한 칸에서 예외가 나도 나머지 칸은 끝까지 돌린다
+        outcomes = await asyncio.gather(*slot_runs, return_exceptions=True)
     finally:
         heartbeat.cancel()
         with suppress(asyncio.CancelledError):
             await heartbeat
-
-    for slot, outcome in zip(job.slots, outcomes, strict=True):
-        if isinstance(outcome, BaseException):
-            logger.error(
-                "slot not recorded: request_id=%s error=%s",
-                slot.request_id,
-                type(outcome).__name__,
-            )
+    _log_unrecorded_slots(job, outcomes)
 
     overall = compute_overall_status(await deps.store.final_statuses(job.simulation_id))
-    if overall in (SimulationStatus.PENDING, SimulationStatus.RUNNING):
+    if not is_run_finished(overall):
         logger.warning(
             "simulation left for recovery: simulation_id=%s", job.simulation_id
         )
@@ -117,6 +103,25 @@ async def run_registered_simulation(
         )
     finally:
         registry.release(job.simulation_id)
+
+
+def _cancel_signal(
+    events: Mapping[uuid.UUID, asyncio.Event], slot: SlotPlan
+) -> asyncio.Event:
+    # 보관함 없이 돌릴 때는 아무도 켜지 않는 신호를 준다
+    return events.get(slot.request_id) or asyncio.Event()
+
+
+def _log_unrecorded_slots(
+    job: SimulationJob, outcomes: list[None | BaseException]
+) -> None:
+    for slot, outcome in zip(job.slots, outcomes, strict=True):
+        if isinstance(outcome, BaseException):
+            logger.error(
+                "slot not recorded: request_id=%s error=%s",
+                slot.request_id,
+                type(outcome).__name__,
+            )
 
 
 async def _run_slot(

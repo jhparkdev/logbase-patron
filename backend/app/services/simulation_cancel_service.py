@@ -7,9 +7,7 @@ from app.models import RequestStatus, SimulationStatus
 from app.services.simulation_cancel import CancelDecision, decide_request_cancel
 from app.services.simulation_ports import RequestRecorder, SimulationStore, SlotState
 from app.services.simulation_registry import CancelRegistry
-from app.services.simulation_status import compute_overall_status
-
-_RUN_NOT_FINISHED = {SimulationStatus.PENDING, SimulationStatus.RUNNING}
+from app.services.simulation_status import compute_overall_status, is_run_finished
 
 
 class SimulationNotFoundError(LookupError):
@@ -71,16 +69,23 @@ async def _cancel(
 
     after = await deps.store.list_slots(simulation_id) or []
     overall = compute_overall_status([slot.status for slot in after])
-    changed = any(o.decision == CancelDecision.CANCEL for o in outcomes)
-    # 실행을 끝난 것으로 기록하는 일은 보통 돌고 있는 실행 작업이 한다(마지막 호출이 취소로 끝난 뒤).
-    # 그 작업이 없는데 이번 취소로 모든 칸이 끝났다면 여기서 기록한다. 이미 끝난 실행은 다시 쓰지 않는다
-    if (
-        changed
-        and overall not in _RUN_NOT_FINISHED
-        and not deps.registry.is_active(simulation_id)
+    if _cancel_must_finish_run(
+        outcomes, overall, task_running=deps.registry.is_active(simulation_id)
     ):
         await deps.store.mark_finished(simulation_id, overall, deps.now())
     return CancelReport(simulation_id=simulation_id, status=overall, outcomes=outcomes)
+
+
+def _cancel_must_finish_run(
+    outcomes: list[SlotCancelOutcome], overall: SimulationStatus, *, task_running: bool
+) -> bool:
+    """이번 취소가 실행 종료까지 기록해야 하는가.
+
+    실행을 끝난 것으로 기록하는 일은 보통 돌고 있는 실행 작업이 한다(마지막 호출이 취소로 끝난 뒤).
+    그 작업이 없는데 이번 취소로 모든 칸이 끝났다면 여기서 기록한다. 이미 끝난 실행은 다시 쓰지 않는다.
+    """
+    changed_something = any(o.decision == CancelDecision.CANCEL for o in outcomes)
+    return changed_something and is_run_finished(overall) and not task_running
 
 
 async def _cancel_one(
@@ -88,16 +93,23 @@ async def _cancel_one(
 ) -> SlotCancelOutcome:
     decision = decide_request_cancel(slot.status)
     if decision != CancelDecision.CANCEL:
-        return SlotCancelOutcome(slot.request_id, slot.slot_no, decision, slot.status)
+        return _outcome(slot, decision, slot.status)
     if await deps.recorder.cancel_if_open(slot.request_id, deps.now()):
         deps.registry.signal(slot.request_id)  # 진행 중인 호출이 있으면 멈추게 한다
-        return SlotCancelOutcome(
-            slot.request_id, slot.slot_no, decision, RequestStatus.CANCELLED
-        )
+        return _outcome(slot, decision, RequestStatus.CANCELLED)
     # 목록을 읽은 뒤 취소하기 전에 다른 쪽이 먼저 끝냈다. 현재 상태를 다시 읽어 그대로 알린다
     current = await _current_status(simulation_id, slot, deps)
+    return _outcome(slot, decide_request_cancel(current), current)
+
+
+def _outcome(
+    slot: SlotState, decision: CancelDecision, status: RequestStatus
+) -> SlotCancelOutcome:
     return SlotCancelOutcome(
-        slot.request_id, slot.slot_no, decide_request_cancel(current), current
+        request_id=slot.request_id,
+        slot_no=slot.slot_no,
+        decision=decision,
+        status=status,
     )
 
 
