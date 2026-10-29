@@ -120,11 +120,8 @@ def test_minimal_custom_request_gets_safe_defaults() -> None:
     assert request.input_text is None
     assert request.json_schema is None
     assert request.execution_config == {}
-    # 비교 실행은 Fallback 을 끄고 요청 파라미터를 모두 지원하는 업체만 쓰는 것이 기본이다
-    assert request.routing_policy.model_dump() == {
-        "allow_fallbacks": False,
-        "require_parameters": True,
-    }
+    # 비교 실행은 Fallback 을 끄는 것이 기본이다 (기준서 7.3 Benchmark 원칙)
+    assert request.routing_policy.model_dump() == {"allow_fallbacks": False}
 
 
 def test_scenario_request_with_scenario_id_is_accepted() -> None:
@@ -222,20 +219,21 @@ def test_execution_config_accepts_json_values() -> None:
     )
 
 
-def test_routing_policy_accepts_what_the_database_stores() -> None:
-    # simulation_runs.routing_policy 의 실제 저장값(seed). 재실행 초안이 이 값을 그대로 돌려보낸다
-    policy = {"allow_fallbacks": False, "require_parameters": True}
-
-    request = SimulationCreateRequest(**create_body(routing_policy=policy))
-
-    assert request.routing_policy.model_dump() == policy
-
-
-@pytest.mark.parametrize("field", ["allow_fallbacks", "require_parameters"])
-def test_each_routing_option_can_be_switched(field: str) -> None:
+def test_fallback_can_be_switched_on_or_off() -> None:
     for value in (True, False):
-        request = SimulationCreateRequest(**create_body(routing_policy={field: value}))
-        assert getattr(request.routing_policy, field) is value
+        request = SimulationCreateRequest(
+            **create_body(routing_policy={"allow_fallbacks": value})
+        )
+        assert request.routing_policy.allow_fallbacks is value
+
+
+def test_require_parameters_is_decided_by_the_server_not_the_client() -> None:
+    # 요청한 설정을 모두 지원하는 업체만 쓰는 것은 비교 실행의 고정 조건이라 사용자가 끌 수 없다.
+    # 서버가 항상 켜서 호출하고 그 값을 기록한다
+    with pytest.raises(ValidationError, match="require_parameters"):
+        SimulationCreateRequest(
+            **create_body(routing_policy={"require_parameters": False})
+        )
 
 
 def test_routing_policy_rejects_unknown_keys() -> None:

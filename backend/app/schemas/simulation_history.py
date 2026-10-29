@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from app.models import ModelStatus, SimulationStatus, TestType
 from app.schemas.common import Page
-from app.schemas.simulation import RoutingPolicy
 from app.schemas.simulation_result import SimulationSummary
 from app.services.simulation_sort import (
     DEFAULT_SORT_COLUMN,
@@ -48,6 +47,16 @@ SimulationHistoryPage = Page[SimulationSummary]
 """이력 목록 응답. 항목은 진행·결과 조회의 요약과 같은 모양이라 합계 계산을 한 곳(뷰)에서만 한다."""
 
 
+class RerunRoutingPolicy(BaseModel):
+    """재실행 초안에 돌려주는 Provider 정책. 사용자가 고칠 값만 담는다.
+
+    과거 기록에는 서버가 적어 둔 값(require_parameters 등)이 더 들어 있으므로
+    모르는 키는 거절하지 않고 버린다(pydantic 기본 동작).
+    """
+
+    allow_fallbacks: bool
+
+
 class RerunBlockReason(StrEnum):
     """재실행을 시작할 수 없는 사유. 모델 상태는 사유가 아니다(교체·제외하면 되므로)."""
 
@@ -84,7 +93,7 @@ class SimulationRerunDraft(BaseModel):
     input_text: str | None
     json_schema: dict[str, JsonValue] | None
     execution_config: dict[str, JsonValue]
-    routing_policy: RoutingPolicy
+    routing_policy: RerunRoutingPolicy
     models: Annotated[
         list[RerunModel],
         Field(min_length=MIN_MODEL_COUNT, max_length=MAX_MODEL_COUNT),

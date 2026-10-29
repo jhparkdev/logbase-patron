@@ -188,7 +188,7 @@ def draft_body(**overrides: object) -> dict[str, object]:
         "input_text": None,
         "json_schema": {"type": "object", "required": ["title"]},
         "execution_config": {"temperature": 0.2},
-        "routing_policy": {"allow_fallbacks": False, "require_parameters": True},
+        "routing_policy": {"allow_fallbacks": False},
         "models": [
             rerun_model(model_id=1, execution_provider="DeepInfra"),
             rerun_model(model_id=2, execution_provider="DekaLLM"),
@@ -198,6 +198,15 @@ def draft_body(**overrides: object) -> dict[str, object]:
     }
     body.update(overrides)
     return body
+
+
+def test_draft_reads_the_routing_policy_the_database_stored() -> None:
+    # 과거 기록(seed)에는 서버가 적어 둔 require_parameters 가 들어 있다. 거절하지 않고, 사용자가 고칠 값만 돌려준다
+    stored = {"allow_fallbacks": False, "require_parameters": True}
+
+    draft = SimulationRerunDraft(**draft_body(routing_policy=stored))
+
+    assert draft.model_dump(mode="json")["routing_policy"] == {"allow_fallbacks": False}
 
 
 def test_draft_returns_the_past_inputs_unchanged() -> None:

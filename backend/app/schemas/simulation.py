@@ -69,17 +69,17 @@ JsonSchemaDocument = Annotated[
 
 
 class RoutingPolicy(BaseModel):
-    """실행 전체의 Provider 정책. 키 이름은 simulation_runs.routing_policy 에 저장되는 값과 같다.
+    """사용자가 정하는 Provider 정책. 키 이름은 simulation_runs.routing_policy 에 저장되는 값과 같다.
 
     업체 순서(order)는 모델 칸마다 execution_provider 로 정해지므로 여기에는 없다.
+    require_parameters(요청한 설정을 모두 지원하는 업체만 사용)는 비교 실행의 고정 조건이라
+    사용자가 정하지 않는다. 서버가 항상 켜서 호출하고 저장할 때 함께 기록한다.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     # 비교 조건이 바뀌지 않도록 선택한 업체가 안 될 때 다른 업체로 넘어가지 않는다
     allow_fallbacks: bool = False
-    # 요청한 파라미터를 모두 지원하는 업체만 쓴다. 꺼지면 미지원 파라미터가 조용히 무시된다
-    require_parameters: bool = True
 
 
 class SimulationCreateRequest(BaseModel):
