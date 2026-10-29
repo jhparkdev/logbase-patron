@@ -1,16 +1,13 @@
 """POST /api/simulations (S-03) 테스트. 접수·저장·작업 시작의 순서와 오류 응답을 확인한다."""
 
-import asyncio
 import uuid
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Any
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.simulation_deps import get_simulation_manager
@@ -25,99 +22,22 @@ from app.models import (
     SimulationStatus,
 )
 from app.services.simulation_manager import SimulationManager
-from app.services.simulation_ports import SimulationDeps, SimulationJob
+from app.services.simulation_ports import SimulationDeps
 from app.services.simulation_recorders import ScopedRequestRecorder
-from app.services.simulation_registry import CancelRegistry
 from app.services.simulation_scoped_store import ScopedSimulationStore
+from tests.api.simulation_helpers import (
+    CREATE,
+    FakeManager,
+    SerializedSessions,
+    count,
+    create_body,
+)
 from tests.api.test_auth import log_in, make_user
 from tests.conftest import TEST_BASE_URL, TEST_ORIGIN
 from tests.db_helpers import T0, Factory
 from tests.services.simulation_fakes import FakeCaller
 
-CREATE = "/api/simulations"
 TEMPLATE = "다음 상품 정보로 작성하세요.\n{{product_info}}"
-
-
-class FakeManager:
-    """작업을 실제로 돌리지 않고 어떤 작업이 언제 넘어왔는지만 기록한다."""
-
-    def __init__(self, events: list[str]) -> None:
-        self.events = events
-        self.jobs: list[SimulationJob] = []
-        self.registry = CancelRegistry()
-
-    def start(self, job: SimulationJob) -> None:
-        self.events.append("start")
-        self.jobs.append(job)
-
-
-class SerializedSessions:
-    """세션을 한 번에 하나만 열게 하는 sessionmaker 대역.
-
-    테스트는 연결 하나를 모든 세션이 나눠 쓴다. 운영처럼 연결을 따로 쓰면 필요 없는 장치이고,
-    모델 호출은 그대로 동시에 돈다. DB 에 쓰는 구간만 차례로 지나간다.
-    """
-
-    def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
-        self._sessions = sessions
-        self._lock = asyncio.Lock()
-
-    @asynccontextmanager
-    async def begin(self) -> AsyncIterator[AsyncSession]:
-        async with self._lock, self._sessions.begin() as session:
-            yield session
-
-
-@pytest.fixture
-def events() -> list[str]:
-    return []
-
-
-@pytest.fixture
-def manager(app: FastAPI, events: list[str]) -> FakeManager:
-    fake = FakeManager(events)
-    app.dependency_overrides[get_simulation_manager] = lambda: fake
-    return fake
-
-
-@pytest.fixture
-async def poc_setup(factory: Factory) -> None:
-    """시뮬레이터 호출을 귀속하는 PoC 프로젝트·서비스·Key."""
-    project = await factory.project(project_code="PRJ-PATRON-POC", project_type="POC")
-    await factory.service(service_code="PATRON_SIMULATOR", service_type="PATRON")
-    await factory.api_key(
-        project_id=project["project_id"], secret_ref="OPENROUTER_KEY_POC"
-    )
-
-
-@pytest.fixture
-async def models(factory: Factory) -> list[int]:
-    rows = [await factory.model(status="ACTIVE") for _ in range(2)]
-    return [row["model_id"] for row in rows]
-
-
-@pytest.fixture
-async def signed_in(client: AsyncClient, factory: Factory) -> dict[str, Any]:
-    user = await make_user(factory)
-    assert (await log_in(client, user["email"])).status_code == 200
-    return user
-
-
-def create_body(model_ids: list[int], **overrides: Any) -> dict[str, Any]:
-    body: dict[str, Any] = {
-        "test_type": "CUSTOM",
-        "prompt_text": "요약해 주세요",
-        "models": [
-            {"model_id": model_ids[0], "execution_provider": "DeepInfra"},
-            {"model_id": model_ids[1], "execution_provider": "DekaLLM"},
-        ],
-    }
-    body.update(overrides)
-    return body
-
-
-async def count(session: AsyncSession, table: Any) -> int:
-    return await session.scalar(select(func.count()).select_from(table)) or 0
 
 
 # --- 접수 성공 ---

@@ -6,10 +6,13 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from app.api.deps import NowDep
 from app.db import get_sessionmaker
+from app.services.simulation_cancel_service import CancelDeps
 from app.services.simulation_manager import SimulationManager
 from app.services.simulation_ports import ModelCaller, SimulationDeps
 from app.services.simulation_recorders import ScopedRequestRecorder
+from app.services.simulation_registry import CancelRegistry
 from app.services.simulation_scoped_store import ScopedSimulationStore
 
 
@@ -23,8 +26,14 @@ def get_model_caller() -> ModelCaller:
 
 
 @lru_cache
+def get_cancel_registry() -> CancelRegistry:
+    """돌고 있는 호출의 취소 신호 보관함. 프로세스에 하나만 두어 실행과 취소 요청이 같은 것을 본다."""
+    return CancelRegistry()
+
+
+@lru_cache
 def get_simulation_manager() -> SimulationManager:
-    """프로세스에 하나만 둔다. 돌고 있는 실행과 취소 신호가 한곳에 모여 있어야 취소 요청이 찾을 수 있다.
+    """프로세스에 하나만 둔다. 모델 호출기가 연결되어야 만들어진다.
 
     테스트는 app.dependency_overrides 로 바꿔 끼운다.
     """
@@ -35,8 +44,24 @@ def get_simulation_manager() -> SimulationManager:
             recorder=ScopedRequestRecorder(sessions),
             store=ScopedSimulationStore(sessions),
             now=lambda: datetime.now(UTC),
-        )
+        ),
+        registry=get_cancel_registry(),
+    )
+
+
+def get_cancel_deps(now: NowDep) -> CancelDeps:
+    """취소에 필요한 것. 모델 호출기와 무관해서 OpenRouter 가 연결되기 전에도 취소할 수 있다.
+
+    쓸 때마다 새 세션을 열고 commit 하므로, CANCELLED 가 확정된 뒤에 멈춤 신호가 켜진다.
+    """
+    sessions = get_sessionmaker()
+    return CancelDeps(
+        store=ScopedSimulationStore(sessions),
+        recorder=ScopedRequestRecorder(sessions),
+        registry=get_cancel_registry(),
+        now=lambda: now,
     )
 
 
 SimulationManagerDep = Annotated[SimulationManager, Depends(get_simulation_manager)]
+CancelDepsDep = Annotated[CancelDeps, Depends(get_cancel_deps)]

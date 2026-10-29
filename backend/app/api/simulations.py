@@ -1,16 +1,34 @@
 """비교 실행(시뮬레이터) 라우터. 입력 검증·인증·응답 변환만 하고 규칙은 services 에 맡긴다."""
 
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 
 from app.api.deps import CurrentUserDep, NowDep
-from app.api.simulation_deps import SimulationManagerDep
+from app.api.simulation_deps import CancelDepsDep, SimulationManagerDep
 from app.api.simulation_errors import SimulationRoute
 from app.db import SessionDep
 from app.schemas.simulation import SimulationAccepted, SimulationCreateRequest
+from app.schemas.simulation_cancel import (
+    RequestCancelOutcome,
+    SimulationCancelResponse,
+)
 from app.schemas.simulation_error import SimulationErrorResponse
+from app.schemas.simulation_history import (
+    SimulationHistoryList,
+    SimulationHistoryQuery,
+)
+from app.schemas.simulation_result import SimulationDetailResponse
+from app.services.simulation_cancel_service import (
+    CancelReport,
+    SimulationNotFoundError,
+    cancel_simulation,
+    cancel_slot,
+)
 from app.services.simulation_create import create_simulation
+from app.services.simulation_detail import get_simulation_detail
+from app.services.simulation_history import list_simulation_history
 from app.services.simulation_lookup import DbSimulationLookup
 from app.services.simulation_ports import IntakeDeps
 from app.services.simulation_recorders import SessionRequestRecorder
@@ -56,3 +74,70 @@ async def create_simulation_run(
     manager.start(job)
     response.headers["Location"] = f"{request.url.path.rstrip('/')}/{job.simulation_id}"
     return SimulationAccepted(simulation_id=job.simulation_id)
+
+
+@router.get(
+    "",
+    responses={
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": SimulationErrorResponse}
+    },
+)
+async def list_simulation_runs(
+    query: Annotated[SimulationHistoryQuery, Query()],
+    session: SessionDep,
+    now: NowDep,
+) -> SimulationHistoryList:
+    """이력 목록. 조건으로 거른 결과를 최신 순으로 상한까지 준다. 정렬·페이지는 화면이 한다."""
+    return await list_simulation_history(session, query, now)
+
+
+@router.get(
+    "/{simulation_id}",
+    responses={status.HTTP_404_NOT_FOUND: {"model": SimulationErrorResponse}},
+)
+async def read_simulation_run(
+    simulation_id: uuid.UUID, session: SessionDep
+) -> SimulationDetailResponse:
+    """진행·결과 조회. 화면이 끝날 때까지 5초마다 부른다. DB 만 읽으므로 비용이 들지 않는다."""
+    detail = await get_simulation_detail(session, simulation_id)
+    if detail is None:
+        raise SimulationNotFoundError
+    return detail
+
+
+@router.post(
+    "/{simulation_id}/cancel",
+    responses={status.HTTP_404_NOT_FOUND: {"model": SimulationErrorResponse}},
+)
+async def cancel_simulation_run(
+    simulation_id: uuid.UUID, deps: CancelDepsDep
+) -> SimulationCancelResponse:
+    """실행 전체를 취소한다. 이미 끝난 모델은 그대로 두고, 이미 끝난 실행도 오류가 아니라 현재 상태를 알려 준다."""
+    return _to_cancel_response(await cancel_simulation(simulation_id, deps))
+
+
+@router.post(
+    "/{simulation_id}/slots/{slot_no}/cancel",
+    responses={status.HTTP_404_NOT_FOUND: {"model": SimulationErrorResponse}},
+)
+async def cancel_simulation_slot(
+    simulation_id: uuid.UUID, slot_no: int, deps: CancelDepsDep
+) -> SimulationCancelResponse:
+    """모델 하나만 취소한다. 나머지 모델은 계속 돈다."""
+    return _to_cancel_response(await cancel_slot(simulation_id, slot_no, deps))
+
+
+def _to_cancel_response(report: CancelReport) -> SimulationCancelResponse:
+    return SimulationCancelResponse(
+        simulation_id=report.simulation_id,
+        status=report.status,
+        results=[
+            RequestCancelOutcome(
+                request_id=outcome.request_id,
+                slot_no=outcome.slot_no,
+                decision=outcome.decision,
+                status=outcome.status,
+            )
+            for outcome in report.outcomes
+        ],
+    )
