@@ -82,8 +82,10 @@ jobs:
         with:
           node-version: "24"  # frontend/package.json engines(>=24)와 맞춘다
 
-      - name: pnpm 활성화 (frontend/package.json의 packageManager 버전)
-        run: corepack enable pnpm
+      # corepack은 실행 위치(루트)의 package.json으로 버전을 정해 frontend의 버전을 못 읽는다.
+      # pnpm을 직접 설치하면 frontend/package.json의 devEngines를 보고 정확한 버전으로 바꿔 실행한다.
+      - name: pnpm 설치
+        run: npm install -g pnpm@12
 
       - name: 의존성 설치
         run: pnpm --dir frontend install
