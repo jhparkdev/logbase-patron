@@ -13,6 +13,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models import CostSource
 from tests.db_helpers import MONTH0, T0, Factory, expect_rejected
 
 # NUMERIC(30,18)에서 0보다 작은 가장 가까운 값
@@ -153,8 +154,20 @@ ALLOWED_VALUES: list[tuple[str, str, str, list[str], dict[str, Any], set[str]]] 
         "ai_requests",
         "ai_request",
         "cost_source",
-        ["API_RESPONSE", "GENERATION_LOOKUP", "PRICE_ESTIMATE", "MANUAL", "MOCK"],
-        {},
+        [
+            "API_RESPONSE",
+            "GENERATION_LOOKUP",
+            "PRICE_ESTIMATE",
+            "MANUAL",
+            "MOCK",
+            "NO_CHARGE",
+        ],
+        {
+            "status": "FAILED",
+            "error_type": "PROVIDER_ERROR",
+            "cost_status": "CONFIRMED",
+            "cost_usd": Decimal(0),
+        },
         set(),
     ),
     ("ai_requests", "ai_request", "data_source", ["MOCK", "LIVE"], {}, set()),
@@ -815,6 +828,76 @@ async def test_unknown_cost_is_null_not_zero(
         factory.ai_request(cost_status="CONFIRMED", cost_usd=None),
         constraint="ck_ai_requests_cost_unknown",
     )
+
+
+def test_cost_source_exposes_no_charge() -> None:
+    assert CostSource.NO_CHARGE.value == "NO_CHARGE"
+
+
+@pytest.mark.parametrize(
+    ("status", "error_type", "cost_status", "cost_usd", "accepted"),
+    [
+        ("FAILED", "PROVIDER_ERROR", "CONFIRMED", Decimal(0), True),
+        ("FAILED", "PROVIDER_ERROR", "CONFIRMED", -JUST_BELOW_ZERO, False),
+        ("FAILED", "PROVIDER_ERROR", "UNKNOWN", None, False),
+        ("FAILED", "PROVIDER_ERROR", "ESTIMATED", Decimal(0), False),
+        ("SUCCESS", None, "CONFIRMED", Decimal(0), False),
+        ("PENDING", None, "CONFIRMED", Decimal(0), False),
+        ("RUNNING", None, "CONFIRMED", Decimal(0), False),
+        ("TIMEOUT", "TIMEOUT_ERROR", "CONFIRMED", Decimal(0), False),
+        ("CANCELLED", None, "CONFIRMED", Decimal(0), False),
+    ],
+)
+async def test_no_charge_requires_failed_confirmed_zero_cost(
+    factory: Factory,
+    db_session: AsyncSession,
+    status: str,
+    error_type: str | None,
+    cost_status: str,
+    cost_usd: Decimal | None,
+    accepted: bool,
+) -> None:
+    """청구 없음의 근거는 실패·확정·0원일 때만 쓸 수 있다."""
+    price_id = (
+        (await factory.model_price())["price_id"]
+        if cost_status == "ESTIMATED"
+        else None
+    )
+    operation = factory.ai_request(
+        status=status,
+        error_type=error_type,
+        cost_status=cost_status,
+        cost_usd=cost_usd,
+        cost_source="NO_CHARGE",
+        price_id=price_id,
+    )
+    if accepted:
+        request = await operation
+        assert request["cost_source"] == "NO_CHARGE"
+        assert request["cost_usd"] == Decimal(0)
+    else:
+        await expect_rejected(
+            db_session, operation, constraint="ck_ai_requests_no_charge"
+        )
+
+
+@pytest.mark.parametrize(
+    ("status", "error_type"),
+    [("TIMEOUT", "TIMEOUT_ERROR"), ("FAILED", "NETWORK_ERROR"), ("CANCELLED", None)],
+)
+async def test_uncertain_failures_can_keep_unknown_cost(
+    factory: Factory, status: str, error_type: str | None
+) -> None:
+    """응답이 없는 실패는 나중에 청구될 수 있으므로 비용 미확인을 유지할 수 있다."""
+    request = await factory.ai_request(
+        status=status,
+        error_type=error_type,
+        cost_status="UNKNOWN",
+        cost_usd=None,
+        cost_source=None,
+    )
+    assert request["cost_status"] == "UNKNOWN"
+    assert request["cost_usd"] is None
 
 
 async def test_estimated_cost_requires_price(

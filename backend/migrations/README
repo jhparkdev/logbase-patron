@@ -1,1 +1,1 @@
-Generic single-database configuration with an async dbapi.
+비동기 DBAPI를 사용하는 단일 데이터베이스용 Alembic 설정입니다.
