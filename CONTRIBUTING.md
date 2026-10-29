@@ -175,7 +175,7 @@ pnpm --dir frontend add <패키지명>
 
 ## 11. 테스트 배치
 
-구현 파일마다 짝 테스트 파일을 둔다. 위치는 아래 규칙을 따른다.
+테스트할 구현 파일마다 짝 테스트 파일을 둔다. 위치는 아래 규칙을 따른다.
 - **백엔드**: 구현 코드(`backend/app/`)와 분리해 `backend/tests/`에 두고, 폴더 구조는 `app/`을 그대로 비춘다. 규칙: `app/<폴더>/<이름>.py` → `tests/<폴더>/test_<이름>.py`
   - 예: `backend/app/services/cost.py` → `backend/tests/services/test_cost.py`
   - 예: `backend/app/models.py` → `backend/tests/test_models.py`
@@ -187,6 +187,8 @@ pnpm --dir frontend add <패키지명>
   - 테스트용 DB(`patron_test`)는 `docker compose up -d db`로 띄운 컨테이너 안에 둔다.
   - 테스트마다 트랜잭션을 롤백해서 서로 격리한다.
 - **프론트엔드**: 같은 폴더에 둔다. 예: `frontend/src/shared/lib/format.ts` → `frontend/src/shared/lib/format.test.ts`. Vitest와 Testing Library로 테스트한다.
+  - 판단이나 동작이 있는 코드만 테스트한다(`lib` 함수, 값에 따라 표시가 달라지는 컴포넌트, 라우팅, 폼). 받은 값을 그대로 그리기만 하는 컴포넌트는 테스트를 두지 않는다. 기준은 `frontend/CLAUDE.md` 테스트 절이다.
+  - `routes/` 안의 테스트는 이름을 `-`로 시작한다(예: `-index.test.tsx`). 라우터가 화면으로 인식하지 않게 하기 위해서다.
 - **순수 함수 우선**: 다음은 DB 없이 단위 테스트할 수 있는 순수 함수로 만든다.
   - 비용 상태 결정
   - 예산 사용률·경고 상태 계산
