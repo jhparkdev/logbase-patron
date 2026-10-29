@@ -45,6 +45,13 @@ def test_finished_request_reports_its_own_final_status(status: str) -> None:
     assert outcome.status == status
 
 
+@pytest.mark.parametrize("status", ["PENDING", "RUNNING", "SUCCESS"])
+def test_cancel_must_show_cancelled_status(status: str) -> None:
+    # 취소하면 호출 이력이 즉시 CANCELLED 가 된다. "취소 중" 같은 중간 상태는 없다
+    with pytest.raises(ValidationError, match="CANCEL"):
+        RequestCancelOutcome(**outcome_body(decision="CANCEL", status=status))
+
+
 def test_already_cancelled_must_show_cancelled_status() -> None:
     with pytest.raises(ValidationError, match="ALREADY_CANCELLED"):
         RequestCancelOutcome(

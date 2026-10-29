@@ -23,7 +23,12 @@ class RequestCancelOutcome(BaseModel):
 
     @model_validator(mode="after")
     def _status_matches_decision(self) -> Self:
-        # CANCEL 직후 상태는 취소 방식(즉시 전이 여부)이 정해진 뒤에 제약한다
+        # 취소하면 호출 이력이 즉시 CANCELLED 가 된다. "취소 중" 같은 중간 상태는 없다
+        if (
+            self.decision == CancelDecision.CANCEL
+            and self.status != RequestStatus.CANCELLED
+        ):
+            raise ValueError("CANCEL 은 상태가 CANCELLED 여야 한다")
         if (
             self.decision == CancelDecision.ALREADY_CANCELLED
             and self.status != RequestStatus.CANCELLED
