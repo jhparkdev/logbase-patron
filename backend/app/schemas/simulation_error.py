@@ -9,6 +9,7 @@ class SimulationErrorCode(StrEnum):
     """시뮬레이터 API 의 오류 코드. 프론트엔드는 이 값으로 상황별로 분기한다."""
 
     INVALID_REQUEST = "INVALID_REQUEST"  # 형식·범위 검증 실패(모델 수, 중복 선택 등)
+    INPUT_REQUIRED = "INPUT_REQUIRED"  # 프롬프트 템플릿에 채울 입력 데이터가 없음
     SIMULATION_NOT_FOUND = "SIMULATION_NOT_FOUND"
     SLOT_NOT_FOUND = "SLOT_NOT_FOUND"
     RERUN_SOURCE_NOT_FOUND = "RERUN_SOURCE_NOT_FOUND"
@@ -34,6 +35,9 @@ class ErrorSpec:
 ERROR_SPECS: dict[SimulationErrorCode, ErrorSpec] = {
     SimulationErrorCode.INVALID_REQUEST: ErrorSpec(
         422, "요청 내용이 올바르지 않습니다. 입력값을 확인해 주세요."
+    ),
+    SimulationErrorCode.INPUT_REQUIRED: ErrorSpec(
+        422, "템플릿에 넣을 입력 데이터가 필요합니다. 입력 데이터를 입력해 주세요."
     ),
     SimulationErrorCode.SIMULATION_NOT_FOUND: ErrorSpec(
         404, "해당 비교 실행을 찾을 수 없습니다."

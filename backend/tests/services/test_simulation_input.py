@@ -3,6 +3,7 @@ import pytest
 from app.services.simulation_input import (
     HEARTBEAT_INTERVAL_SECONDS,
     SIMULATION_TIMEOUT_SECONDS,
+    InputRequiredError,
     build_messages,
     build_prompt_text,
     build_request_routing_policy,
@@ -10,6 +11,7 @@ from app.services.simulation_input import (
     compute_input_hash,
     resolve_execution_config,
     resolve_json_schema,
+    validate_input_present,
 )
 
 TEMPLATE = (
@@ -41,11 +43,32 @@ def test_input_is_appended_when_the_prompt_has_no_placeholder() -> None:
     )
 
 
-@pytest.mark.parametrize("input_text", [None, ""])
+@pytest.mark.parametrize("input_text", [None, "", "  \n"])
 def test_prompt_is_sent_as_is_without_input(input_text: str | None) -> None:
     # 입력 데이터는 선택사항이다. 템플릿 자리가 남아 있어도 사용자가 쓴 글을 바꾸지 않는다
     assert build_prompt_text(TEMPLATE, input_text) == TEMPLATE
     assert build_prompt_text("그냥 질문", input_text) == "그냥 질문"
+
+
+# --- 입력이 필요한 템플릿 (요청 접수 때 거절) ---
+
+
+@pytest.mark.parametrize("input_text", [None, "", "   ", "\n\t"])
+def test_template_with_a_placeholder_needs_input(input_text: str | None) -> None:
+    # 자리를 채우지 못한 채 "{{product_info}}" 라는 글이 모델에 가지 않도록 접수 때 막는다
+    with pytest.raises(InputRequiredError):
+        validate_input_present(TEMPLATE, input_text)
+
+
+def test_template_with_input_is_accepted() -> None:
+    validate_input_present(TEMPLATE, PRODUCT)
+
+
+@pytest.mark.parametrize("input_text", [None, "", PRODUCT])
+def test_prompt_without_a_placeholder_never_needs_input(
+    input_text: str | None,
+) -> None:
+    validate_input_present("그냥 질문", input_text)
 
 
 def test_every_placeholder_gets_the_same_input() -> None:

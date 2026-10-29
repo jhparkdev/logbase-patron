@@ -13,13 +13,33 @@ REQUIRE_PARAMETERS = True
 _PLACEHOLDER = re.compile(r"\{\{[^{}]+\}\}")
 
 
+class InputRequiredError(ValueError):
+    """프롬프트에 {{...}} 자리가 있는데 채울 입력 데이터가 비어 있다."""
+
+    def __init__(self) -> None:
+        super().__init__("템플릿 자리를 채울 입력 데이터가 필요하다")
+
+
+def _has_input(input_text: str | None) -> bool:
+    return bool(input_text and input_text.strip())
+
+
+def validate_input_present(prompt_text: str, input_text: str | None) -> None:
+    """템플릿 자리가 있는데 입력이 비어 있으면 거절한다. 요청 접수 때 호출한다.
+
+    자리를 채우지 못한 글("{{product_info}}")이 모델에 가면 비교가 의미 없어지고 비용만 나간다.
+    """
+    if _PLACEHOLDER.search(prompt_text) and not _has_input(input_text):
+        raise InputRequiredError
+
+
 def build_prompt_text(prompt_text: str, input_text: str | None) -> str:
     """모델에 보낼 글을 만든다. 모든 모델에 같은 글이 간다.
 
     템플릿의 {{...}} 자리에 입력을 한 번에 끼운다. 자리가 없으면 입력을 뒤에 붙이고,
-    입력이 없으면 사용자가 쓴 프롬프트를 바꾸지 않는다.
+    입력이 없으면 사용자가 쓴 프롬프트를 바꾸지 않는다(자리가 있는 경우는 접수 때 거절한다).
     """
-    if not input_text:
+    if not _has_input(input_text):
         return prompt_text
     if _PLACEHOLDER.search(prompt_text):
         # 함수로 치환해야 입력 안의 역슬래시가 해석되지 않고, 입력 안의 {{...}} 도 다시 바뀌지 않는다
