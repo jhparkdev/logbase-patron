@@ -1,3 +1,6 @@
+/** 모든 목록 화면이 쓰는 한 페이지의 항목 수. 목록 API 요청의 page_size로 보낸다. */
+export const PAGE_SIZE = 10;
+
 /** 항목이 하나도 없어도 1페이지로 본다. */
 export function pageCount(total: number, pageSize: number): number {
   return Math.max(1, Math.ceil(total / pageSize));
