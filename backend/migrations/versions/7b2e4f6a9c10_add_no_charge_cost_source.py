@@ -1,11 +1,11 @@
-"""add no charge cost source
+"""청구 없는 실패 호출의 비용 근거 NO_CHARGE 추가
 
 청구 없는 실패 호출을 확정 0원으로 기록할 수 있게 비용 근거와 조합 제약을 추가한다.
 CHECK 내용 변경은 autogenerate가 감지하지 못하므로 직접 작성했다.
 
-Revision ID: 7b2e4f6a9c10
-Revises: ee924be75819
-Create Date: 2026-10-29 13:56:52.439747
+리비전 ID: 7b2e4f6a9c10
+이전 리비전: ee924be75819
+생성 시각: 2026-10-29 13:56:52.439747
 
 """
 
@@ -13,7 +13,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-# revision identifiers, used by Alembic.
+# Alembic이 사용하는 리비전 식별 정보.
 revision: str = "7b2e4f6a9c10"
 down_revision: str | Sequence[str] | None = "ee924be75819"
 branch_labels: str | Sequence[str] | None = None
