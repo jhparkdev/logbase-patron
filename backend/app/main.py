@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
     install_error_handlers(app)
     # Origin 검사를 인증보다 먼저 해, 다른 사이트에서 온 요청은 세션을 조회하지 않고 거절한다.
     origin_check = Depends(require_allowed_origin)
+    # 공개 라우트인 로그인도 쿠키를 발급하므로 Origin 검사는 똑같이 적용한다.
     for router in PUBLIC_ROUTERS:
         app.include_router(router, prefix=API_PREFIX, dependencies=[origin_check])
     for router in PROTECTED_ROUTERS:

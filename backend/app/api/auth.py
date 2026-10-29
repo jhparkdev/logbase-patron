@@ -51,6 +51,7 @@ async def logout(
     session: SessionDep,
     settings: SettingsDep,
 ) -> Response:
+    # 쿠키만 지우면 복사된 토큰을 재사용할 수 있으므로 DB 세션을 먼저 삭제한다.
     await auth.logout(session, token)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     clear_session_cookie(response, secure=settings.session_cookie_secure)

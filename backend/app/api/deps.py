@@ -54,6 +54,7 @@ def unauthenticated() -> ApiError:
 
 def require_session_token(token: SessionTokenCookie = None) -> str:
     """세션 쿠키의 토큰 원문. 쿠키가 없으면 401."""
+    # 여기서는 토큰 유무만 확인한다. DB 세션의 유효성은 get_current_user에서 검사한다.
     if not token:
         raise unauthenticated()
     return token

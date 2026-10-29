@@ -163,6 +163,7 @@ async def test_logout_deletes_only_that_session(
     db_session: AsyncSession, factory: Factory
 ) -> None:
     user = await make_user(factory)
+    # 같은 계정으로 두 번 로그인해 한 기기의 로그아웃이 다른 세션에 영향을 주지 않는지 본다.
     first = await auth.login(db_session, user.email, PASSWORD, now=T0)
     second = await auth.login(db_session, user.email, PASSWORD, now=T0)
     assert first is not None and second is not None

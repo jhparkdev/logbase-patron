@@ -19,6 +19,7 @@ _password_hash = PasswordHash.recommended()
 
 
 def hash_password(password: str) -> str:
+    # 매번 새 솔트가 붙으므로 같은 비밀번호도 서로 다른 해시로 저장된다.
     return _password_hash.hash(password)
 
 

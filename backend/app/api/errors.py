@@ -78,6 +78,7 @@ async def handle_http_exception(
         code, message = ErrorCode.INTERNAL_ERROR, INTERNAL_ERROR_MESSAGE
     else:
         code, message = ErrorCode.BAD_REQUEST, BAD_REQUEST_MESSAGE
+    # 405 응답의 Allow처럼 HTTP 동작에 필요한 헤더는 오류 형식을 바꿔도 유지한다.
     return error_response(exc.status_code, code, message, exc.headers)
 
 

@@ -56,6 +56,7 @@ async def login(
         )
     )
     user.last_login_at = now
+    # DB 저장이 성공해야 라우터가 쿠키를 발급한다. 실패하면 토큰을 클라이언트에 넘기지 않는다.
     await session.commit()
     return LoginResult(user=user, token=token)
 
@@ -64,6 +65,7 @@ async def get_session_user(
     session: AsyncSession, token: str, *, now: datetime
 ) -> User | None:
     """유효한 세션(만료 전, 활성 사용자)의 사용자를 돌려준다. 아니면 None."""
+    # 사용자도 함께 조회해, 세션 발급 이후 계정이 비활성화된 경우까지 확인한다.
     row = (
         await session.execute(
             select(UserSession.expires_at, User)

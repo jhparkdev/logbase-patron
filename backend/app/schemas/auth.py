@@ -17,6 +17,7 @@ class LoginRequest(BaseModel):
 class CurrentUserRead(BaseModel):
     """로그인한 관리자. 비밀번호 해시와 세션 값은 내보내지 않는다."""
 
+    # ORM 사용자 객체에서 아래 필드만 읽는다. 모델에 다른 속성이 있어도 응답에는 포함되지 않는다.
     model_config = ConfigDict(from_attributes=True)
 
     user_id: int

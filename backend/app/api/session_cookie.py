@@ -13,6 +13,7 @@ SESSION_COOKIE_SAMESITE: Literal["lax"] = "lax"
 # 토큰 수명과 쿠키 수명은 같은 상수에서 나온다.
 SESSION_COOKIE_MAX_AGE = int(SESSION_TTL.total_seconds())
 
+# Python 인자 이름과 관계없이 브라우저의 patron_session 쿠키에서 토큰을 읽는다.
 SessionTokenCookie = Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)]
 
 

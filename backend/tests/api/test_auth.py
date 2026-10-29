@@ -138,6 +138,7 @@ async def test_longest_allowed_password_is_checked(client: AsyncClient) -> None:
         json={"email": "admin@example.test", "password": "p" * PASSWORD_MAX_LENGTH},
     )
 
+    # 길이 제한에 걸리는 422가 아니라, 자격 증명 검증까지 진행한 결과인 401이어야 한다.
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -208,6 +209,7 @@ async def test_me_rejects_deactivated_user(
     user = await make_user(factory)
     await log_in(client, user["email"])
 
+    # 세션은 남겨 둔 채 계정만 비활성화해, 매 요청 사용자 상태를 다시 확인하는지 본다.
     await db_session.execute(
         update(User).where(User.user_id == user["user_id"]).values(is_active=False)
     )

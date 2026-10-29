@@ -150,6 +150,7 @@ def app(db_session: AsyncSession, now: datetime) -> FastAPI:
     settings = get_settings().model_copy(
         update={"session_cookie_secure": True, "allowed_origin": TEST_ORIGIN}
     )
+    # 라우터와 서비스가 모두 이 세션을 쓰므로 API에서 commit해도 테스트 종료 시 롤백된다.
     app.dependency_overrides[get_session] = override_session
     app.dependency_overrides[get_now] = lambda: now
     app.dependency_overrides[get_settings] = lambda: settings

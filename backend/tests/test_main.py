@@ -58,6 +58,7 @@ async def test_only_public_routes_skip_login(app: FastAPI, client: AsyncClient) 
         if response.status_code == status.HTTP_401_UNAUTHORIZED:
             assert response.json()["code"] == "UNAUTHENTICATED"
         else:
+            # 공개 로그인은 본문이 없으면 422다. 성공 여부 대신 세션 요구 여부를 비교한다.
             reachable_without_login.add((method, path))
 
     assert reachable_without_login == PUBLIC_ROUTES
