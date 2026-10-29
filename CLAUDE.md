@@ -10,7 +10,7 @@
 ## 기술 스택
 - 백엔드: Python 3.14, uv, FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2.x(async), Alembic, httpx(async), Ruff, pytest(실제 PostgreSQL)
 - 프론트엔드: Node.js LTS(24 이상), pnpm, React 19, React Compiler, TypeScript, Vite, TanStack Router, TanStack Query, React Hook Form, Zod 4, Tailwind CSS v4, Recharts, Biome, Vitest
-- 디자인: 토스 디자인 원칙과 토스 디자인 시스템(TDS)을 적용한다. 세부 규칙은 `frontend/CLAUDE.md`를 따른다.
+- 디자인: TDS(토스 디자인 시스템)를 참고해 웹 대시보드용 디자인 시스템을 직접 만든다. TDS 패키지는 설치하지 않는다. 세부 규칙은 `frontend/CLAUDE.md`와 `docs/design/`을 따른다.
 - DB: PostgreSQL 18. AI 연동: OpenRouter API
 - 인프라: Docker, docker compose, GCP(Cloud Run·Cloud SQL·Artifact Registry·Secret Manager), GitHub Actions
 - 새 의존성, 새 패키지, 폴더 구조 변경, 배포 설정 변경은 사용자 승인 후 진행한다.
