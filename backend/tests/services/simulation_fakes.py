@@ -20,6 +20,7 @@ from app.services.simulation_ports import (
     SimulatorContext,
     SlotPlan,
     SlotRecord,
+    SlotState,
 )
 
 NOW = datetime(2026, 10, 29, 1, 0, tzinfo=UTC)
@@ -117,8 +118,7 @@ class FakeRecorder:
     ) -> None:
         self.payloads[request_id] = (messages, response_text)
 
-    def cancel_if_open(self, request_id: uuid.UUID) -> bool:
-        """5단계 취소가 쓸 조건부 전이. 진행 중일 때만 CANCELLED 로 바꾼다."""
+    async def cancel_if_open(self, request_id: uuid.UUID, now: datetime) -> bool:
         if self.statuses[request_id] in (R.PENDING, R.RUNNING):
             self.statuses[request_id] = R.CANCELLED
             return True
@@ -136,12 +136,26 @@ class FakeStore:
         self.validations: dict[uuid.UUID, SlotRecord] = {}
         self.runs: list[NewRun] = []
         self.results: list[NewResult] = []
+        self.known_simulations: set[uuid.UUID] = set()
+        self.slot_numbers: dict[uuid.UUID, int] = {}
 
     async def insert_run(self, run: NewRun) -> None:
         self.runs.append(run)
 
     async def insert_result(self, result: NewResult) -> None:
         self.results.append(result)
+        self.known_simulations.add(result.simulation_id)
+        self.slot_numbers[result.request_id] = result.slot_no
+
+    async def list_slots(self, simulation_id: uuid.UUID) -> list[SlotState] | None:
+        if simulation_id not in self.known_simulations:
+            return None
+        return [
+            SlotState(request_id, slot_no, self.recorder.statuses[request_id])
+            for request_id, slot_no in sorted(
+                self.slot_numbers.items(), key=lambda item: item[1]
+            )
+        ]
 
     async def mark_started(self, simulation_id: uuid.UUID, now: datetime) -> None:
         self.started.append(now)
@@ -189,6 +203,7 @@ class Harness:
         self.caller = FakeCaller(behaviors)
         self.recorder = FakeRecorder(self.slots)
         self.store = FakeStore(self.recorder)
+        self.store.slot_numbers = {s.request_id: s.slot_no for s in self.slots}
         self.messages = [{"role": "user", "content": "질문"}]
         self.job = SimulationJob(
             simulation_id=uuid.uuid4(),
@@ -198,6 +213,7 @@ class Harness:
             execution_config=execution_config or {},
             allow_fallbacks=allow_fallbacks,
         )
+        self.store.known_simulations.add(self.job.simulation_id)
         self.deps = SimulationDeps(
             caller=self.caller,
             recorder=self.recorder,

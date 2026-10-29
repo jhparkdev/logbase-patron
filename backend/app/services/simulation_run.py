@@ -18,6 +18,7 @@ from app.services.simulation_ports import (
     SimulationStore,
     SlotPlan,
 )
+from app.services.simulation_registry import CancelRegistry
 from app.services.simulation_status import compute_overall_status
 
 # 로그에는 request_id 와 상태, 예외 종류만 남긴다. 프롬프트·응답·예외 메시지(키가 들어갈 수 있음)는 남기지 않는다
@@ -92,6 +93,30 @@ async def run_simulation(
         return overall
     await deps.store.mark_finished(job.simulation_id, overall, deps.now())
     return overall
+
+
+async def run_registered_simulation(
+    job: SimulationJob,
+    deps: SimulationDeps,
+    registry: CancelRegistry,
+    *,
+    timeout_seconds: float = SIMULATION_TIMEOUT_SECONDS,
+    heartbeat_interval_seconds: float = HEARTBEAT_INTERVAL_SECONDS,
+) -> SimulationStatus:
+    """취소 신호 보관함에 등록한 채로 실행한다. 끝나면(실패해도) 신호를 버린다."""
+    events = registry.register(
+        job.simulation_id, [slot.request_id for slot in job.slots]
+    )
+    try:
+        return await run_simulation(
+            job,
+            deps,
+            cancel_events=events,
+            timeout_seconds=timeout_seconds,
+            heartbeat_interval_seconds=heartbeat_interval_seconds,
+        )
+    finally:
+        registry.release(job.simulation_id)
 
 
 async def _run_slot(

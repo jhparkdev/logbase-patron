@@ -175,6 +175,15 @@ class NewResult:
     model_display_name_at_run: str
 
 
+@dataclass(frozen=True)
+class SlotState:
+    """칸 하나의 현재 상태. 칸마다 최종 시도만 다룬다."""
+
+    request_id: uuid.UUID
+    slot_no: int
+    status: RequestStatus
+
+
 class ModelCaller(Protocol):
     """정욱님 call_model. 실패해도 예외를 던지지 않고 결과로 돌려준다."""
 
@@ -197,6 +206,13 @@ class RequestRecorder(Protocol):
 
     async def create_pending(self, request: NewRequest) -> None:
         """호출 이력을 PENDING 으로 만든다. 호출 전에 Request ID 를 저장해 두는 것이 원칙이다."""
+        ...
+
+    async def cancel_if_open(self, request_id: uuid.UUID, now: datetime) -> bool:
+        """PENDING 이나 RUNNING 일 때만 CANCELLED 로 바꾼다. 이미 종료되었으면 False.
+
+        취소와 정상 완료가 거의 동시에 올 때 어느 쪽이 이길지를 DB 의 조건부 갱신이 정한다.
+        """
         ...
 
     async def mark_running(self, request_id: uuid.UUID, now: datetime) -> bool:
@@ -233,6 +249,10 @@ class SimulationStore(Protocol):
     async def save_validation(
         self, request_id: uuid.UUID, record: SlotRecord
     ) -> None: ...
+
+    async def list_slots(self, simulation_id: uuid.UUID) -> list[SlotState] | None:
+        """칸 번호 순서로 칸마다 최종 시도의 상태. 없는 실행이면 None."""
+        ...
 
     async def final_statuses(self, simulation_id: uuid.UUID) -> list[RequestStatus]:
         """칸마다 최종 시도의 상태."""

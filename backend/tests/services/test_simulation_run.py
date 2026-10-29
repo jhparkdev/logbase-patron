@@ -193,7 +193,7 @@ async def test_cancelling_every_model_ends_the_run_as_cancelled() -> None:
 
 async def test_a_slot_cancelled_before_it_starts_is_never_called() -> None:
     h = Harness(count=3)
-    assert h.recorder.cancel_if_open(h.request_id(2))
+    assert await h.recorder.cancel_if_open(h.request_id(2), NOW)
 
     status = await run_simulation(h.job, h.deps)
 
@@ -219,7 +219,7 @@ async def test_a_response_that_arrives_after_cancel_does_not_change_the_cancelle
 
     task = asyncio.create_task(run_simulation(h.job, h.deps))
     await asyncio.wait_for(started.wait(), timeout=1)
-    assert h.recorder.cancel_if_open(h.request_id(1))
+    assert await h.recorder.cancel_if_open(h.request_id(1), NOW)
     gate.set()
 
     assert await asyncio.wait_for(task, timeout=1) == S.PARTIAL_SUCCESS
