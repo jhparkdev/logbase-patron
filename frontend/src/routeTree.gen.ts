@@ -10,33 +10,105 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppCustomerUsageRouteImport } from './routes/_app/customer-usage'
+import { Route as AppInternalBudgetRouteImport } from './routes/_app/internal-budget'
+import { Route as AppModelsRouteImport } from './routes/_app/models'
+import { Route as AppSimulationHistoryRouteImport } from './routes/_app/simulation-history'
+import { Route as AppSimulatorRouteImport } from './routes/_app/simulator'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppCustomerUsageRoute = AppCustomerUsageRouteImport.update({
+  id: '/customer-usage',
+  path: '/customer-usage',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInternalBudgetRoute = AppInternalBudgetRouteImport.update({
+  id: '/internal-budget',
+  path: '/internal-budget',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppModelsRoute = AppModelsRouteImport.update({
+  id: '/models',
+  path: '/models',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSimulationHistoryRoute = AppSimulationHistoryRouteImport.update({
+  id: '/simulation-history',
+  path: '/simulation-history',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSimulatorRoute = AppSimulatorRouteImport.update({
+  id: '/simulator',
+  path: '/simulator',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/customer-usage': typeof AppCustomerUsageRoute
+  '/internal-budget': typeof AppInternalBudgetRoute
+  '/models': typeof AppModelsRoute
+  '/simulation-history': typeof AppSimulationHistoryRoute
+  '/simulator': typeof AppSimulatorRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/customer-usage': typeof AppCustomerUsageRoute
+  '/internal-budget': typeof AppInternalBudgetRoute
+  '/models': typeof AppModelsRoute
+  '/simulation-history': typeof AppSimulationHistoryRoute
+  '/simulator': typeof AppSimulatorRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_app/customer-usage': typeof AppCustomerUsageRoute
+  '/_app/internal-budget': typeof AppInternalBudgetRoute
+  '/_app/models': typeof AppModelsRoute
+  '/_app/simulation-history': typeof AppSimulationHistoryRoute
+  '/_app/simulator': typeof AppSimulatorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/customer-usage'
+    | '/internal-budget'
+    | '/models'
+    | '/simulation-history'
+    | '/simulator'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/customer-usage'
+    | '/internal-budget'
+    | '/models'
+    | '/simulation-history'
+    | '/simulator'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_app/customer-usage'
+    | '/_app/internal-budget'
+    | '/_app/models'
+    | '/_app/simulation-history'
+    | '/_app/simulator'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +120,72 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/customer-usage': {
+      id: '/_app/customer-usage'
+      path: '/customer-usage'
+      fullPath: '/customer-usage'
+      preLoaderRoute: typeof AppCustomerUsageRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/internal-budget': {
+      id: '/_app/internal-budget'
+      path: '/internal-budget'
+      fullPath: '/internal-budget'
+      preLoaderRoute: typeof AppInternalBudgetRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/models': {
+      id: '/_app/models'
+      path: '/models'
+      fullPath: '/models'
+      preLoaderRoute: typeof AppModelsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/simulation-history': {
+      id: '/_app/simulation-history'
+      path: '/simulation-history'
+      fullPath: '/simulation-history'
+      preLoaderRoute: typeof AppSimulationHistoryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/simulator': {
+      id: '/_app/simulator'
+      path: '/simulator'
+      fullPath: '/simulator'
+      preLoaderRoute: typeof AppSimulatorRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppCustomerUsageRoute: typeof AppCustomerUsageRoute
+  AppInternalBudgetRoute: typeof AppInternalBudgetRoute
+  AppModelsRoute: typeof AppModelsRoute
+  AppSimulationHistoryRoute: typeof AppSimulationHistoryRoute
+  AppSimulatorRoute: typeof AppSimulatorRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppCustomerUsageRoute: AppCustomerUsageRoute,
+  AppInternalBudgetRoute: AppInternalBudgetRoute,
+  AppModelsRoute: AppModelsRoute,
+  AppSimulationHistoryRoute: AppSimulationHistoryRoute,
+  AppSimulatorRoute: AppSimulatorRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
