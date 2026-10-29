@@ -3,34 +3,13 @@ from decimal import Decimal
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from app.schemas.common import ErrorResponse, Money, Page
+from app.schemas.simulation_types import Money, Page
 
 
 class Priced(BaseModel):
     """Money 를 필드로 쓰는 최소 모델. 비용 미확인은 None 이다."""
 
     cost_usd: Money | None
-
-
-def test_error_response_has_only_code_and_message() -> None:
-    # 스택 트레이스·SQL 같은 내부 정보가 끼어들 자리가 없어야 한다
-    error = ErrorResponse(
-        code="SIMULATION_ALREADY_FINISHED", message="이미 종료된 실행입니다."
-    )
-
-    assert error.model_dump() == {
-        "code": "SIMULATION_ALREADY_FINISHED",
-        "message": "이미 종료된 실행입니다.",
-    }
-
-
-@pytest.mark.parametrize("missing", ["code", "message"])
-def test_error_response_requires_both_fields(missing: str) -> None:
-    values = {"code": "SOME_ERROR", "message": "문구"}
-    del values[missing]
-
-    with pytest.raises(ValidationError):
-        ErrorResponse(**values)
 
 
 def test_page_has_items_and_total() -> None:

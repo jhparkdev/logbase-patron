@@ -13,7 +13,7 @@ from app.models import (
     TestType,
     ValidationStatus,
 )
-from app.schemas.common import Money
+from app.schemas.simulation_types import Money
 from app.services.simulation_validation import MAX_MODEL_COUNT, MIN_MODEL_COUNT
 
 Count = Annotated[int, Field(ge=0)]

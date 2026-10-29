@@ -6,8 +6,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from app.models import ModelStatus, SimulationStatus, TestType
-from app.schemas.common import Page
 from app.schemas.simulation_result import SimulationSummary
+from app.schemas.simulation_types import Page
 from app.services.simulation_sort import (
     DEFAULT_SORT_COLUMN,
     DEFAULT_SORT_DIRECTION,
