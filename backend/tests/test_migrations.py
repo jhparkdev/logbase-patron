@@ -3,10 +3,22 @@
 patron_test에서만 실행된다(conftest의 migrated_database).
 """
 
+from collections.abc import Callable
+from decimal import Decimal
+
+import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
+from alembic.script import ScriptDirectory
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import URL
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
+
+from tests.db_helpers import Factory, expect_rejected
 
 # 설계서 v0.6의 테이블 22개와 뷰 2개
 DESIGN_TABLES = {
@@ -36,6 +48,7 @@ DESIGN_TABLES = {
 DESIGN_VIEWS = {"v_request_facts", "v_simulation_summary"}
 # Alembic이 "어디까지 적용했는지" 기록하는 테이블
 ALEMBIC_VERSION_TABLE = "alembic_version"
+NO_CHARGE_REVISION = "7b2e4f6a9c10"
 
 
 def _schema_objects(database_url: URL) -> tuple[set[str], set[str]]:
@@ -80,3 +93,105 @@ def test_downgrade_to_base_then_upgrade_again(
     tables, views = _schema_objects(migrated_database)
     assert tables == DESIGN_TABLES | {ALEMBIC_VERSION_TABLE}
     assert views == DESIGN_VIEWS
+
+
+def _run_no_charge_migration(
+    session: Session, config: Config, *, upgrade: bool
+) -> None:
+    """같은 트랜잭션에서 실행해 검증용 이력과 DDL을 테스트 종료 시 함께 롤백한다."""
+    revision = ScriptDirectory.from_config(config).get_revision(NO_CHARGE_REVISION)
+    assert revision is not None
+    migrate: Callable[[], None] = (
+        revision.module.upgrade if upgrade else revision.module.downgrade
+    )
+    with Operations.context(MigrationContext.configure(session.connection())):
+        migrate()
+
+
+async def test_no_charge_migration_preserves_history_and_restores_old_check(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    """기존 행을 유지한 채 새 제약을 내렸다 올리고, 각 버전의 허용 값도 확인한다."""
+    request = await factory.ai_request(
+        status="SUCCESS",
+        cost_status="CONFIRMED",
+        cost_usd=Decimal("0.05"),
+        cost_source="API_RESPONSE",
+    )
+    await db_session.run_sync(_run_no_charge_migration, alembic_config, upgrade=False)
+    await expect_rejected(
+        db_session,
+        factory.ai_request(
+            status="FAILED",
+            error_type="PROVIDER_ERROR",
+            cost_status="CONFIRMED",
+            cost_usd=Decimal(0),
+            cost_source="NO_CHARGE",
+        ),
+        constraint="ai_requests_cost_source_check",
+    )
+
+    await db_session.run_sync(_run_no_charge_migration, alembic_config, upgrade=True)
+    restored = (
+        (
+            await db_session.execute(
+                text("SELECT * FROM ai_requests WHERE request_id = :id"),
+                {"id": request["request_id"]},
+            )
+        )
+        .mappings()
+        .one()
+    )
+    assert restored == request
+    await factory.ai_request(
+        status="FAILED",
+        error_type="PROVIDER_ERROR",
+        cost_status="CONFIRMED",
+        cost_usd=Decimal(0),
+        cost_source="NO_CHARGE",
+    )
+
+
+async def test_no_charge_history_blocks_downgrade_without_changing_data_or_schema(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    """NO_CHARGE 이력이 있으면 명확한 오류로 멈추고 행·제약·리비전을 보존한다."""
+    request = await factory.ai_request(
+        status="FAILED",
+        error_type="PROVIDER_ERROR",
+        cost_status="CONFIRMED",
+        cost_usd=Decimal(0),
+        cost_source="NO_CHARGE",
+    )
+    checks_query = text(
+        "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint "
+        "WHERE conrelid = 'ai_requests'::regclass AND contype = 'c' ORDER BY conname"
+    )
+    checks_before = (await db_session.execute(checks_query)).all()
+    version_before = await db_session.scalar(
+        text("SELECT version_num FROM alembic_version")
+    )
+
+    with pytest.raises(DBAPIError, match="Cannot downgrade.*NO_CHARGE") as caught:
+        async with db_session.begin_nested():
+            await db_session.run_sync(
+                _run_no_charge_migration, alembic_config, upgrade=False
+            )
+
+    assert caught.value.orig.sqlstate == "23514"
+    assert (await db_session.execute(checks_query)).all() == checks_before
+    assert (
+        await db_session.scalar(text("SELECT version_num FROM alembic_version"))
+        == version_before
+    )
+    preserved = (
+        (
+            await db_session.execute(
+                text("SELECT * FROM ai_requests WHERE request_id = :id"),
+                {"id": request["request_id"]},
+            )
+        )
+        .mappings()
+        .one()
+    )
+    assert preserved == request
