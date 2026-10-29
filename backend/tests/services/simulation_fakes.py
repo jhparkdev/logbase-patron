@@ -7,11 +7,17 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from app.models import CostStatus, RequestStatus, SimulationStatus
+from app.models import CostStatus, ModelStatus, RequestStatus, SimulationStatus
 from app.services.simulation_ports import (
     ModelCallResult,
+    ModelInfo,
+    NewRequest,
+    NewResult,
+    NewRun,
+    ScenarioInfo,
     SimulationDeps,
     SimulationJob,
+    SimulatorContext,
     SlotPlan,
     SlotRecord,
 )
@@ -73,13 +79,18 @@ class FakeCaller:
 class FakeRecorder:
     """건호님 services/requests.py 가 해 줄 조건부 상태 변경을 메모리로 흉내 낸다."""
 
-    def __init__(self, slots: Sequence[SlotPlan]) -> None:
+    def __init__(self, slots: Sequence[SlotPlan] = ()) -> None:
+        self.created: list[NewRequest] = []
         self.statuses: dict[uuid.UUID, RequestStatus] = {
             s.request_id: R.PENDING for s in slots
         }
         self.records: dict[uuid.UUID, SlotRecord] = {}
         self.payloads: dict[uuid.UUID, tuple[list[dict[str, str]], str | None]] = {}
         self.fail_on_record: set[uuid.UUID] = set()
+
+    async def create_pending(self, request: NewRequest) -> None:
+        self.created.append(request)
+        self.statuses[request.request_id] = R.PENDING
 
     async def mark_running(self, request_id: uuid.UUID, now: datetime) -> bool:
         if self.statuses[request_id] != R.PENDING:
@@ -123,6 +134,14 @@ class FakeStore:
         self.heartbeats: list[datetime] = []
         self.finished: list[tuple[SimulationStatus, datetime]] = []
         self.validations: dict[uuid.UUID, SlotRecord] = {}
+        self.runs: list[NewRun] = []
+        self.results: list[NewResult] = []
+
+    async def insert_run(self, run: NewRun) -> None:
+        self.runs.append(run)
+
+    async def insert_result(self, result: NewResult) -> None:
+        self.results.append(result)
 
     async def mark_started(self, simulation_id: uuid.UUID, now: datetime) -> None:
         self.started.append(now)
@@ -213,3 +232,40 @@ def until_cancelled(started: asyncio.Event | None = None) -> CallBehavior:
         return failed(R.CANCELLED)
 
     return behavior
+
+
+class FakeLookup:
+    """접수 때 읽는 DB 내용(시나리오·모델·기존 실행·시뮬레이터 식별자)을 메모리로 흉내 낸다."""
+
+    def __init__(self) -> None:
+        self.scenarios: dict[int, ScenarioInfo] = {
+            7: ScenarioInfo(
+                scenario_id=7,
+                is_active=True,
+                default_json_schema={"type": "object", "required": ["name"]},
+                default_execution_config={"temperature": 0.7, "max_tokens": 1024},
+            )
+        }
+        self.models: dict[int, ModelInfo] = {
+            n: ModelInfo(
+                model_id=n,
+                openrouter_model_id=f"vendor/model-{n}",
+                display_name=f"Model {n}",
+                status=ModelStatus.ACTIVE,
+            )
+            for n in range(1, 5)
+        }
+        self.simulations: set[uuid.UUID] = set()
+        self.context = SimulatorContext(project_id=3, key_id=1, service_id=4)
+
+    async def find_scenario(self, scenario_id: int) -> ScenarioInfo | None:
+        return self.scenarios.get(scenario_id)
+
+    async def find_models(self, model_ids: Sequence[int]) -> dict[int, ModelInfo]:
+        return {mid: self.models[mid] for mid in model_ids if mid in self.models}
+
+    async def simulation_exists(self, simulation_id: uuid.UUID) -> bool:
+        return simulation_id in self.simulations
+
+    async def simulator_context(self) -> SimulatorContext:
+        return self.context
