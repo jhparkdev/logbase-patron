@@ -1,0 +1,67 @@
+# 디자인 토큰과 데스크톱 규격
+
+정본은 `frontend/src/styles.css`의 `@theme`이다. 값의 출처는 [tds-reference.md](tds-reference.md)이고, 이 문서는 데스크톱에서 어떻게 쓰는지를 적는다. Tailwind 기본 색과 글자 크기는 꺼 두어서 아래 토큰만 쓸 수 있다.
+
+## 색
+TDS 팔레트를 이름 그대로 쓴다(`grey-50`~`grey-900`, `blue`, `red`, `orange`, `yellow`, `green`, `teal`, `purple`). 예: `text-grey-700`, `bg-blue-500`
+
+| 역할 | 토큰 |
+|---|---|
+| 페이지 배경 | `surface` (#f6f7f9, TDS의 PC 화면 배경) |
+| 카드, 헤더 | `white` |
+| 표 머리글, 입력 칸, 행 마우스 올림 | `grey-50` |
+| 행 구분선 | `grey-100` |
+| 테두리, 진행 막대 바탕 | `grey-200` |
+| 제목, 숫자, 본문 | `grey-900` |
+| 본문 보조 | `grey-700` |
+| 라벨, 설명, 표 머리글 글자 | `grey-600` |
+| 사이드바 | 배경 `grey-900`, 글자 `grey-400`, 선택 `white/12` + `white` |
+| 주 버튼, 포커스 테두리 | `brand` (= blue-500) |
+| 링크, 추정 비용 | `blue-600` |
+| 전월 대비 증가 / 감소 | `delta-up` (= red-600) / `delta-down` (= blue-600). 바꿀 때는 `styles.css`의 이 두 줄만 고친다 |
+
+TDS 글자 색은 투명한 회색이지만, 배경에 따라 달라 보이지 않도록 같은 색이 나오는 불투명 회색 단계를 쓴다.
+
+## 상태 배지
+TDS Badge의 Weak 형태다. 배경은 `*-weak`(같은 색 16%), 글자는 같은 계열의 진한 색이다.
+
+| 상태 | 배경 | 글자 |
+|---|---|---|
+| 확정, 정상 | `success-weak` | `green-700` |
+| 추정 | `brand-weak` | `blue-600` |
+| 미확인, 주의 | `warning-weak` | `yellow-900` |
+| 초과 | `danger-weak` | `red-600` |
+| 미설정 | `neutral-weak` | `grey-700` |
+
+실행 상태(성공, 실패, Timeout)는 비용 상태와 같은 줄에 나오므로 테두리(`grey-200`)와 점으로 모양을 다르게 한다. 점 색은 `green-500`, `red-500`, `yellow-800`이다.
+
+## 글자
+| 토큰 | 크기/줄 높이 | 쓰는 곳 |
+|---|---|---|
+| `text-title` | 26/35 | 화면 제목, 요약 숫자 (Bold) |
+| `text-section` | 18/27 | 구역 제목 (Bold) |
+| `text-body` | 15/22.5 | 기본 본문 (`body` 기본값) |
+| `text-body-sm` | 14/21 | 표 셀, 입력 칸, 헤더 |
+| `text-label` | 13/19.5 | 라벨, 표 머리글, 경로 표시 |
+| `text-caption` | 12/18 | 보조 설명, 배지 |
+
+모두 TDS 타이포그래피 표에 있는 크기다. 글꼴은 시스템 글꼴(Mac은 SF Pro·Apple SD 산돌고딕, Windows는 맑은 고딕)이다.
+
+## 모서리와 간격
+- `rounded-control`(10px): 버튼 M, 입력 칸
+- `rounded-lg`(8px): 버튼 S
+- `rounded-2xl`(16px): 카드
+- `rounded-full`: 배지, 진행 막대
+- 간격과 그림자는 Tailwind 기본 값을 쓴다.
+
+## 데스크톱 컴포넌트 규격
+| 컴포넌트 | 규격 | TDS 대비 |
+|---|---|---|
+| 버튼 | M 38px(좌우 16, 글자 15 Semibold), S 32px(좌우 10, 글자 13). 진한 파란 버튼은 화면마다 하나 | TDS S·M 그대로. L·XL은 쓰지 않음 |
+| 입력 칸, 선택 상자 | 높이 38px, `grey-50` 배경, `neutral-weak` 테두리, 글자 14. 포커스는 `brand` 테두리, 오류는 `red-500` 테두리 | TDS 56px을 버튼 M에 맞춰 줄임 |
+| 배지 | 24px, 좌우 7, 글자 12 Bold | TDS S 그대로 |
+| 진행 막대 | 8px, 바탕 `grey-200`, 막대는 예산 상태 색 | TDS L 두께 |
+| 카드 | `white`, 모서리 16, 안쪽 여백 20~24, 테두리·그림자 없음 | TDS 모서리 XS |
+| 표 | 행 48px, 셀 14px, 머리글 13px `grey-600` on `grey-50`, 숫자는 오른쪽 정렬 `tabular-nums` | TDS에 없음 |
+| 마우스 올림 | 버튼은 한 단계 진하게, 표 행은 `grey-50` | TDS에 없음 |
+| 키보드 포커스 | `brand` 2px 테두리, 2px 띄움 | TDS에 없음 |
