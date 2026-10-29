@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # 테스트 전용 patron_test DB (테스트에서만 사용)
     test_database_url: SecretStr | None = None
     # 실행 환경 이름. "production"이면 seed 같은 위험한 명령에 확인 옵션을 요구한다.
+    # 계정 생성·비활성화·만료 세션 정리 CLI에도 같은 운영 보호 규칙을 적용한다.
     app_env: str = "development"
     # 세션 쿠키를 HTTPS에서만 보낸다. dev·운영 배포 모두 HTTPS라 기본값은 켬이고,
     # http로 띄우는 로컬 개발에서만 .env에 SESSION_COOKIE_SECURE=false로 끈다.
