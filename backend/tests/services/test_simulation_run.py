@@ -152,6 +152,34 @@ async def test_response_text_and_validation_are_saved_for_each_finished_slot() -
     assert h.store.validations[h.request_id(2)].json_parse_status.value == "FAILED"
 
 
+async def test_a_finished_slot_is_saved_while_the_others_are_still_running() -> None:
+    # 화면은 5초마다 칸별 상태를 조회한다. 먼저 끝난 모델은 나머지를 기다리지 않고 바로 보여야 한다
+    second_started = asyncio.Event()
+    h = Harness(count=2, json_schema=SCHEMA)
+    h.caller.behaviors = {h.model(2): never_finishes(second_started)}
+
+    task = asyncio.create_task(run_simulation(h.job, h.deps))
+
+    async def first_slot_saved() -> None:
+        while h.request_id(1) not in h.store.validations:
+            await asyncio.sleep(0)
+
+    await asyncio.wait_for(first_slot_saved(), timeout=1)
+    await asyncio.wait_for(second_started.wait(), timeout=1)
+
+    slots = await h.store.list_slots(h.job.simulation_id)
+    assert [(s.slot_no, s.status) for s in slots or []] == [
+        (1, R.SUCCESS),
+        (2, R.RUNNING),
+    ]
+    assert h.recorder.payloads[h.request_id(1)] == (h.messages, "응답")
+    assert h.store.finished == []  # 실행 전체는 아직 끝나지 않았다
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
 # --- 취소 ---
 
 
