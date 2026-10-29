@@ -1,12 +1,23 @@
 import asyncio
+import dataclasses
+import json
 import uuid
+from decimal import Decimal
 from typing import Any
 
+import httpx
 import pytest
 
-from app.models import CostStatus, ErrorType, RequestStatus, SimulationStatus
+from app.models import (
+    CostSource,
+    CostStatus,
+    ErrorType,
+    RequestStatus,
+    SimulationStatus,
+)
+from app.openrouter.client import OpenRouterClient
+from app.openrouter.result import CallResult
 from app.services.simulation_input import SIMULATION_TIMEOUT_SECONDS
-from app.services.simulation_ports import ModelCallResult
 from app.services.simulation_run import run_simulation
 from tests.services.simulation_fakes import (
     NOW,
@@ -38,12 +49,12 @@ async def test_every_model_gets_the_same_input_and_its_own_pinned_provider() -> 
         count=2,
         json_schema=SCHEMA,
         allow_fallbacks=True,
-        execution_config={"temperature": 0.2, "max_tokens": 512},
+        max_tokens=512,
     )
 
     await run_simulation(h.job, h.deps)
 
-    calls = {call["model"]: call for call in h.caller.calls}
+    calls = {call["model_id"]: call for call in h.caller.calls}
     assert set(calls) == {h.model(1), h.model(2)}
     for slot in h.slots:
         call = calls[slot.openrouter_model_id]
@@ -51,7 +62,10 @@ async def test_every_model_gets_the_same_input_and_its_own_pinned_provider() -> 
         assert call["provider_order"] == [slot.execution_provider]
         assert call["allow_fallbacks"] is True
         assert call["json_schema"] == SCHEMA
-        assert call["execution_config"] == {"temperature": 0.2, "max_tokens": 512}
+        assert (
+            call["request_id"] == slot.request_id
+        )  # 정욱님 call_model 이 로그에 남긴다
+        assert call["max_tokens"] == 512
         assert call["timeout_seconds"] == SIMULATION_TIMEOUT_SECONDS
         assert isinstance(call["cancel"], asyncio.Event)
 
@@ -62,7 +76,7 @@ async def test_models_are_called_in_parallel() -> None:
     arrived = 0
     all_arrived = asyncio.Event()
 
-    async def wait_for_the_others(kwargs: dict[str, Any]) -> ModelCallResult:
+    async def wait_for_the_others(kwargs: dict[str, Any]) -> CallResult:
         nonlocal arrived
         arrived += 1
         if arrived == 4:
@@ -79,7 +93,7 @@ async def test_models_are_called_in_parallel() -> None:
 
 async def test_one_timeout_leaves_the_other_results_and_is_partial_success() -> None:
     # T-10, T-21
-    async def timeout(kwargs: dict[str, Any]) -> ModelCallResult:
+    async def timeout(kwargs: dict[str, Any]) -> CallResult:
         return failed(R.TIMEOUT)
 
     h = Harness(count=3)
@@ -97,7 +111,7 @@ async def test_one_timeout_leaves_the_other_results_and_is_partial_success() -> 
 
 
 async def test_an_unexpected_error_fails_only_that_slot() -> None:
-    async def boom(kwargs: dict[str, Any]) -> ModelCallResult:
+    async def boom(kwargs: dict[str, Any]) -> CallResult:
         raise RuntimeError("예상 밖 오류")
 
     h = Harness(count=3)
@@ -114,7 +128,7 @@ async def test_an_unexpected_error_fails_only_that_slot() -> None:
 
 async def test_the_error_message_is_not_stored_for_the_user() -> None:
     # 예외 메시지에는 내부 정보나 키가 들어 있을 수 있어 기록에 옮기지 않는다
-    async def boom(kwargs: dict[str, Any]) -> ModelCallResult:
+    async def boom(kwargs: dict[str, Any]) -> CallResult:
         raise RuntimeError("sk-secret-key")
 
     h = Harness(count=2)
@@ -126,7 +140,7 @@ async def test_the_error_message_is_not_stored_for_the_user() -> None:
 
 
 async def test_all_models_fail_is_failed() -> None:
-    async def fail(kwargs: dict[str, Any]) -> ModelCallResult:
+    async def fail(kwargs: dict[str, Any]) -> CallResult:
         return failed()
 
     h = Harness(count=2)
@@ -139,7 +153,7 @@ async def test_all_models_fail_is_failed() -> None:
 async def test_response_text_and_validation_are_saved_for_each_finished_slot() -> None:
     h = Harness(count=2, json_schema=SCHEMA)
 
-    async def bad_json(kwargs: dict[str, Any]) -> ModelCallResult:
+    async def bad_json(kwargs: dict[str, Any]) -> CallResult:
         return ok("JSON 아님")
 
     h.caller.behaviors = {h.model(1): bad_json}
@@ -226,7 +240,7 @@ async def test_a_slot_cancelled_before_it_starts_is_never_called() -> None:
     status = await run_simulation(h.job, h.deps)
 
     assert status == S.PARTIAL_SUCCESS
-    assert h.model(2) not in {call["model"] for call in h.caller.calls}
+    assert h.model(2) not in {call["model_id"] for call in h.caller.calls}
     assert h.recorder.statuses[h.request_id(2)] == R.CANCELLED
 
 
@@ -238,7 +252,7 @@ async def test_a_response_that_arrives_after_cancel_does_not_change_the_cancelle
     started = asyncio.Event()
     h = Harness(count=2)
 
-    async def late_success(kwargs: dict[str, Any]) -> ModelCallResult:
+    async def late_success(kwargs: dict[str, Any]) -> CallResult:
         started.set()
         await gate.wait()
         return ok("늦은 응답")
@@ -264,7 +278,7 @@ async def test_heartbeat_is_recorded_while_running_and_stops_at_the_end() -> Non
     gate = asyncio.Event()
     h = Harness(count=1)
 
-    async def slow(kwargs: dict[str, Any]) -> ModelCallResult:
+    async def slow(kwargs: dict[str, Any]) -> CallResult:
         started.set()
         await gate.wait()
         return ok()
@@ -319,3 +333,86 @@ def test_job_carries_the_ids_needed_to_run() -> None:
 
     assert isinstance(h.job.simulation_id, uuid.UUID)
     assert [slot.slot_no for slot in h.job.slots] == [1, 2]
+
+
+# --- 정욱님 실제 OpenRouterClient 와 연결 (가짜 HTTP 서버, 실제 OpenRouter 는 부르지 않는다) ---
+
+OPENROUTER_REPLY = {
+    "id": "gen-real-client",
+    "model": "vendor/model-1",
+    "provider": "DekaLLM",
+    "choices": [{"message": {"role": "assistant", "content": '{"title": "a"}'}}],
+    "usage": {"prompt_tokens": 16, "completion_tokens": 2, "cost": 3.48e-07},
+}
+
+
+async def test_the_real_openrouter_client_fits_the_simulator() -> None:
+    sent: list[dict[str, Any]] = []
+
+    def fake_openrouter(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json=OPENROUTER_REPLY)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(fake_openrouter)
+    ) as http_client:
+        client = OpenRouterClient(http_client=http_client, api_key="test-only-key")
+        h = Harness(count=2, json_schema=SCHEMA, max_tokens=512)
+        deps = dataclasses.replace(h.deps, caller=client.call_model)
+
+        status = await run_simulation(h.job, deps)
+
+    assert status == S.SUCCESS
+    record = h.recorder.records[h.request_id(1)]
+    assert (record.cost_status, record.cost_usd) == (
+        CostStatus.CONFIRMED,
+        Decimal("3.48E-7"),
+    )
+    assert record.cost_source == CostSource.API_RESPONSE
+    assert (record.actual_provider, record.external_generation_id) == (
+        "DekaLLM",
+        "gen-real-client",
+    )
+    assert h.store.validations[h.request_id(1)].schema_validation_status.value == (
+        "PASSED"
+    )
+    # 보낸 요청에 칸마다 고정한 업체와 최대 토큰이 들어간다. temperature 는 아직 보내지 않는다
+    bodies = {body["provider"]["order"][0]: body for body in sent}
+    assert set(bodies) == {"Provider1", "Provider2"}
+    body = bodies["Provider1"]
+    assert body["max_tokens"] == 512
+    assert body["provider"]["allow_fallbacks"] is False
+    assert "temperature" not in body
+
+
+async def test_cancel_reaches_the_real_openrouter_client() -> None:
+    # 취소 신호가 켜지면 정욱님 클라이언트가 기다리던 HTTP 요청을 끊고 CANCELLED 를 돌려준다
+    request_sent = asyncio.Event()
+
+    async def slow_openrouter(request: httpx.Request) -> httpx.Response:
+        request_sent.set()
+        await asyncio.sleep(3600)
+        return httpx.Response(200, json=OPENROUTER_REPLY)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(slow_openrouter)
+    ) as http_client:
+        client = OpenRouterClient(http_client=http_client, api_key="test-only-key")
+        h = Harness(count=1)
+        deps = dataclasses.replace(h.deps, caller=client.call_model)
+        cancel_events = {h.request_id(1): asyncio.Event()}
+
+        task = asyncio.create_task(
+            run_simulation(h.job, deps, cancel_events=cancel_events)
+        )
+        await asyncio.wait_for(request_sent.wait(), timeout=1)
+        cancel_events[h.request_id(1)].set()
+        status = await asyncio.wait_for(task, timeout=1)
+
+    assert status == S.CANCELLED
+    record = h.recorder.records[h.request_id(1)]
+    assert (record.status, record.cost_status, record.cost_usd) == (
+        R.CANCELLED,
+        CostStatus.UNKNOWN,
+        None,
+    )

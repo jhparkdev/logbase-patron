@@ -2,32 +2,67 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import CostStatus, ErrorType, RequestStatus, ValidationStatus
+from app.models import (
+    CostSource,
+    CostStatus,
+    ErrorType,
+    RequestStatus,
+    ValidationStatus,
+)
+from app.openrouter import errors as openrouter_errors
+from app.openrouter import result as openrouter_result
 from app.services.simulation_outcome import to_slot_record
-from app.services.simulation_ports import ModelCallResult
+from tests.services.simulation_fakes import NOW
 
 R = RequestStatus
 V = ValidationStatus
+CALL = openrouter_result.CallStatus
+CALL_COST = openrouter_result.CostStatus
+CALL_ERROR = openrouter_errors.ErrorType
 SCHEMA = {"type": "object", "required": ["title"]}
 
 
-def result(**overrides: object) -> ModelCallResult:
-    """성공한 호출 결과. 필요한 값만 덮어써서 쓴다."""
+def result(**overrides: object) -> openrouter_result.CallResult:
+    """정욱님 call_model 이 돌려주는 성공 결과. 필요한 값만 덮어써서 쓴다."""
     values: dict[str, object] = {
-        "status": R.SUCCESS,
+        "status": CALL.SUCCESS,
         "content": '{"title": "a"}',
-        "error_type": None,
-        "prompt_tokens": 16,
-        "completion_tokens": 2,
-        "cost_usd": Decimal("0.000000348"),
-        "cost_status": CostStatus.CONFIRMED,
+        "finish_reason": "stop",
+        "requested_model": "mistralai/mistral-nemo",
         "actual_model": "mistralai/mistral-nemo",
         "provider": "DeepInfra",
-        "latency_ms": 1830,
         "generation_id": "gen-1",
+        "prompt_tokens": 16,
+        "completion_tokens": 2,
+        "cached_tokens": 4,
+        "cache_write_tokens": 1,
+        "reasoning_tokens": 0,
+        "cost_usd": Decimal("0.000000348"),
+        "cost_status": CALL_COST.CONFIRMED,
+        "cost_source": openrouter_result.CostSource.API_RESPONSE,
+        "http_status": 200,
+        "started_at": NOW,
+        "finished_at": NOW,
+        "latency_ms": 1830,
     }
     values.update(overrides)
-    return ModelCallResult(**values)  # type: ignore[arg-type]
+    return openrouter_result.CallResult(**values)  # type: ignore[arg-type]
+
+
+def failure(
+    status: openrouter_result.CallStatus, **overrides: object
+) -> openrouter_result.CallResult:
+    """비용 미확인으로 끝난 호출. 응답 본문이 없다."""
+    values: dict[str, object] = {
+        "content": None,
+        "finish_reason": None,
+        "cost_usd": None,
+        "cost_status": CALL_COST.UNKNOWN,
+        "cost_source": None,
+        "status": status,
+    }
+    values.update(overrides)
+    return result(**values)
 
 
 def test_successful_call_is_recorded_as_it_came() -> None:
@@ -45,42 +80,32 @@ def test_successful_call_is_recorded_as_it_came() -> None:
     assert record.latency_ms == 1830
     assert record.external_generation_id == "gen-1"
     assert record.response_text == '{"title": "a"}'
+    # DB 에 칸이 있는 값은 버리지 않고 넘긴다
+    assert (
+        record.cached_tokens,
+        record.cache_write_tokens,
+        record.reasoning_tokens,
+    ) == (
+        4,
+        1,
+        0,
+    )
+    assert record.cost_source == CostSource.API_RESPONSE
+    assert record.http_status == 200
+    assert record.finish_reason == "stop"
+    assert record.error_message is None
 
 
 # --- 비용: 미확인은 절대 0 이 되지 않는다 ---
 
 
 def test_unknown_cost_stays_null() -> None:
-    record = to_slot_record(result(cost_status=CostStatus.UNKNOWN, cost_usd=None), None)
-
-    assert (record.cost_status, record.cost_usd) == (CostStatus.UNKNOWN, None)
-
-
-def test_unknown_cost_with_an_amount_is_not_trusted() -> None:
-    # UNKNOWN 이면 금액은 항상 null 이다 (DB 제약과 같은 규칙)
     record = to_slot_record(
-        result(cost_status=CostStatus.UNKNOWN, cost_usd=Decimal(0)), None
-    )
-
-    assert record.cost_usd is None
-
-
-def test_confirmed_cost_without_an_amount_becomes_unknown() -> None:
-    # 금액이 없는데 확정이라고 올 수는 없다. 0 으로 채우지 않고 미확인으로 둔다
-    record = to_slot_record(
-        result(cost_status=CostStatus.CONFIRMED, cost_usd=None), None
+        result(cost_status=CALL_COST.UNKNOWN, cost_usd=None, cost_source=None), None
     )
 
     assert (record.cost_status, record.cost_usd) == (CostStatus.UNKNOWN, None)
-
-
-def test_estimated_cost_is_never_created_by_the_simulator() -> None:
-    # 추정 비용은 정욱님 쪽에서 만든다. 시뮬레이터는 확정이 아니면 미확인으로 기록한다
-    record = to_slot_record(
-        result(cost_status=CostStatus.ESTIMATED, cost_usd=Decimal("0.01")), None
-    )
-
-    assert (record.cost_status, record.cost_usd) == (CostStatus.UNKNOWN, None)
+    assert record.cost_source is None
 
 
 def test_a_real_zero_cost_is_kept_as_zero() -> None:
@@ -108,61 +133,57 @@ def test_empty_response_keeps_the_cost_that_was_charged() -> None:
     assert record.cost_usd == Decimal("0.000000348")
 
 
-def test_failed_call_keeps_its_error_type() -> None:
+def test_empty_response_says_why_it_failed() -> None:
+    record = to_slot_record(result(content=""), None)
+
+    assert (
+        record.error_message
+        == openrouter_errors.USER_MESSAGES[CALL_ERROR.INVALID_RESPONSE]
+    )
+
+
+def test_failed_call_keeps_its_error_type_and_message() -> None:
+    message = openrouter_errors.USER_MESSAGES[CALL_ERROR.RATE_LIMIT]
     record = to_slot_record(
-        result(
-            status=R.FAILED,
-            content=None,
-            error_type=ErrorType.RATE_LIMIT,
-            cost_status=CostStatus.UNKNOWN,
-            cost_usd=None,
+        failure(
+            CALL.FAILED,
+            error_type=CALL_ERROR.RATE_LIMIT,
+            error_message=message,
+            http_status=429,
         ),
         None,
     )
 
     assert (record.status, record.error_type) == (R.FAILED, ErrorType.RATE_LIMIT)
+    assert (record.error_message, record.http_status) == (message, 429)
 
 
 @pytest.mark.parametrize(
     ("status", "expected"),
-    [(R.FAILED, ErrorType.UNKNOWN_ERROR), (R.TIMEOUT, ErrorType.TIMEOUT_ERROR)],
+    [(CALL.FAILED, ErrorType.UNKNOWN_ERROR), (CALL.TIMEOUT, ErrorType.TIMEOUT_ERROR)],
 )
 def test_failure_without_an_error_type_gets_a_default(
-    status: R, expected: ErrorType
+    status: openrouter_result.CallStatus, expected: ErrorType
 ) -> None:
     # DB 는 FAILED·TIMEOUT 에 오류 유형이 반드시 있어야 한다
-    record = to_slot_record(result(status=status, content=None, error_type=None), None)
+    record = to_slot_record(failure(status, error_type=None), None)
 
     assert record.error_type == expected
 
 
 def test_cancelled_call_has_no_error_type() -> None:
     record = to_slot_record(
-        result(
-            status=R.CANCELLED,
-            content=None,
-            error_type=ErrorType.UNKNOWN_ERROR,
-            cost_status=CostStatus.UNKNOWN,
-            cost_usd=None,
-        ),
-        None,
+        failure(CALL.CANCELLED, error_type=CALL_ERROR.UNKNOWN_ERROR), None
     )
 
     assert (record.status, record.error_type) == (R.CANCELLED, None)
+    assert record.cost_status == CostStatus.UNKNOWN
 
 
 def test_success_never_carries_an_error_type() -> None:
-    record = to_slot_record(result(error_type=ErrorType.UNKNOWN_ERROR), None)
+    record = to_slot_record(result(error_type=CALL_ERROR.UNKNOWN_ERROR), None)
 
     assert (record.status, record.error_type) == (R.SUCCESS, None)
-
-
-@pytest.mark.parametrize("status", [R.PENDING, R.RUNNING])
-def test_unfinished_status_from_the_caller_is_a_failure(status: R) -> None:
-    # call_model 은 끝난 상태만 돌려줘야 한다. 그렇지 않으면 RUNNING 에 남지 않게 실패로 닫는다
-    record = to_slot_record(result(status=status, content=None), None)
-
-    assert (record.status, record.error_type) == (R.FAILED, ErrorType.UNKNOWN_ERROR)
 
 
 # --- JSON 검증은 응답을 받았을 때만 ---
@@ -198,12 +219,13 @@ def test_json_check_is_not_applicable_without_a_schema() -> None:
     )
 
 
-@pytest.mark.parametrize("status", [R.FAILED, R.TIMEOUT, R.CANCELLED])
-def test_json_check_is_not_executed_without_a_response(status: R) -> None:
+@pytest.mark.parametrize("status", [CALL.FAILED, CALL.TIMEOUT, CALL.CANCELLED])
+def test_json_check_is_not_executed_without_a_response(
+    status: openrouter_result.CallStatus,
+) -> None:
     # 응답을 받지 못한 것은 "검증 실패"가 아니라 "미실행"이다
     record = to_slot_record(
-        result(status=status, content=None, error_type=ErrorType.PROVIDER_ERROR),
-        SCHEMA,
+        failure(status, error_type=CALL_ERROR.PROVIDER_ERROR), SCHEMA
     )
 
     assert (record.json_parse_status, record.schema_validation_status) == (

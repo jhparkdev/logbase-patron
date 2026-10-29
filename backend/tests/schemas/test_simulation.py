@@ -291,7 +291,7 @@ def test_fallback_can_be_switched_on_or_off() -> None:
 
 def test_require_parameters_is_decided_by_the_server_not_the_client() -> None:
     # 요청한 설정을 모두 지원하는 업체만 쓰는 것은 비교 실행의 고정 조건이라 사용자가 끌 수 없다.
-    # 서버가 항상 켜서 호출하고 그 값을 기록한다
+    # 서버가 정해서 호출하고, 실제로 보낸 값을 기록한다
     with pytest.raises(ValidationError, match="require_parameters"):
         SimulationCreateRequest(
             **create_body(routing_policy={"require_parameters": False})

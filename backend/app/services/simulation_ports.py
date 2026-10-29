@@ -1,6 +1,7 @@
 """비교 실행이 기대하는 외부 모듈의 모양.
 
-건호님 services/requests.py 와 정욱님 openrouter/client.py 가 합류하면 이 모양에 맞춰 연결한다.
+ModelCaller 는 정욱님 OpenRouterClient.call_model 과 같은 모양이라 그대로 넘기면 된다.
+건호님 services/requests.py 가 합류하면 RequestRecorder 모양에 맞춰 연결한다.
 아직 없는 동안에는 가짜 객체로 같은 모양을 흉내 내어 실행 흐름을 검증한다.
 """
 
@@ -14,6 +15,7 @@ from typing import Any, Protocol
 
 from app.models import (
     CallPurpose,
+    CostSource,
     CostStatus,
     DataSource,
     ErrorType,
@@ -24,24 +26,8 @@ from app.models import (
     UsageOrigin,
     ValidationStatus,
 )
+from app.openrouter.result import CallResult
 from app.services.simulation_json_check import ValidationErrors
-
-
-@dataclass(frozen=True)
-class ModelCallResult:
-    """call_model 이 돌려주는 결과. 필드 이름은 정욱님의 CallResult 를 따른다."""
-
-    status: RequestStatus
-    content: str | None
-    error_type: ErrorType | None
-    prompt_tokens: int | None
-    completion_tokens: int | None
-    cost_usd: Decimal | None
-    cost_status: CostStatus
-    actual_model: str | None
-    provider: str | None  # 실제 처리한 업체
-    latency_ms: int | None
-    generation_id: str | None
 
 
 @dataclass(frozen=True)
@@ -50,11 +36,18 @@ class SlotRecord:
 
     status: RequestStatus
     error_type: ErrorType | None
+    error_message: str | None  # 사용자에게 보여 줄 문구. 예외 원문이 아니다
+    http_status: int | None
+    finish_reason: str | None
     response_text: str | None
     input_tokens: int | None
     output_tokens: int | None
+    cached_tokens: int | None
+    cache_write_tokens: int | None
+    reasoning_tokens: int | None
     cost_usd: Decimal | None  # cost_status 가 UNKNOWN 이면 항상 None
     cost_status: CostStatus
+    cost_source: CostSource | None  # 확정 비용의 근거. 미확인이면 None
     actual_provider: str | None
     actual_model: str | None
     latency_ms: int | None
@@ -84,7 +77,7 @@ class SimulationJob:
     slots: Sequence[SlotPlan]
     messages: list[dict[str, str]]
     json_schema: dict[str, Any] | None
-    execution_config: Mapping[str, Any]
+    max_tokens: int
     allow_fallbacks: bool
 
 
@@ -185,20 +178,21 @@ class SlotState:
 
 
 class ModelCaller(Protocol):
-    """정욱님 call_model. 실패해도 예외를 던지지 않고 결과로 돌려준다."""
+    """정욱님 OpenRouterClient.call_model 에서 시뮬레이터가 쓰는 인자. 실패해도 예외 없이 결과로 돌려준다."""
 
     async def __call__(
         self,
         *,
-        model: str,
-        messages: list[dict[str, str]],
+        request_id: uuid.UUID,
+        model_id: str,
+        messages: list[dict[str, Any]],
+        max_tokens: int,
+        timeout_seconds: float,
+        json_schema: dict[str, Any] | None,
         provider_order: list[str],
         allow_fallbacks: bool,
-        json_schema: dict[str, Any] | None,
-        execution_config: Mapping[str, Any],
-        timeout_seconds: float,
         cancel: asyncio.Event,
-    ) -> ModelCallResult: ...
+    ) -> CallResult: ...
 
 
 class RequestRecorder(Protocol):

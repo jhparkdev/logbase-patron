@@ -73,7 +73,7 @@ class RoutingPolicy(BaseModel):
 
     업체 순서(order)는 모델 칸마다 execution_provider 로 정해지므로 여기에는 없다.
     require_parameters(요청한 설정을 모두 지원하는 업체만 사용)는 비교 실행의 고정 조건이라
-    사용자가 정하지 않는다. 서버가 항상 켜서 호출하고 저장할 때 함께 기록한다.
+    사용자가 정하지 않는다. 서버가 정해서 호출하고, 실제로 보낸 값을 저장할 때 함께 기록한다.
     """
 
     model_config = ConfigDict(extra="forbid")

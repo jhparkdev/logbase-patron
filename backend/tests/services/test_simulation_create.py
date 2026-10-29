@@ -21,6 +21,7 @@ from app.services.simulation_create import (
     create_simulation,
 )
 from app.services.simulation_input import (
+    DEFAULT_MAX_TOKENS,
     InputRequiredError,
     build_messages,
     compute_input_hash,
@@ -100,7 +101,8 @@ async def test_scenario_run_is_saved_with_the_confirmed_inputs() -> None:
     assert run.model_count == 2
     # 보내지 않은 Schema·설정은 시나리오 기본값을 쓴다
     assert run.json_schema == {"type": "object", "required": ["name"]}
-    assert run.execution_config == {"temperature": 0.7, "max_tokens": 1024}
+    # temperature 는 call_model 이 아직 받지 않아 기록하지 않는다(보낸 값만 기록)
+    assert run.execution_config == {"max_tokens": 1024}
     assert run.routing_policy == {"allow_fallbacks": False, "require_parameters": True}
     # 비용 귀속과 실행자는 서버가 정한다
     assert (run.project_id, run.key_id, run.executed_by) == (3, 1, USER_ID)
@@ -119,7 +121,7 @@ async def test_request_values_win_over_the_scenario_defaults() -> None:
 
     [run] = intake.store.runs
     assert run.json_schema == own_schema
-    assert run.execution_config == {"temperature": 0.7, "max_tokens": 256}
+    assert run.execution_config == {"max_tokens": 256}
 
 
 async def test_one_pending_request_is_created_per_model_in_order() -> None:
@@ -144,7 +146,7 @@ async def test_one_pending_request_is_created_per_model_in_order() -> None:
         assert request.executed_by == USER_ID
         assert request.requested_at == NOW
         assert request.input_hash == compute_input_hash(TEMPLATE, PRODUCT)
-        assert request.execution_config == {"temperature": 0.7, "max_tokens": 1024}
+        assert request.execution_config == {"max_tokens": 1024}
     # 칸마다 고정한 업체가 호출별 정책의 order 에 들어간다
     assert first.routing_policy == {
         "allow_fallbacks": False,
@@ -192,7 +194,7 @@ async def test_the_returned_job_is_ready_to_run() -> None:
     ]
     assert job.messages == build_messages("다음 상품 정보로 작성하세요.\n" + PRODUCT)
     assert job.allow_fallbacks is True
-    assert job.execution_config == {"temperature": 0.7, "max_tokens": 1024}
+    assert job.max_tokens == 1024
     assert job.json_schema == {"type": "object", "required": ["name"]}
 
 
@@ -205,7 +207,9 @@ async def test_custom_run_has_no_scenario_and_no_defaults() -> None:
     assert run.test_type == RunType.CUSTOM
     assert run.scenario_id is None
     assert run.json_schema is None
-    assert run.execution_config == {}
+    assert run.execution_config == {"max_tokens": DEFAULT_MAX_TOKENS}
+    # Schema 가 없으면 call_model 이 require_parameters 를 켜지 않으므로 그대로 기록한다
+    assert run.routing_policy == {"allow_fallbacks": False, "require_parameters": False}
 
 
 async def test_same_model_with_different_providers_gets_two_slots() -> None:

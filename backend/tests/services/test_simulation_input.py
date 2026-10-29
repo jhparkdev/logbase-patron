@@ -1,6 +1,7 @@
 import pytest
 
 from app.services.simulation_input import (
+    DEFAULT_MAX_TOKENS,
     HEARTBEAT_INTERVAL_SECONDS,
     SIMULATION_TIMEOUT_SECONDS,
     InputRequiredError,
@@ -26,6 +27,8 @@ def test_team_decided_numbers() -> None:
     # 팀의 "임시 수치(결정됨)" 표와 하트비트 결정(30초)
     assert SIMULATION_TIMEOUT_SECONDS == 180
     assert HEARTBEAT_INTERVAL_SECONDS == 30
+    # 직접 작성 실행처럼 아무도 정하지 않았을 때의 최대 토큰. 사용자 입력 상한과 같다
+    assert DEFAULT_MAX_TOKENS == 4096
 
 
 # --- 프롬프트 합성 ---
@@ -111,26 +114,35 @@ def test_input_hash_changes_when_the_input_changes() -> None:
 
 
 # --- 시나리오 기본값 ---
+# call_model 이 아직 temperature 를 받지 않는다. 보내지 못하는 값을 기록하면 기록과 실제 호출이 달라지므로
+# 실제로 보내는 설정(max_tokens)만 남긴다. temperature 인자가 생기면 이 규칙을 되돌린다
 
 
-def test_scenario_defaults_fill_in_what_the_request_left_out() -> None:
+def test_scenario_default_fills_in_max_tokens() -> None:
     defaults = {"temperature": 0.7, "max_tokens": 1024}
 
-    assert resolve_execution_config({}, defaults) == defaults
+    assert resolve_execution_config({}, defaults) == {"max_tokens": 1024}
 
 
-def test_request_values_win_over_scenario_defaults_per_setting() -> None:
+def test_request_value_wins_over_the_scenario_default() -> None:
     defaults = {"temperature": 0.7, "max_tokens": 1024}
 
     assert resolve_execution_config({"max_tokens": 256}, defaults) == {
-        "temperature": 0.7,
-        "max_tokens": 256,
+        "max_tokens": 256
     }
 
 
-def test_custom_run_without_defaults_uses_only_the_request() -> None:
-    assert resolve_execution_config({}, None) == {}
-    assert resolve_execution_config({"temperature": 0}, None) == {"temperature": 0}
+def test_max_tokens_falls_back_to_the_default_when_nobody_set_it() -> None:
+    assert resolve_execution_config({}, None) == {"max_tokens": DEFAULT_MAX_TOKENS}
+    assert resolve_execution_config({}, {"temperature": 0}) == {
+        "max_tokens": DEFAULT_MAX_TOKENS
+    }
+
+
+def test_settings_that_cannot_be_sent_yet_are_not_recorded() -> None:
+    assert resolve_execution_config({"temperature": 0.2}, {"temperature": 0.7}) == {
+        "max_tokens": DEFAULT_MAX_TOKENS
+    }
 
 
 def test_json_schema_falls_back_to_the_scenario_default() -> None:
@@ -145,17 +157,22 @@ def test_json_schema_falls_back_to_the_scenario_default() -> None:
 # --- 라우팅 정책 ---
 
 
-def test_run_routing_policy_always_requires_parameters() -> None:
-    # require_parameters 는 사용자가 정하지 않고 서버가 항상 켠다
-    assert build_run_routing_policy(allow_fallbacks=False) == {
+def test_run_routing_policy_records_require_parameters_only_with_a_schema() -> None:
+    # call_model 은 Schema 가 있을 때만 require_parameters 를 켠다. 실제로 보낸 값과 같게 기록한다
+    assert build_run_routing_policy(allow_fallbacks=False, has_json_schema=True) == {
         "allow_fallbacks": False,
         "require_parameters": True,
     }
-    assert build_run_routing_policy(allow_fallbacks=True)["allow_fallbacks"] is True
+    assert build_run_routing_policy(allow_fallbacks=False, has_json_schema=False) == {
+        "allow_fallbacks": False,
+        "require_parameters": False,
+    }
+    policy = build_run_routing_policy(allow_fallbacks=True, has_json_schema=False)
+    assert policy["allow_fallbacks"] is True
 
 
 def test_request_routing_policy_pins_the_chosen_provider() -> None:
-    run_policy = build_run_routing_policy(allow_fallbacks=False)
+    run_policy = build_run_routing_policy(allow_fallbacks=False, has_json_schema=True)
 
     assert build_request_routing_policy(run_policy, "DekaLLM") == {
         "allow_fallbacks": False,

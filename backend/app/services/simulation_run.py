@@ -5,14 +5,16 @@ from collections.abc import Callable, Mapping
 from contextlib import suppress
 from datetime import datetime
 
-from app.models import CostStatus, ErrorType, RequestStatus, SimulationStatus
+from app.models import SimulationStatus
+from app.openrouter.errors import ErrorType as CallErrorType
+from app.openrouter.failures import build_failure_result
+from app.openrouter.result import CallResult, CallStatus
 from app.services.simulation_input import (
     HEARTBEAT_INTERVAL_SECONDS,
     SIMULATION_TIMEOUT_SECONDS,
 )
 from app.services.simulation_outcome import to_slot_record
 from app.services.simulation_ports import (
-    ModelCallResult,
     SimulationDeps,
     SimulationJob,
     SimulationStore,
@@ -23,20 +25,6 @@ from app.services.simulation_status import compute_overall_status, is_run_finish
 
 # 로그에는 request_id 와 상태, 예외 종류만 남긴다. 프롬프트·응답·예외 메시지(키가 들어갈 수 있음)는 남기지 않는다
 logger = logging.getLogger(__name__)
-
-_UNEXPECTED_FAILURE = ModelCallResult(
-    status=RequestStatus.FAILED,
-    content=None,
-    error_type=ErrorType.UNKNOWN_ERROR,
-    prompt_tokens=None,
-    completion_tokens=None,
-    cost_usd=None,
-    cost_status=CostStatus.UNKNOWN,
-    actual_model=None,
-    provider=None,
-    latency_ms=None,
-    generation_id=None,
-)
 
 
 async def run_simulation(
@@ -131,17 +119,19 @@ async def _run_slot(
     cancel: asyncio.Event,
     timeout_seconds: float,
 ) -> None:
-    if not await deps.recorder.mark_running(slot.request_id, deps.now()):
+    started_at = deps.now()
+    if not await deps.recorder.mark_running(slot.request_id, started_at):
         return  # 시작 전에 이미 취소되었다
     try:
         result = await deps.caller(
-            model=slot.openrouter_model_id,
+            request_id=slot.request_id,
+            model_id=slot.openrouter_model_id,
             messages=job.messages,
+            max_tokens=job.max_tokens,
+            timeout_seconds=timeout_seconds,
+            json_schema=job.json_schema,
             provider_order=[slot.execution_provider],
             allow_fallbacks=job.allow_fallbacks,
-            json_schema=job.json_schema,
-            execution_config=job.execution_config,
-            timeout_seconds=timeout_seconds,
             cancel=cancel,
         )
     except Exception as error:  # noqa: BLE001 - 예상 밖 오류는 이 칸의 실패로 바꿔 기록한다
@@ -150,7 +140,7 @@ async def _run_slot(
             slot.request_id,
             type(error).__name__,
         )
-        result = _UNEXPECTED_FAILURE
+        result = _unexpected_failure(slot, started_at, deps.now())
     record = to_slot_record(result, job.json_schema)
     if not await deps.recorder.record_finished(slot.request_id, record, deps.now()):
         # 이미 취소로 끝난 칸이다. 종료된 호출의 상태는 바꾸지 않으므로 늦게 온 결과는 저장하지 않는다
@@ -159,6 +149,19 @@ async def _run_slot(
         slot.request_id, job.messages, record.response_text
     )
     await deps.store.save_validation(slot.request_id, record)
+
+
+def _unexpected_failure(
+    slot: SlotPlan, started_at: datetime, finished_at: datetime
+) -> CallResult:
+    # 예외 원문은 키나 내부 정보가 들어 있을 수 있어 옮기지 않고 정해진 문구만 쓴다
+    return build_failure_result(
+        status=CallStatus.FAILED,
+        error_type=CallErrorType.UNKNOWN_ERROR,
+        requested_model=slot.openrouter_model_id,
+        started_at=started_at,
+        finished_at=finished_at,
+    )
 
 
 async def _beat(

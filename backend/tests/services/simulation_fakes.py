@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from app.models import CostStatus, ModelStatus, RequestStatus, SimulationStatus
+from app.models import ModelStatus, RequestStatus, SimulationStatus
+from app.openrouter.result import CallResult, CallStatus, CostSource, CostStatus
 from app.services.simulation_ports import (
-    ModelCallResult,
     ModelInfo,
     NewRequest,
     NewResult,
@@ -27,38 +27,37 @@ NOW = datetime(2026, 10, 29, 1, 0, tzinfo=UTC)
 
 R = RequestStatus
 
-CallBehavior = Callable[[dict[str, Any]], Awaitable[ModelCallResult]]
+CallBehavior = Callable[[dict[str, Any]], Awaitable[CallResult]]
 
 
-def ok(content: str = "응답") -> ModelCallResult:
-    return ModelCallResult(
-        status=R.SUCCESS,
+def ok(content: str = "응답") -> CallResult:
+    return CallResult(
+        status=CallStatus.SUCCESS,
         content=content,
-        error_type=None,
+        requested_model="m",
+        actual_model="m",
+        provider="P",
+        generation_id="gen",
         prompt_tokens=10,
         completion_tokens=5,
         cost_usd=Decimal("0.001"),
         cost_status=CostStatus.CONFIRMED,
-        actual_model="m",
-        provider="P",
+        cost_source=CostSource.API_RESPONSE,
+        started_at=NOW,
+        finished_at=NOW,
         latency_ms=100,
-        generation_id="gen",
     )
 
 
-def failed(status: RequestStatus = R.FAILED) -> ModelCallResult:
-    return ModelCallResult(
-        status=status,
-        content=None,
-        error_type=None,
-        prompt_tokens=None,
-        completion_tokens=None,
-        cost_usd=None,
+def failed(status: RequestStatus = R.FAILED) -> CallResult:
+    """비용 미확인으로 끝난 호출. status 는 FAILED·TIMEOUT·CANCELLED 중 하나다."""
+    return CallResult(
+        status=CallStatus(status.value),
+        requested_model="m",
         cost_status=CostStatus.UNKNOWN,
-        actual_model=None,
-        provider=None,
-        latency_ms=None,
-        generation_id=None,
+        started_at=NOW,
+        finished_at=NOW,
+        latency_ms=100,
     )
 
 
@@ -69,9 +68,9 @@ class FakeCaller:
         self.behaviors = dict(behaviors or {})
         self.calls: list[dict[str, Any]] = []
 
-    async def __call__(self, **kwargs: Any) -> ModelCallResult:
+    async def __call__(self, **kwargs: Any) -> CallResult:
         self.calls.append(kwargs)
-        behavior = self.behaviors.get(kwargs["model"])
+        behavior = self.behaviors.get(kwargs["model_id"])
         if behavior is None:
             return ok()
         return await behavior(kwargs)
@@ -197,7 +196,7 @@ class Harness:
         behaviors: Mapping[str, CallBehavior] | None = None,
         json_schema: dict[str, Any] | None = None,
         allow_fallbacks: bool = False,
-        execution_config: Mapping[str, Any] | None = None,
+        max_tokens: int = 4096,
     ) -> None:
         self.slots = make_slots(count)
         self.caller = FakeCaller(behaviors)
@@ -210,7 +209,7 @@ class Harness:
             slots=self.slots,
             messages=self.messages,
             json_schema=json_schema,
-            execution_config=execution_config or {},
+            max_tokens=max_tokens,
             allow_fallbacks=allow_fallbacks,
         )
         self.store.known_simulations.add(self.job.simulation_id)
@@ -229,7 +228,7 @@ class Harness:
 
 
 def never_finishes(started: asyncio.Event | None = None) -> CallBehavior:
-    async def behavior(kwargs: dict[str, Any]) -> ModelCallResult:
+    async def behavior(kwargs: dict[str, Any]) -> CallResult:
         if started is not None:
             started.set()
         await asyncio.sleep(3600)
@@ -241,7 +240,7 @@ def never_finishes(started: asyncio.Event | None = None) -> CallBehavior:
 def until_cancelled(started: asyncio.Event | None = None) -> CallBehavior:
     """취소 신호가 켜질 때까지 기다렸다가 CANCELLED 결과를 돌려주는 가짜 call_model."""
 
-    async def behavior(kwargs: dict[str, Any]) -> ModelCallResult:
+    async def behavior(kwargs: dict[str, Any]) -> CallResult:
         if started is not None:
             started.set()
         await kwargs["cancel"].wait()

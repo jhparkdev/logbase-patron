@@ -84,7 +84,8 @@ async def create_simulation(
         context=context,
         executed_by=executed_by,
         run_policy=build_run_routing_policy(
-            allow_fallbacks=request.routing_policy.allow_fallbacks
+            allow_fallbacks=request.routing_policy.allow_fallbacks,
+            has_json_schema=json_schema is not None,
         ),
         execution_config=execution_config,
         input_hash=compute_input_hash(request.prompt_text, request.input_text),
@@ -124,7 +125,7 @@ async def create_simulation(
             build_prompt_text(request.prompt_text, request.input_text)
         ),
         json_schema=json_schema,
-        execution_config=execution_config,
+        max_tokens=execution_config["max_tokens"],
         allow_fallbacks=request.routing_policy.allow_fallbacks,
     )
 
