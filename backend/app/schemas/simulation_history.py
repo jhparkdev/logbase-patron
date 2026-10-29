@@ -1,12 +1,13 @@
 from datetime import date
-from typing import Annotated
+from enum import StrEnum
+from typing import Annotated, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
-from app.models import TestType
+from app.models import ModelStatus, SimulationStatus, TestType
 from app.schemas.common import Page
-from app.schemas.simulation import ModelSelectionRequest, RoutingPolicy
+from app.schemas.simulation import RoutingPolicy
 from app.schemas.simulation_result import SimulationSummary
 from app.services.simulation_sort import (
     DEFAULT_SORT_COLUMN,
@@ -31,6 +32,11 @@ class SimulationHistoryQuery(BaseModel):
 
     start_date: date | None = None  # KST 달력 기준, 포함
     end_date: date | None = None  # KST 달력 기준, 포함
+    # 검색 조건(기준서 8.3). 지정하지 않으면 거르지 않는다
+    scenario_id: int | None = None
+    model_id: int | None = None  # 이 모델이 참여한 실행
+    status: SimulationStatus | None = None
+    simulation_id: UUID | None = None
     # 타입이 허용 목록이다. 목록 밖의 값은 거절하고 OpenAPI enum 으로 프론트엔드에 전달된다
     sort: SortColumn = DEFAULT_SORT_COLUMN
     direction: SortDirection = DEFAULT_SORT_DIRECTION
@@ -42,11 +48,32 @@ SimulationHistoryPage = Page[SimulationSummary]
 """이력 목록 응답. 항목은 진행·결과 조회의 요약과 같은 모양이라 합계 계산을 한 곳(뷰)에서만 한다."""
 
 
+class RerunBlockReason(StrEnum):
+    """재실행을 시작할 수 없는 사유. 모델 상태는 사유가 아니다(교체·제외하면 되므로)."""
+
+    INPUT_MISSING = "INPUT_MISSING"  # 저장된 입력을 복원할 수 없다
+
+
+class RerunModel(BaseModel):
+    """재실행 초안의 모델 한 칸. 과거에 고른 값에 모델의 현재 상태를 더해 교체·제외 안내를 돕는다."""
+
+    # 과거에 고른 값. 새 실행 요청의 모델 칸과 같은 이름이다
+    model_id: int
+    execution_provider: str
+    # 현재 값. 실행 당시 이름·상태(결과 조회 응답)와 다를 수 있다
+    current_display_name: str
+    current_status: ModelStatus
+    selectable: (
+        bool  # 지금 일반 실행에서 고를 수 있는가. 판단은 is_model_selectable 이 한다
+    )
+
+
 class SimulationRerunDraft(BaseModel):
     """재실행 초안(S-09) 응답. 과거 실행의 입력값을 그대로 돌려주어 화면 입력칸을 채운다.
 
-    비교 실행 요청(SimulationCreateRequest)과 입력 필드가 같아서, 사용자가 고친 값을
-    rerun_of_simulation_id 를 뺀 채 그대로 새 실행 요청으로 보낼 수 있다.
+    입력 필드는 비교 실행 요청(SimulationCreateRequest)과 같고, 화면이 안내에 쓰는
+    rerunnable·blocked_reason 과 모델 칸의 현재 상태가 더해진다. 사용자가 고친 값은
+    그 둘을 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).
     과거 이력은 지금 규칙으로 다시 거절하지 않는다. 새 실행 요청이 들어올 때 검증한다.
     """
 
@@ -59,6 +86,16 @@ class SimulationRerunDraft(BaseModel):
     execution_config: dict[str, JsonValue]
     routing_policy: RoutingPolicy
     models: Annotated[
-        list[ModelSelectionRequest],
+        list[RerunModel],
         Field(min_length=MIN_MODEL_COUNT, max_length=MAX_MODEL_COUNT),
     ]
+    rerunnable: bool
+    blocked_reason: RerunBlockReason | None
+
+    @model_validator(mode="after")
+    def _reason_matches_rerunnable(self) -> Self:
+        if self.rerunnable and self.blocked_reason is not None:
+            raise ValueError("재실행할 수 있으면 blocked_reason 은 null 이어야 한다")
+        if not self.rerunnable and self.blocked_reason is None:
+            raise ValueError("재실행할 수 없으면 blocked_reason 이 있어야 한다")
+        return self
