@@ -1,6 +1,7 @@
 """비교 실행 서비스 테스트용 가짜 객체. DB 와 OpenRouter 없이 동작을 검증한다."""
 
 import asyncio
+import itertools
 import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import UTC, datetime
@@ -30,14 +31,14 @@ R = RequestStatus
 CallBehavior = Callable[[dict[str, Any]], Awaitable[CallResult]]
 
 
-def ok(content: str = "응답") -> CallResult:
+def ok(content: str = "응답", generation_id: str = "gen") -> CallResult:
     return CallResult(
         status=CallStatus.SUCCESS,
         content=content,
         requested_model="m",
         actual_model="m",
         provider="P",
-        generation_id="gen",
+        generation_id=generation_id,
         prompt_tokens=10,
         completion_tokens=5,
         cost_usd=Decimal("0.001"),
@@ -67,12 +68,14 @@ class FakeCaller:
     def __init__(self, behaviors: Mapping[str, CallBehavior] | None = None) -> None:
         self.behaviors = dict(behaviors or {})
         self.calls: list[dict[str, Any]] = []
+        self._generation_ids = itertools.count(1)
 
     async def __call__(self, **kwargs: Any) -> CallResult:
         self.calls.append(kwargs)
         behavior = self.behaviors.get(kwargs["model_id"])
         if behavior is None:
-            return ok()
+            # OpenRouter 의 생성 ID 는 호출마다 다르다. DB 도 고유값으로 강제한다
+            return ok(generation_id=f"gen-{next(self._generation_ids)}")
         return await behavior(kwargs)
 
 

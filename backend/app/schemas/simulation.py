@@ -136,3 +136,9 @@ class SimulationCreateRequest(BaseModel):
         if self.test_type == TestType.CUSTOM and self.scenario_id is not None:
             raise ValueError("직접 작성 실행에는 scenario_id 를 보낼 수 없다")
         return self
+
+
+class SimulationAccepted(BaseModel):
+    """실행 요청을 받았다는 응답(202). 진행과 결과는 이 ID 로 조회한다."""
+
+    simulation_id: UUID
