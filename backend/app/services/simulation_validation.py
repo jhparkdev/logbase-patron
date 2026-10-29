@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from app.models import ModelStatus
+
 MIN_MODEL_COUNT = 2
 MAX_MODEL_COUNT = 4
 
@@ -49,3 +51,11 @@ def validate_model_selection(selections: Sequence[ModelSelection]) -> None:
         if selection in seen:
             raise DuplicateModelSelectionError(selection)
         seen.add(selection)
+
+
+def is_model_selectable(status: ModelStatus) -> bool:
+    """일반 비교 실행에서 고를 수 있는 모델인지 판단한다. ACTIVE 만 가능하다.
+
+    TESTING 은 관리자 모델 관리의 연결 테스트에서만 쓰고, INACTIVE 는 신규 실행에서 제외한다.
+    """
+    return status == ModelStatus.ACTIVE

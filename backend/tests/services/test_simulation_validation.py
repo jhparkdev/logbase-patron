@@ -1,11 +1,13 @@
 import pytest
 
+from app.models import ModelStatus
 from app.services.simulation_validation import (
     MAX_MODEL_COUNT,
     MIN_MODEL_COUNT,
     DuplicateModelSelectionError,
     ModelCountError,
     ModelSelection,
+    is_model_selectable,
     validate_model_count,
     validate_model_selection,
 )
@@ -96,3 +98,23 @@ def test_selection_fields_are_named_after_the_db_columns() -> None:
     # simulation_results 의 model_id, execution_provider 와 이름이 같아야 한다
     selection = ModelSelection(GPT, "openai")
     assert (selection.model_id, selection.execution_provider) == (GPT, "openai")
+
+
+# 일반 비교 실행에서는 ACTIVE 모델만 고를 수 있다 (기준서 6.5)
+@pytest.mark.parametrize(
+    ("status", "selectable"),
+    [
+        (ModelStatus.ACTIVE, True),
+        (ModelStatus.TESTING, False),  # 관리자 테스트에서만 선택 가능
+        (ModelStatus.INACTIVE, False),
+    ],
+)
+def test_only_active_models_are_selectable(
+    status: ModelStatus, selectable: bool
+) -> None:
+    assert is_model_selectable(status) is selectable
+
+
+def test_every_model_status_has_a_selectability_decision() -> None:
+    # 상태가 새로 생기면 이 규칙도 함께 정하도록 강제한다
+    assert {s for s in ModelStatus if is_model_selectable(s)} == {ModelStatus.ACTIVE}
