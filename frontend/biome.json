@@ -13,6 +13,7 @@
       "!src/shared/api/schema.d.ts",
       "!openapi.json",
       "!pnpm-lock.yaml",
+      "!src/assets",
       "!**/*.md"
     ]
   },
