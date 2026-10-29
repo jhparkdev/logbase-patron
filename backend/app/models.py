@@ -215,6 +215,7 @@ class CostSource(StrEnum):
     PRICE_ESTIMATE = "PRICE_ESTIMATE"
     MANUAL = "MANUAL"
     MOCK = "MOCK"
+    NO_CHARGE = "NO_CHARGE"
 
 
 class ValidationStatus(StrEnum):
@@ -806,6 +807,13 @@ class AIRequest(Base):
         CheckConstraint(
             f"cost_status <> '{CostStatus.ESTIMATED}' OR price_id IS NOT NULL",
             name="ck_ai_requests_cost_estimated",
+        ),
+        # 청구 없음으로 확정한 근거는 실패 호출의 확정 0원에만 쓴다.
+        CheckConstraint(
+            f"cost_source <> '{CostSource.NO_CHARGE}' OR "
+            f"(cost_status = '{CostStatus.CONFIRMED}' AND cost_usd = 0 "
+            f"AND status = '{RequestStatus.FAILED}')",
+            name="ck_ai_requests_no_charge",
         ),
         # 7) 오류 정합성
         CheckConstraint(
