@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { beforeAll, expect, test } from "vitest";
 import { renderAt } from "../../test/renderAt";
+
+// jsdom에는 모달 dialog 열기가 없어서, 브라우저처럼 open 속성만 켠다.
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true;
+  };
+});
 
 type Router = ReturnType<typeof renderAt>;
 
@@ -82,4 +89,38 @@ test("검색어를 바꾸면 1페이지로 돌아간다", async () => {
   });
 
   await waitFor(() => expect(appliedSearch(router)).toEqual({ q: "gpt" }));
+});
+
+test("주소에 모델 번호가 있으면 상세 패널을 연다", async () => {
+  renderAt("/models?model=3");
+
+  expect(await screen.findByRole("dialog", { name: "모델 상세" })).toBeTruthy();
+});
+
+test("모델 번호가 1 이상의 정수가 아니면 상세 패널을 열지 않는다", async () => {
+  for (const model of ["0", "-1", "1.5", "abc"]) {
+    renderAt(`/models?model=${model}`);
+    await screen.findByRole("table", { name: "등록된 AI 모델" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    cleanup();
+  }
+});
+
+test("닫기를 누르면 패널이 닫히고 다른 조회 조건은 남는다", async () => {
+  const router = renderAt("/models?q=gpt&model=3");
+  await screen.findByRole("dialog", { name: "모델 상세" });
+
+  fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(appliedSearch(router)).toEqual({ q: "gpt" });
+});
+
+test("Esc를 누르면 패널이 닫힌다", async () => {
+  renderAt("/models?model=3");
+  const panel = await screen.findByRole("dialog", { name: "모델 상세" });
+
+  fireEvent(panel, new Event("cancel", { cancelable: true }));
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 });

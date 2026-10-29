@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import plusIcon from "../../assets/plus.svg";
+import { ModelDetailPanel } from "../../features/models/components/ModelDetailPanel";
 import { Button } from "../../shared/components/ui/Button";
 import { type Column, DataTable } from "../../shared/components/ui/DataTable";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
@@ -29,6 +30,8 @@ const searchSchema = z.object({
   sort: z.enum(SORT_KEYS).optional().catch(undefined),
   order: z.enum(["asc", "desc"]).optional().catch(undefined),
   page: z.number().int().min(1).optional().catch(undefined),
+  // 상세 패널을 연 모델의 번호(models.model_id)
+  model: z.number().int().min(1).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_app/models")({
@@ -167,6 +170,13 @@ function ModelsPage() {
           }
         />
       </SectionCard>
+      {search.model !== undefined && (
+        <ModelDetailPanel
+          onClose={() =>
+            navigate({ search: (prev) => ({ ...prev, model: undefined }) })
+          }
+        />
+      )}
     </>
   );
 }
