@@ -1,5 +1,4 @@
 # 로컬과 CI가 같은 명령을 돌린다.
-# 프론트엔드 job은 frontend/package.json이 생긴 뒤에 추가한다.
 name: CI
 
 # 지금은 feature 브랜치에서 dev로 가는 PR만 검사한다.
@@ -71,3 +70,32 @@ jobs:
 
       - name: 테스트
         run: uv --directory backend run pytest -q
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"  # frontend/package.json engines(>=24)와 맞춘다
+
+      - name: pnpm 활성화 (frontend/package.json의 packageManager 버전)
+        run: corepack enable pnpm
+
+      - name: 의존성 설치
+        run: pnpm --dir frontend install
+
+      - name: 타입 검사
+        run: pnpm --dir frontend typecheck
+
+      - name: 린트
+        run: pnpm --dir frontend lint
+
+      - name: 테스트
+        run: pnpm --dir frontend test
+
+      - name: 빌드
+        run: pnpm --dir frontend build
