@@ -18,6 +18,11 @@ from app.services.simulation_sort import SortColumn, SortDirection
 PAST_ID = "0192a3c4-0000-7000-8000-000000000001"
 
 
+def test_default_page_size_follows_the_screen_mockup() -> None:
+    # 시뮬레이터 이력 화면 목업의 "10개씩 보기"
+    assert DEFAULT_PAGE_SIZE == 10
+
+
 def test_query_defaults_to_latest_first_first_page() -> None:
     query = SimulationHistoryQuery()
 

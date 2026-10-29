@@ -16,7 +16,7 @@ from app.services.simulation_sort import (
 )
 from app.services.simulation_validation import MAX_MODEL_COUNT, MIN_MODEL_COUNT
 
-DEFAULT_PAGE_SIZE = 20
+DEFAULT_PAGE_SIZE = 10  # 시뮬레이터 이력 화면 목업의 "10개씩 보기"
 MAX_PAGE_SIZE = 100
 
 

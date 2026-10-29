@@ -82,6 +82,33 @@ class RoutingPolicy(BaseModel):
     allow_fallbacks: bool = False
 
 
+# 시나리오 기본값(seed)이 512~1024 라서 여유를 두고 정한 상한이다. 한 번의 실수로 큰 비용이 나가지 않게 한다
+MAX_TOKENS_LIMIT = 4096
+MIN_TEMPERATURE = 0.0
+MAX_TEMPERATURE = 2.0
+
+
+class ExecutionConfig(BaseModel):
+    """모델 실행 설정. 시나리오 기본 실행 설정(test_scenarios.default_execution_config)과 같은 항목이다.
+
+    허용 항목만 받는다. provider·response_format 같은 키가 섞여 업체 고정이나 Schema 전달을
+    덮어쓰는 일을 막기 위해서다. 보내지 않은 항목은 모델 기본값(또는 시나리오 기본값)을 쓴다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    temperature: (
+        Annotated[
+            float, Field(ge=MIN_TEMPERATURE, le=MAX_TEMPERATURE, allow_inf_nan=False)
+        ]
+        | None
+    ) = None
+    # strict: 512.5 나 "512" 처럼 정수가 아닌 값은 변환하지 않고 거절한다
+    max_tokens: Annotated[int, Field(strict=True, ge=1, le=MAX_TOKENS_LIMIT)] | None = (
+        None
+    )
+
+
 class SimulationCreateRequest(BaseModel):
     """비교 실행 요청. simulation_runs 한 행을 만들 재료 중 사용자가 정하는 값만 담는다.
 
@@ -99,7 +126,7 @@ class SimulationCreateRequest(BaseModel):
     prompt_text: Annotated[str, Field(pattern=r"\S")]
     input_text: str | None = None
     json_schema: JsonSchemaDocument | None = None  # 없으면 Schema 검증은 "미적용"
-    execution_config: dict[str, JsonValue] = Field(default_factory=dict)
+    execution_config: ExecutionConfig = Field(default_factory=ExecutionConfig)
     routing_policy: RoutingPolicy = Field(default_factory=RoutingPolicy)
     models: ModelSelections
 

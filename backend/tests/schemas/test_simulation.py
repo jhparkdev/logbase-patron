@@ -5,6 +5,9 @@ from app.models import (
     TestType as RunType,
 )  # 이름이 Test 로 시작하면 pytest 가 테스트로 오해한다
 from app.schemas.simulation import (
+    MAX_TEMPERATURE,
+    MAX_TOKENS_LIMIT,
+    MIN_TEMPERATURE,
     ModelSelectionRequest,
     ModelSelections,
     SimulationCreateRequest,
@@ -119,7 +122,7 @@ def test_minimal_custom_request_gets_safe_defaults() -> None:
     assert request.scenario_id is None
     assert request.input_text is None
     assert request.json_schema is None
-    assert request.execution_config == {}
+    assert request.execution_config.model_dump(exclude_none=True) == {}
     # 비교 실행은 Fallback 을 끄는 것이 기본이다 (기준서 7.3 Benchmark 원칙)
     assert request.routing_policy.model_dump() == {"allow_fallbacks": False}
 
@@ -210,13 +213,72 @@ def test_broken_json_schema_is_rejected_before_any_model_is_called() -> None:
         SimulationCreateRequest(**create_body(json_schema={"type": "nonsense"}))
 
 
-def test_execution_config_accepts_json_values() -> None:
-    config = {"temperature": 0.2, "max_tokens": 512, "stop": ["END"]}
+def execution_config_of(config: dict[str, object]) -> dict[str, object]:
+    """요청에 담긴 실행 설정이 저장될 때의 모양. 보내지 않은 항목은 들어가지 않는다."""
+    request = SimulationCreateRequest(**create_body(execution_config=config))
+    return request.execution_config.model_dump(exclude_none=True)
 
-    assert (
-        SimulationCreateRequest(**create_body(execution_config=config)).execution_config
-        == config
+
+def test_execution_config_accepts_the_scenario_defaults_shape() -> None:
+    # 시나리오 기본 실행 설정(seed)과 같은 모양이다
+    config = {"temperature": 0.7, "max_tokens": 1024}
+
+    assert execution_config_of(config) == config
+
+
+def test_each_execution_setting_is_optional() -> None:
+    assert execution_config_of({"temperature": 0}) == {"temperature": 0}
+    assert execution_config_of({"max_tokens": 512}) == {"max_tokens": 512}
+
+
+# 값 범위는 바로 전, 정확히 그 값, 바로 후를 모두 검사한다
+@pytest.mark.parametrize("temperature", [MIN_TEMPERATURE, 1, MAX_TEMPERATURE])
+def test_temperature_within_range_is_accepted(temperature: float) -> None:
+    assert execution_config_of({"temperature": temperature})["temperature"] == (
+        temperature
     )
+
+
+@pytest.mark.parametrize(
+    "temperature", [MIN_TEMPERATURE - 0.01, MAX_TEMPERATURE + 0.01, float("nan")]
+)
+def test_temperature_outside_range_is_rejected(temperature: float) -> None:
+    with pytest.raises(ValidationError):
+        execution_config_of({"temperature": temperature})
+
+
+@pytest.mark.parametrize("max_tokens", [1, 2, MAX_TOKENS_LIMIT - 1, MAX_TOKENS_LIMIT])
+def test_max_tokens_within_range_is_accepted(max_tokens: int) -> None:
+    assert execution_config_of({"max_tokens": max_tokens}) == {"max_tokens": max_tokens}
+
+
+@pytest.mark.parametrize("max_tokens", [0, -1, MAX_TOKENS_LIMIT + 1])
+def test_max_tokens_outside_range_is_rejected(max_tokens: int) -> None:
+    # 상한이 없으면 한 번의 실수로 큰 비용이 나갈 수 있다
+    with pytest.raises(ValidationError):
+        execution_config_of({"max_tokens": max_tokens})
+
+
+@pytest.mark.parametrize("max_tokens", [512.5, "512", True])
+def test_max_tokens_must_be_a_whole_number(max_tokens: object) -> None:
+    with pytest.raises(ValidationError):
+        execution_config_of({"max_tokens": max_tokens})
+
+
+@pytest.mark.parametrize(
+    "key", ["provider", "response_format", "model", "stream", "stop", "top_p"]
+)
+def test_execution_config_rejects_keys_outside_the_allow_list(key: str) -> None:
+    # provider·response_format 이 섞이면 업체 고정이나 Schema 전달을 덮어쓸 수 있다
+    with pytest.raises(ValidationError, match=key):
+        execution_config_of({key: 1})
+
+
+def test_openapi_carries_the_execution_setting_limits() -> None:
+    schema = SimulationCreateRequest.model_json_schema()["$defs"]["ExecutionConfig"]
+
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["max_tokens"]["anyOf"][0]["maximum"] == MAX_TOKENS_LIMIT
 
 
 def test_fallback_can_be_switched_on_or_off() -> None:
