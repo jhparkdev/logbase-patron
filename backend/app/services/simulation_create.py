@@ -29,7 +29,7 @@ FIRST_ATTEMPT = 1
 
 
 class ScenarioNotFoundError(LookupError):
-    """없거나 비활성인 시나리오를 골랐다."""
+    """없는 시나리오를 골랐거나, 새 실행에서 비활성 시나리오를 골랐다."""
 
 
 class RerunSourceNotFoundError(LookupError):
@@ -168,7 +168,11 @@ async def _find_scenario(
     if request.test_type != RunType.SCENARIO or request.scenario_id is None:
         return None
     scenario = await deps.lookup.find_scenario(request.scenario_id)
-    if scenario is None or not scenario.is_active:
+    if scenario is None:
+        raise ScenarioNotFoundError
+    # 비활성 시나리오는 새 실행에서만 제외한다. 재실행은 과거 입력과 설정을 복원하는 것이고
+    # 그 값은 실행 당시 simulation_runs 에 복사되어 있으므로 시나리오가 나중에 비활성이 되어도 허용한다
+    if not scenario.is_active and request.rerun_of_simulation_id is None:
         raise ScenarioNotFoundError
     return scenario
 

@@ -260,18 +260,53 @@ async def test_unknown_scenario_is_rejected() -> None:
     assert intake.nothing_was_saved()
 
 
-async def test_inactive_scenario_is_rejected_like_a_missing_one() -> None:
+async def test_a_new_run_cannot_pick_a_retired_scenario() -> None:
     intake = Intake()
-    intake.lookup.scenarios[SCENARIO_ID] = ScenarioInfo(
-        scenario_id=SCENARIO_ID,
-        is_active=False,
-        default_json_schema=None,
-        default_execution_config={},
-    )
+    retire_the_scenario(intake)
 
     with pytest.raises(ScenarioNotFoundError):
         await create_simulation(
             scenario_request(), executed_by=USER_ID, deps=intake.deps
+        )
+
+    assert intake.nothing_was_saved()
+
+
+def retire_the_scenario(intake: Intake) -> None:
+    intake.lookup.scenarios[SCENARIO_ID] = ScenarioInfo(
+        scenario_id=SCENARIO_ID,
+        is_active=False,
+        default_json_schema={"type": "object", "required": ["name"]},
+        default_execution_config={"temperature": 0.7, "max_tokens": 1024},
+    )
+
+
+async def test_rerun_is_allowed_after_its_scenario_was_retired() -> None:
+    # 재실행은 과거 입력과 설정을 복원하는 것이고(기준서 8.4), 실행 당시 값은 이미 실행에 복사되어 있다.
+    # 시나리오가 나중에 비활성이 되어도 과거 실행을 다시 돌릴 수 있어야 한다
+    intake = Intake()
+    retire_the_scenario(intake)
+    intake.lookup.simulations.add(OTHER_RUN)
+
+    await create_simulation(
+        scenario_request(rerun_of_simulation_id=str(OTHER_RUN)),
+        executed_by=USER_ID,
+        deps=intake.deps,
+    )
+
+    [run] = intake.store.runs
+    assert (run.scenario_id, run.rerun_of_simulation_id) == (SCENARIO_ID, OTHER_RUN)
+
+
+async def test_rerun_still_needs_the_scenario_row_to_exist() -> None:
+    intake = Intake()
+    intake.lookup.simulations.add(OTHER_RUN)
+
+    with pytest.raises(ScenarioNotFoundError):
+        await create_simulation(
+            scenario_request(scenario_id=99, rerun_of_simulation_id=str(OTHER_RUN)),
+            executed_by=USER_ID,
+            deps=intake.deps,
         )
 
     assert intake.nothing_was_saved()
