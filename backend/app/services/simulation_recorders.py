@@ -14,7 +14,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.services import requests
+from app.services import simulation_requests
 from app.services.simulation_ports import NewRequest, SlotRecord
 
 
@@ -23,20 +23,24 @@ class SessionRequestRecorder:
         self._session = session
 
     async def create_pending(self, request: NewRequest) -> None:
-        await requests.create_simulation_request(self._session, request)
+        await simulation_requests.create_simulation_request(self._session, request)
 
     async def mark_running(self, request_id: uuid.UUID, now: datetime) -> bool:
-        return await requests.start_simulation_request(self._session, request_id)
+        return await simulation_requests.start_simulation_request(
+            self._session, request_id
+        )
 
     async def record_finished(
         self, request_id: uuid.UUID, record: SlotRecord, now: datetime
     ) -> bool:
-        return await requests.finish_simulation_request(
+        return await simulation_requests.finish_simulation_request(
             self._session, request_id, record, now
         )
 
     async def cancel_if_open(self, request_id: uuid.UUID, now: datetime) -> bool:
-        return await requests.cancel_simulation_request(self._session, request_id, now)
+        return await simulation_requests.cancel_simulation_request(
+            self._session, request_id, now
+        )
 
     async def save_payload(
         self,
@@ -44,7 +48,7 @@ class SessionRequestRecorder:
         messages: Sequence[dict[str, str]],
         response_text: str | None,
     ) -> None:
-        await requests.save_simulation_payload(
+        await simulation_requests.save_simulation_payload(
             self._session, request_id, messages, response_text
         )
 

@@ -19,7 +19,9 @@ from app.models import (
     UsageOrigin,
 )
 from app.openrouter.result import CallStatus
-from app.services.requests import (
+from app.services.simulation_outcome import to_slot_record
+from app.services.simulation_ports import NewRequest, SlotRecord
+from app.services.simulation_requests import (
     cancel_simulation_request,
     create_simulation_request,
     fail_unfinished_simulation_request,
@@ -27,8 +29,6 @@ from app.services.requests import (
     save_simulation_payload,
     start_simulation_request,
 )
-from app.services.simulation_outcome import to_slot_record
-from app.services.simulation_ports import NewRequest, SlotRecord
 from tests.db_helpers import T0, Factory
 from tests.services.simulation_fakes import failed, ok
 

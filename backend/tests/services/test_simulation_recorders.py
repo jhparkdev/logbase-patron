@@ -7,15 +7,15 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models import AIRequest, CostStatus, RequestStatus
-from app.services.requests import create_simulation_request
 from app.services.simulation_outcome import to_slot_record
 from app.services.simulation_recorders import (
     ScopedRequestRecorder,
     SessionRequestRecorder,
 )
+from app.services.simulation_requests import create_simulation_request
 from tests.db_helpers import T0, Factory
 from tests.services.simulation_fakes import ok
-from tests.services.test_requests import MESSAGES, new_request
+from tests.services.test_simulation_requests import MESSAGES, new_request
 
 R = RequestStatus
 END = T0 + timedelta(seconds=5)
