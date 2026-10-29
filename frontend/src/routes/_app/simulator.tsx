@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SimulatorPage } from "../../features/simulator/components/SimulatorPage";
+import { SimulatorRestore } from "../../features/simulator/components/SimulatorRestore";
 import { simulatorSearchSchema } from "../../features/simulator/lib/search";
 
 export const Route = createFileRoute("/_app/simulator")({
@@ -10,6 +11,8 @@ export const Route = createFileRoute("/_app/simulator")({
 function SimulatorRoute() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  if (search.sourceRun)
+    return <SimulatorRestore sourceKey={search.sourceRun} />;
   return (
     <SimulatorPage
       sort={{ key: search.sort, direction: search.direction }}

@@ -6,7 +6,7 @@ import type { RunView } from "../lib/presentation";
 export function RunSummary({ run }: { run: RunView }) {
   return (
     <div>
-      <div className="grid grid-cols-3 gap-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-3 @min-[32rem]:grid-cols-2 @min-[48rem]:grid-cols-3 @min-[96rem]:grid-cols-6">
         <StatCard
           label="전체 상태"
           value={run.status.label}

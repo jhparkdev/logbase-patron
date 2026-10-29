@@ -72,7 +72,7 @@ export function SimulationResults({
   return (
     <section
       aria-labelledby="sim-results-title"
-      className="flex flex-col gap-5"
+      className="@container flex flex-col gap-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

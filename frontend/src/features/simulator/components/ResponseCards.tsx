@@ -14,7 +14,7 @@ export function ResponseCards({
   cancelling: (key: string) => boolean;
 }) {
   return (
-    <div className="grid grid-cols-2 items-start gap-4 2xl:grid-cols-4">
+    <div className="grid grid-cols-1 items-start gap-4 @min-[32rem]:grid-cols-2 @min-[72rem]:grid-cols-4">
       {slots.map((slot) => (
         <article
           key={slot.key}
