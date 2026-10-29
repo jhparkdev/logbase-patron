@@ -3,10 +3,15 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+import httpx
 import pytest
 
 from app.openrouter.errors import ErrorType
-from app.openrouter.parsing import build_result_from_chat_body, loads_decimal
+from app.openrouter.parsing import (
+    build_result_from_chat_body,
+    generation_id_from_headers,
+    loads_decimal,
+)
 from app.openrouter.result import CallResult, CallStatus, CostSource, CostStatus
 
 STARTED_AT = datetime(2026, 10, 27, 1, 0, 0, tzinfo=UTC)
@@ -286,3 +291,68 @@ def test_비정상_응답이어도_대조에_쓸_generation_id와_원문은_남�
     assert result.generation_id == "gen-abc123"
     assert result.raw_response == body
     assert result.http_status == 200
+
+
+# ---------------------------------------------------------------
+# 호출 ID는 응답 헤더(X-Generation-Id)에서도 받는다
+# ---------------------------------------------------------------
+def build_with_header(body: dict[str, Any], header_id: str | None) -> CallResult:
+    return build_result_from_chat_body(
+        body,
+        requested_model="mistralai/mistral-nemo",
+        started_at=STARTED_AT,
+        finished_at=FINISHED_AT,
+        http_status=200,
+        generation_id_header=header_id,
+    )
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [{"X-Generation-Id": "gen-abc123"}, {"x-generation-id": "gen-abc123"}],
+)
+def test_헤더에서_호출_ID를_읽는다(headers: dict[str, str]) -> None:
+    assert generation_id_from_headers(httpx.Headers(headers)) == "gen-abc123"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [None, "", "abc", "gen-", "gen-abc def", "gen-abc/def", "gen-" + "a" * 130],
+)
+def test_헤더가_없거나_형식이_틀리면_None이다(value: str | None) -> None:
+    headers = {} if value is None else {"X-Generation-Id": value}
+
+    assert generation_id_from_headers(httpx.Headers(headers)) is None
+
+
+def test_본문에_ID가_없으면_헤더의_ID를_쓴다() -> None:
+    body = make_body()
+    del body["id"]
+
+    result = build_with_header(body, "gen-from-header")
+
+    assert result.generation_id == "gen-from-header"
+
+
+def test_본문과_헤더에_모두_ID가_있으면_본문의_ID를_쓴다() -> None:
+    result = build_with_header(make_body(), "gen-from-header")
+
+    assert result.generation_id == "gen-abc123"
+
+
+def test_본문도_헤더도_ID가_없으면_None이다() -> None:
+    body = make_body()
+    del body["id"]
+
+    assert build_with_header(body, None).generation_id is None
+
+
+def test_비정상_응답도_헤더의_ID를_남긴다() -> None:
+    body = make_body()
+    del body["id"]
+    set_empty_content(body)
+
+    result = build_with_header(body, "gen-from-header")
+
+    assert result.error_type == ErrorType.INVALID_RESPONSE
+    assert result.generation_id == "gen-from-header"

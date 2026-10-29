@@ -68,3 +68,11 @@ def test_JSON_Schema가_없으면_response_format을_보내지_않는다() -> No
 
     assert "response_format" not in body
     assert "require_parameters" not in body["provider"]
+
+
+def test_스트리밍을_켜면_stream을_true로_보낸다() -> None:
+    body = build_request_body(
+        model_id=MODEL_ID, messages=MESSAGES, max_tokens=100, stream=True
+    )
+
+    assert body["stream"] is True

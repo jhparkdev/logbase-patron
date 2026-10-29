@@ -464,3 +464,70 @@ async def test_취소되어도_로그에는_상태만_남는다(
     assert "CANCELLED" in caplog.text
     assert SECRET_PROMPT not in caplog.text
     assert FAKE_API_KEY not in caplog.text
+
+
+# ---------------------------------------------------------------
+# 호출 ID는 응답 헤더에서도 받는다
+# ---------------------------------------------------------------
+ID_HEADERS = {"X-Generation-Id": "gen-from-header"}
+
+
+async def test_오류_응답의_헤더에_호출_ID가_있으면_결과에_담는다(
+    make_client: ClientFactory,
+) -> None:
+    client = make_client(
+        lambda request: httpx.Response(500, text="boom", headers=ID_HEADERS)
+    )
+
+    result = await call(client)
+
+    assert result.error_type == ErrorType.PROVIDER_ERROR
+    assert result.generation_id == "gen-from-header"
+
+
+async def test_JSON이_아닌_200_응답도_헤더의_호출_ID를_담는다(
+    make_client: ClientFactory,
+) -> None:
+    client = make_client(
+        lambda request: httpx.Response(200, text="not json", headers=ID_HEADERS)
+    )
+
+    result = await call(client)
+
+    assert result.error_type == ErrorType.INVALID_RESPONSE
+    assert result.generation_id == "gen-from-header"
+
+
+async def test_본문에_ID가_없는_정상_응답은_헤더의_호출_ID를_쓴다(
+    make_client: ClientFactory,
+) -> None:
+    body = json.loads(SUCCESS_BODY_TEXT)
+    del body["id"]
+    client = make_client(
+        lambda request: httpx.Response(200, json=body, headers=ID_HEADERS)
+    )
+
+    result = await call(client)
+
+    assert result.status == CallStatus.SUCCESS
+    assert result.generation_id == "gen-from-header"
+
+
+async def test_정상_응답은_본문과_헤더가_다르면_본문의_호출_ID를_쓴다(
+    make_client: ClientFactory,
+) -> None:
+    client = make_client(
+        lambda request: httpx.Response(200, text=SUCCESS_BODY_TEXT, headers=ID_HEADERS)
+    )
+
+    result = await call(client)
+
+    assert result.generation_id == "gen-abc123"
+
+
+async def test_헤더가_없는_오류_응답의_호출_ID는_None이다(
+    make_client: ClientFactory,
+) -> None:
+    result = await call(make_client(respond_500))
+
+    assert result.generation_id is None

@@ -77,3 +77,29 @@ def test_취소_결과는_오류_유형이_없고_비용은_미확인이다() ->
     assert result.cost_usd is None
     assert result.latency_ms == 2000
     assert result.http_status is None
+
+
+def test_실패_결과에_호출_ID를_담을_수_있다() -> None:
+    result = build_failure_result(
+        status=CallStatus.FAILED,
+        error_type=ErrorType.PROVIDER_ERROR,
+        requested_model="mistralai/mistral-nemo",
+        started_at=STARTED_AT,
+        finished_at=FINISHED_AT,
+        http_status=500,
+        generation_id="gen-abc123",
+    )
+
+    assert result.generation_id == "gen-abc123"
+
+
+def test_취소_결과에도_이미_알게_된_호출_ID를_담을_수_있다() -> None:
+    result = build_cancelled_result(
+        requested_model="mistralai/mistral-nemo",
+        started_at=STARTED_AT,
+        finished_at=FINISHED_AT,
+        generation_id="gen-abc123",
+    )
+
+    assert result.status == CallStatus.CANCELLED
+    assert result.generation_id == "gen-abc123"

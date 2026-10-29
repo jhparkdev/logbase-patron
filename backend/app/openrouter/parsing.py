@@ -4,6 +4,8 @@
 """
 
 import json
+import re
+from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -22,6 +24,26 @@ from app.openrouter.result import (
 def loads_decimal(text: str) -> Any:
     """JSON 문자열을 읽되, 소수는 float이 아니라 Decimal로 읽는다."""
     return json.loads(text, parse_float=Decimal)
+
+
+GENERATION_ID_HEADER = "X-Generation-Id"
+# 호출 조회(/generation)가 받는 ID 형식. 공식 문서의 규칙이다.
+GENERATION_ID_PATTERN = re.compile(r"gen-[0-9A-Za-z-]+")
+MAX_GENERATION_ID_LENGTH = 128
+
+
+def clean_generation_id(value: str | None) -> str | None:
+    """호출 ID로 쓸 수 있는 값만 돌려준다. 없거나 형식이 틀리면 None."""
+    if value is None or len(value) > MAX_GENERATION_ID_LENGTH:
+        return None
+    if not GENERATION_ID_PATTERN.fullmatch(value):
+        return None
+    return value
+
+
+def generation_id_from_headers(headers: Mapping[str, str]) -> str | None:
+    """응답 헤더에서 호출 ID를 꺼낸다. 없거나 형식이 틀리면 None."""
+    return clean_generation_id(headers.get(GENERATION_ID_HEADER))
 
 
 def _get_first_choice(body: dict[str, Any]) -> dict[str, Any]:
@@ -46,8 +68,12 @@ def build_result_from_chat_body(
     started_at: datetime,
     finished_at: datetime,
     http_status: int,
+    generation_id_header: str | None = None,
 ) -> CallResult:
-    """HTTP 200으로 온 응답 본문을 CallResult로 바꾼다."""
+    """HTTP 200으로 온 응답 본문을 CallResult로 바꾼다.
+
+    호출 ID는 본문의 id를 우선하고, 없으면 헤더에서 읽은 값을 쓴다.
+    """
     choice = _get_first_choice(body)
     message = get_dict(choice, "message")
     usage = get_dict(body, "usage")
@@ -66,7 +92,7 @@ def build_result_from_chat_body(
         "requested_model": requested_model,
         "actual_model": actual_model,
         "provider": get_str(body, "provider"),
-        "generation_id": get_str(body, "id"),
+        "generation_id": get_str(body, "id") or generation_id_header,
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
         "total_tokens": get_int(usage, "total_tokens"),

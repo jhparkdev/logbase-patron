@@ -6,7 +6,7 @@ call_model은 실패해도 예외를 던지지 않고 실패 결과(CallResult)�
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
@@ -22,6 +22,7 @@ from app.openrouter.errors import (
     get_failed_routing_step,
 )
 from app.openrouter.failures import build_cancelled_result, build_failure_result
+from app.openrouter.json_access import get_str
 from app.openrouter.lookup_parsing import (
     parse_generation,
     parse_key_usage,
@@ -35,9 +36,23 @@ from app.openrouter.lookup_result import (
     LookupResult,
     ModelInfo,
 )
-from app.openrouter.parsing import build_result_from_chat_body, loads_decimal
+from app.openrouter.parsing import (
+    build_result_from_chat_body,
+    generation_id_from_headers,
+    loads_decimal,
+)
 from app.openrouter.request import build_request_body
 from app.openrouter.result import CallResult, CallStatus
+from app.openrouter.streaming import (
+    DONE_PAYLOAD,
+    GenerationIdCallback,
+    GenerationIdTracker,
+    StreamReply,
+    find_stream_error,
+    get_data_payload,
+    merge_chunks,
+    parse_chunk,
+)
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 CHAT_COMPLETIONS_URL = f"{OPENROUTER_BASE_URL}/chat/completions"
@@ -63,6 +78,15 @@ def _read_json(response: httpx.Response) -> Any:
         return loads_decimal(response.text)
     except ValueError:
         return None
+
+
+async def _run[T](
+    work: Coroutine[Any, Any, T], cancel: asyncio.Event | None
+) -> T | None:
+    """취소 신호가 있으면 신호와 겨루고, 없으면 그냥 기다린다. 취소되면 None."""
+    if cancel is None:
+        return await work
+    return await run_unless_cancelled(work, cancel)
 
 
 def _lookup_failure(
@@ -120,11 +144,18 @@ class OpenRouterClient:
         provider_order: list[str] | None = None,
         allow_fallbacks: bool = False,
         cancel: asyncio.Event | None = None,
+        stream: bool = False,
+        on_generation_id: GenerationIdCallback | None = None,
     ) -> CallResult:
         """모델을 호출하고 결과를 돌려준다. 실패해도 예외를 던지지 않는다.
 
         cancel 신호가 켜지면 호출을 멈추고 CANCELLED 결과를 돌려준다.
         신호가 없으면(None) 취소하지 않는다.
+
+        stream이 True이면 답을 조각으로 받는다. 이때 timeout_seconds는 한 번 읽는
+        시간이 아니라 호출 전체의 제한 시간이다. on_generation_id는 스트리밍일 때만
+        쓰이며, 호출 ID를 처음 알게 된 순간(응답 헤더 또는 첫 조각) 한 번 불린다.
+        끝나기 전에 끊기거나 취소돼도 ID를 저장해 둘 수 있게 하기 위해서다.
         """
         started_at = self._clock()
         request_body = build_request_body(
@@ -134,11 +165,21 @@ class OpenRouterClient:
             json_schema=json_schema,
             provider_order=provider_order,
             allow_fallbacks=allow_fallbacks,
+            stream=stream,
         )
 
         if cancel is not None and cancel.is_set():
             # 이미 취소 신호가 켜져 있으면 요청을 보내지 않는다.
             result = self._cancelled(model_id, started_at)
+        elif stream:
+            result = await self._send_stream(
+                request_body,
+                model_id,
+                timeout_seconds,
+                cancel,
+                on_generation_id,
+                started_at,
+            )
         else:
             result = await self._send(
                 request_body, model_id, timeout_seconds, cancel, started_at
@@ -266,7 +307,109 @@ class OpenRouterClient:
 
         if response is None:
             return self._cancelled(model_id, started_at)
-        return self._result_from_response(response, model_id, started_at)
+        return self._result_from_body(
+            response.status_code,
+            _read_json(response),
+            generation_id_from_headers(response.headers),
+            model_id,
+            started_at,
+        )
+
+    async def _send_stream(
+        self,
+        request_body: dict[str, Any],
+        model_id: str,
+        timeout_seconds: float,
+        cancel: asyncio.Event | None,
+        on_generation_id: GenerationIdCallback | None,
+        started_at: datetime,
+    ) -> CallResult:
+        # 스트리밍도 비용이 드는 호출이라 자동으로 다시 보내지 않는다.
+        # 끊기거나 취소돼도 이미 알게 된 호출 ID는 결과에 남겨 비용 대조에 쓴다.
+        tracker = GenerationIdTracker(on_generation_id)
+        work = self._read_stream(request_body, timeout_seconds, tracker)
+        try:
+            reply = await _run(work, cancel)
+        except httpx.TimeoutException, TimeoutError:
+            return self._failure(
+                CallStatus.TIMEOUT,
+                ErrorType.TIMEOUT_ERROR,
+                model_id,
+                started_at,
+                tracker.generation_id,
+            )
+        except httpx.RequestError:
+            return self._failure(
+                CallStatus.FAILED,
+                ErrorType.NETWORK_ERROR,
+                model_id,
+                started_at,
+                tracker.generation_id,
+            )
+
+        if reply is None:
+            return self._cancelled(model_id, started_at, tracker.generation_id)
+
+        if reply.midstream_error:
+            # 스트림 도중의 오류는 모델을 제공하는 업체 쪽 오류로 본다.
+            return build_failure_result(
+                status=CallStatus.FAILED,
+                error_type=ErrorType.PROVIDER_ERROR,
+                requested_model=model_id,
+                started_at=started_at,
+                finished_at=self._clock(),
+                http_status=reply.status_code,
+                raw_response=reply.body,
+                generation_id=tracker.generation_id,
+            )
+        return self._result_from_body(
+            reply.status_code, reply.body, tracker.generation_id, model_id, started_at
+        )
+
+    async def _read_stream(
+        self,
+        request_body: dict[str, Any],
+        timeout_seconds: float,
+        tracker: GenerationIdTracker,
+    ) -> StreamReply:
+        """스트리밍 요청을 보내고 끝까지 읽는다. 호출 ID를 알게 되면 바로 tracker에 알린다."""
+        # httpx의 timeout은 한 번 읽는 시간만 제한한다. 호출 전체 시간은 따로 제한한다.
+        async with (
+            asyncio.timeout(timeout_seconds),
+            self._http_client.stream(
+                "POST",
+                CHAT_COMPLETIONS_URL,
+                json=request_body,
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                timeout=timeout_seconds,
+            ) as response,
+        ):
+            await tracker.note(generation_id_from_headers(response.headers))
+
+            if not response.is_success:
+                # 오류 응답은 조각이 아니라 일반 JSON이다.
+                await response.aread()
+                return StreamReply(response.status_code, _read_json(response))
+
+            chunks: list[dict[str, Any]] = []
+            async for line in response.aiter_lines():
+                payload = get_data_payload(line)
+                if payload is None:
+                    continue
+                if payload == DONE_PAYLOAD:
+                    break
+                chunk = parse_chunk(payload)
+                if chunk is None:
+                    return StreamReply(response.status_code, None)
+                await tracker.note(get_str(chunk, "id"))
+                chunks.append(chunk)
+
+            error = find_stream_error(chunks)
+            if error is not None:
+                return StreamReply(
+                    response.status_code, {"error": error}, midstream_error=True
+                )
+            return StreamReply(response.status_code, merge_chunks(chunks))
 
     async def _post(
         self,
@@ -281,15 +424,16 @@ class OpenRouterClient:
             headers={"Authorization": f"Bearer {self._api_key}"},
             timeout=timeout_seconds,
         )
-        if cancel is None:
-            return await work
-        return await run_unless_cancelled(work, cancel)
+        return await _run(work, cancel)
 
-    def _cancelled(self, model_id: str, started_at: datetime) -> CallResult:
+    def _cancelled(
+        self, model_id: str, started_at: datetime, generation_id: str | None = None
+    ) -> CallResult:
         return build_cancelled_result(
             requested_model=model_id,
             started_at=started_at,
             finished_at=self._clock(),
+            generation_id=generation_id,
         )
 
     def _failure(
@@ -298,6 +442,7 @@ class OpenRouterClient:
         error_type: ErrorType,
         model_id: str,
         started_at: datetime,
+        generation_id: str | None = None,
     ) -> CallResult:
         return build_failure_result(
             status=status,
@@ -305,15 +450,24 @@ class OpenRouterClient:
             requested_model=model_id,
             started_at=started_at,
             finished_at=self._clock(),
+            generation_id=generation_id,
         )
 
-    def _result_from_response(
-        self, response: httpx.Response, model_id: str, started_at: datetime
+    def _result_from_body(
+        self,
+        status_code: int,
+        body: Any,
+        generation_id: str | None,
+        model_id: str,
+        started_at: datetime,
     ) -> CallResult:
-        finished_at = self._clock()
-        body = _read_json(response)
+        """받은 응답(일반 응답이든 합친 스트림이든)을 CallResult로 바꾼다.
 
-        if response.is_success:
+        generation_id는 응답 헤더나 조각에서 알게 된 호출 ID다. 본문에 id가 없을 때 쓴다.
+        """
+        finished_at = self._clock()
+
+        if httpx.codes.is_success(status_code):
             if not isinstance(body, dict):
                 return build_failure_result(
                     status=CallStatus.FAILED,
@@ -321,24 +475,27 @@ class OpenRouterClient:
                     requested_model=model_id,
                     started_at=started_at,
                     finished_at=finished_at,
-                    http_status=response.status_code,
+                    http_status=status_code,
+                    generation_id=generation_id,
                 )
             return build_result_from_chat_body(
                 body,
                 requested_model=model_id,
                 started_at=started_at,
                 finished_at=finished_at,
-                http_status=response.status_code,
+                http_status=status_code,
+                generation_id_header=generation_id,
             )
 
         error_body = body if isinstance(body, dict) else None
         return build_failure_result(
             status=CallStatus.FAILED,
-            error_type=classify_http_error(response.status_code, error_body),
+            error_type=classify_http_error(status_code, error_body),
             requested_model=model_id,
             started_at=started_at,
             finished_at=finished_at,
-            http_status=response.status_code,
+            http_status=status_code,
             failed_routing_step=get_failed_routing_step(error_body),
             raw_response=error_body,
+            generation_id=generation_id,
         )

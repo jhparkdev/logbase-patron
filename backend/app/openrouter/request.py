@@ -13,6 +13,7 @@ def build_request_body(
     json_schema: dict[str, Any] | None = None,
     provider_order: list[str] | None = None,
     allow_fallbacks: bool = False,
+    stream: bool = False,
 ) -> dict[str, Any]:
     # 업체 자동 전환은 기본으로 끈다. 비교 조건이 바뀌지 않게 하기 위해서다.
     provider: dict[str, Any] = {"allow_fallbacks": allow_fallbacks}
@@ -25,6 +26,9 @@ def build_request_body(
         "max_tokens": max_tokens,
         "provider": provider,
     }
+
+    if stream:
+        body["stream"] = True
 
     if json_schema is not None:
         body["response_format"] = {
