@@ -74,12 +74,14 @@ function fill() {
   fireEvent.change(screen.getByLabelText("Prompt"), {
     target: { value: "요약해 주세요." },
   });
-  fireEvent.change(screen.getByLabelText("비교 모델 1"), {
-    target: { value: "a:p1" },
-  });
-  fireEvent.change(screen.getByLabelText("비교 모델 2"), {
-    target: { value: "a:p2" },
-  });
+  fireEvent.click(screen.getByRole("button", { name: "모델 검색" }));
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "모델 A · Provider 1" }),
+  );
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "모델 A · Provider 2" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "선택 적용" }));
 }
 
 test("API 미연결 화면은 가짜 모델과 실행 결과를 만들지 않는다", () => {
@@ -174,13 +176,21 @@ test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번
   expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
 });
 
-test("모델 칸을 최대 네 개까지 추가하고 하나만 남으면 실행을 막는다", () => {
-  render(<SimulatorPage choices={choices} onRun={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name: "모델 추가" }));
-  fireEvent.click(screen.getByRole("button", { name: "모델 추가" }));
+test("네 모델이 선택되어 있어도 검색으로 교체할 수 있고 하나만 남으면 실행을 막는다", () => {
+  const catalog = [
+    ...choices,
+    ...["c", "d"].map((name) => ({ ...choices[0], key: `${name}:p1`, name })),
+  ];
+  render(
+    <SimulatorPage
+      choices={catalog}
+      onRun={vi.fn()}
+      initialValues={{ selections: ["a:p1", "a:p2", "c:p1", "d:p1"] }}
+    />,
+  );
   expect(
-    screen.getByRole("button", { name: "모델 추가" }).hasAttribute("disabled"),
-  ).toBe(true);
+    screen.getByRole("button", { name: "모델 검색" }).hasAttribute("disabled"),
+  ).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "비교 모델 4 제거" }));
   fireEvent.click(screen.getByRole("button", { name: "비교 모델 3 제거" }));
   fireEvent.click(screen.getByRole("button", { name: "비교 모델 2 제거" }));
@@ -201,11 +211,12 @@ test.each([1, 2])(
     fireEvent.click(
       screen.getByRole("button", { name: `비교 모델 ${removed} 제거` }),
     );
-    expect(screen.queryByLabelText("비교 모델 2")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "비교 모델 2" })).toBeNull();
     const remaining = removed === 1 ? "a:p2" : "a:p1";
+    const selected = screen.getByRole("list", { name: "선택한 비교 모델" });
     expect(
-      (screen.getByLabelText("비교 모델 1") as HTMLSelectElement).value,
-    ).toBe(remaining);
+      within(selected).getByText(removed === 1 ? "Provider 2" : "Provider 1"),
+    ).toBeDefined();
     expect(run.hasAttribute("disabled")).toBe(true);
     expect(
       screen
@@ -221,12 +232,15 @@ test.each([1, 2])(
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(onRun).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "모델 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "모델 검색" }));
     expect(run.hasAttribute("disabled")).toBe(true);
     const restored = removed === 1 ? "a:p1" : "a:p2";
-    fireEvent.change(screen.getByLabelText("비교 모델 2"), {
-      target: { value: restored },
-    });
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: `모델 A · Provider ${removed === 1 ? 1 : 2}`,
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "선택 적용" }));
     expect(run.hasAttribute("disabled")).toBe(false);
     fireEvent.click(run);
     const dialog = await screen.findByRole("dialog", {

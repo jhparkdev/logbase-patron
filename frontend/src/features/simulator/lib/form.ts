@@ -89,8 +89,8 @@ export function createDefaultValues(
     jsonSchema: "",
     temperature: "",
     maxTokens: "",
-    selections: ["", ""],
     files: [],
     ...initialValues,
+    selections: initialValues?.selections?.filter(Boolean) ?? [],
   };
 }

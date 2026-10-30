@@ -56,11 +56,14 @@ test("P-04의 입력·모델 선택·결과를 같은 mock 실행 한 건으로 
     (screen.getByLabelText("입력 텍스트 (선택사항)") as HTMLTextAreaElement)
       .value,
   ).toBe(previewData.initialValues.text);
+  const selected = within(
+    screen.getByRole("list", { name: "선택한 비교 모델" }),
+  ).getAllByRole("listitem");
   for (const [index, key] of previewData.initialValues.selections.entries()) {
-    expect(
-      (screen.getByLabelText(`비교 모델 ${index + 1}`) as HTMLSelectElement)
-        .value,
-    ).toBe(key);
+    const choice = previewData.choices.find((item) => item.key === key);
+    if (!choice) throw new Error("선택한 예시 모델이 없습니다.");
+    expect(within(selected[index]).getByText(choice.name)).toBeDefined();
+    expect(within(selected[index]).getByText(choice.provider)).toBeDefined();
   }
   expect(
     screen.getByRole("heading", { name: "시뮬레이션 결과 요약" }),

@@ -1,9 +1,12 @@
-import { Controller, useFormContext, useWatch } from "react-hook-form";
+import { useEffect, useRef, useState } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
+import searchIcon from "../../../assets/search.svg";
 import { Button } from "../../../shared/components/ui/Button";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
-import { controlClass, MODEL_LIMITS } from "../lib/limits";
+import { MODEL_LIMITS } from "../lib/limits";
 import type { ModelChoice } from "../lib/presentation";
 import { FieldError } from "./InputFields";
+import { ModelPickerDialog } from "./ModelPickerDialog";
 
 export function ModelSelection({
   choices,
@@ -18,6 +21,20 @@ export function ModelSelection({
     formState: { errors },
   } = useFormContext<SimulatorFormValues, unknown, SimulatorDraft>();
   const selections = useWatch({ control, name: "selections" });
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!pickerOpen) return;
+    return () => trigger.current?.focus();
+  }, [pickerOpen]);
+  const apply = (keys: string[]) => {
+    setValue("selections", keys, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: !!errors.selections,
+    });
+    setPickerOpen(false);
+  };
   return (
     <section className="border-t border-grey-100 pt-5">
       <div className="mb-3 flex items-center justify-between">
@@ -28,104 +45,87 @@ export function ModelSelection({
           </span>
         </h3>
         <Button
+          ref={trigger}
           size="sm"
           variant="secondary"
-          disabled={selections.length >= MODEL_LIMITS.max}
-          onClick={() => setValue("selections", [...selections, ""])}
+          icon={searchIcon}
+          disabled={unavailable}
+          aria-haspopup="dialog"
+          onClick={() => setPickerOpen(true)}
         >
-          모델 추가
+          모델 검색
         </Button>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {selections.map((_, index) => {
-          const selected = choices.find(
-            (item) => item.key === selections[index],
-          );
-          // 칸 번호가 정체성이다. 모든 입력은 RHF로 제어하며 제거 후 순서대로 다시 번호를 붙인다.
-          return (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: 칸 번호가 정체성이고 내부 입력은 모두 제어된다.
-              key={`slot-${index}`}
-              className="rounded-control border border-grey-200 p-3"
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <label
-                  htmlFor={`sim-model-${index}`}
-                  className="text-label font-semibold"
-                >
-                  비교 모델 {index + 1}
-                </label>
-                <button
-                  type="button"
-                  aria-label={`비교 모델 ${index + 1} 제거`}
-                  disabled={selections.length === 1}
-                  onClick={() =>
-                    setValue(
-                      "selections",
-                      selections.filter((_, i) => i !== index),
-                      { shouldDirty: true },
-                    )
-                  }
-                  className="rounded-lg px-2 text-caption text-grey-600 focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-40"
-                >
-                  제거
-                </button>
-              </div>
-              <Controller
-                name={`selections.${index}`}
-                control={control}
-                render={({ field }) => (
-                  <select
-                    {...field}
-                    id={`sim-model-${index}`}
-                    disabled={unavailable}
-                    aria-invalid={!!errors.selections?.[index]}
-                    aria-describedby={`sim-model-${index}-error`}
-                    className={controlClass}
+      {selections.length ? (
+        <ul aria-label="선택한 비교 모델" className="grid grid-cols-2 gap-3">
+          {selections.map((key, index) => {
+            const selected = choices.find((item) => item.key === key);
+            return (
+              <li
+                key={key}
+                className="rounded-control border border-grey-200 p-3"
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <h4 className="text-label font-semibold">
+                    비교 모델 {index + 1}
+                  </h4>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    aria-label={`비교 모델 ${index + 1} 제거`}
+                    disabled={selections.length === 1}
+                    onClick={() =>
+                      setValue(
+                        "selections",
+                        selections.filter((_, i) => i !== index),
+                        {
+                          shouldDirty: true,
+                          shouldValidate: !!errors.selections,
+                        },
+                      )
+                    }
                   >
-                    <option value="">
-                      {unavailable
-                        ? "모델 목록 준비 중"
-                        : "모델을 선택해 주세요"}
-                    </option>
-                    {choices.map((choice) => (
-                      <option
-                        key={choice.key}
-                        value={choice.key}
-                        disabled={
-                          !choice.selectable ||
-                          selections.some(
-                            (key, i) => i !== index && key === choice.key,
-                          )
-                        }
-                      >
-                        {choice.name} · {choice.provider}
-                        {!choice.selectable
-                          ? ` · ${choice.unavailableReason ?? "선택 불가"}`
-                          : ""}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              />
-              {selected && (
-                <p className="mt-2 text-caption text-grey-600">
-                  Provider: {selected.provider} ·{" "}
-                  {selected.supportsImages ? "텍스트·이미지" : "텍스트"}
+                    제거
+                  </Button>
+                </div>
+                <p className="text-body-sm font-semibold">
+                  {selected?.name ?? "목록에 없는 모델"}
                 </p>
-              )}
-              <FieldError
-                id={`sim-model-${index}-error`}
-                message={errors.selections?.[index]?.message}
-              />
-            </div>
-          );
-        })}
-      </div>
+                {selected && (
+                  <div className="mt-1 flex items-center gap-2 text-caption text-grey-600">
+                    <span>{selected.provider}</span>
+                    <span>
+                      · {selected.supportsImages ? "텍스트·이미지" : "텍스트"}
+                    </span>
+                  </div>
+                )}
+                {selected && !selected.selectable && (
+                  <p className="mt-1 text-caption text-red-600">
+                    {selected.unavailableReason ?? "선택 불가"}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="rounded-control border border-dashed border-grey-200 p-5 text-body-sm text-grey-600">
+          모델 검색에서 비교할 모델을 한 번에 선택해 주세요.
+        </p>
+      )}
       <FieldError
         id="sim-selections-error"
         message={errors.selections?.root?.message ?? errors.selections?.message}
       />
+      {pickerOpen && (
+        <ModelPickerDialog
+          choices={choices}
+          selections={selections}
+          unavailable={unavailable}
+          onClose={() => setPickerOpen(false)}
+          onApply={apply}
+        />
+      )}
     </section>
   );
 }
