@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import CostSource
@@ -1047,10 +1047,10 @@ async def test_one_final_result_per_slot(
     )
 
 
-async def test_same_model_needs_different_provider(
+async def test_same_model_and_provider_cannot_repeat_the_same_settings(
     factory: Factory, db_session: AsyncSession
 ) -> None:
-    """uq_sim_results_model_provider: 같은 모델은 실행 Provider가 다를 때만 한 실행에 두 번 넣을 수 있다."""
+    """같은 모델·Provider·적용 설정의 최종 결과만 중복으로 본다."""
     simulation_id = (await factory.simulation_run())["simulation_id"]
     model_id = (await factory.model())["model_id"]
     await factory.simulation_result(
@@ -1074,7 +1074,254 @@ async def test_same_model_needs_different_provider(
             slot_no=3,
             execution_provider="provider-a",
         ),
-        constraint="uq_sim_results_model_provider",
+        constraint="uq_sim_results_model_provider_config",
+    )
+
+
+async def _configured_result(
+    factory: Factory,
+    simulation_id: uuid.UUID,
+    model_id: int,
+    slot_no: int,
+    config: dict[str, Any],
+    **values: Any,
+) -> RowMapping:
+    request = await factory.ai_request(
+        usage_origin="SIMULATION",
+        simulation_id=simulation_id,
+        execution_config=config,
+    )
+    return await factory.simulation_result(
+        simulation_id=simulation_id,
+        model_id=model_id,
+        request_id=request["request_id"],
+        slot_no=slot_no,
+        **values,
+    )
+
+
+async def test_same_model_and_provider_accept_different_settings_without_a_hash(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    simulation_id = (await factory.simulation_run())["simulation_id"]
+    model_id = (await factory.model())["model_id"]
+    first = await _configured_result(
+        factory, simulation_id, model_id, 1, {"temperature": 0.3}
+    )
+    second = await _configured_result(
+        factory, simulation_id, model_id, 2, {"temperature": 0.7}
+    )
+    assert first["execution_config_hash"] != second["execution_config_hash"]
+    assert len(first["execution_config_hash"]) == 64
+    await expect_rejected(
+        db_session,
+        _configured_result(factory, simulation_id, model_id, 3, {"temperature": 0.3}),
+        constraint="uq_sim_results_model_provider_config",
+    )
+
+
+@pytest.mark.parametrize(
+    ("left", "right", "equal"),
+    [
+        (
+            '{"temperature": 1, "max_tokens": 512}',
+            '{"max_tokens": 512.00, "temperature": 1.0}',
+            True,
+        ),
+        (
+            '{"reasoning": {"effort": "high", "values": [1, 0.30]}}',
+            '{"reasoning": {"values": [1.00, 0.3], "effort": "high"}}',
+            True,
+        ),
+        ('{"value": -0.00}', '{"value": 0}', True),
+        ('{"value": "1"}', '{"value": 1}', False),
+        ('{"value": true}', '{"value": 1}', False),
+        ("{}", '{"temperature": null}', False),
+        ('{"value": []}', '{"value": {}}', False),
+        ('{"value": [1, 2]}', '{"value": [2, 1]}', False),
+        ('{"value": "한글\\n문자"}', '{"value": "한글\\n문자"}', True),
+    ],
+)
+async def test_config_fingerprint_respects_json_value_equality(
+    db_session: AsyncSession, left: str, right: str, equal: bool
+) -> None:
+    same = await db_session.scalar(
+        text(
+            "SELECT simulation_execution_config_hash(CAST(:left AS jsonb)) = "
+            "simulation_execution_config_hash(CAST(:right AS jsonb))"
+        ),
+        {"left": left, "right": right},
+    )
+    assert same is equal
+
+
+async def test_supplied_hash_cannot_bypass_duplicate_detection(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    simulation_id = (await factory.simulation_run())["simulation_id"]
+    model_id = (await factory.model())["model_id"]
+    await _configured_result(factory, simulation_id, model_id, 1, {"max_tokens": 512})
+    await expect_rejected(
+        db_session,
+        _configured_result(
+            factory,
+            simulation_id,
+            model_id,
+            2,
+            {"max_tokens": 512.0},
+            execution_config_hash="f" * 64,
+        ),
+        constraint="uq_sim_results_model_provider_config",
+    )
+
+
+async def test_linked_request_settings_cannot_change_the_result_fingerprint(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    simulation_id = (await factory.simulation_run())["simulation_id"]
+    model_id = (await factory.model())["model_id"]
+    result = await _configured_result(
+        factory, simulation_id, model_id, 1, {"max_tokens": 512}
+    )
+    await expect_rejected(
+        db_session,
+        db_session.execute(
+            text(
+                "UPDATE ai_requests SET execution_config = '{\"max_tokens\": 1024}' "
+                "WHERE request_id = :id"
+            ),
+            {"id": result["request_id"]},
+        ),
+        constraint="fk_simulation_results_request_config",
+    )
+    await expect_rejected(
+        db_session,
+        factory.ai_request(execution_config_hash="f" * 64),
+        sqlstate=GENERATED_ALWAYS_SQLSTATE,
+    )
+
+
+async def test_config_hash_cannot_be_overwritten_on_a_result(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    result = await factory.simulation_result()
+    value = await db_session.scalar(
+        text(
+            "UPDATE simulation_results SET execution_config_hash = :fake "
+            "WHERE request_id = :id RETURNING execution_config_hash"
+        ),
+        {"fake": "f" * 64, "id": result["request_id"]},
+    )
+    assert value == result["execution_config_hash"]
+
+
+async def test_non_final_attempt_does_not_block_the_same_settings(
+    factory: Factory,
+) -> None:
+    simulation_id = (await factory.simulation_run())["simulation_id"]
+    model_id = (await factory.model())["model_id"]
+    await _configured_result(
+        factory, simulation_id, model_id, 1, {}, is_final_attempt=False
+    )
+    await _configured_result(factory, simulation_id, model_id, 1, {})
+
+
+@pytest.mark.parametrize("table", ["simulation_runs", "ai_requests"])
+@pytest.mark.parametrize("config", ["[]", "null", '"text"', "1", "true"])
+async def test_execution_config_requires_a_json_object(
+    factory: Factory, db_session: AsyncSession, table: str, config: str
+) -> None:
+    make = factory.simulation_run if table == "simulation_runs" else factory.ai_request
+    row = await make()
+    key = "simulation_id" if table == "simulation_runs" else "request_id"
+    await expect_rejected(
+        db_session,
+        db_session.execute(
+            text(
+                f"UPDATE {table} SET execution_config = CAST(:config AS jsonb) "
+                f"WHERE {key} = :id"
+            ),
+            {"config": config, "id": row[key]},
+        ),
+        constraint=f"ck_{table}_execution_config_object",
+    )
+
+
+async def test_favorites_are_unique_per_user_model_and_provider(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    user = await factory.user()
+    model = await factory.model()
+    values = {
+        "user_id": user["user_id"],
+        "model_id": model["model_id"],
+        "execution_provider": "provider-a",
+    }
+    favorite = await factory.insert("user_model_favorites", values)
+    assert favorite["created_at"].tzinfo is not None
+    await expect_rejected(
+        db_session,
+        factory.insert("user_model_favorites", values),
+        constraint="user_model_favorites_pkey",
+    )
+    await factory.insert(
+        "user_model_favorites", {**values, "execution_provider": "provider-b"}
+    )
+    await factory.insert(
+        "user_model_favorites", {**values, "user_id": (await factory.user())["user_id"]}
+    )
+    await factory.insert(
+        "user_model_favorites",
+        {**values, "model_id": (await factory.model())["model_id"]},
+    )
+    await db_session.execute(
+        text(
+            "DELETE FROM user_model_favorites WHERE user_id = :user_id "
+            "AND model_id = :model_id AND execution_provider = :execution_provider"
+        ),
+        values,
+    )
+    await factory.insert("user_model_favorites", values)
+
+
+@pytest.mark.parametrize("provider", ["", " ", " provider-a", "provider-a "])
+async def test_favorites_reject_blank_or_untrimmed_provider(
+    factory: Factory, db_session: AsyncSession, provider: str
+) -> None:
+    values = {
+        "user_id": (await factory.user())["user_id"],
+        "model_id": (await factory.model())["model_id"],
+        "execution_provider": provider,
+    }
+    await expect_rejected(
+        db_session,
+        factory.insert("user_model_favorites", values),
+        constraint="ck_user_model_favorites_provider",
+    )
+
+
+@pytest.mark.parametrize("parent,key", [("users", "user_id"), ("models", "model_id")])
+async def test_favorites_require_existing_parents_and_restrict_parent_deletion(
+    factory: Factory, db_session: AsyncSession, parent: str, key: str
+) -> None:
+    values = {
+        "user_id": (await factory.user())["user_id"],
+        "model_id": (await factory.model())["model_id"],
+        "execution_provider": "provider-a",
+    }
+    constraint = f"user_model_favorites_{key}_fkey"
+    await expect_rejected(
+        db_session,
+        factory.insert("user_model_favorites", {**values, key: -1}),
+        constraint=constraint,
+    )
+    await factory.insert("user_model_favorites", values)
+    await expect_rejected(
+        db_session,
+        db_session.execute(
+            text(f"DELETE FROM {parent} WHERE {key} = :id"), {"id": values[key]}
+        ),
+        constraint=constraint,
     )
 
 
