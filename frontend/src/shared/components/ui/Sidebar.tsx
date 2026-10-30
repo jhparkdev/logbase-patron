@@ -4,7 +4,7 @@ import internalBudgetIcon from "../../../assets/internalBudget.svg";
 import logoMark from "../../../assets/logo.svg";
 import modelIcon from "../../../assets/model.svg";
 import simulatorIcon from "../../../assets/simulator.svg";
-import simulationHistoryIcon from "../../../assets/simulatorResult.svg";
+import simulatorResultIcon from "../../../assets/simulatorResult.svg";
 import { Icon } from "./Icon";
 
 const NAV_ITEMS = [
@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   {
     to: "/simulation-history",
     label: "시뮬레이션 결과 이력",
-    icon: simulationHistoryIcon,
+    icon: simulatorResultIcon,
   },
 ] as const;
 
