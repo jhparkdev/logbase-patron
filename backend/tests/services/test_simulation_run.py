@@ -62,9 +62,7 @@ async def test_every_model_gets_the_same_input_and_its_own_pinned_provider() -> 
         assert call["provider_order"] == [slot.execution_provider]
         assert call["allow_fallbacks"] is True
         assert call["json_schema"] == SCHEMA
-        assert (
-            call["request_id"] == slot.request_id
-        )  # 정욱님 call_model 이 로그에 남긴다
+        assert call["request_id"] == slot.request_id  # call_model 이 로그에 남긴다
         assert call["max_tokens"] == 512
         assert call["timeout_seconds"] == SIMULATION_TIMEOUT_SECONDS
         assert isinstance(call["cancel"], asyncio.Event)
@@ -335,7 +333,7 @@ def test_job_carries_the_ids_needed_to_run() -> None:
     assert [slot.slot_no for slot in h.job.slots] == [1, 2]
 
 
-# --- 정욱님 실제 OpenRouterClient 와 연결 (가짜 HTTP 서버, 실제 OpenRouter 는 부르지 않는다) ---
+# --- 실제 OpenRouterClient 와 연결 (가짜 HTTP 서버, 실제 OpenRouter 는 부르지 않는다) ---
 
 OPENROUTER_REPLY = {
     "id": "gen-real-client",
@@ -386,7 +384,7 @@ async def test_the_real_openrouter_client_fits_the_simulator() -> None:
 
 
 async def test_cancel_reaches_the_real_openrouter_client() -> None:
-    # 취소 신호가 켜지면 정욱님 클라이언트가 기다리던 HTTP 요청을 끊고 CANCELLED 를 돌려준다
+    # 취소 신호가 켜지면 클라이언트가 기다리던 HTTP 요청을 끊고 CANCELLED 를 돌려준다
     request_sent = asyncio.Event()
 
     async def slow_openrouter(request: httpx.Request) -> httpx.Response:

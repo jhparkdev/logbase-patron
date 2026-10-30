@@ -1,8 +1,8 @@
 """비교 실행이 기대하는 외부 모듈의 모양.
 
-ModelCaller 는 정욱님 OpenRouterClient.call_model 과 같은 모양이라 그대로 넘기면 된다.
-건호님 services/requests.py 가 합류하면 RequestRecorder 모양에 맞춰 연결한다.
-아직 없는 동안에는 가짜 객체로 같은 모양을 흉내 내어 실행 흐름을 검증한다.
+ModelCaller 는 openrouter/client.py 의 call_model 과 같은 모양이라 그대로 넘기면 된다.
+RequestRecorder 의 DB 구현은 simulation_recorders.py 이고 쓰기는 services/requests.py 에 맡긴다.
+테스트는 가짜 객체로 같은 모양을 흉내 내어 실행 흐름을 검증한다.
 """
 
 import asyncio
@@ -134,7 +134,7 @@ class NewRun:
 
 @dataclass(frozen=True)
 class NewRequest:
-    """저장할 ai_requests 한 행(PENDING). 만드는 곳은 건호님 services/requests.py 다."""
+    """저장할 ai_requests 한 행(PENDING). 만드는 곳은 services/requests.py 의 create_pending 이다."""
 
     request_id: uuid.UUID
     simulation_id: uuid.UUID
@@ -178,7 +178,7 @@ class SlotState:
 
 
 class ModelCaller(Protocol):
-    """정욱님 OpenRouterClient.call_model 에서 시뮬레이터가 쓰는 인자. 실패해도 예외 없이 결과로 돌려준다."""
+    """openrouter/client.py 의 call_model 에서 시뮬레이터가 쓰는 인자. 실패해도 예외 없이 결과로 돌려준다."""
 
     async def __call__(
         self,
@@ -196,7 +196,7 @@ class ModelCaller(Protocol):
 
 
 class RequestRecorder(Protocol):
-    """건호님 services/requests.py 에서 필요한 것. 상태 변경은 모두 조건부이고 바뀌었는지를 돌려준다."""
+    """services/requests.py 로 채울 수 있는 것. 상태 변경은 모두 조건부이고 바뀌었는지를 돌려준다."""
 
     async def create_pending(self, request: NewRequest) -> None:
         """호출 이력을 PENDING 으로 만든다. 호출 전에 Request ID 를 저장해 두는 것이 원칙이다."""

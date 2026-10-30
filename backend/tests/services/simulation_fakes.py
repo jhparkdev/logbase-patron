@@ -80,7 +80,7 @@ class FakeCaller:
 
 
 class FakeRecorder:
-    """건호님 services/requests.py 가 해 줄 조건부 상태 변경을 메모리로 흉내 낸다."""
+    """services/requests.py 의 조건부 상태 변경을 메모리로 흉내 낸다."""
 
     def __init__(self, slots: Sequence[SlotPlan] = ()) -> None:
         self.created: list[NewRequest] = []

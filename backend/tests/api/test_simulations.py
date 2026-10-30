@@ -238,7 +238,7 @@ async def test_without_an_openrouter_client_nothing_is_saved(
     models: list[int],
     db_session: AsyncSession,
 ) -> None:
-    # 정욱님 OpenRouter 클라이언트가 연결되기 전에는 실행을 받지 않는다. 저장이 시작되기 전에 멈춘다
+    # OpenRouter 클라이언트가 연결되기 전에는 실행을 받지 않는다. 저장이 시작되기 전에 멈춘다
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(
         transport=transport, base_url=TEST_BASE_URL, headers={"Origin": TEST_ORIGIN}

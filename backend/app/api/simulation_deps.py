@@ -19,7 +19,7 @@ from app.services.simulation_scoped_store import ScopedSimulationStore
 def get_model_caller() -> ModelCaller:
     """모델을 부르는 함수(OpenRouterClient.call_model).
 
-    OpenRouter Key 설정과 클라이언트를 만들어 주입하는 일은 정욱님 몫이라 아직 연결되지 않았다.
+    OpenRouter Key 설정과 클라이언트 생성·주입이 아직 연결되지 않았다.
     그 전에는 실행을 받지 않는다. 의존성이 저장보다 먼저 풀리므로 아무것도 저장되지 않는다.
     """
     raise RuntimeError("OpenRouter 클라이언트가 아직 연결되지 않았다")

@@ -65,7 +65,7 @@ async def add_slot(
     slot_no: int,
     status: RequestStatus = R.PENDING,
 ) -> uuid.UUID:
-    """칸 하나: 호출 이력(건호님 몫이라 테스트에서는 직접 넣는다)과 칸 결과."""
+    """칸 하나: 호출 이력(requests.py 몫이라 테스트에서는 직접 넣는다)과 칸 결과."""
     model = await factory.model(status="ACTIVE")
     request = await factory.ai_request(
         usage_origin="SIMULATION",

@@ -60,7 +60,7 @@ def build_messages(text: str) -> list[dict[str, str]]:
 
 
 def compute_input_hash(prompt_text: str, input_text: str | None) -> str:
-    """실행의 입력 해시. 건호님 seed 와 같은 식(sha256(프롬프트 + 입력 텍스트))이다.
+    """실행의 입력 해시. seed 와 같은 식(sha256(프롬프트 + 입력 텍스트))이다.
 
     합치기 전의 원본 두 조각으로 계산한다. Schema 는 넣지 않는다.
     """

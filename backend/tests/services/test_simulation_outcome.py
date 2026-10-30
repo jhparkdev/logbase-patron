@@ -23,7 +23,7 @@ SCHEMA = {"type": "object", "required": ["title"]}
 
 
 def result(**overrides: object) -> openrouter_result.CallResult:
-    """정욱님 call_model 이 돌려주는 성공 결과. 필요한 값만 덮어써서 쓴다."""
+    """call_model 이 돌려주는 성공 결과. 필요한 값만 덮어써서 쓴다."""
     values: dict[str, object] = {
         "status": CALL.SUCCESS,
         "content": '{"title": "a"}',

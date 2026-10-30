@@ -88,7 +88,7 @@ def test_messages_are_a_single_user_message() -> None:
     assert build_messages("안녕") == [{"role": "user", "content": "안녕"}]
 
 
-# --- 입력 해시 (건호님 seed 와 같은 식: sha256(프롬프트 + 입력 텍스트)) ---
+# --- 입력 해시 (seed 와 같은 식: sha256(프롬프트 + 입력 텍스트)) ---
 
 
 def test_input_hash_matches_the_seed_value() -> None:
