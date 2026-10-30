@@ -54,7 +54,7 @@ class SimulationSummary(BaseModel):
 
 
 class SimulationModelResult(BaseModel):
-    """모델 한 칸의 결과. 응답 본문은 길어서 넣지 않고 원문 조회 API 로 따로 준다."""
+    """모델 한 칸의 결과. 화면이 모델 칸에 그대로 그릴 수 있게 응답 원문도 함께 준다."""
 
     slot_no: Annotated[int, Field(ge=1, le=MAX_MODEL_COUNT)]
     request_id: UUID
@@ -76,6 +76,8 @@ class SimulationModelResult(BaseModel):
     schema_validation_status: ValidationStatus | None
     missing_required_fields: list[str] | None
     comparability_note: str | None
+    # 모델이 돌려준 답변. 끝나지 않았거나 실패·취소되어 답변이 없으면 null
+    response_text: str | None
 
     @model_validator(mode="after")
     def _cost_unknown_means_null(self) -> Self:

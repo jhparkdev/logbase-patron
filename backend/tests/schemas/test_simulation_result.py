@@ -60,6 +60,7 @@ def result_body(**overrides: object) -> dict[str, object]:
         "schema_validation_status": "PASSED",
         "missing_required_fields": [],
         "comparability_note": None,
+        "response_text": None,
     }
     body.update(overrides)
     return body
@@ -235,9 +236,16 @@ def test_failed_result_keeps_its_error_type() -> None:
     assert result.error_type == "PROVIDER_ERROR"
 
 
-def test_response_text_is_not_part_of_the_result() -> None:
-    # 응답 본문은 길어서 진행 조회에 매번 싣지 않고 원문 조회 API(S-05)로만 준다
-    assert "response_text" not in SimulationModelResult.model_fields
+def test_result_carries_the_response_text() -> None:
+    # 화면이 모델 칸에 답변을 그대로 그린다. 모델 4개 × 최대 토큰이라 매번 실어도 부담이 작다
+    result = SimulationModelResult(**result_body(response_text="답변"))
+
+    assert result.model_dump(mode="json")["response_text"] == "답변"
+
+
+def test_result_without_a_response_is_null() -> None:
+    # 진행 중·실패·취소된 칸은 답변이 없다. 빈 문자열과 구분해 null 로 준다
+    assert SimulationModelResult(**result_body()).response_text is None
 
 
 def test_detail_response_holds_summary_and_results() -> None:

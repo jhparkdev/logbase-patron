@@ -107,6 +107,9 @@ async def test_a_finished_run_shows_the_summary_and_every_slot(
     assert (second["status"], second["error_type"]) == ("FAILED", "UNKNOWN_ERROR")
     assert (second["cost_usd"], second["cost_status"]) == (None, "UNKNOWN")
     assert second["execution_provider"] == "DekaLLM"
+    # 화면은 모델 칸에 응답 원문을 그대로 보여 준다. 실패한 칸은 원문이 없다
+    assert first["response_text"] == "응답"
+    assert second["response_text"] is None
 
 
 @pytest.mark.usefixtures("poc_setup", "signed_in")
@@ -148,6 +151,8 @@ async def test_a_run_that_has_not_started_shows_pending_slots_and_no_cost(
         assert (result["cost_usd"], result["cost_status"]) == (None, "UNKNOWN")
         assert result["json_parse_status"] is None
         assert result["actual_provider"] is None
+        # 아직 원문이 저장되지 않은 칸도 오류 없이 null 이다
+        assert result["response_text"] is None
 
 
 @pytest.mark.usefixtures("poc_setup", "signed_in")
