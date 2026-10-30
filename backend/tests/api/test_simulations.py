@@ -326,3 +326,62 @@ async def test_recovery_runs_while_the_server_is_up(
         assert not stopped.is_set()
 
     assert stopped.is_set()
+
+
+# --- OpenAPI 의 오류 응답 형식 ---
+
+
+def simulator_operations() -> list[tuple[str, str, dict[str, Any]]]:
+    paths = create_app().openapi()["paths"]
+    return [
+        (method, path, operation)
+        for path, operations in paths.items()
+        if path.startswith("/api/simulations")
+        for method, operation in operations.items()
+    ]
+
+
+def error_schema(response: dict[str, Any]) -> dict[str, Any]:
+    ref = response["content"]["application/json"]["schema"]["$ref"]
+    schemas = create_app().openapi()["components"]["schemas"]
+    return schemas[ref.rsplit("/", 1)[-1]]
+
+
+def code_values(schema: dict[str, Any]) -> set[str]:
+    schemas = create_app().openapi()["components"]["schemas"]
+    code = schema["properties"]["code"]
+    options = code.get("anyOf", [code])
+    values: set[str] = set()
+    for option in options:
+        if "$ref" in option:
+            option = schemas[option["$ref"].rsplit("/", 1)[-1]]
+        values.update(option.get("enum", [option.get("const")]))
+    return values
+
+
+def test_every_simulator_error_is_documented_as_code_and_message() -> None:
+    # 실제 오류 응답은 모두 {code, message} 다. 프론트엔드 타입이 이 문서에서 생성되므로 문서도 같아야 한다
+    for method, path, operation in simulator_operations():
+        for status_code, response in operation["responses"].items():
+            if int(status_code) >= 400:
+                schema = error_schema(response)
+                assert set(schema["properties"]) == {"code", "message"}, (
+                    method,
+                    path,
+                    status_code,
+                )
+
+
+def test_validation_failures_carry_the_code_the_server_actually_sends() -> None:
+    # 형식 검증 실패는 공통 코드 VALIDATION_ERROR 로 나간다(모델 수, 글자 수, 잘못된 정렬 키 등)
+    for method, path, operation in simulator_operations():
+        assert "422" in operation["responses"], (method, path)
+        codes = code_values(error_schema(operation["responses"]["422"]))
+        assert "VALIDATION_ERROR" in codes, (method, path)
+
+
+def test_state_changing_requests_document_the_origin_refusal() -> None:
+    for method, path, operation in simulator_operations():
+        if method == "post":
+            codes = code_values(error_schema(operation["responses"]["403"]))
+            assert codes == {"ORIGIN_NOT_ALLOWED"}, path

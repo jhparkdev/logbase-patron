@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal
 
-from app.schemas.common import ErrorResponse
+from app.schemas.common import ErrorCode, ErrorResponse
 from app.services.simulation_period import MAX_PERIOD_DAYS, InvalidPeriodReason
 
 
@@ -88,6 +89,21 @@ class SimulationErrorResponse(ErrorResponse):
     """
 
     code: SimulationErrorCode
+
+
+class SimulationRequestErrorResponse(ErrorResponse):
+    """422 응답의 문서용 형식. 형식 검증 실패는 공통 코드로, 업무 규칙 위반은 시뮬레이터 코드로 나간다.
+
+    형식 검증(모델 수, 글자 수, 정렬 키 등)은 공통 오류 처리기가 VALIDATION_ERROR 로 돌려준다.
+    """
+
+    code: Literal[ErrorCode.VALIDATION_ERROR] | SimulationErrorCode
+
+
+class OriginNotAllowedResponse(ErrorResponse):
+    """403 응답의 문서용 형식. 상태를 바꾸는 요청의 Origin 이 허용한 화면 주소가 아닐 때다."""
+
+    code: Literal[ErrorCode.ORIGIN_NOT_ALLOWED]
 
 
 def error_body(code: SimulationErrorCode) -> SimulationErrorResponse:
