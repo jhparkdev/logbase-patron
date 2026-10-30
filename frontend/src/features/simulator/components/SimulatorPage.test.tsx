@@ -189,6 +189,55 @@ test("모델 칸을 최대 네 개까지 추가하고 하나만 남으면 실행
   ).toBe(true);
 });
 
+test.each([1, 2])(
+  "선택한 모델 두 개 중 %i번을 제거하면 실행·직접 제출을 막고 두 개로 복구하면 실행한다",
+  async (removed) => {
+    const onRun = vi.fn();
+    render(<SimulatorPage choices={choices} onRun={onRun} />);
+    fill();
+    const run = screen.getByRole("button", { name: "비교 실행" });
+    expect(run.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: `비교 모델 ${removed} 제거` }),
+    );
+    expect(screen.queryByLabelText("비교 모델 2")).toBeNull();
+    const remaining = removed === 1 ? "a:p2" : "a:p1";
+    expect(
+      (screen.getByLabelText("비교 모델 1") as HTMLSelectElement).value,
+    ).toBe(remaining);
+    expect(run.hasAttribute("disabled")).toBe(true);
+    expect(
+      screen
+        .getByRole("button", { name: "비교 모델 1 제거" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    fireEvent.click(run);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onRun).not.toHaveBeenCalled();
+
+    fireEvent.submit(run.closest("form") as HTMLFormElement);
+    await screen.findByText("모델을 2개 이상 선택해 주세요.");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onRun).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "모델 추가" }));
+    expect(run.hasAttribute("disabled")).toBe(true);
+    const restored = removed === 1 ? "a:p1" : "a:p2";
+    fireEvent.change(screen.getByLabelText("비교 모델 2"), {
+      target: { value: restored },
+    });
+    expect(run.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(run);
+    const dialog = await screen.findByRole("dialog", {
+      name: "비교를 실행할까요?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
+    await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
+    expect(onRun.mock.calls[0]?.[0].selections).toEqual([remaining, restored]);
+  },
+);
+
 test("기존 DB 시나리오의 Prompt·Schema를 복원하고 고급 설정은 기본값을 따른다", () => {
   render(
     <SimulatorPage
