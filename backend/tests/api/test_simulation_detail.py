@@ -198,10 +198,3 @@ async def test_a_malformed_id_is_a_validation_error(client: AsyncClient) -> None
 
     assert response.status_code == 422
     assert response.json()["code"] == "VALIDATION_ERROR"
-
-
-async def test_reading_a_run_requires_login(client: AsyncClient) -> None:
-    response = await client.get(detail_url(uuid.uuid4()))
-
-    assert response.status_code == 401
-    assert response.json()["code"] == "UNAUTHENTICATED"

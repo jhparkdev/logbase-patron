@@ -301,11 +301,3 @@ async def test_a_slot_the_run_does_not_have_is_404(
     assert response.json()["code"] == "SLOT_NOT_FOUND"
     await client.post(run_url(running.simulation_id))
     await running.manager.wait_idle()
-
-
-async def test_cancelling_requires_login(client: AsyncClient) -> None:
-    for url in (run_url(uuid.uuid4()), slot_url(uuid.uuid4(), 1)):
-        response = await client.post(url)
-
-        assert response.status_code == 401
-        assert response.json()["code"] == "UNAUTHENTICATED"

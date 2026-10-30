@@ -45,13 +45,6 @@ async def past_run_id(client: AsyncClient, models: list[int]) -> str:
     return response.json()["simulation_id"]
 
 
-async def test_the_draft_needs_a_login(client: AsyncClient) -> None:
-    response = await client.get(draft_url(uuid.uuid7()))
-
-    assert response.status_code == 401
-    assert response.json()["code"] == "UNAUTHENTICATED"
-
-
 @pytest.mark.usefixtures("signed_in")
 async def test_an_unknown_run_has_no_draft(client: AsyncClient) -> None:
     response = await client.get(draft_url(uuid.uuid7()))

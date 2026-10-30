@@ -28,13 +28,6 @@ async def listed_ids(client: AsyncClient, **params: Any) -> list[str]:
     return [item["simulation_id"] for item in response.json()["items"]]
 
 
-async def test_the_history_needs_a_login(client: AsyncClient) -> None:
-    response = await client.get(CREATE)
-
-    assert response.status_code == 401
-    assert response.json()["code"] == "UNAUTHENTICATED"
-
-
 @pytest.mark.usefixtures("signed_in")
 async def test_the_default_period_is_the_last_30_kst_days_newest_first(
     client: AsyncClient, factory: Factory

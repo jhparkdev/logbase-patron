@@ -6,7 +6,7 @@
 from fastapi import Depends, FastAPI
 
 from app.api import auth, health, simulations
-from app.api.deps import get_current_user, require_allowed_origin
+from app.api.deps import require_allowed_origin
 from app.api.errors import install_error_handlers
 
 # 배포 환경에서는 nginx가 /api/* 만 backend로 넘기므로 모든 라우트를 이 아래에 둔다.
@@ -28,11 +28,8 @@ def create_app() -> FastAPI:
     for router in PUBLIC_ROUTERS:
         app.include_router(router, prefix=API_PREFIX, dependencies=[origin_check])
     for router in PROTECTED_ROUTERS:
-        app.include_router(
-            router,
-            prefix=API_PREFIX,
-            dependencies=[origin_check, Depends(get_current_user)],
-        )
+        # 개발 중 임시로 로그인 검사를 뺐다. 복구할 때 dependencies에 Depends(get_current_user)를 다시 건다.
+        app.include_router(router, prefix=API_PREFIX, dependencies=[origin_check])
     return app
 
 
