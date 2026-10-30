@@ -17,6 +17,7 @@ export function Dialog({
   showTopClose?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const content = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   useEffect(() => {
@@ -24,7 +25,7 @@ export function Dialog({
     if (open && element && !element.open) {
       element.showModal();
       heading.current?.focus({ preventScroll: true });
-      element.scrollTop = 0;
+      if (content.current) content.current.scrollTop = 0;
     }
     if (!open && element?.open) element.close();
   }, [open]);
@@ -38,13 +39,13 @@ export function Dialog({
         event.stopPropagation();
         onClose();
       }}
-      className="fixed inset-0 m-auto max-h-4/5 w-3/4 max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 text-grey-900 shadow-xl backdrop:bg-grey-900/40"
+      className="fixed inset-0 m-auto max-h-4/5 w-3/4 max-w-4xl overflow-hidden rounded-2xl bg-white p-6 text-grey-900 shadow-xl backdrop:bg-grey-900/40 open:flex open:flex-col"
     >
       <div
         className={
           showTopClose
-            ? "sticky top-0 z-10 -mx-6 -mt-6 mb-4 flex items-start justify-between gap-4 bg-white px-6 pt-6 pb-3"
-            : "mb-4"
+            ? "mb-4 flex shrink-0 items-start justify-between gap-4"
+            : "mb-4 shrink-0"
         }
       >
         <h2
@@ -70,12 +71,14 @@ export function Dialog({
           </Button>
         )}
       </div>
-      {children}
-      <div className="mt-6 flex justify-end gap-2">
-        <Button variant="secondary" onClick={onClose}>
-          닫기
-        </Button>
-        {action}
+      <div ref={content} className="min-h-0 overflow-y-auto">
+        {children}
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            닫기
+          </Button>
+          {action}
+        </div>
       </div>
     </dialog>
   );
