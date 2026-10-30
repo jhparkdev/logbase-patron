@@ -9,7 +9,7 @@ import uuid
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AIRequest, AIRequestPayload, SimulationResult
+from app.models import AIRequest, AIRequestPayload, RequestStatus, SimulationResult
 from app.schemas.simulation_result import (
     SimulationDetailResponse,
     SimulationModelResult,
@@ -75,6 +75,7 @@ def _to_model_result(
         actual_model=request.actual_model,
         status=request.status,
         error_type=request.error_type,
+        error_message=request.error_message,
         latency_ms=request.latency_ms,
         input_tokens=request.input_tokens,
         output_tokens=request.output_tokens,
@@ -84,5 +85,8 @@ def _to_model_result(
         schema_validation_status=result.schema_validation_status,
         missing_required_fields=result.missing_required_fields,
         comparability_note=result.comparability_note,
-        response_text=response_text,
+        # 취소된 칸의 원문은 취소 뒤 늦게 도착해 대조용으로만 남긴 것이라 결과로 보여 주지 않는다
+        response_text=(
+            None if request.status == RequestStatus.CANCELLED else response_text
+        ),
     )

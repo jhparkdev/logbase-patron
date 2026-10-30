@@ -78,6 +78,8 @@ class SimulationModelResult(BaseModel):
     comparability_note: str | None
     # 모델이 돌려준 답변. 끝나지 않았거나 실패·취소되어 답변이 없으면 null
     response_text: str | None
+    # 실패한 칸에 화면이 보여 줄 문구. 내부 예외 원문이 아니라 정해진 사용자 문구다. 실패가 아니면 null
+    error_message: str | None
 
     @model_validator(mode="after")
     def _cost_unknown_means_null(self) -> Self:

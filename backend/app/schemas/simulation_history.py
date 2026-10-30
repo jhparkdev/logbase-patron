@@ -14,18 +14,18 @@ MAX_PAGE_SIZE = 100
 
 
 class HistorySortColumn(StrEnum):
-    """이력 목록의 정렬 열(허용 목록). 값은 v_simulation_summary 의 열 이름과 같다.
+    """이력 목록의 정렬 열(허용 목록). 값은 이력 화면의 URL 정렬 키와 같다.
 
-    총 비용 열은 요약 뷰에 합계 열이 생기면 여기에 추가한다. 그 열을 SimulationSummary 에도 넣으면
-    목록 조회가 같은 이름으로 읽고 정렬한다.
+    요약 뷰의 어느 열로 정렬할지는 서비스(simulation_history.py)가 정한다. 총 비용(totalCost)은
+    요약 뷰에 합계 열이 생기면 여기와 서비스의 열 대응표에 한 줄씩 추가한다.
     """
 
-    REQUESTED_AT = "requested_at"
-    SIMULATION_ID = "simulation_id"
-    SCENARIO_CODE = "scenario_code"
-    MODEL_COUNT = "model_count"
+    REQUESTED_AT = "requestedAt"
+    ID = "id"
+    SCENARIO = "scenario"
+    MODEL_COUNT = "modelCount"
     STATUS = "status"
-    COST_CHECK_STATUS = "cost_check_status"
+    COST_STATUS = "costStatus"
 
 
 class SortDirection(StrEnum):
@@ -55,6 +55,13 @@ class SimulationHistoryQuery(BaseModel):
     simulation_id: UUID | None = None
 
 
+class SimulationHistoryItem(SimulationSummary):
+    """이력 목록 한 행. 진행·결과 조회의 요약에 재실행 판단용 값 하나를 더한다."""
+
+    # 이 실행에 쓴 모델 중 지금은 선택할 수 없는 모델 수(서로 다른 모델 기준)
+    inactive_model_count: Annotated[int, Field(ge=0, le=MAX_MODEL_COUNT)]
+
+
 class SimulationHistoryList(BaseModel):
     """이력 목록 한 페이지. 정렬한 값이 같으면 실행 ID 내림차순으로 순서를 고정한다.
 
@@ -62,7 +69,7 @@ class SimulationHistoryList(BaseModel):
     total 은 조건에 맞는 전체 건수라 items 길이보다 클 수 있다.
     """
 
-    items: Annotated[list[SimulationSummary], Field(max_length=MAX_PAGE_SIZE)]
+    items: Annotated[list[SimulationHistoryItem], Field(max_length=MAX_PAGE_SIZE)]
     total: Annotated[int, Field(ge=0)]
 
 

@@ -116,8 +116,45 @@ async def test_a_list_item_is_the_same_summary_the_detail_shows(
     listed = (await client.get(CREATE)).json()["items"]
     detail = (await client.get(f"{CREATE}/{simulation_id}")).json()["summary"]
 
-    assert listed == [detail]
+    # 목록 행은 요약에 "지금 선택할 수 없는 모델 수"만 더한다
+    assert [
+        {k: v for k, v in item.items() if k != "inactive_model_count"}
+        for item in listed
+    ] == [detail]
     assert detail["confirmed_cost_usd"] == "0.000125000000000000"
+
+
+@pytest.mark.usefixtures("signed_in")
+async def test_each_row_counts_the_models_that_can_no_longer_be_chosen(
+    client: AsyncClient, factory: Factory
+) -> None:
+    # 재실행하려면 바꿔야 하는 모델 수다. 같은 모델을 Provider 만 바꿔 두 칸에 넣었어도 한 개로 센다
+    run = uuid.UUID(await run_at(factory, T0))
+    active = await factory.model(status="ACTIVE")
+    retired = await factory.model(status="INACTIVE")
+    for slot_no, model in [(1, active), (2, retired), (3, retired)]:
+        await factory.simulation_result(
+            simulation_id=run,
+            model_id=model["model_id"],
+            slot_no=slot_no,
+            execution_provider=f"provider-{slot_no}",
+        )
+
+    item = (await client.get(CREATE)).json()["items"][0]
+
+    assert item["inactive_model_count"] == 1
+
+
+@pytest.mark.usefixtures("signed_in")
+async def test_a_row_whose_models_are_all_selectable_counts_zero(
+    client: AsyncClient, factory: Factory
+) -> None:
+    run = uuid.UUID(await run_at(factory, T0))
+    await factory.simulation_result(
+        simulation_id=run, model_id=(await factory.model(status="ACTIVE"))["model_id"]
+    )
+
+    assert (await client.get(CREATE)).json()["items"][0]["inactive_model_count"] == 0
 
 
 @pytest.mark.usefixtures("signed_in")
@@ -168,7 +205,7 @@ async def test_the_history_is_sorted_by_the_chosen_column(
         count: await run_at(factory, T0, model_count=count) for count in (3, 2, 4)
     }
 
-    ids = await listed_ids(client, sort="model_count", direction=direction)
+    ids = await listed_ids(client, sort="modelCount", direction=direction)
 
     ascending = [by_count[2], by_count[3], by_count[4]]
     assert ids == (ascending if direction == "asc" else ascending[::-1])
@@ -186,7 +223,7 @@ async def test_empty_values_go_last_in_either_direction(
         factory, T0, test_type="SCENARIO", scenario_id=scenario["scenario_id"]
     )
 
-    ids = await listed_ids(client, sort="scenario_code", direction=direction)
+    ids = await listed_ids(client, sort="scenario", direction=direction)
 
     assert ids == [from_scenario, custom]
 

@@ -1,5 +1,6 @@
 """POST /api/simulations (S-03) 테스트. 접수·저장·작업 시작의 순서와 오류 응답을 확인한다."""
 
+import asyncio
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -10,7 +11,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.api import simulation_deps
 from app.api.simulation_deps import get_simulation_manager
+from app.main import create_app
 from app.models import (
     AIRequest,
     AIRequestPayload,
@@ -296,3 +299,30 @@ async def test_after_the_answer_the_run_finishes_in_the_database(
     assert [r.status for r in requests] == [RequestStatus.SUCCESS] * 2
     assert {r.cost_status for r in requests} == {CostStatus.CONFIRMED}
     assert await count(db_session, AIRequestPayload) == 2
+
+
+# --- 서버가 떠 있는 동안의 정리 작업 ---
+
+
+async def test_recovery_runs_while_the_server_is_up(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """시뮬레이터 라우터를 등록한 앱이 뜨면 미완료 실행 정리(J-01·J-03)가 돌고, 내려가면 멈춘다."""
+    started = asyncio.Event()
+    stopped = asyncio.Event()
+
+    async def fake_loop(*args: object, **kwargs: object) -> None:
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    monkeypatch.setattr(simulation_deps, "run_recovery_loop", fake_loop)
+    app = create_app()
+
+    async with app.router.lifespan_context(app):
+        await asyncio.wait_for(started.wait(), timeout=1)
+        assert not stopped.is_set()
+
+    assert stopped.is_set()

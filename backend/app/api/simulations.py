@@ -6,7 +6,11 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request, Response, status
 
 from app.api.deps import DevUserDep, NowDep
-from app.api.simulation_deps import CancelDepsDep, SimulationManagerDep
+from app.api.simulation_deps import (
+    CancelDepsDep,
+    SimulationManagerDep,
+    recovery_lifespan,
+)
 from app.api.simulation_errors import SimulationRoute
 from app.db import SessionDep
 from app.schemas.simulation import SimulationAccepted, SimulationCreateRequest
@@ -37,7 +41,10 @@ from app.services.simulation_rerun import get_rerun_draft
 from app.services.simulation_store import DbSimulationStore
 
 router = APIRouter(
-    prefix="/simulations", tags=["simulations"], route_class=SimulationRoute
+    prefix="/simulations",
+    tags=["simulations"],
+    route_class=SimulationRoute,
+    lifespan=recovery_lifespan,
 )
 
 

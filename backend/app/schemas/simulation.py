@@ -84,6 +84,8 @@ class RoutingPolicy(BaseModel):
 
 # 시나리오 기본값(seed)이 512~1024 라서 여유를 두고 정한 상한이다. 한 번의 실수로 큰 비용이 나가지 않게 한다
 MAX_TOKENS_LIMIT = 4096
+# Prompt·입력 텍스트 한 칸의 최대 글자 수. 화면과 같은 값이며 OpenAPI maxLength 로 화면에 전달된다
+MAX_TEXT_LENGTH = 2_000
 MIN_TEMPERATURE = 0.0
 MAX_TEMPERATURE = 2.0
 
@@ -121,8 +123,8 @@ class SimulationCreateRequest(BaseModel):
     rerun_of_simulation_id: UUID | None = None
     scenario_id: int | None = None  # test_scenarios 표의 scenario_id
     # 실행 당시 원문이라 다듬지 않는다. 공백뿐인 값만 거절한다(\S = 공백이 아닌 글자 하나 이상)
-    prompt_text: Annotated[str, Field(pattern=r"\S")]
-    input_text: str | None = None
+    prompt_text: Annotated[str, Field(pattern=r"\S", max_length=MAX_TEXT_LENGTH)]
+    input_text: Annotated[str, Field(max_length=MAX_TEXT_LENGTH)] | None = None
     json_schema: JsonSchemaDocument | None = None  # 없으면 Schema 검증은 "미적용"
     execution_config: ExecutionConfig = Field(default_factory=ExecutionConfig)
     routing_policy: RoutingPolicy = Field(default_factory=RoutingPolicy)

@@ -63,6 +63,7 @@ class DbSimulationStore:
                 execution_provider=result.execution_provider,
                 model_status_at_run=result.model_status_at_run,
                 model_display_name_at_run=result.model_display_name_at_run,
+                comparability_note=result.comparability_note,
             )
         )
         await self._session.flush()

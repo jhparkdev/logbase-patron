@@ -61,6 +61,7 @@ def result_body(**overrides: object) -> dict[str, object]:
         "missing_required_fields": [],
         "comparability_note": None,
         "response_text": None,
+        "error_message": None,
     }
     body.update(overrides)
     return body

@@ -245,7 +245,7 @@ async def test_a_slot_cancelled_before_it_starts_is_never_called() -> None:
 async def test_a_response_that_arrives_after_cancel_does_not_change_the_cancelled_slot() -> (
     None
 ):
-    # 종료된 호출의 상태는 바꾸지 않는다. 늦게 온 결과는 저장하지 않는다
+    # 종료된 호출의 상태는 바꾸지 않는다. 늦게 온 결과는 비용 대조용으로만 남긴다(J-03)
     gate = asyncio.Event()
     started = asyncio.Event()
     h = Harness(count=2)
@@ -264,8 +264,10 @@ async def test_a_response_that_arrives_after_cancel_does_not_change_the_cancelle
 
     assert await asyncio.wait_for(task, timeout=1) == S.PARTIAL_SUCCESS
     assert h.recorder.statuses[h.request_id(1)] == R.CANCELLED
-    assert h.request_id(1) not in h.recorder.payloads
+    assert h.request_id(1) not in h.recorder.records
     assert h.request_id(1) not in h.store.validations
+    late = h.recorder.late[h.request_id(1)]
+    assert (late.external_generation_id, late.response_text) == ("gen", "늦은 응답")
 
 
 # --- 하트비트와 끝나지 않은 실행 ---

@@ -18,6 +18,7 @@ from app.services.simulation_create import (
     ModelNotFoundError,
     RerunSourceNotFoundError,
     ScenarioNotFoundError,
+    comparability_notes,
     create_simulation,
 )
 from app.services.simulation_input import (
@@ -222,6 +223,35 @@ async def test_same_model_with_different_providers_gets_two_slots() -> None:
 
     assert [s.execution_provider for s in job.slots] == ["DeepInfra", "DekaLLM"]
     assert {s.model_id for s in job.slots} == {1}
+
+
+def test_slots_sharing_a_model_are_told_apart_by_provider() -> None:
+    # 같은 모델을 Provider 만 바꿔 비교하는 칸에 그 사실을 적어, 화면이 결과 칸에 보여 준다
+    notes = comparability_notes([(1, "DeepInfra"), (2, "DeepInfra"), (1, "DekaLLM")])
+
+    assert notes == [
+        "같은 모델, 실행 Provider DeepInfra",
+        None,
+        "같은 모델, 실행 Provider DekaLLM",
+    ]
+
+
+def test_slots_with_different_models_have_no_note() -> None:
+    assert comparability_notes([(1, "DeepInfra"), (2, "DeepInfra")]) == [None, None]
+
+
+async def test_the_note_is_saved_with_each_result_row() -> None:
+    intake = Intake()
+    request = custom_request(
+        models=[selection(1, "DeepInfra"), selection(1, "DekaLLM")]
+    )
+
+    await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert [r.comparability_note for r in intake.store.results] == [
+        "같은 모델, 실행 Provider DeepInfra",
+        "같은 모델, 실행 Provider DekaLLM",
+    ]
 
 
 async def test_rerun_keeps_the_link_to_the_original_run() -> None:

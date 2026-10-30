@@ -14,6 +14,7 @@ from app.schemas.simulation_history import (
     SimulationHistoryQuery,
     SimulationRerunDraft,
 )
+from app.services.simulation_validation import MAX_MODEL_COUNT
 
 PAST_ID = "0192a3c4-0000-7000-8000-000000000001"
 
@@ -70,13 +71,14 @@ def test_sort_values_outside_the_allowed_list_are_rejected(
 def test_openapi_lists_the_sort_columns() -> None:
     schema = SimulationHistoryQuery.model_json_schema()
 
+    # 이름은 이력 화면의 URL 정렬 키와 같다
     assert schema["$defs"]["HistorySortColumn"]["enum"] == [
-        "requested_at",
-        "simulation_id",
-        "scenario_code",
-        "model_count",
+        "requestedAt",
+        "id",
+        "scenario",
+        "modelCount",
         "status",
-        "cost_check_status",
+        "costStatus",
     ]
 
 
@@ -152,8 +154,18 @@ def summary_body() -> dict[str, object]:
     }
 
 
+def item_body(**overrides: object) -> dict[str, object]:
+    return {**summary_body(), "inactive_model_count": 0, **overrides}
+
+
+@pytest.mark.parametrize("count", [-1, MAX_MODEL_COUNT + 1])
+def test_inactive_model_count_stays_within_the_model_count(count: int) -> None:
+    with pytest.raises(ValidationError):
+        SimulationHistoryList(items=[item_body(inactive_model_count=count)], total=1)
+
+
 def test_history_list_holds_one_page_and_the_full_count() -> None:
-    history = SimulationHistoryList(items=[summary_body()], total=25)
+    history = SimulationHistoryList(items=[item_body()], total=25)
 
     dumped = history.model_dump(mode="json")
     assert dumped["total"] == 25
@@ -171,7 +183,7 @@ def test_empty_history_is_a_valid_list() -> None:
 def test_a_page_holds_at_most_the_largest_page_size() -> None:
     with pytest.raises(ValidationError):
         SimulationHistoryList(
-            items=[summary_body()] * (MAX_PAGE_SIZE + 1), total=MAX_PAGE_SIZE + 1
+            items=[item_body()] * (MAX_PAGE_SIZE + 1), total=MAX_PAGE_SIZE + 1
         )
 
 

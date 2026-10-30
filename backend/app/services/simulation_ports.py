@@ -166,6 +166,8 @@ class NewResult:
     execution_provider: str
     model_status_at_run: ModelStatus
     model_display_name_at_run: str
+    # 같은 모델을 다른 Provider 로 넣은 칸이면 그 사실을 적는다. 아니면 None
+    comparability_note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -225,6 +227,15 @@ class RequestRecorder(Protocol):
         messages: list[dict[str, str]],
         response_text: str | None,
     ) -> None: ...
+
+    async def keep_late_result(
+        self,
+        request_id: uuid.UUID,
+        messages: list[dict[str, str]],
+        record: SlotRecord,
+    ) -> None:
+        """취소로 먼저 끝난 칸에 늦게 온 결과를 비용 대조용으로만 남긴다(J-03). 상태·비용은 그대로다."""
+        ...
 
 
 class SimulationStore(Protocol):

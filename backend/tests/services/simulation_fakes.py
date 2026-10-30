@@ -90,6 +90,7 @@ class FakeRecorder:
         self.records: dict[uuid.UUID, SlotRecord] = {}
         self.payloads: dict[uuid.UUID, tuple[list[dict[str, str]], str | None]] = {}
         self.fail_on_record: set[uuid.UUID] = set()
+        self.late: dict[uuid.UUID, SlotRecord] = {}
 
     async def create_pending(self, request: NewRequest) -> None:
         self.created.append(request)
@@ -119,6 +120,15 @@ class FakeRecorder:
         response_text: str | None,
     ) -> None:
         self.payloads[request_id] = (messages, response_text)
+
+    async def keep_late_result(
+        self,
+        request_id: uuid.UUID,
+        messages: list[dict[str, str]],
+        record: SlotRecord,
+    ) -> None:
+        if self.statuses[request_id] == R.CANCELLED:
+            self.late[request_id] = record
 
     async def cancel_if_open(self, request_id: uuid.UUID, now: datetime) -> bool:
         if self.statuses[request_id] in (R.PENDING, R.RUNNING):

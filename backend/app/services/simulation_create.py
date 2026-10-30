@@ -1,4 +1,6 @@
 import uuid
+from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -113,9 +115,14 @@ async def create_simulation(
             data_source=RUN_DATA_SOURCE,
         )
     )
+    notes = comparability_notes(
+        [(chosen.model_id, chosen.execution_provider) for chosen in request.models]
+    )
     slots = [
-        await _save_slot(slot_no, chosen, models[chosen.model_id], shared, deps)
-        for slot_no, chosen in enumerate(request.models, start=1)
+        await _save_slot(slot_no, chosen, models[chosen.model_id], shared, deps, note)
+        for slot_no, (chosen, note) in enumerate(
+            zip(request.models, notes, strict=True), start=1
+        )
     ]
 
     return SimulationJob(
@@ -128,6 +135,20 @@ async def create_simulation(
         max_tokens=execution_config["max_tokens"],
         allow_fallbacks=request.routing_policy.allow_fallbacks,
     )
+
+
+def comparability_notes(
+    selections: Sequence[tuple[int, str]],
+) -> list[str | None]:
+    """칸마다 비교 조건 문구. 같은 모델을 두 칸 이상 넣었으면 그 칸들은 Provider 로 구분된다고 적는다.
+
+    (모델 ID, 실행 Provider) 목록을 받아 같은 순서로 돌려준다. 다른 모델끼리의 비교는 문구가 없다.
+    """
+    counts = Counter(model_id for model_id, _ in selections)
+    return [
+        f"같은 모델, 실행 Provider {provider}" if counts[model_id] > 1 else None
+        for model_id, provider in selections
+    ]
 
 
 @dataclass(frozen=True)
@@ -149,6 +170,7 @@ async def _save_slot(
     model: ModelInfo,
     shared: _RunValues,
     deps: IntakeDeps,
+    comparability_note: str | None,
 ) -> SlotPlan:
     """모델 한 칸의 호출 이력(PENDING)과 칸 결과를 저장하고, 실행할 칸을 돌려준다."""
     request_id = deps.new_id()
@@ -184,6 +206,7 @@ async def _save_slot(
             execution_provider=chosen.execution_provider,
             model_status_at_run=model.status,
             model_display_name_at_run=model.display_name,
+            comparability_note=comparability_note,
         )
     )
     return SlotPlan(

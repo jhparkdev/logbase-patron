@@ -6,6 +6,7 @@ from app.models import (
 )  # 이름이 Test 로 시작하면 pytest 가 테스트로 오해한다
 from app.schemas.simulation import (
     MAX_TEMPERATURE,
+    MAX_TEXT_LENGTH,
     MAX_TOKENS_LIMIT,
     MIN_TEMPERATURE,
     ModelSelectionRequest,
@@ -163,6 +164,43 @@ def test_prompt_is_required() -> None:
 def test_blank_prompt_is_rejected(prompt: str) -> None:
     with pytest.raises(ValidationError):
         SimulationCreateRequest(**create_body(prompt_text=prompt))
+
+
+def test_text_limit_is_two_thousand_characters() -> None:
+    assert MAX_TEXT_LENGTH == 2_000
+
+
+@pytest.mark.parametrize("field", ["prompt_text", "input_text"])
+@pytest.mark.parametrize(
+    ("length", "accepted"),
+    [
+        (MAX_TEXT_LENGTH - 1, True),
+        (MAX_TEXT_LENGTH, True),
+        (MAX_TEXT_LENGTH + 1, False),
+    ],
+    ids=["just-under", "exactly", "just-over"],
+)
+def test_prompt_and_input_text_are_limited(
+    field: str, length: int, accepted: bool
+) -> None:
+    # 화면과 같은 한도를 서버 계약에 둔다. 한글도 한 글자로 센다
+    body = create_body(**{field: "가" * length})
+
+    if accepted:
+        assert len(getattr(SimulationCreateRequest(**body), field)) == length
+    else:
+        with pytest.raises(ValidationError):
+            SimulationCreateRequest(**body)
+
+
+def test_openapi_carries_the_text_limit() -> None:
+    properties = SimulationCreateRequest.model_json_schema()["properties"]
+
+    assert properties["prompt_text"]["maxLength"] == MAX_TEXT_LENGTH
+    input_text = next(
+        option for option in properties["input_text"]["anyOf"] if "type" in option
+    )
+    assert input_text["maxLength"] == MAX_TEXT_LENGTH
 
 
 def test_prompt_is_kept_exactly_as_typed() -> None:

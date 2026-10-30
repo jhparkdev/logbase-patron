@@ -143,7 +143,8 @@ async def _run_slot(
         result = _unexpected_failure(slot, started_at, deps.now())
     record = to_slot_record(result, job.json_schema)
     if not await deps.recorder.record_finished(slot.request_id, record, deps.now()):
-        # 이미 취소로 끝난 칸이다. 종료된 호출의 상태는 바꾸지 않으므로 늦게 온 결과는 저장하지 않는다
+        # 이미 취소로 끝난 칸이다. 종료된 호출의 상태는 바꾸지 않고, 늦게 온 결과는 대조용으로만 남긴다
+        await deps.recorder.keep_late_result(slot.request_id, job.messages, record)
         return
     await deps.recorder.save_payload(
         slot.request_id, job.messages, record.response_text

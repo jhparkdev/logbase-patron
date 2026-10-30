@@ -1,11 +1,14 @@
 """시뮬레이터 라우터가 쓰는 의존성."""
 
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Annotated
 
 import httpx
-from fastapi import Depends
+from fastapi import Depends, FastAPI
 from pydantic import SecretStr
 
 from app.api.deps import NowDep, SettingsDep
@@ -15,6 +18,7 @@ from app.services.simulation_cancel_service import CancelDeps
 from app.services.simulation_manager import SimulationManager
 from app.services.simulation_ports import ModelCaller, SimulationDeps
 from app.services.simulation_recorders import ScopedRequestRecorder
+from app.services.simulation_recovery import run_recovery_loop
 from app.services.simulation_registry import CancelRegistry
 from app.services.simulation_scoped_store import ScopedSimulationStore
 
@@ -81,3 +85,22 @@ def get_cancel_deps(now: NowDep) -> CancelDeps:
 
 SimulationManagerDep = Annotated[SimulationManager, Depends(get_simulation_manager)]
 CancelDepsDep = Annotated[CancelDeps, Depends(get_cancel_deps)]
+
+
+@asynccontextmanager
+async def recovery_lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """서버가 떠 있는 동안 미완료 실행 정리(J-01·J-03)를 돌린다. 시뮬레이터 라우터의 lifespan 이다.
+
+    라우터에 달아 두면 앱이 라우터를 등록할 때 합쳐져 app/main.py 를 고치지 않아도 된다.
+    실행 중인 작업은 라우터와 같은 취소 신호 보관함에서 읽어, 이 서버가 돌리는 실행은 건드리지 않는다.
+    테스트 클라이언트(ASGITransport)는 lifespan 을 돌리지 않는다.
+    """
+    recovery = asyncio.create_task(
+        run_recovery_loop(get_sessionmaker(), get_cancel_registry().is_active)
+    )
+    try:
+        yield
+    finally:
+        recovery.cancel()
+        with suppress(asyncio.CancelledError):
+            await recovery
