@@ -1,4 +1,5 @@
-"""RequestRecorder 포트의 DB 구현. 쓰기는 모두 services/requests.py 에 맡긴다.
+"""RequestRecorder 포트의 DB 구현. 쓰기는 services/requests.py 에 맡기고,
+그 함수가 받지 않는 값만 simulation_requests.py 로 보탠다.
 
 두 가지 쓰임이 있다.
 - SessionRequestRecorder: 요청 세션을 그대로 쓰고 commit 하지 않는다. 접수가 실행·호출 이력·칸 결과를
@@ -14,7 +15,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.services import simulation_requests
+from app.services import requests, simulation_requests
 from app.services.simulation_ports import NewRequest, SlotRecord
 
 
@@ -23,24 +24,26 @@ class SessionRequestRecorder:
         self._session = session
 
     async def create_pending(self, request: NewRequest) -> None:
-        await simulation_requests.create_simulation_request(self._session, request)
+        await requests.create_pending(self._session, request)
 
     async def mark_running(self, request_id: uuid.UUID, now: datetime) -> bool:
-        return await simulation_requests.start_simulation_request(
-            self._session, request_id
-        )
+        return await requests.mark_running(self._session, request_id, now)
 
     async def record_finished(
         self, request_id: uuid.UUID, record: SlotRecord, now: datetime
     ) -> bool:
-        return await simulation_requests.finish_simulation_request(
-            self._session, request_id, record, now
+        finished = await requests.record_finished(
+            self._session, request_id, record, now, cost_source=record.cost_source
         )
+        # requests.py 가 받지 않는 값은 같은 트랜잭션에서 이어 쓴다. 졌으면(취소가 먼저) 쓰지 않는다
+        if finished:
+            await simulation_requests.save_finish_details(
+                self._session, request_id, record
+            )
+        return finished
 
     async def cancel_if_open(self, request_id: uuid.UUID, now: datetime) -> bool:
-        return await simulation_requests.cancel_simulation_request(
-            self._session, request_id, now
-        )
+        return await requests.cancel_request(self._session, request_id, now)
 
     async def save_payload(
         self,
@@ -48,9 +51,7 @@ class SessionRequestRecorder:
         messages: Sequence[dict[str, str]],
         response_text: str | None,
     ) -> None:
-        await simulation_requests.save_simulation_payload(
-            self._session, request_id, messages, response_text
-        )
+        await requests.save_payload(self._session, request_id, messages, response_text)
 
 
 class ScopedRequestRecorder:
