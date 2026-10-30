@@ -1,0 +1,200 @@
+"""GET /api/simulations/{id} (S-04) 테스트. 화면이 5초마다 조회하는 진행·결과 응답을 확인한다."""
+
+import uuid
+from decimal import Decimal
+from typing import Any
+
+import pytest
+from fastapi import FastAPI
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.simulation_deps import get_simulation_manager
+from app.models import RequestStatus
+from tests.api.simulation_helpers import (
+    CREATE,
+    FakeManager,
+    build_manager,
+    create_body,
+)
+from tests.db_helpers import Factory
+from tests.services.simulation_fakes import FakeCaller, failed
+
+R = RequestStatus
+
+
+def detail_url(simulation_id: object) -> str:
+    return f"{CREATE}/{simulation_id}"
+
+
+async def run_to_the_end(
+    app: FastAPI,
+    client: AsyncClient,
+    db_session: AsyncSession,
+    factory: Factory,
+    caller_of: Any,
+) -> tuple[str, list[dict[str, Any]]]:
+    """모델 2개를 가짜로 끝까지 돌리고 (실행 ID, 모델 행들)을 돌려준다."""
+    rows = [dict(await factory.model(status="ACTIVE")) for _ in range(2)]
+    manager = build_manager(db_session, caller_of(rows))
+    app.dependency_overrides[get_simulation_manager] = lambda: manager
+    response = await client.post(
+        CREATE, json=create_body([r["model_id"] for r in rows])
+    )
+    await manager.wait_idle()
+    return response.json()["simulation_id"], rows
+
+
+# --- 끝난 실행 ---
+
+
+@pytest.mark.usefixtures("poc_setup")
+async def test_a_finished_run_shows_the_summary_and_every_slot(
+    app: FastAPI,
+    client: AsyncClient,
+    factory: Factory,
+    db_session: AsyncSession,
+    signed_in: dict[str, Any],
+) -> None:
+    async def fail(kwargs: dict[str, Any]) -> Any:
+        return failed(R.FAILED)
+
+    simulation_id, rows = await run_to_the_end(
+        app,
+        client,
+        db_session,
+        factory,
+        lambda rows: FakeCaller({rows[1]["openrouter_model_id"]: fail}),
+    )
+
+    response = await client.get(detail_url(simulation_id))
+
+    assert response.status_code == 200
+    body = response.json()
+    summary = body["summary"]
+    assert summary["simulation_id"] == simulation_id
+    assert summary["status"] == "PARTIAL_SUCCESS"
+    assert (summary["test_type"], summary["scenario_code"]) == ("CUSTOM", None)
+    assert summary["model_count"] == 2
+    assert summary["executed_by"] == signed_in["user_id"]
+    assert summary["completed_at"] is not None
+    assert (
+        summary["final_result_count"],
+        summary["success_count"],
+        summary["failure_count"],
+    ) == (2, 1, 1)
+    # 비용 미확인 호출은 합계에 넣지 않고 따로 센다
+    assert Decimal(summary["confirmed_cost_usd"]) == Decimal("0.001")
+    assert summary["estimated_cost_usd"] is None
+    assert summary["unknown_cost_count"] == 1
+    assert summary["cost_check_status"] == "미확인 포함"
+
+    first, second = body["results"]
+    assert [first["slot_no"], second["slot_no"]] == [1, 2]
+    assert (first["status"], first["error_type"]) == ("SUCCESS", None)
+    assert Decimal(first["cost_usd"]) == Decimal("0.001")
+    assert first["cost_status"] == "CONFIRMED"
+    assert (first["input_tokens"], first["output_tokens"]) == (10, 5)
+    assert (first["actual_provider"], first["actual_model"]) == ("P", "m")
+    assert first["model_display_name_at_run"] == rows[0]["display_name"]
+    assert first["model_status_at_run"] == "ACTIVE"
+    assert first["execution_provider"] == "DeepInfra"
+    assert (first["json_parse_status"], first["schema_validation_status"]) == (
+        "NOT_APPLICABLE",
+        "NOT_APPLICABLE",
+    )
+    # 실패한 호출의 비용은 0 이 아니라 미확인(null)이다
+    assert (second["status"], second["error_type"]) == ("FAILED", "UNKNOWN_ERROR")
+    assert (second["cost_usd"], second["cost_status"]) == (None, "UNKNOWN")
+    assert second["execution_provider"] == "DekaLLM"
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in")
+async def test_the_summary_total_equals_the_sum_of_the_slots(
+    app: FastAPI, client: AsyncClient, factory: Factory, db_session: AsyncSession
+) -> None:
+    simulation_id, _ = await run_to_the_end(
+        app, client, db_session, factory, lambda rows: FakeCaller()
+    )
+
+    body = (await client.get(detail_url(simulation_id))).json()
+
+    confirmed = sum(
+        Decimal(r["cost_usd"])
+        for r in body["results"]
+        if r["cost_status"] == "CONFIRMED"
+    )
+    assert Decimal(body["summary"]["confirmed_cost_usd"]) == confirmed
+    assert body["summary"]["cost_check_status"] == "확정"
+
+
+# --- 진행 중 ---
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in")
+async def test_a_run_that_has_not_started_shows_pending_slots_and_no_cost(
+    client: AsyncClient, manager: FakeManager, models: list[int]
+) -> None:
+    created = await client.post(CREATE, json=create_body(models))
+
+    response = await client.get(detail_url(created.json()["simulation_id"]))
+
+    body = response.json()
+    assert body["summary"]["status"] == "PENDING"
+    assert body["summary"]["completed_at"] is None
+    assert body["summary"]["cost_check_status"] == "확인 중"
+    assert [r["status"] for r in body["results"]] == ["PENDING", "PENDING"]
+    for result in body["results"]:
+        assert (result["cost_usd"], result["cost_status"]) == (None, "UNKNOWN")
+        assert result["json_parse_status"] is None
+        assert result["actual_provider"] is None
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in")
+async def test_only_the_final_attempt_of_a_slot_is_shown(
+    client: AsyncClient,
+    manager: FakeManager,
+    models: list[int],
+    factory: Factory,
+) -> None:
+    created = await client.post(CREATE, json=create_body(models))
+    simulation_id = uuid.UUID(created.json()["simulation_id"])
+    earlier = await factory.ai_request(
+        usage_origin="SIMULATION", simulation_id=simulation_id, status="PENDING"
+    )
+    await factory.simulation_result(
+        simulation_id=simulation_id,
+        request_id=earlier["request_id"],
+        model_id=models[0],
+        slot_no=1,
+        execution_provider="Earlier",
+        is_final_attempt=False,
+    )
+
+    body = (await client.get(detail_url(simulation_id))).json()
+
+    assert [r["slot_no"] for r in body["results"]] == [1, 2]
+    assert earlier["request_id"] not in {r["request_id"] for r in body["results"]}
+    assert body["summary"]["final_result_count"] == 2
+
+
+# --- 거절 ---
+
+
+@pytest.mark.usefixtures("signed_in")
+async def test_an_unknown_run_is_404_without_needing_the_model_caller(
+    client: AsyncClient,
+) -> None:
+    # 조회는 DB 만 읽는다. OpenRouter 클라이언트가 연결되기 전에도 동작해야 한다
+    response = await client.get(detail_url(uuid.uuid4()))
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "SIMULATION_NOT_FOUND"
+
+
+@pytest.mark.usefixtures("signed_in")
+async def test_a_malformed_id_is_a_validation_error(client: AsyncClient) -> None:
+    response = await client.get(detail_url("not-a-uuid"))
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "VALIDATION_ERROR"
