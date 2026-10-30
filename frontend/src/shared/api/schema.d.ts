@@ -72,10 +72,131 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/simulations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Simulation Runs
+         * @description 이력 목록. 조건으로 거른 결과를 최신 순으로 상한까지 준다. 정렬·페이지는 화면이 한다.
+         */
+        get: operations["list_simulation_runs_api_simulations_get"];
+        put?: never;
+        /**
+         * Create Simulation Run
+         * @description 비교 실행을 접수하고 바로 돌려준다. 모델 호출은 응답 뒤 백그라운드에서 진행한다.
+         */
+        post: operations["create_simulation_run_api_simulations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulations/{simulation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Simulation Run
+         * @description 진행·결과 조회. 화면이 끝날 때까지 5초마다 부른다. DB 만 읽으므로 비용이 들지 않는다.
+         */
+        get: operations["read_simulation_run_api_simulations__simulation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulations/{simulation_id}/rerun-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Rerun Draft
+         * @description 재실행 초안. 과거 입력으로 화면 입력칸을 채운다. 실행은 사용자가 새 실행 요청으로 보낼 때 시작한다.
+         */
+        get: operations["read_rerun_draft_api_simulations__simulation_id__rerun_draft_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulations/{simulation_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Simulation Run
+         * @description 실행 전체를 취소한다. 이미 끝난 모델은 그대로 두고, 이미 끝난 실행도 오류가 아니라 현재 상태를 알려 준다.
+         */
+        post: operations["cancel_simulation_run_api_simulations__simulation_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulations/{simulation_id}/slots/{slot_no}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Simulation Slot
+         * @description 모델 하나만 취소한다. 나머지 모델은 계속 돈다.
+         */
+        post: operations["cancel_simulation_slot_api_simulations__simulation_id__slots__slot_no__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * CancelDecision
+         * @enum {string}
+         */
+        CancelDecision: "CANCEL" | "ALREADY_CANCELLED" | "ALREADY_TERMINAL";
+        /**
+         * CostCheckStatus
+         * @description v_simulation_summary 의 cost_check_status 값. 뷰가 한국어 문구를 그대로 내보내므로 값도 같다.
+         * @enum {string}
+         */
+        CostCheckStatus: "확인 중" | "미확인 포함" | "추정 포함" | "확정";
+        /**
+         * CostStatus
+         * @description 비용 상태. UNKNOWN이면 cost_usd는 반드시 NULL이다(0으로 기록하지 않음).
+         * @enum {string}
+         */
+        CostStatus: "CONFIRMED" | "ESTIMATED" | "UNKNOWN";
         /**
          * CurrentUserRead
          * @description 로그인한 관리자. 비밀번호 해시와 세션 값은 내보내지 않는다.
@@ -105,6 +226,24 @@ export interface components {
             /** Message */
             message: string;
         };
+        /**
+         * ErrorType
+         * @enum {string}
+         */
+        ErrorType: "AUTH_ERROR" | "RATE_LIMIT" | "TIMEOUT_ERROR" | "PROVIDER_ERROR" | "NETWORK_ERROR" | "INVALID_RESPONSE" | "UNSUPPORTED_INPUT" | "UNKNOWN_ERROR";
+        /**
+         * ExecutionConfig
+         * @description 모델 실행 설정. 시나리오 기본 실행 설정(test_scenarios.default_execution_config)과 같은 항목이다.
+         *
+         *     허용 항목만 받는다. provider·response_format 같은 키가 섞여 업체 고정이나 Schema 전달을
+         *     덮어쓰는 일을 막기 위해서다. 보내지 않은 항목은 모델 기본값(또는 시나리오 기본값)을 쓴다.
+         */
+        ExecutionConfig: {
+            /** Temperature */
+            temperature?: number | null;
+            /** Max Tokens */
+            max_tokens?: number | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -118,6 +257,7 @@ export interface components {
              */
             status: "ok";
         };
+        JsonValue: unknown;
         /** LoginRequest */
         LoginRequest: {
             /** Email */
@@ -128,6 +268,317 @@ export interface components {
              */
             password: string;
         };
+        /**
+         * ModelSelectionRequest
+         * @description 비교 실행에서 고른 모델 한 칸. 필드 이름은 simulation_results 컬럼과 같다.
+         */
+        ModelSelectionRequest: {
+            /** Model Id */
+            model_id: number;
+            /** Execution Provider */
+            execution_provider: string;
+        };
+        /**
+         * ModelStatus
+         * @description 등록 모델 상태. 시뮬레이션 결과에는 실행 당시 상태로 복사해 둔다.
+         * @enum {string}
+         */
+        ModelStatus: "TESTING" | "ACTIVE" | "INACTIVE";
+        /**
+         * RequestCancelOutcome
+         * @description 모델 한 칸의 취소 처리 결과. decision 은 decide_request_cancel 이 내린 판정이다.
+         *
+         *     비용은 싣지 않는다. 취소된 호출의 비용은 대조(reconcile) 전까지 미확인이라 여기서 0 으로 보일 수 있다.
+         */
+        RequestCancelOutcome: {
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /** Slot No */
+            slot_no: number;
+            decision: components["schemas"]["CancelDecision"];
+            status: components["schemas"]["RequestStatus"];
+        };
+        /**
+         * RequestStatus
+         * @enum {string}
+         */
+        RequestStatus: "PENDING" | "RUNNING" | "SUCCESS" | "FAILED" | "TIMEOUT" | "CANCELLED";
+        /**
+         * RerunBlockReason
+         * @description 재실행을 시작할 수 없는 사유. 모델 상태는 사유가 아니다(교체·제외하면 되므로).
+         * @enum {string}
+         */
+        RerunBlockReason: "INPUT_MISSING";
+        /**
+         * RerunModel
+         * @description 재실행 초안의 모델 한 칸. 과거에 고른 값에 모델의 현재 상태를 더해 교체·제외 안내를 돕는다.
+         */
+        RerunModel: {
+            /** Model Id */
+            model_id: number;
+            /** Execution Provider */
+            execution_provider: string;
+            /** Current Display Name */
+            current_display_name: string;
+            current_status: components["schemas"]["ModelStatus"];
+            /** Selectable */
+            selectable: boolean;
+        };
+        /**
+         * RerunRoutingPolicy
+         * @description 재실행 초안에 돌려주는 Provider 정책. 사용자가 고칠 값만 담는다.
+         *
+         *     과거 기록에는 서버가 적어 둔 값(require_parameters 등)이 더 들어 있으므로
+         *     모르는 키는 거절하지 않고 버린다(pydantic 기본 동작).
+         */
+        RerunRoutingPolicy: {
+            /** Allow Fallbacks */
+            allow_fallbacks: boolean;
+        };
+        /**
+         * RoutingPolicy
+         * @description 사용자가 정하는 Provider 정책. 키 이름은 simulation_runs.routing_policy 에 저장되는 값과 같다.
+         *
+         *     업체 순서(order)는 모델 칸마다 execution_provider 로 정해지므로 여기에는 없다.
+         *     require_parameters(요청한 설정을 모두 지원하는 업체만 사용)는 비교 실행의 고정 조건이라
+         *     사용자가 정하지 않는다. 서버가 정해서 호출하고, 실제로 보낸 값을 저장할 때 함께 기록한다.
+         */
+        RoutingPolicy: {
+            /**
+             * Allow Fallbacks
+             * @default false
+             */
+            allow_fallbacks: boolean;
+        };
+        /**
+         * SimulationAccepted
+         * @description 실행 요청을 받았다는 응답(202). 진행과 결과는 이 ID 로 조회한다.
+         */
+        SimulationAccepted: {
+            /**
+             * Simulation Id
+             * Format: uuid
+             */
+            simulation_id: string;
+        };
+        /**
+         * SimulationCancelResponse
+         * @description 취소 요청 응답. 실행 전체 취소는 칸 전부를, 모델 하나 취소는 그 칸 하나를 담는다.
+         */
+        SimulationCancelResponse: {
+            /**
+             * Simulation Id
+             * Format: uuid
+             */
+            simulation_id: string;
+            status: components["schemas"]["SimulationStatus"];
+            /** Results */
+            results: components["schemas"]["RequestCancelOutcome"][];
+        };
+        /**
+         * SimulationCreateRequest
+         * @description 비교 실행 요청. simulation_runs 한 행을 만들 재료 중 사용자가 정하는 값만 담는다.
+         *
+         *     project_id·key_id·executed_by 는 서버가 PoC Key 와 실행자 계정(app/api/deps.py)으로 정하고,
+         *     model_count·input_hash·status·시각은 서버가 계산하므로 받지 않는다(extra 는 거절).
+         */
+        SimulationCreateRequest: {
+            test_type: components["schemas"]["TestType"];
+            /** Rerun Of Simulation Id */
+            rerun_of_simulation_id?: string | null;
+            /** Scenario Id */
+            scenario_id?: number | null;
+            /** Prompt Text */
+            prompt_text: string;
+            /** Input Text */
+            input_text?: string | null;
+            /** Json Schema */
+            json_schema?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            execution_config?: components["schemas"]["ExecutionConfig"];
+            routing_policy?: components["schemas"]["RoutingPolicy"];
+            /** Models */
+            models: components["schemas"]["ModelSelectionRequest"][];
+        };
+        /**
+         * SimulationDetailResponse
+         * @description 진행·결과 조회(S-04) 응답. 완료될 때까지 화면이 같은 요청을 반복해 상태를 확인한다.
+         *
+         *     results 에는 칸마다 마지막 시도(is_final_attempt)만 싣는다. 재시도 전 시도는 싣지 않는다.
+         */
+        SimulationDetailResponse: {
+            summary: components["schemas"]["SimulationSummary"];
+            /** Results */
+            results: components["schemas"]["SimulationModelResult"][];
+        };
+        /**
+         * SimulationErrorCode
+         * @description 시뮬레이터 API 의 오류 코드. 프론트엔드는 이 값으로 상황별로 분기한다.
+         * @enum {string}
+         */
+        SimulationErrorCode: "INVALID_REQUEST" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "PROVIDER_NOT_AVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
+        /**
+         * SimulationErrorResponse
+         * @description 공통 오류 형식 {code, message} 에서 code 를 시뮬레이터 코드로 좁힌 응답.
+         *
+         *     라우터가 responses= 에 이 모델을 지정하면 OpenAPI 에 코드 목록(enum)이 실린다.
+         */
+        SimulationErrorResponse: {
+            code: components["schemas"]["SimulationErrorCode"];
+            /** Message */
+            message: string;
+        };
+        /**
+         * SimulationHistoryList
+         * @description 이력 목록 응답. 요청 시각 최신 순(같으면 실행 ID 내림차순)으로 준다.
+         *
+         *     항목은 진행·결과 조회의 요약과 같은 모양이라 합계 계산을 한 곳(뷰)에서만 한다.
+         *     total 은 조건에 맞는 전체 건수, truncated 는 상한 때문에 items 가 전체보다 적은지다.
+         */
+        SimulationHistoryList: {
+            /** Items */
+            items: components["schemas"]["SimulationSummary"][];
+            /** Total */
+            total: number;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * SimulationModelResult
+         * @description 모델 한 칸의 결과. 응답 본문은 길어서 넣지 않고 원문 조회 API 로 따로 준다.
+         */
+        SimulationModelResult: {
+            /** Slot No */
+            slot_no: number;
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /** Model Id */
+            model_id: number;
+            /** Model Display Name At Run */
+            model_display_name_at_run: string;
+            model_status_at_run: components["schemas"]["ModelStatus"];
+            /** Execution Provider */
+            execution_provider: string;
+            /** Actual Provider */
+            actual_provider: string | null;
+            /** Actual Model */
+            actual_model: string | null;
+            status: components["schemas"]["RequestStatus"];
+            error_type: components["schemas"]["ErrorType"] | null;
+            /** Latency Ms */
+            latency_ms: number | null;
+            /** Input Tokens */
+            input_tokens: number | null;
+            /** Output Tokens */
+            output_tokens: number | null;
+            /** Cost Usd */
+            cost_usd: string | null;
+            cost_status: components["schemas"]["CostStatus"];
+            json_parse_status: components["schemas"]["ValidationStatus"] | null;
+            schema_validation_status: components["schemas"]["ValidationStatus"] | null;
+            /** Missing Required Fields */
+            missing_required_fields: string[] | null;
+            /** Comparability Note */
+            comparability_note: string | null;
+        };
+        /**
+         * SimulationRerunDraft
+         * @description 재실행 초안(S-09) 응답. 과거 실행의 입력값을 그대로 돌려주어 화면 입력칸을 채운다.
+         *
+         *     입력 필드는 비교 실행 요청(SimulationCreateRequest)과 같고, 화면이 안내에 쓰는
+         *     rerunnable·blocked_reason 과 모델 칸의 현재 상태가 더해진다. 사용자가 고친 값은
+         *     그 둘을 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).
+         *     과거 이력은 지금 규칙으로 다시 거절하지 않는다. 새 실행 요청이 들어올 때 검증한다.
+         */
+        SimulationRerunDraft: {
+            /**
+             * Rerun Of Simulation Id
+             * Format: uuid
+             */
+            rerun_of_simulation_id: string;
+            test_type: components["schemas"]["TestType"];
+            /** Scenario Id */
+            scenario_id: number | null;
+            /** Prompt Text */
+            prompt_text: string;
+            /** Input Text */
+            input_text: string | null;
+            /** Json Schema */
+            json_schema: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            /** Execution Config */
+            execution_config: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            routing_policy: components["schemas"]["RerunRoutingPolicy"];
+            /** Models */
+            models: components["schemas"]["RerunModel"][];
+            /** Rerunnable */
+            rerunnable: boolean;
+            blocked_reason: components["schemas"]["RerunBlockReason"] | null;
+        };
+        /**
+         * SimulationStatus
+         * @enum {string}
+         */
+        SimulationStatus: "PENDING" | "RUNNING" | "SUCCESS" | "PARTIAL_SUCCESS" | "FAILED" | "CANCELLED";
+        /**
+         * SimulationSummary
+         * @description 비교 실행 한 건의 요약. v_simulation_summary 한 행과 같은 칸이며 여기서 다시 계산하지 않는다.
+         *
+         *     confirmed_cost_usd·estimated_cost_usd 가 null 이면 그 상태의 호출이 하나도 없다는 뜻이다(0 이 아님).
+         *     비용 미확인 호출은 금액 합계에 넣지 않고 unknown_cost_count 로 센다.
+         */
+        SimulationSummary: {
+            /**
+             * Simulation Id
+             * Format: uuid
+             */
+            simulation_id: string;
+            /** Rerun Of Simulation Id */
+            rerun_of_simulation_id: string | null;
+            test_type: components["schemas"]["TestType"];
+            /** Scenario Code */
+            scenario_code: string | null;
+            status: components["schemas"]["SimulationStatus"];
+            /** Model Count */
+            model_count: number;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Completed At */
+            completed_at: string | null;
+            /** Executed By */
+            executed_by: number;
+            /** Final Result Count */
+            final_result_count: number;
+            /** Success Count */
+            success_count: number;
+            /** Failure Count */
+            failure_count: number;
+            /** Confirmed Cost Usd */
+            confirmed_cost_usd: string | null;
+            /** Estimated Cost Usd */
+            estimated_cost_usd: string | null;
+            /** Unknown Cost Count */
+            unknown_cost_count: number;
+            cost_check_status: components["schemas"]["CostCheckStatus"];
+        };
+        /**
+         * TestType
+         * @enum {string}
+         */
+        TestType: "SCENARIO" | "CUSTOM";
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -141,6 +592,12 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * ValidationStatus
+         * @description 시뮬레이션 결과의 JSON 파싱·Schema 검증 결과.
+         * @enum {string}
+         */
+        ValidationStatus: "PASSED" | "FAILED" | "NOT_APPLICABLE" | "NOT_EXECUTED";
     };
     responses: never;
     parameters: never;
@@ -277,6 +734,245 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_simulation_runs_api_simulations_get: {
+        parameters: {
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+                scenario_id?: number | null;
+                model_id?: number | null;
+                status?: components["schemas"]["SimulationStatus"] | null;
+                simulation_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationHistoryList"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+        };
+    };
+    create_simulation_run_api_simulations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationAccepted"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+        };
+    };
+    read_simulation_run_api_simulations__simulation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                simulation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_rerun_draft_api_simulations__simulation_id__rerun_draft_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                simulation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationRerunDraft"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_simulation_run_api_simulations__simulation_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                simulation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationCancelResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_simulation_slot_api_simulations__simulation_id__slots__slot_no__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                simulation_id: string;
+                slot_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationCancelResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
                 };
             };
             /** @description Validation Error */
