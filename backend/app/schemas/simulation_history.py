@@ -9,20 +9,43 @@ from app.models import ModelStatus, SimulationStatus, TestType
 from app.schemas.simulation_result import SimulationSummary
 from app.services.simulation_validation import MAX_MODEL_COUNT, MIN_MODEL_COUNT
 
-# 한 번에 내려주는 이력의 상한. 정렬·페이지는 화면이 하므로 서버는 거른 결과를 통째로 준다.
-# 상한을 넘으면 최신 순으로 자르고 truncated 로 알린다. 잘린 목록을 전체처럼 정렬해 보이지 않기 위해서다
-MAX_HISTORY_ITEMS = 1000
+DEFAULT_PAGE_SIZE = 10  # 이력 화면 목업의 "10개씩 보기"
+MAX_PAGE_SIZE = 100
+
+
+class HistorySortColumn(StrEnum):
+    """이력 목록의 정렬 열(허용 목록). 값은 v_simulation_summary 의 열 이름과 같다.
+
+    총 비용 열은 요약 뷰에 합계 열이 생기면 여기에 추가한다. 그 열을 SimulationSummary 에도 넣으면
+    목록 조회가 같은 이름으로 읽고 정렬한다.
+    """
+
+    REQUESTED_AT = "requested_at"
+    SIMULATION_ID = "simulation_id"
+    SCENARIO_CODE = "scenario_code"
+    MODEL_COUNT = "model_count"
+    STATUS = "status"
+    COST_CHECK_STATUS = "cost_check_status"
+
+
+class SortDirection(StrEnum):
+    ASC = "asc"
+    DESC = "desc"
 
 
 class SimulationHistoryQuery(BaseModel):
     """이력 목록(S-08) 조회 조건. 화면은 이 값을 URL 검색 파라미터에 둔다.
 
-    정렬과 페이지는 화면이 한다(팀 결정). 그 파라미터를 받는 척 무시하지 않도록 모르는 값은 거절한다.
+    정렬과 페이지는 서버가 한다. 화면이 받은 한 페이지만 다시 정렬하면 전체 순서와 어긋나기 때문이다.
     기간이 올바른지(시작≤종료, 366일 이내)는 오늘 날짜가 필요해 서비스가 판단한다.
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    sort: HistorySortColumn = HistorySortColumn.REQUESTED_AT
+    direction: SortDirection = SortDirection.DESC
+    page: Annotated[int, Field(ge=1)] = 1
+    page_size: Annotated[int, Field(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE
     start_date: date | None = None  # KST 달력 기준, 포함
     end_date: date | None = None  # KST 달력 기준, 포함
     # 검색 조건(기준서 8.3). 지정하지 않으면 거르지 않는다
@@ -33,21 +56,14 @@ class SimulationHistoryQuery(BaseModel):
 
 
 class SimulationHistoryList(BaseModel):
-    """이력 목록 응답. 요청 시각 최신 순(같으면 실행 ID 내림차순)으로 준다.
+    """이력 목록 한 페이지. 정렬한 값이 같으면 실행 ID 내림차순으로 순서를 고정한다.
 
     항목은 진행·결과 조회의 요약과 같은 모양이라 합계 계산을 한 곳(뷰)에서만 한다.
-    total 은 조건에 맞는 전체 건수, truncated 는 상한 때문에 items 가 전체보다 적은지다.
+    total 은 조건에 맞는 전체 건수라 items 길이보다 클 수 있다.
     """
 
-    items: list[SimulationSummary]
+    items: Annotated[list[SimulationSummary], Field(max_length=MAX_PAGE_SIZE)]
     total: Annotated[int, Field(ge=0)]
-    truncated: bool
-
-    @model_validator(mode="after")
-    def _truncated_matches_count(self) -> Self:
-        if self.truncated != (self.total > len(self.items)):
-            raise ValueError("truncated 는 total 이 items 보다 많을 때만 true 다")
-        return self
 
 
 class RerunRoutingPolicy(BaseModel):

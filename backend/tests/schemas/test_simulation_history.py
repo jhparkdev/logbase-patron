@@ -6,7 +6,9 @@ from pydantic import ValidationError
 from app.models import SimulationStatus
 from app.schemas.simulation import SimulationCreateRequest
 from app.schemas.simulation_history import (
-    MAX_HISTORY_ITEMS,
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
+    HistorySortColumn,
     RerunBlockReason,
     SimulationHistoryList,
     SimulationHistoryQuery,
@@ -29,16 +31,53 @@ def test_query_reads_dates_as_calendar_days() -> None:
     assert (query.start_date, query.end_date) == (date(2026, 10, 1), date(2026, 10, 28))
 
 
+def test_query_sorts_newest_first_on_the_first_page_by_default() -> None:
+    query = SimulationHistoryQuery()
+
+    assert (query.sort, query.direction) == (HistorySortColumn.REQUESTED_AT, "desc")
+    assert (query.page, query.page_size) == (1, DEFAULT_PAGE_SIZE)
+
+
+def test_page_size_defaults_to_ten_and_is_capped_at_a_hundred() -> None:
+    assert (DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE) == (10, 100)
+
+
+@pytest.mark.parametrize("page_size", [1, MAX_PAGE_SIZE])
+def test_page_size_within_range_is_accepted(page_size: int) -> None:
+    assert SimulationHistoryQuery(page_size=page_size).page_size == page_size
+
+
 @pytest.mark.parametrize(
     "parameter",
-    [{"sort": "requested_at"}, {"direction": "asc"}, {"page": 1}, {"page_size": 10}],
+    [{"page": 0}, {"page_size": 0}, {"page_size": MAX_PAGE_SIZE + 1}],
 )
-def test_sorting_and_paging_are_not_server_parameters(
+def test_page_values_outside_the_range_are_rejected(
     parameter: dict[str, object],
 ) -> None:
-    # 정렬과 페이지는 화면이 한다(팀 결정). 받는 척하고 무시하면 화면이 서버 정렬을 믿게 되므로 거절한다
     with pytest.raises(ValidationError):
         SimulationHistoryQuery(**parameter)
+
+
+@pytest.mark.parametrize("parameter", [{"sort": "prompt_text"}, {"direction": "up"}])
+def test_sort_values_outside_the_allowed_list_are_rejected(
+    parameter: dict[str, object],
+) -> None:
+    # 정렬 열은 허용 목록만 받는다. 목록 밖 열로 쿼리를 만들지 않기 위해서다
+    with pytest.raises(ValidationError):
+        SimulationHistoryQuery(**parameter)
+
+
+def test_openapi_lists_the_sort_columns() -> None:
+    schema = SimulationHistoryQuery.model_json_schema()
+
+    assert schema["$defs"]["HistorySortColumn"]["enum"] == [
+        "requested_at",
+        "simulation_id",
+        "scenario_code",
+        "model_count",
+        "status",
+        "cost_check_status",
+    ]
 
 
 def test_query_rejects_unknown_parameters() -> None:
@@ -113,38 +152,27 @@ def summary_body() -> dict[str, object]:
     }
 
 
-def test_history_list_holds_summaries_and_the_full_count() -> None:
-    history = SimulationHistoryList(items=[summary_body()], total=1, truncated=False)
+def test_history_list_holds_one_page_and_the_full_count() -> None:
+    history = SimulationHistoryList(items=[summary_body()], total=25)
 
     dumped = history.model_dump(mode="json")
-    assert (dumped["total"], dumped["truncated"]) == (1, False)
+    assert dumped["total"] == 25
     assert dumped["items"][0]["confirmed_cost_usd"] == "0.000123"
     assert dumped["items"][0]["estimated_cost_usd"] is None
+    assert "truncated" not in dumped
 
 
 def test_empty_history_is_a_valid_list() -> None:
-    history = SimulationHistoryList(items=[], total=0, truncated=False)
+    history = SimulationHistoryList(items=[], total=0)
 
     assert history.items == []
 
 
-def test_a_cut_list_says_so() -> None:
-    # 상한에 걸려 일부만 준 목록이다. 화면은 "일부만 표시" 를 알리고, 잘린 목록을 전체처럼 정렬해 보이지 않는다
-    history = SimulationHistoryList(items=[summary_body()], total=1500, truncated=True)
-
-    assert history.truncated is True
-
-
-@pytest.mark.parametrize(
-    ("total", "truncated"), [(1, True), (2, False)], ids=["claims-cut", "hides-cut"]
-)
-def test_truncated_must_agree_with_the_count(total: int, truncated: bool) -> None:
-    with pytest.raises(ValidationError, match="truncated"):
-        SimulationHistoryList(items=[summary_body()], total=total, truncated=truncated)
-
-
-def test_the_item_limit_is_a_thousand() -> None:
-    assert MAX_HISTORY_ITEMS == 1000
+def test_a_page_holds_at_most_the_largest_page_size() -> None:
+    with pytest.raises(ValidationError):
+        SimulationHistoryList(
+            items=[summary_body()] * (MAX_PAGE_SIZE + 1), total=MAX_PAGE_SIZE + 1
+        )
 
 
 def rerun_model(**overrides: object) -> dict[str, object]:

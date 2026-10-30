@@ -1,6 +1,6 @@
 """이력 목록(S-08). 읽기만 한다.
 
-정렬과 페이지는 화면이 한다(팀 결정). 서버는 조건으로 거른 결과를 고정된 순서로 상한까지 준다.
+조건으로 거른 결과를 서버가 정렬하고 한 페이지씩 준다.
 요약은 v_simulation_summary 가 계산한 값을 그대로 쓰고 여기서 다시 합산하지 않는다.
 """
 
@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SimulationResult, SimulationRun
 from app.schemas.simulation_history import (
-    MAX_HISTORY_ITEMS,
     SimulationHistoryList,
     SimulationHistoryQuery,
+    SortDirection,
 )
 from app.schemas.simulation_result import SimulationSummary
 from app.services.simulation_period import (
@@ -53,12 +53,20 @@ async def list_simulation_history(
     rows = await session.execute(
         select(_SUMMARY)
         .where(*conditions)
-        .order_by(_SUMMARY.c.requested_at.desc(), _SUMMARY.c.simulation_id.desc())
-        .limit(MAX_HISTORY_ITEMS)
+        .order_by(*_ordering(query))
+        .offset((query.page - 1) * query.page_size)
+        .limit(query.page_size)
     )
     items = [SimulationSummary.model_validate(dict(row)) for row in rows.mappings()]
-    total = total or 0
-    return SimulationHistoryList(items=items, total=total, truncated=total > len(items))
+    return SimulationHistoryList(items=items, total=total or 0)
+
+
+def _ordering(query: SimulationHistoryQuery) -> list[ColumnElement[object]]:
+    column = _SUMMARY.c[query.sort.value]
+    chosen = column.asc() if query.direction == SortDirection.ASC else column.desc()
+    # 값이 없는 행(직접 작성 실행의 시나리오 등)은 방향과 관계없이 뒤로 보낸다.
+    # 같은 값이면 실행 ID 로 순서를 고정해 페이지를 넘겨도 겹치거나 빠지지 않게 한다
+    return [chosen.nulls_last(), _SUMMARY.c.simulation_id.desc()]
 
 
 def _conditions(

@@ -89,7 +89,7 @@ async def list_simulation_runs(
     session: SessionDep,
     now: NowDep,
 ) -> SimulationHistoryList:
-    """이력 목록. 조건으로 거른 결과를 최신 순으로 상한까지 준다. 정렬·페이지는 화면이 한다."""
+    """이력 목록. 조건으로 거른 결과를 요청한 열·방향으로 정렬해 한 페이지씩 준다."""
     return await list_simulation_history(session, query, now)
 
 
