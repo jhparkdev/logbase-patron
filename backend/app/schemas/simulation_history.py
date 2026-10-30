@@ -7,24 +7,18 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from app.models import ModelStatus, SimulationStatus, TestType
 from app.schemas.simulation_result import SimulationSummary
-from app.schemas.simulation_types import Page
-from app.services.simulation_sort import (
-    DEFAULT_SORT_COLUMN,
-    DEFAULT_SORT_DIRECTION,
-    SortColumn,
-    SortDirection,
-)
 from app.services.simulation_validation import MAX_MODEL_COUNT, MIN_MODEL_COUNT
 
-DEFAULT_PAGE_SIZE = 10  # 시뮬레이터 이력 화면 목업의 "10개씩 보기"
-MAX_PAGE_SIZE = 100
+# 한 번에 내려주는 이력의 상한. 정렬·페이지는 화면이 하므로 서버는 거른 결과를 통째로 준다.
+# 상한을 넘으면 최신 순으로 자르고 truncated 로 알린다. 잘린 목록을 전체처럼 정렬해 보이지 않기 위해서다
+MAX_HISTORY_ITEMS = 1000
 
 
 class SimulationHistoryQuery(BaseModel):
     """이력 목록(S-08) 조회 조건. 화면은 이 값을 URL 검색 파라미터에 둔다.
 
-    기간이 올바른지(시작≤종료, 366일 이내)는 오늘 날짜가 필요해 resolve_period 가 판단한다.
-    둘 다 없으면 서비스가 최근 30일을 쓴다.
+    정렬과 페이지는 화면이 한다(팀 결정). 그 파라미터를 받는 척 무시하지 않도록 모르는 값은 거절한다.
+    기간이 올바른지(시작≤종료, 366일 이내)는 오늘 날짜가 필요해 서비스가 판단한다.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -36,15 +30,24 @@ class SimulationHistoryQuery(BaseModel):
     model_id: int | None = None  # 이 모델이 참여한 실행
     status: SimulationStatus | None = None
     simulation_id: UUID | None = None
-    # 타입이 허용 목록이다. 목록 밖의 값은 거절하고 OpenAPI enum 으로 프론트엔드에 전달된다
-    sort: SortColumn = DEFAULT_SORT_COLUMN
-    direction: SortDirection = DEFAULT_SORT_DIRECTION
-    page: Annotated[int, Field(ge=1)] = 1
-    page_size: Annotated[int, Field(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE
 
 
-SimulationHistoryPage = Page[SimulationSummary]
-"""이력 목록 응답. 항목은 진행·결과 조회의 요약과 같은 모양이라 합계 계산을 한 곳(뷰)에서만 한다."""
+class SimulationHistoryList(BaseModel):
+    """이력 목록 응답. 요청 시각 최신 순(같으면 실행 ID 내림차순)으로 준다.
+
+    항목은 진행·결과 조회의 요약과 같은 모양이라 합계 계산을 한 곳(뷰)에서만 한다.
+    total 은 조건에 맞는 전체 건수, truncated 는 상한 때문에 items 가 전체보다 적은지다.
+    """
+
+    items: list[SimulationSummary]
+    total: Annotated[int, Field(ge=0)]
+    truncated: bool
+
+    @model_validator(mode="after")
+    def _truncated_matches_count(self) -> Self:
+        if self.truncated != (self.total > len(self.items)):
+            raise ValueError("truncated 는 total 이 items 보다 많을 때만 true 다")
+        return self
 
 
 class RerunRoutingPolicy(BaseModel):

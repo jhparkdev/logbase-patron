@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -8,7 +8,9 @@ from app.services.simulation_period import (
     DateRange,
     InvalidPeriodError,
     InvalidPeriodReason,
+    kst_today,
     resolve_period,
+    utc_bounds,
 )
 
 TODAY = date(2026, 10, 27)
@@ -80,3 +82,39 @@ def test_only_one_of_start_and_end_is_rejected(
     with pytest.raises(InvalidPeriodError) as error:
         resolve_period(start, end, TODAY)
     assert error.value.reason == InvalidPeriodReason.INCOMPLETE
+
+
+# --- KST 달력과 UTC 시각 사이의 경계 ---
+# KST 자정은 전날 UTC 15:00 이다. 바로 전, 정확히 그 값, 바로 후를 모두 검사한다
+KST_MIDNIGHT_OCT_2 = datetime(2026, 10, 1, 15, tzinfo=UTC)
+ONE_MICROSECOND = timedelta(microseconds=1)
+
+
+@pytest.mark.parametrize(
+    ("now", "today"),
+    [
+        (KST_MIDNIGHT_OCT_2 - ONE_MICROSECOND, date(2026, 10, 1)),
+        (KST_MIDNIGHT_OCT_2, date(2026, 10, 2)),
+        (KST_MIDNIGHT_OCT_2 + ONE_MICROSECOND, date(2026, 10, 2)),
+    ],
+)
+def test_today_follows_the_kst_calendar(now: datetime, today: date) -> None:
+    assert kst_today(now) == today
+
+
+def test_period_bounds_start_and_end_at_kst_midnight() -> None:
+    start, end = utc_bounds(DateRange(date(2026, 10, 2), date(2026, 10, 3)))
+
+    # 시작은 포함하고 끝은 포함하지 않는다. 종료일 하루 전체가 들어가도록 다음 날 KST 자정까지다
+    assert start == KST_MIDNIGHT_OCT_2
+    assert end == KST_MIDNIGHT_OCT_2 + timedelta(days=2)
+
+
+def test_bounds_of_a_month_end_period_cross_into_the_next_month() -> None:
+    # KST 10월 31일 하루는 UTC 로 10월 30일 15:00 부터 10월 31일 15:00 직전까지다
+    start, end = utc_bounds(DateRange(date(2026, 10, 31), date(2026, 10, 31)))
+
+    assert (start, end) == (
+        datetime(2026, 10, 30, 15, tzinfo=UTC),
+        datetime(2026, 10, 31, 15, tzinfo=UTC),
+    )

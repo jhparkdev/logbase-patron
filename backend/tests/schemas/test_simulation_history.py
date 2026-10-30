@@ -6,31 +6,21 @@ from pydantic import ValidationError
 from app.models import SimulationStatus
 from app.schemas.simulation import SimulationCreateRequest
 from app.schemas.simulation_history import (
-    DEFAULT_PAGE_SIZE,
-    MAX_PAGE_SIZE,
+    MAX_HISTORY_ITEMS,
     RerunBlockReason,
-    SimulationHistoryPage,
+    SimulationHistoryList,
     SimulationHistoryQuery,
     SimulationRerunDraft,
 )
-from app.services.simulation_sort import SortColumn, SortDirection
 
 PAST_ID = "0192a3c4-0000-7000-8000-000000000001"
 
 
-def test_default_page_size_follows_the_screen_mockup() -> None:
-    # 시뮬레이터 이력 화면 목업의 "10개씩 보기"
-    assert DEFAULT_PAGE_SIZE == 10
-
-
-def test_query_defaults_to_latest_first_first_page() -> None:
+def test_query_has_no_period_by_default() -> None:
     query = SimulationHistoryQuery()
 
     assert query.start_date is None
     assert query.end_date is None
-    assert query.sort == SortColumn.REQUESTED_AT
-    assert query.direction == SortDirection.DESC
-    assert (query.page, query.page_size) == (1, DEFAULT_PAGE_SIZE)
 
 
 def test_query_reads_dates_as_calendar_days() -> None:
@@ -39,42 +29,16 @@ def test_query_reads_dates_as_calendar_days() -> None:
     assert (query.start_date, query.end_date) == (date(2026, 10, 1), date(2026, 10, 28))
 
 
-# 페이지 경계는 바로 전, 정확히 그 값, 바로 후를 모두 검사한다
-@pytest.mark.parametrize("page", [1, 2])
-def test_page_from_one_is_accepted(page: int) -> None:
-    assert SimulationHistoryQuery(page=page).page == page
-
-
-def test_page_below_one_is_rejected() -> None:
+@pytest.mark.parametrize(
+    "parameter",
+    [{"sort": "requested_at"}, {"direction": "asc"}, {"page": 1}, {"page_size": 10}],
+)
+def test_sorting_and_paging_are_not_server_parameters(
+    parameter: dict[str, object],
+) -> None:
+    # 정렬과 페이지는 화면이 한다(팀 결정). 받는 척하고 무시하면 화면이 서버 정렬을 믿게 되므로 거절한다
     with pytest.raises(ValidationError):
-        SimulationHistoryQuery(page=0)
-
-
-@pytest.mark.parametrize("size", [1, MAX_PAGE_SIZE - 1, MAX_PAGE_SIZE])
-def test_page_size_within_limit_is_accepted(size: int) -> None:
-    assert SimulationHistoryQuery(page_size=size).page_size == size
-
-
-@pytest.mark.parametrize("size", [0, MAX_PAGE_SIZE + 1])
-def test_page_size_outside_limit_is_rejected(size: int) -> None:
-    with pytest.raises(ValidationError):
-        SimulationHistoryQuery(page_size=size)
-
-
-@pytest.mark.parametrize("column", [column.value for column in SortColumn])
-def test_every_allowed_sort_column_is_accepted(column: str) -> None:
-    assert SimulationHistoryQuery(sort=column).sort == column
-
-
-@pytest.mark.parametrize("column", ["prompt_text", "executed_by; DROP TABLE", ""])
-def test_sort_column_outside_the_allow_list_is_rejected(column: str) -> None:
-    with pytest.raises(ValidationError):
-        SimulationHistoryQuery(sort=column)
-
-
-def test_sort_direction_outside_asc_desc_is_rejected() -> None:
-    with pytest.raises(ValidationError):
-        SimulationHistoryQuery(direction="up")
+        SimulationHistoryQuery(**parameter)
 
 
 def test_query_rejects_unknown_parameters() -> None:
@@ -128,14 +92,6 @@ def test_openapi_lists_the_status_filter_values() -> None:
     ]
 
 
-def test_openapi_carries_sort_allow_list_and_page_limits() -> None:
-    # 프론트엔드는 정렬 열과 한도를 따로 외우지 않고 OpenAPI 문서에서 받는다
-    schema = SimulationHistoryQuery.model_json_schema()
-
-    assert schema["$defs"]["SortColumn"]["enum"] == [c.value for c in SortColumn]
-    assert schema["properties"]["page_size"]["maximum"] == MAX_PAGE_SIZE
-
-
 def summary_body() -> dict[str, object]:
     return {
         "simulation_id": PAST_ID,
@@ -157,17 +113,38 @@ def summary_body() -> dict[str, object]:
     }
 
 
-def test_history_page_holds_summaries_and_total() -> None:
-    page = SimulationHistoryPage(items=[summary_body()], total=120)
+def test_history_list_holds_summaries_and_the_full_count() -> None:
+    history = SimulationHistoryList(items=[summary_body()], total=1, truncated=False)
 
-    dumped = page.model_dump(mode="json")
-    assert dumped["total"] == 120
+    dumped = history.model_dump(mode="json")
+    assert (dumped["total"], dumped["truncated"]) == (1, False)
     assert dumped["items"][0]["confirmed_cost_usd"] == "0.000123"
     assert dumped["items"][0]["estimated_cost_usd"] is None
 
 
-def test_empty_history_is_a_valid_page() -> None:
-    assert SimulationHistoryPage(items=[], total=0).items == []
+def test_empty_history_is_a_valid_list() -> None:
+    history = SimulationHistoryList(items=[], total=0, truncated=False)
+
+    assert history.items == []
+
+
+def test_a_cut_list_says_so() -> None:
+    # 상한에 걸려 일부만 준 목록이다. 화면은 "일부만 표시" 를 알리고, 잘린 목록을 전체처럼 정렬해 보이지 않는다
+    history = SimulationHistoryList(items=[summary_body()], total=1500, truncated=True)
+
+    assert history.truncated is True
+
+
+@pytest.mark.parametrize(
+    ("total", "truncated"), [(1, True), (2, False)], ids=["claims-cut", "hides-cut"]
+)
+def test_truncated_must_agree_with_the_count(total: int, truncated: bool) -> None:
+    with pytest.raises(ValidationError, match="truncated"):
+        SimulationHistoryList(items=[summary_body()], total=total, truncated=truncated)
+
+
+def test_the_item_limit_is_a_thousand() -> None:
+    assert MAX_HISTORY_ITEMS == 1000
 
 
 def rerun_model(**overrides: object) -> dict[str, object]:
