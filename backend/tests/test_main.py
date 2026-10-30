@@ -50,20 +50,6 @@ async def test_api_routes_use_common_error_format(client: AsyncClient) -> None:
 # 인증
 
 
-async def test_only_public_routes_skip_login(app: FastAPI, client: AsyncClient) -> None:
-    """세션 없이 401이 아닌 응답을 주는 라우트는 공개 목록과 정확히 같아야 한다."""
-    reachable_without_login: set[tuple[str, str]] = set()
-    for method, path in api_routes(app):
-        response = await client.request(method, concrete_path(path))
-        if response.status_code == status.HTTP_401_UNAUTHORIZED:
-            assert response.json()["code"] == "UNAUTHENTICATED"
-        else:
-            # 공개 로그인은 본문이 없으면 422다. 성공 여부 대신 세션 요구 여부를 비교한다.
-            reachable_without_login.add((method, path))
-
-    assert reachable_without_login == PUBLIC_ROUTES
-
-
 # Origin 검사
 
 

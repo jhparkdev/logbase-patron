@@ -33,3 +33,15 @@ test("현재 화면의 메뉴만 선택 상태로 표시한다", async () => {
 
   expect(current).toEqual(["AI 모델 관리"]);
 });
+
+test.each([
+  ["/simulation-history", "시뮬레이션 결과 이력"],
+  ["/simulator?sourceRun=run-1", "AI 모델 시뮬레이터"],
+])("실제 화면 %s에서도 현재 메뉴를 선택한다", async (path, label) => {
+  renderAt(path);
+  const current = within(await findNav())
+    .getAllByRole("link")
+    .filter((link) => link.getAttribute("aria-current") === "page")
+    .map((link) => link.textContent);
+  expect(current).toEqual([label]);
+});

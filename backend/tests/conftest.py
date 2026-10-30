@@ -148,7 +148,12 @@ def app(db_session: AsyncSession, now: datetime) -> FastAPI:
         return db_session
 
     settings = get_settings().model_copy(
-        update={"session_cookie_secure": True, "allowed_origin": TEST_ORIGIN}
+        # Key 는 비워 둔다. 로컬 .env 에 Key 가 있어도 테스트가 실제 OpenRouter 를 부르지 않게 한다
+        update={
+            "session_cookie_secure": True,
+            "allowed_origin": TEST_ORIGIN,
+            "openrouter_api_key": None,
+        }
     )
     # 라우터와 서비스가 모두 이 세션을 쓰므로 API에서 commit해도 테스트 종료 시 롤백된다.
     app.dependency_overrides[get_session] = override_session

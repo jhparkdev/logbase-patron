@@ -1,6 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader } from "../../shared/components/ui/PageHeader";
+import { HistoryPage } from "../../features/simulation-history/components/HistoryPage";
+import { historySearchSchema } from "../../features/simulation-history/lib/search";
 
 export const Route = createFileRoute("/_app/simulation-history")({
-  component: () => <PageHeader title="시뮬레이션 결과 이력" />,
+  validateSearch: historySearchSchema,
+  component: HistoryRoute,
 });
+
+function HistoryRoute() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  return (
+    <HistoryPage
+      search={search}
+      onSearch={(value) => {
+        void navigate({ search: value, resetScroll: false });
+      }}
+      onRerun={(key) => {
+        void navigate({
+          to: "/simulator",
+          search: { sourceRun: key, sort: "model", direction: "asc" },
+        });
+      }}
+    />
+  );
+}
