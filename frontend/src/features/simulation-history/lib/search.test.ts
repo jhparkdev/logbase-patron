@@ -1,11 +1,44 @@
 import { expect, test } from "vitest";
 import {
+  changeHistorySort,
   createHistorySearchSchema,
   historyFiltersSchema,
   recentHistoryFilters,
 } from "./search";
 
 const now = new Date("2026-10-29T15:10:00Z");
+
+test.each([
+  [undefined, 1],
+  [1, 1],
+  [2, 2],
+  [0, 1],
+  [-1, 1],
+  [1.5, 1],
+  ["abc", 1],
+  ["2", 1],
+  [Number.MAX_SAFE_INTEGER + 1, 1],
+])("URL의 페이지 %s를 %i로 검증한다", (page, expected) => {
+  expect(createHistorySearchSchema(now).parse({ page })).toHaveProperty(
+    "page",
+    expected,
+  );
+});
+
+test("정렬을 변경하면 필터와 선택은 유지하고 첫 페이지로 돌아간다", () => {
+  const search = createHistorySearchSchema(now).parse({
+    page: 3,
+    status: "FAILED",
+    selected: "run-1",
+    detail: true,
+  });
+  expect(changeHistorySort(search, "totalCost")).toMatchObject({
+    ...search,
+    page: 1,
+    sort: "totalCost",
+    direction: "asc",
+  });
+});
 test("최근 30일의 기본 기간을 KST 자정 기준으로 계산한다", () => {
   expect(recentHistoryFilters(now)).toMatchObject({
     from: "2026-10-01",

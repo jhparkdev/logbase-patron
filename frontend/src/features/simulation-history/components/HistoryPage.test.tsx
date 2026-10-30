@@ -88,6 +88,43 @@ test("API 미연결 상태와 실제 조회 결과 없음은 구분하고 페이
   );
   expect(screen.getByText("조건에 맞는 실행 이력이 없어요")).toBeDefined();
 });
+
+test("공통 페이지 이동으로 서버 행을 유지하고 페이지와 선택 상태를 갱신한다", () => {
+  const onSearch = vi.fn();
+  render(
+    <HistoryPage
+      search={{ ...search, page: 2, selected: row.key }}
+      onSearch={onSearch}
+      view={{ kind: "ready", items: [row], total: 12 }}
+    />,
+  );
+  expect(screen.getByRole("button", { name: row.key })).toBeDefined();
+  const pagination = within(screen.getByRole("navigation", { name: "페이지" }));
+  expect(
+    pagination.getByRole("button", { name: "2" }).getAttribute("aria-current"),
+  ).toBe("page");
+  expect(
+    pagination
+      .getByRole("button", { name: "다음 페이지" })
+      .hasAttribute("disabled"),
+  ).toBe(true);
+  fireEvent.click(pagination.getByRole("button", { name: "이전 페이지" }));
+  expect(onSearch).toHaveBeenCalledWith({
+    ...search,
+    page: 1,
+    selected: undefined,
+    detail: false,
+  });
+});
+
+test("두 번째 페이지에서 조회하면 첫 페이지로 돌아간다", async () => {
+  const onSearch = vi.fn();
+  render(<HistoryPage search={{ ...search, page: 2 }} onSearch={onSearch} />);
+  fireEvent.click(screen.getByRole("button", { name: "조회" }));
+  await waitFor(() =>
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ page: 1 })),
+  );
+});
 test("필터는 조회할 때 제출하고 역전된 날짜를 입력하면 URL 변경을 막는다", async () => {
   const onSearch = vi.fn();
   render(<HistoryPage search={search} onSearch={onSearch} />);

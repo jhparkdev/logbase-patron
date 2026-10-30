@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import { Button } from "../../../shared/components/ui/Button";
 import { PageHeader } from "../../../shared/components/ui/PageHeader";
+import { Pagination } from "../../../shared/components/ui/Pagination";
 import { RefreshingBar } from "../../../shared/components/ui/RefreshingBar";
 import { Result } from "../../../shared/components/ui/Result";
 import { SectionCard } from "../../../shared/components/ui/SectionCard";
 import { Skeleton } from "../../../shared/components/ui/Skeleton";
+import { PAGE_SIZE } from "../../../shared/lib/pagination";
 import type {
   HistoryDetailState,
   HistoryListView,
@@ -27,7 +29,6 @@ export function HistoryPage({
   onRetryDetail,
   onRerun,
   renderResults,
-  pagination,
 }: {
   search: HistorySearch;
   onSearch: (value: HistorySearch) => void;
@@ -39,8 +40,6 @@ export function HistoryPage({
   onRetryDetail?: () => void;
   onRerun?: (key: string) => void;
   renderResults?: (key: string) => ReactNode;
-  /** P-03 담당자의 공통 페이지네이션을 라우트에서 연결할 자리다. */
-  pagination?: ReactNode;
 }) {
   const selected =
     view.kind === "ready"
@@ -70,6 +69,7 @@ export function HistoryPage({
           onSearch({
             ...search,
             ...filters,
+            page: 1,
             selected: undefined,
             detail: false,
           })
@@ -95,7 +95,19 @@ export function HistoryPage({
               search={search}
               onSearch={onSearch}
             />
-            {pagination && <div className="p-5">{pagination}</div>}
+            <Pagination
+              total={view.total}
+              pageSize={PAGE_SIZE}
+              page={search.page}
+              onPageChange={(page) =>
+                onSearch({
+                  ...search,
+                  page,
+                  selected: undefined,
+                  detail: false,
+                })
+              }
+            />
           </>
         ) : (
           <Result

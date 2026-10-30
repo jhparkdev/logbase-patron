@@ -18,7 +18,7 @@ export function PreviewLayout() {
         </a>
       </div>
       <div className="flex min-h-screen">
-        <Sidebar />
+        <Sidebar activeTo="/simulator" />
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex h-16 items-center gap-1 border-b border-grey-200 bg-white px-8 text-body-sm">
             <span className="font-semibold">LOGBASE Patron</span>

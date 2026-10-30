@@ -87,6 +87,7 @@ export function createHistorySearchSchema(now = new Date()) {
       status: z.enum(HISTORY_STATUSES).catch("all"),
       sort: z.enum(HISTORY_SORTS).catch("requestedAt"),
       direction: z.enum(["asc", "desc"]).catch("desc"),
+      page: z.number().int().min(1).catch(1),
       selected: key.min(1).optional().catch(undefined),
       detail: z.boolean().catch(false),
     })
@@ -107,6 +108,7 @@ export function changeHistorySort(
 ): HistorySearch {
   return {
     ...search,
+    page: 1,
     sort,
     direction:
       search.sort === sort && search.direction === "asc" ? "desc" : "asc",

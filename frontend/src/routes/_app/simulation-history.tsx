@@ -14,7 +14,7 @@ function HistoryRoute() {
     <HistoryPage
       search={search}
       onSearch={(value) => {
-        void navigate({ search: value });
+        void navigate({ search: value, resetScroll: false });
       }}
       onRerun={(key) => {
         void navigate({

@@ -32,9 +32,26 @@ function show(path: string) {
   render(<RouterProvider router={router} />);
   return router;
 }
+
+test("실제 이력 화면의 조회 조건을 바꿔도 스크롤을 초기화하지 않는다", async () => {
+  const router = show("/simulation-history?page=2");
+  const filter = await screen.findByLabelText("Simulation ID");
+  await waitFor(() => expect(router.state.status).toBe("idle"));
+  fireEvent.change(filter, { target: { value: "run-1" } });
+  const button = screen.getByRole("button", { name: "조회" });
+  vi.mocked(window.scrollTo).mockClear();
+  fireEvent.click(button);
+  await waitFor(() =>
+    expect(router.state.location.search).toMatchObject({
+      simulationId: "run-1",
+      page: 1,
+    }),
+  );
+  expect(window.scrollTo).not.toHaveBeenCalled();
+});
 test("주소로 복원한 상세를 닫아도 조회 기간·필터·정렬·선택 ID를 유지한다", async () => {
   const router = show(
-    "/simulation-history?from=2026-10-01&to=2026-10-29&status=FAILED&sort=totalCost&direction=asc&selected=run-1&detail=true",
+    "/simulation-history?from=2026-10-01&to=2026-10-29&status=FAILED&sort=totalCost&direction=asc&page=2&selected=run-1&detail=true",
   );
   await screen.findByRole("dialog", { name: "시뮬레이션 실행 상세" });
   fireEvent.click(screen.getByRole("button", { name: "닫기" }));
@@ -45,6 +62,7 @@ test("주소로 복원한 상세를 닫아도 조회 기간·필터·정렬·선
       status: "FAILED",
       sort: "totalCost",
       direction: "asc",
+      page: 2,
       selected: "run-1",
       detail: false,
     }),
