@@ -18,6 +18,7 @@ from app.schemas.simulation_error import SimulationErrorResponse
 from app.schemas.simulation_history import (
     SimulationHistoryList,
     SimulationHistoryQuery,
+    SimulationRerunDraft,
 )
 from app.schemas.simulation_result import SimulationDetailResponse
 from app.services.simulation_cancel_service import (
@@ -32,6 +33,7 @@ from app.services.simulation_history import list_simulation_history
 from app.services.simulation_lookup import DbSimulationLookup
 from app.services.simulation_ports import IntakeDeps
 from app.services.simulation_recorders import SessionRequestRecorder
+from app.services.simulation_rerun import get_rerun_draft
 from app.services.simulation_store import DbSimulationStore
 
 router = APIRouter(
@@ -103,6 +105,20 @@ async def read_simulation_run(
     if detail is None:
         raise SimulationNotFoundError
     return detail
+
+
+@router.get(
+    "/{simulation_id}/rerun-draft",
+    responses={status.HTTP_404_NOT_FOUND: {"model": SimulationErrorResponse}},
+)
+async def read_rerun_draft(
+    simulation_id: uuid.UUID, session: SessionDep
+) -> SimulationRerunDraft:
+    """재실행 초안. 과거 입력으로 화면 입력칸을 채운다. 실행은 사용자가 새 실행 요청으로 보낼 때 시작한다."""
+    draft = await get_rerun_draft(session, simulation_id)
+    if draft is None:
+        raise SimulationNotFoundError
+    return draft
 
 
 @router.post(
