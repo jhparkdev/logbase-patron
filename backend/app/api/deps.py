@@ -78,9 +78,9 @@ CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
 async def get_dev_user(session: SessionDep) -> User:
-    """개발 중 로그인 검사를 뺀 동안 실행자(executed_by, NOT NULL)로 쓸 사용자. 가장 먼저 만든 활성 계정이다.
+    """실행자(executed_by, NOT NULL)로 기록할 사용자. 가장 먼저 만든 활성 계정이다.
 
-    로그인 검사를 복구하면 이 함수와 DevUserDep 을 지우고 CurrentUserDep 으로 되돌린다.
+    팀 결정으로 로그인 검사를 하지 않아 요청한 사람을 알 수 없으므로 이 계정으로 기록한다.
     """
     user = await session.scalar(
         select(User).where(User.is_active).order_by(User.user_id).limit(1)

@@ -13,7 +13,7 @@ from app.api.errors import install_error_handlers
 API_PREFIX = "/api"
 # 로그인 없이 부를 수 있는 라우터. CLAUDE.md의 예외(로그인·health·기록 API)만 둔다.
 PUBLIC_ROUTERS = (health.router, auth.public_router)
-# 로그인 세션을 요구하는 라우터. 새 기능 라우터는 여기에 추가한다.
+# 기능 라우터. 새 기능 라우터는 여기에 추가한다. 팀 결정으로 라우터 단위 로그인 검사는 하지 않는다.
 # (기록 API는 쿠키 대신 Ingest 토큰을 쓰므로 Origin 검사 없이 따로 등록한다.)
 PROTECTED_ROUTERS = (auth.router, simulations.router)
 
@@ -28,7 +28,6 @@ def create_app() -> FastAPI:
     for router in PUBLIC_ROUTERS:
         app.include_router(router, prefix=API_PREFIX, dependencies=[origin_check])
     for router in PROTECTED_ROUTERS:
-        # 개발 중 임시로 로그인 검사를 뺐다. 복구할 때 dependencies에 Depends(get_current_user)를 다시 건다.
         app.include_router(router, prefix=API_PREFIX, dependencies=[origin_check])
     return app
 

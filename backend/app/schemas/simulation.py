@@ -110,7 +110,7 @@ class ExecutionConfig(BaseModel):
 class SimulationCreateRequest(BaseModel):
     """비교 실행 요청. simulation_runs 한 행을 만들 재료 중 사용자가 정하는 값만 담는다.
 
-    project_id·key_id·executed_by 는 서버가 로그인 세션과 PoC Key 로 정하고,
+    project_id·key_id·executed_by 는 서버가 PoC Key 와 실행자 계정(app/api/deps.py)으로 정하고,
     model_count·input_hash·status·시각은 서버가 계산하므로 받지 않는다(extra 는 거절).
     """
 
