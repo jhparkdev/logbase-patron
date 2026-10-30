@@ -10,6 +10,7 @@ from app.config import Settings
 # 테스트용 가짜 값. 실제 비밀번호가 아니며, 화면에 드러나는지 찾을 표식으로 쓴다.
 DEV_URL = "postgresql+psycopg://patron:dev-secret@localhost:5432/patron"
 TEST_URL = "postgresql+psycopg://patron:dev-secret@localhost:5432/patron_test"
+OPENROUTER_KEY = "sk-or-test-only-not-a-real-key"
 
 
 @pytest.fixture
@@ -23,6 +24,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     monkeypatch.delenv("APP_ENV", raising=False)
     monkeypatch.delenv("SESSION_COOKIE_SECURE", raising=False)
     monkeypatch.delenv("ALLOWED_ORIGIN", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     return monkeypatch
 
 
@@ -70,6 +72,35 @@ def test_reads_allowed_origin_from_environment(clean_env: pytest.MonkeyPatch) ->
     clean_env.setenv("ALLOWED_ORIGIN", "http://localhost:5173")
 
     assert Settings(_env_file=None).allowed_origin == "http://localhost:5173"
+
+
+def test_openrouter_api_key_is_optional(clean_env: pytest.MonkeyPatch) -> None:
+    """Key는 작업할 때만 넣고 끝나면 지우므로, 없어도 설정을 만들 수 있어야 한다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+
+    assert Settings(_env_file=None).openrouter_api_key is None
+
+
+def test_reads_openrouter_api_key_from_environment(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("OPENROUTER_API_KEY", OPENROUTER_KEY)
+
+    settings = Settings(_env_file=None)
+
+    assert settings.openrouter_api_key.get_secret_value() == OPENROUTER_KEY
+
+
+def test_openrouter_api_key_is_hidden_in_repr(clean_env: pytest.MonkeyPatch) -> None:
+    """설정 객체를 출력하거나 로그에 남겨도 Key 원문이 보이지 않는다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("OPENROUTER_API_KEY", OPENROUTER_KEY)
+
+    settings = Settings(_env_file=None)
+
+    assert OPENROUTER_KEY not in repr(settings)
+    assert OPENROUTER_KEY not in str(settings)
 
 
 def test_reads_database_url_from_environment(clean_env: pytest.MonkeyPatch) -> None:

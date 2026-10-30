@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # 상태를 바꾸는 요청(POST 등)을 받을 화면 주소. 예: http://localhost:5173 (끝에 / 없음)
     # 비어 있으면 그런 요청을 모두 거절한다.
     allowed_origin: str | None = None
+    # OpenRouter Key 원문. 로컬에서는 작업할 때만 넣고 끝나면 지우므로 없어도 앱은 뜬다.
+    # 없으면 비교 실행 접수만 거절한다(app/api/simulation_deps.py).
+    openrouter_api_key: SecretStr | None = None
 
 
 @lru_cache
