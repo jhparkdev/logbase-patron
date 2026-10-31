@@ -27,10 +27,15 @@ def past_run(**values: Any) -> SimulationRun:
     return SimulationRun(**fields)
 
 
-def slot(model_id: int, status: ModelStatus = ModelStatus.ACTIVE) -> PastSlot:
+def slot(
+    model_id: int,
+    status: ModelStatus = ModelStatus.ACTIVE,
+    execution_config: dict[str, Any] | None = None,
+) -> PastSlot:
     return PastSlot(
         model_id=model_id,
         execution_provider=f"provider-{model_id}",
+        execution_config=execution_config or {"max_tokens": 4096},
         current_display_name=f"모델 {model_id}",
         current_status=status,
     )
@@ -119,3 +124,18 @@ def test_a_run_with_attached_images_cannot_be_restored() -> None:
 
     assert draft.rerunnable is False
     assert draft.blocked_reason == RerunBlockReason.INPUT_MISSING
+
+
+def test_each_model_comes_back_with_the_settings_that_were_applied() -> None:
+    # 칸마다 다르게 돌린 설정을 돌려줘야 같은 조건으로 다시 돌릴 수 있다
+    slots = [
+        slot(1, execution_config={"max_tokens": 100, "reasoning_effort": "low"}),
+        slot(1, execution_config={"max_tokens": 100, "reasoning_effort": "high"}),
+    ]
+
+    draft = build_rerun_draft(past_run(), slots, has_input_assets=False)
+
+    assert [m.execution_config for m in draft.models] == [
+        {"max_tokens": 100, "reasoning_effort": "low"},
+        {"max_tokens": 100, "reasoning_effort": "high"},
+    ]

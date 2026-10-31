@@ -16,6 +16,7 @@ from app.services.simulation_input import (
     compute_input_hash,
     resolve_execution_config,
     resolve_json_schema,
+    resolve_slot_config,
     validate_input_present,
 )
 from app.services.simulation_ports import (
@@ -29,7 +30,11 @@ from app.services.simulation_ports import (
     SimulatorContext,
     SlotPlan,
 )
-from app.services.simulation_validation import is_model_selectable
+from app.services.simulation_validation import (
+    ModelSelection,
+    is_model_selectable,
+    validate_model_selection,
+)
 
 # 실제 OpenRouter 를 부르는 실행이다. mock seed 는 MOCK 으로 구분한다
 RUN_DATA_SOURCE = DataSource.LIVE
@@ -81,6 +86,20 @@ async def create_simulation(
     json_schema = resolve_json_schema(
         request.json_schema, scenario.default_json_schema if scenario else None
     )
+    # 중복은 실행 공통 설정·시나리오 기본값과 합친 적용 설정으로 판단한다(DB 제약과 같은 기준).
+    # 저장 전에 판단해야 거절되었을 때 아무것도 남지 않는다
+    slot_configs = [
+        resolve_slot_config(
+            execution_config, chosen.execution_config.model_dump(exclude_none=True)
+        )
+        for chosen in request.models
+    ]
+    validate_model_selection(
+        [
+            ModelSelection(chosen.model_id, chosen.execution_provider, config)
+            for chosen, config in zip(request.models, slot_configs, strict=True)
+        ]
+    )
     shared = _RunValues(
         simulation_id=deps.new_id(),
         context=context,
@@ -89,7 +108,6 @@ async def create_simulation(
             allow_fallbacks=request.routing_policy.allow_fallbacks,
             has_json_schema=json_schema is not None,
         ),
-        execution_config=execution_config,
         input_hash=compute_input_hash(request.prompt_text, request.input_text),
         now=deps.now(),
     )
@@ -119,9 +137,11 @@ async def create_simulation(
         [(chosen.model_id, chosen.execution_provider) for chosen in request.models]
     )
     slots = [
-        await _save_slot(slot_no, chosen, models[chosen.model_id], shared, deps, note)
-        for slot_no, (chosen, note) in enumerate(
-            zip(request.models, notes, strict=True), start=1
+        await _save_slot(
+            slot_no, chosen, models[chosen.model_id], shared, deps, note, config
+        )
+        for slot_no, (chosen, note, config) in enumerate(
+            zip(request.models, notes, slot_configs, strict=True), start=1
         )
     ]
 
@@ -132,7 +152,6 @@ async def create_simulation(
             build_prompt_text(request.prompt_text, request.input_text)
         ),
         json_schema=json_schema,
-        max_tokens=execution_config["max_tokens"],
         allow_fallbacks=request.routing_policy.allow_fallbacks,
     )
 
@@ -159,7 +178,6 @@ class _RunValues:
     context: SimulatorContext
     executed_by: int
     run_policy: dict[str, Any]
-    execution_config: dict[str, Any]
     input_hash: str
     now: datetime
 
@@ -171,6 +189,7 @@ async def _save_slot(
     shared: _RunValues,
     deps: IntakeDeps,
     comparability_note: str | None,
+    execution_config: dict[str, Any],
 ) -> SlotPlan:
     """모델 한 칸의 호출 이력(PENDING)과 칸 결과를 저장하고, 실행할 칸을 돌려준다."""
     request_id = deps.new_id()
@@ -191,7 +210,7 @@ async def _save_slot(
             routing_policy=build_request_routing_policy(
                 shared.run_policy, chosen.execution_provider
             ),
-            execution_config=shared.execution_config,
+            execution_config=execution_config,
             input_hash=shared.input_hash,
             requested_at=shared.now,
             data_source=RUN_DATA_SOURCE,
@@ -215,6 +234,7 @@ async def _save_slot(
         model_id=model.model_id,
         openrouter_model_id=model.openrouter_model_id,
         execution_provider=chosen.execution_provider,
+        execution_config=execution_config,
     )
 
 

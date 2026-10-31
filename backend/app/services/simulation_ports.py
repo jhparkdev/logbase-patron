@@ -67,6 +67,8 @@ class SlotPlan:
     model_id: int
     openrouter_model_id: str
     execution_provider: str
+    # 이 칸에 실제로 적용할 설정(실행 공통 설정과 합친 값). max_tokens 는 항상 있다
+    execution_config: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -77,7 +79,6 @@ class SimulationJob:
     slots: Sequence[SlotPlan]
     messages: list[dict[str, str]]
     json_schema: dict[str, Any] | None
-    max_tokens: int
     allow_fallbacks: bool
 
 
@@ -194,6 +195,8 @@ class ModelCaller(Protocol):
         provider_order: list[str],
         allow_fallbacks: bool,
         cancel: asyncio.Event,
+        temperature: float | None = None,
+        reasoning_effort: str | None = None,
     ) -> CallResult: ...
 
 

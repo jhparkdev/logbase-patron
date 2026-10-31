@@ -71,6 +71,7 @@ def _to_model_result(
         model_display_name_at_run=result.model_display_name_at_run,
         model_status_at_run=result.model_status_at_run,
         execution_provider=result.execution_provider,
+        execution_config=request.execution_config,
         actual_provider=request.actual_provider,
         actual_model=request.actual_model,
         status=request.status,

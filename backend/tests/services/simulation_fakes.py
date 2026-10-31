@@ -187,7 +187,7 @@ class FakeStore:
         self.finished.append((status, now))
 
 
-def make_slots(count: int) -> list[SlotPlan]:
+def make_slots(count: int, max_tokens: int = 4096) -> list[SlotPlan]:
     return [
         SlotPlan(
             slot_no=n,
@@ -195,6 +195,7 @@ def make_slots(count: int) -> list[SlotPlan]:
             model_id=n,
             openrouter_model_id=f"vendor/model-{n}",
             execution_provider=f"Provider{n}",
+            execution_config={"max_tokens": max_tokens},
         )
         for n in range(1, count + 1)
     ]
@@ -211,7 +212,7 @@ class Harness:
         allow_fallbacks: bool = False,
         max_tokens: int = 4096,
     ) -> None:
-        self.slots = make_slots(count)
+        self.slots = make_slots(count, max_tokens)
         self.caller = FakeCaller(behaviors)
         self.recorder = FakeRecorder(self.slots)
         self.store = FakeStore(self.recorder)
@@ -222,7 +223,6 @@ class Harness:
             slots=self.slots,
             messages=self.messages,
             json_schema=json_schema,
-            max_tokens=max_tokens,
             allow_fallbacks=allow_fallbacks,
         )
         self.store.known_simulations.add(self.job.simulation_id)

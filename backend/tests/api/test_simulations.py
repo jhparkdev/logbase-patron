@@ -88,7 +88,9 @@ async def test_the_run_and_every_call_are_saved_as_pending_before_answering(
     assert [r.status for r in requests] == [RequestStatus.PENDING] * 2
     assert {r.cost_status for r in requests} == {CostStatus.UNKNOWN}
     assert await count(db_session, SimulationResult) == 2
-    assert manager.jobs[0].max_tokens == 4096
+    assert [slot.execution_config for slot in manager.jobs[0].slots] == [
+        {"max_tokens": 4096}
+    ] * 2
 
 
 @pytest.mark.usefixtures("poc_setup", "signed_in")
@@ -385,3 +387,69 @@ def test_state_changing_requests_document_the_origin_refusal() -> None:
         if method == "post":
             codes = code_values(error_schema(operation["responses"]["403"]))
             assert codes == {"ORIGIN_NOT_ALLOWED"}, path
+
+
+def tuned_body(model_ids: list[int], *configs: dict[str, Any]) -> dict[str, Any]:
+    """첫 모델을 같은 Provider 로 설정만 달리해 칸마다 넣은 요청."""
+    return create_body(
+        model_ids,
+        models=[
+            {
+                "model_id": model_ids[0],
+                "execution_provider": "DeepInfra",
+                "execution_config": config,
+            }
+            for config in configs
+        ],
+    )
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in")
+async def test_same_model_and_provider_with_different_settings_are_saved_per_slot(
+    client: AsyncClient,
+    manager: FakeManager,
+    models: list[int],
+    db_session: AsyncSession,
+) -> None:
+    body = tuned_body(models, {"reasoning_effort": "low"}, {"reasoning_effort": "high"})
+
+    response = await client.post(CREATE, json=body)
+
+    # DB 의 설정별 고유 제약에 걸리지 않고 두 칸이 모두 저장된다
+    assert response.status_code == 202, response.text
+    assert await count(db_session, SimulationResult) == 2
+    efforts = (
+        await db_session.scalars(
+            select(AIRequest.execution_config["reasoning_effort"].as_string())
+        )
+    ).all()
+    assert sorted(efforts) == ["high", "low"]
+    assert [s.execution_config["reasoning_effort"] for s in manager.jobs[0].slots] == [
+        "low",
+        "high",
+    ]
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in")
+@pytest.mark.parametrize(
+    "configs",
+    [
+        ({"max_tokens": 300}, {"max_tokens": 300}),
+        ({"temperature": 1}, {"temperature": 1.0}),
+        ({}, {}),
+    ],
+)
+async def test_same_model_provider_and_settings_are_rejected_with_a_code(
+    client: AsyncClient,
+    manager: FakeManager,
+    models: list[int],
+    db_session: AsyncSession,
+    configs: tuple[dict[str, Any], dict[str, Any]],
+) -> None:
+    response = await client.post(CREATE, json=tuned_body(models, *configs))
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "DUPLICATE_MODEL_SELECTION"
+    assert manager.jobs == []
+    assert await count(db_session, SimulationRun) == 0
+    assert await count(db_session, AIRequest) == 0

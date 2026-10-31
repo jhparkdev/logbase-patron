@@ -13,9 +13,9 @@ HEARTBEAT_INTERVAL_SECONDS = 30
 # 추론 모델은 생각한 토큰도 이 한도에 들어가서, 낮으면 답이 비고 비용만 나간다
 DEFAULT_MAX_TOKENS = MAX_TOKENS_LIMIT
 
-# call_model 이 실제로 보내는 실행 설정. 보내지 못하는 값(temperature)을 기록하면 기록과 호출이 달라지므로
-# 이 목록의 값만 남긴다. call_model 에 temperature 인자가 생기면 목록에 더한다
-SENT_EXECUTION_SETTINGS = ("max_tokens",)
+# call_model 이 실제로 보내는 실행 설정. 보내지 못하는 값을 기록하면 기록과 호출이 달라지므로
+# 이 목록의 값만 남긴다. call_model 에 새 인자가 생기면 목록에 더한다
+SENT_EXECUTION_SETTINGS = ("max_tokens", "temperature", "reasoning_effort")
 
 _PLACEHOLDER = re.compile(r"\{\{[^{}]+\}\}")
 
@@ -74,8 +74,20 @@ def resolve_execution_config(
 
     요청에 없는 설정은 시나리오 기본값으로 채우고, 요청에 있는 값이 항목별로 우선한다.
     최대 토큰은 call_model 이 반드시 받으므로 아무도 정하지 않으면 기본값을 쓴다.
+    temperature 와 reasoning_effort 는 아무도 정하지 않으면 담지 않고 모델 기본값에 맡긴다.
     """
     merged = {"max_tokens": DEFAULT_MAX_TOKENS, **(scenario_default or {}), **requested}
+    return {key: merged[key] for key in SENT_EXECUTION_SETTINGS if key in merged}
+
+
+def resolve_slot_config(
+    run_config: Mapping[str, Any], slot_override: Mapping[str, Any]
+) -> dict[str, Any]:
+    """모델 한 칸에 실제로 적용할 설정. 칸에서 정한 항목이 실행 공통 설정보다 항목별로 우선한다.
+
+    기록(ai_requests)에도 이 값이 그대로 남고, 같은 모델·Provider 의 중복 판정도 이 값으로 한다.
+    """
+    merged = {**run_config, **slot_override}
     return {key: merged[key] for key in SENT_EXECUTION_SETTINGS if key in merged}
 
 

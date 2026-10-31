@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from contextlib import suppress
 from datetime import datetime
+from typing import Any
 
 from app.models import SimulationStatus
 from app.openrouter.errors import ErrorType as CallErrorType
@@ -112,6 +113,16 @@ def _log_unrecorded_slots(
             )
 
 
+def _call_settings(slot: SlotPlan) -> dict[str, Any]:
+    """칸의 적용 설정을 call_model 인자로 바꾼다. 아무도 정하지 않은 값은 인자로 보내지 않는다."""
+    config = slot.execution_config
+    settings: dict[str, Any] = {"max_tokens": config["max_tokens"]}
+    for name in ("temperature", "reasoning_effort"):
+        if name in config:
+            settings[name] = config[name]
+    return settings
+
+
 async def _run_slot(
     slot: SlotPlan,
     job: SimulationJob,
@@ -127,12 +138,12 @@ async def _run_slot(
             request_id=slot.request_id,
             model_id=slot.openrouter_model_id,
             messages=job.messages,
-            max_tokens=job.max_tokens,
             timeout_seconds=timeout_seconds,
             json_schema=job.json_schema,
             provider_order=[slot.execution_provider],
             allow_fallbacks=job.allow_fallbacks,
             cancel=cancel,
+            **_call_settings(slot),
         )
     except Exception as error:  # noqa: BLE001 - 예상 밖 오류는 이 칸의 실패로 바꿔 기록한다
         logger.error(

@@ -12,6 +12,7 @@ from app.services.simulation_input import (
     compute_input_hash,
     resolve_execution_config,
     resolve_json_schema,
+    resolve_slot_config,
     validate_input_present,
 )
 
@@ -114,34 +115,76 @@ def test_input_hash_changes_when_the_input_changes() -> None:
 
 
 # --- 시나리오 기본값 ---
-# call_model 이 아직 temperature 를 받지 않는다. 보내지 못하는 값을 기록하면 기록과 실제 호출이 달라지므로
-# 실제로 보내는 설정(max_tokens)만 남긴다. temperature 인자가 생기면 이 규칙을 되돌린다
+# call_model 이 보내는 설정(max_tokens, temperature, reasoning_effort)만 기록한다.
+# 보내지 못하는 값을 기록하면 기록과 실제 호출이 달라지기 때문이다
 
 
-def test_scenario_default_fills_in_max_tokens() -> None:
-    defaults = {"temperature": 0.7, "max_tokens": 1024}
+def test_scenario_default_fills_in_the_settings_that_are_sent() -> None:
+    defaults = {"temperature": 0.7, "max_tokens": 1024, "top_p": 0.9}
 
-    assert resolve_execution_config({}, defaults) == {"max_tokens": 1024}
+    assert resolve_execution_config({}, defaults) == {
+        "temperature": 0.7,
+        "max_tokens": 1024,
+    }
 
 
 def test_request_value_wins_over_the_scenario_default() -> None:
     defaults = {"temperature": 0.7, "max_tokens": 1024}
 
     assert resolve_execution_config({"max_tokens": 256}, defaults) == {
-        "max_tokens": 256
+        "temperature": 0.7,
+        "max_tokens": 256,
     }
 
 
 def test_max_tokens_falls_back_to_the_default_when_nobody_set_it() -> None:
     assert resolve_execution_config({}, None) == {"max_tokens": DEFAULT_MAX_TOKENS}
     assert resolve_execution_config({}, {"temperature": 0}) == {
+        "temperature": 0,
+        "max_tokens": DEFAULT_MAX_TOKENS,
+    }
+
+
+def test_settings_that_are_not_sent_are_not_recorded() -> None:
+    assert resolve_execution_config({"provider": "x", "top_k": 5}, None) == {
         "max_tokens": DEFAULT_MAX_TOKENS
     }
 
 
-def test_settings_that_cannot_be_sent_yet_are_not_recorded() -> None:
-    assert resolve_execution_config({"temperature": 0.2}, {"temperature": 0.7}) == {
-        "max_tokens": DEFAULT_MAX_TOKENS
+def test_reasoning_effort_is_kept_only_when_someone_set_it() -> None:
+    assert "reasoning_effort" not in resolve_execution_config({}, None)
+    assert resolve_execution_config({"reasoning_effort": "low"}, None) == {
+        "max_tokens": DEFAULT_MAX_TOKENS,
+        "reasoning_effort": "low",
+    }
+
+
+# --- 모델별 설정 ---
+def test_a_slot_setting_wins_over_the_run_setting_item_by_item() -> None:
+    run = {"max_tokens": 1024, "temperature": 0.7}
+
+    assert resolve_slot_config(run, {"temperature": 0.1}) == {
+        "max_tokens": 1024,
+        "temperature": 0.1,
+    }
+
+
+def test_a_slot_without_its_own_settings_uses_the_run_setting() -> None:
+    run = {"max_tokens": 1024, "temperature": 0.7}
+
+    assert resolve_slot_config(run, {}) == run
+
+
+def test_a_slot_can_add_a_setting_the_run_does_not_have() -> None:
+    assert resolve_slot_config({"max_tokens": 1024}, {"reasoning_effort": "high"}) == {
+        "max_tokens": 1024,
+        "reasoning_effort": "high",
+    }
+
+
+def test_slot_settings_that_are_not_sent_are_dropped() -> None:
+    assert resolve_slot_config({"max_tokens": 1024}, {"top_p": 0.5}) == {
+        "max_tokens": 1024
     }
 
 

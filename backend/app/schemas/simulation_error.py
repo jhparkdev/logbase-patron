@@ -9,7 +9,9 @@ from app.services.simulation_period import MAX_PERIOD_DAYS, InvalidPeriodReason
 class SimulationErrorCode(StrEnum):
     """시뮬레이터 API 의 오류 코드. 프론트엔드는 이 값으로 상황별로 분기한다."""
 
-    INVALID_REQUEST = "INVALID_REQUEST"  # 형식·범위 검증 실패(모델 수, 중복 선택 등)
+    INVALID_REQUEST = "INVALID_REQUEST"  # 형식·범위 검증 실패(모델 수 등)
+    # 같은 모델·Provider 를 설정까지 같게 두 번 골랐다. 설정이 다르면 별도 비교 대상이라 허용한다
+    DUPLICATE_MODEL_SELECTION = "DUPLICATE_MODEL_SELECTION"
     INPUT_REQUIRED = "INPUT_REQUIRED"  # 프롬프트 템플릿에 채울 입력 데이터가 없음
     SIMULATION_NOT_FOUND = "SIMULATION_NOT_FOUND"
     SLOT_NOT_FOUND = "SLOT_NOT_FOUND"
@@ -39,6 +41,10 @@ ERROR_SPECS: dict[SimulationErrorCode, ErrorSpec] = {
     ),
     SimulationErrorCode.INPUT_REQUIRED: ErrorSpec(
         422, "템플릿에 넣을 입력 데이터가 필요합니다. 입력 데이터를 입력해 주세요."
+    ),
+    SimulationErrorCode.DUPLICATE_MODEL_SELECTION: ErrorSpec(
+        422,
+        "같은 모델과 Provider 를 같은 설정으로 두 번 고를 수 없습니다. 설정을 다르게 하거나 하나를 빼 주세요.",
     ),
     SimulationErrorCode.SIMULATION_NOT_FOUND: ErrorSpec(
         404, "해당 비교 실행을 찾을 수 없습니다."

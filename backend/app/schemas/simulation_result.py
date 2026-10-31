@@ -2,7 +2,7 @@ from enum import StrEnum
 from typing import Annotated, Self
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, JsonValue, model_validator
 
 from app.models import (
     CostStatus,
@@ -63,6 +63,8 @@ class SimulationModelResult(BaseModel):
     model_display_name_at_run: str
     model_status_at_run: ModelStatus
     execution_provider: str  # 이 칸에서 고정한 업체
+    # 이 칸에 실제로 적용한 설정(실행 공통 설정과 합친 값). 과거 이력은 지금 규칙으로 다시 거절하지 않는다
+    execution_config: dict[str, JsonValue]
     actual_provider: str | None  # 실제로 처리한 업체. 모르면 null
     actual_model: str | None
     status: RequestStatus

@@ -95,6 +95,9 @@ class RerunModel(BaseModel):
     # 과거에 고른 값. 새 실행 요청의 모델 칸과 같은 이름이다
     model_id: int
     execution_provider: str
+    # 이 칸에 실제로 적용했던 설정(실행 공통 설정과 합친 값). 그대로 보내면 같은 조건으로 다시 돌린다.
+    # 과거 이력은 지금 규칙으로 다시 거절하지 않으므로 dict 로 받는다
+    execution_config: dict[str, JsonValue]
     # 현재 값. 실행 당시 이름·상태(결과 조회 응답)와 다를 수 있다
     current_display_name: str
     current_status: ModelStatus

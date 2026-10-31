@@ -103,6 +103,7 @@ async def test_a_finished_run_shows_the_summary_and_every_slot(
     assert first["model_display_name_at_run"] == rows[0]["display_name"]
     assert first["model_status_at_run"] == "ACTIVE"
     assert first["execution_provider"] == "DeepInfra"
+    assert first["execution_config"] == {"max_tokens": 4096}
     assert (first["json_parse_status"], first["schema_validation_status"]) == (
         "NOT_APPLICABLE",
         "NOT_APPLICABLE",

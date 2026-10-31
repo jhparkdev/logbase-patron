@@ -18,6 +18,10 @@ from app.services.simulation_create import (
 from app.services.simulation_input import InputRequiredError
 from app.services.simulation_lookup import SimulatorContextMissingError
 from app.services.simulation_period import InvalidPeriodError, InvalidPeriodReason
+from app.services.simulation_validation import (
+    DuplicateModelSelectionError,
+    ModelSelection,
+)
 
 C = SimulationErrorCode
 
@@ -26,6 +30,10 @@ C = SimulationErrorCode
     ("error", "code"),
     [
         (InputRequiredError(), C.INPUT_REQUIRED),
+        (
+            DuplicateModelSelectionError(ModelSelection(1, "DeepInfra")),
+            C.DUPLICATE_MODEL_SELECTION,
+        ),
         (ScenarioNotFoundError(), C.SCENARIO_NOT_FOUND),
         (RerunSourceNotFoundError(), C.RERUN_SOURCE_NOT_FOUND),
         (ModelNotFoundError([9]), C.MODEL_NOT_FOUND),

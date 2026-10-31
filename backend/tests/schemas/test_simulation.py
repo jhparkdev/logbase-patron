@@ -11,6 +11,7 @@ from app.schemas.simulation import (
     MIN_TEMPERATURE,
     ModelSelectionRequest,
     ModelSelections,
+    ReasoningEffort,
     SimulationCreateRequest,
 )
 
@@ -38,7 +39,12 @@ def selection(model_id: int, provider: str = PROVIDER_A) -> dict[str, object]:
 def test_selection_has_model_id_and_provider() -> None:
     chosen = ModelSelectionRequest(model_id=GPT, execution_provider=PROVIDER_A)
 
-    assert chosen.model_dump() == {"model_id": GPT, "execution_provider": PROVIDER_A}
+    # 칸에서 설정을 정하지 않았으면 실행 공통 설정을 쓴다는 뜻으로 비워 둔다
+    assert chosen.model_dump(exclude_none=True) == {
+        "model_id": GPT,
+        "execution_provider": PROVIDER_A,
+        "execution_config": {},
+    }
 
 
 def test_provider_is_required() -> None:
@@ -81,11 +87,11 @@ def test_same_model_with_a_different_provider_is_allowed() -> None:
     assert len(Request(models=models).models) == 2
 
 
-def test_same_model_with_the_same_provider_is_rejected() -> None:
-    models = [selection(GPT, PROVIDER_A), selection(CLAUDE), selection(GPT, PROVIDER_A)]
+def test_same_model_with_the_same_provider_passes_the_schema() -> None:
+    # 설정까지 같은지는 실행 공통 설정·시나리오 기본값과 합친 뒤에야 알 수 있어 접수 서비스가 판단한다
+    models = [selection(GPT, PROVIDER_A), selection(GPT, PROVIDER_A)]
 
-    with pytest.raises(ValidationError, match="중복"):
-        Request(models=models)
+    assert len(Request(models=models).models) == 2
 
 
 def test_different_models_with_the_same_provider_are_allowed() -> None:
@@ -212,11 +218,9 @@ def test_prompt_is_kept_exactly_as_typed() -> None:
     )
 
 
-def test_model_selection_rules_apply_to_the_whole_request() -> None:
+def test_model_count_rule_applies_to_the_whole_request() -> None:
     with pytest.raises(ValidationError):
         SimulationCreateRequest(**create_body(models=[selection(GPT)]))
-    with pytest.raises(ValidationError, match="중복"):
-        SimulationCreateRequest(**create_body(models=[selection(GPT), selection(GPT)]))
 
 
 # 비용 귀속·상태·계산값은 서버가 정한다. 클라이언트가 보내면 조용히 무시하지 않고 거절한다
@@ -369,3 +373,63 @@ def test_openapi_lists_test_type_values_and_forbids_extra_fields() -> None:
     assert schema["properties"]["test_type"]["$ref"].endswith("TestType")
     assert schema["$defs"]["TestType"]["enum"] == ["SCENARIO", "CUSTOM"]
     assert schema["additionalProperties"] is False
+
+
+# --- 모델별 실행 설정 ---
+def slot_config_of(config: dict[str, object]) -> dict[str, object]:
+    chosen = ModelSelectionRequest(
+        model_id=GPT, execution_provider=PROVIDER_A, execution_config=config
+    )
+    return chosen.execution_config.model_dump(exclude_none=True)
+
+
+def test_a_slot_can_set_effort_temperature_and_max_tokens() -> None:
+    config = {"reasoning_effort": "high", "temperature": 0.2, "max_tokens": 2048}
+
+    assert slot_config_of(config) == config
+
+
+def test_the_run_level_config_accepts_reasoning_effort_too() -> None:
+    assert execution_config_of({"reasoning_effort": "low"}) == {
+        "reasoning_effort": "low"
+    }
+
+
+@pytest.mark.parametrize(
+    "effort", ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+)
+def test_documented_reasoning_efforts_are_accepted(effort: str) -> None:
+    assert slot_config_of({"reasoning_effort": effort}) == {"reasoning_effort": effort}
+
+
+@pytest.mark.parametrize("effort", ["", "HIGH", "extreme", 3, True])
+def test_other_reasoning_efforts_are_rejected(effort: object) -> None:
+    with pytest.raises(ValidationError):
+        slot_config_of({"reasoning_effort": effort})
+
+
+def test_slot_settings_have_the_same_ranges_as_the_run_settings() -> None:
+    with pytest.raises(ValidationError):
+        slot_config_of({"temperature": MAX_TEMPERATURE + 0.01})
+    with pytest.raises(ValidationError):
+        slot_config_of({"max_tokens": MAX_TOKENS_LIMIT + 1})
+
+
+def test_a_slot_rejects_keys_outside_the_allow_list() -> None:
+    with pytest.raises(ValidationError):
+        slot_config_of({"provider": {"order": ["x"]}})
+
+
+def test_openapi_lists_the_reasoning_effort_values() -> None:
+    # 허용 값은 OpenAPI enum 으로 프론트엔드에 전달한다
+    schema = SimulationCreateRequest.model_json_schema()["$defs"]["ExecutionConfig"]
+    options = schema["properties"]["reasoning_effort"]["anyOf"][0]
+    effort_enum = schema_ref(options)
+
+    assert effort_enum["enum"] == list(ReasoningEffort)
+
+
+def schema_ref(options: dict[str, object]) -> dict[str, object]:
+    name = str(options["$ref"]).rsplit("/", 1)[-1]
+    defs = SimulationCreateRequest.model_json_schema()["$defs"]
+    return defs[name]

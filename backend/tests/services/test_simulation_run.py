@@ -416,3 +416,33 @@ async def test_cancel_reaches_the_real_openrouter_client() -> None:
         CostStatus.UNKNOWN,
         None,
     )
+
+
+async def test_each_slot_is_called_with_its_own_settings() -> None:
+    h = Harness(count=2)
+    h.slots[0].execution_config.update(
+        {"temperature": 0.2, "reasoning_effort": "high", "max_tokens": 100}
+    )
+    h.slots[1].execution_config.update({"max_tokens": 900})
+
+    await run_simulation(h.job, h.deps)
+
+    calls = {call["model_id"]: call for call in h.caller.calls}
+    first, second = calls[h.model(1)], calls[h.model(2)]
+    assert (first["max_tokens"], first["temperature"], first["reasoning_effort"]) == (
+        100,
+        0.2,
+        "high",
+    )
+    assert second["max_tokens"] == 900
+
+
+async def test_settings_nobody_set_are_not_passed_to_call_model_at_all() -> None:
+    # 값이 없을 때는 인자를 보내지 않아 모델 기본값에 맡기고, 아직 새 인자를 모르는 call_model 도 깨지지 않는다
+    h = Harness(count=2)
+
+    await run_simulation(h.job, h.deps)
+
+    for call in h.caller.calls:
+        assert "temperature" not in call
+        assert "reasoning_effort" not in call

@@ -192,6 +192,7 @@ def rerun_model(**overrides: object) -> dict[str, object]:
     body: dict[str, object] = {
         "model_id": 1,
         "execution_provider": "DeepInfra",
+        "execution_config": {"max_tokens": 4096},
         "current_display_name": "Mistral Nemo",
         "current_status": "ACTIVE",
         "selectable": True,

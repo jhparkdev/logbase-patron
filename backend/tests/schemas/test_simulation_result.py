@@ -47,6 +47,7 @@ def result_body(**overrides: object) -> dict[str, object]:
         "model_display_name_at_run": "Mistral Nemo",
         "model_status_at_run": "ACTIVE",
         "execution_provider": "DeepInfra",
+        "execution_config": {"max_tokens": 4096},
         "actual_provider": "DeepInfra",
         "actual_model": "mistralai/mistral-nemo",
         "status": "SUCCESS",
@@ -282,3 +283,19 @@ def test_detail_response_shows_one_result_per_slot() -> None:
         SimulationDetailResponse(
             summary=summary_body(), results=[earlier_attempt, final_attempt]
         )
+
+
+def test_a_slot_result_carries_the_settings_it_was_run_with() -> None:
+    config = {"max_tokens": 512, "temperature": 0.2, "reasoning_effort": "high"}
+
+    result = SimulationModelResult(**result_body(execution_config=config))
+
+    assert result.model_dump(mode="json")["execution_config"] == config
+
+
+def test_a_slot_result_requires_its_settings() -> None:
+    body = result_body()
+    del body["execution_config"]
+
+    with pytest.raises(ValidationError, match="execution_config"):
+        SimulationModelResult(**body)

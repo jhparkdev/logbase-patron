@@ -7,11 +7,13 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    AIRequest,
     ModelRegistry,
     ModelStatus,
     SimulationResult,
@@ -34,6 +36,7 @@ class PastSlot:
 
     model_id: int
     execution_provider: str
+    execution_config: dict[str, Any]  # 이 칸에 실제로 적용했던 설정
     current_display_name: str
     current_status: ModelStatus
 
@@ -70,6 +73,7 @@ def _to_rerun_model(slot: PastSlot) -> RerunModel:
     return RerunModel(
         model_id=slot.model_id,
         execution_provider=slot.execution_provider,
+        execution_config=slot.execution_config,
         current_display_name=slot.current_display_name,
         current_status=slot.current_status,
         selectable=is_model_selectable(slot.current_status),
@@ -100,10 +104,12 @@ async def _past_slots(
         select(
             SimulationResult.model_id,
             SimulationResult.execution_provider,
+            AIRequest.execution_config,
             ModelRegistry.display_name,
             ModelRegistry.status,
         )
         .join(ModelRegistry, ModelRegistry.model_id == SimulationResult.model_id)
+        .join(AIRequest, AIRequest.request_id == SimulationResult.request_id)
         .where(
             SimulationResult.simulation_id == simulation_id,
             SimulationResult.is_final_attempt,
@@ -114,8 +120,9 @@ async def _past_slots(
         PastSlot(
             model_id=model_id,
             execution_provider=provider,
+            execution_config=config,
             current_display_name=name,
             current_status=ModelStatus(status),
         )
-        for model_id, provider, name, status in rows
+        for model_id, provider, config, name, status in rows
     ]
