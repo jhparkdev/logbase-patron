@@ -8,6 +8,7 @@ import {
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, expect, test } from "vitest";
+import { createComparisons } from "../lib/comparisons";
 import { createDefaultValues } from "../lib/form";
 import { dbMock } from "./dbMock.fixture";
 import { SimulatorRestore } from "./SimulatorRestore";
@@ -45,10 +46,12 @@ test("원문과 파라미터를 P-04에 복원하고 원본 결과 없이 새 �
     text: "저장한 자료",
     temperature: "0.3",
     maxTokens: "512",
-    selections: dbMock.choices
-      .filter((m) => m.selectable)
-      .slice(0, 2)
-      .map((m) => m.key),
+    comparisons: createComparisons(
+      dbMock.choices
+        .filter((m) => m.selectable)
+        .slice(0, 2)
+        .map((m) => m.key),
+    ),
   });
   const page = show(
     <SimulatorRestore
@@ -65,10 +68,10 @@ test("원문과 파라미터를 P-04에 복원하고 원본 결과 없이 새 �
   expect((screen.getByLabelText("Prompt") as HTMLTextAreaElement).value).toBe(
     "저장한 Prompt",
   );
-  fireEvent.click(screen.getByRole("button", { name: /고급 설정/ }));
-  expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
-    "0.3",
-  );
+  fireEvent.click(screen.getByRole("button", { name: /^공통 설정 선택사항$/ }));
+  expect(
+    (screen.getByLabelText("공통 Temperature") as HTMLInputElement).value,
+  ).toBe("0.3");
   expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
   expect(
     screen.getByRole("button", { name: "비교 실행" }).hasAttribute("disabled"),

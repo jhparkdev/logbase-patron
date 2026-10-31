@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Button } from "../../../shared/components/ui/Button";
 import { Dialog } from "../../../shared/components/ui/Dialog";
 import { SearchField } from "../../../shared/components/ui/SearchField";
+import { selectedComparisonCount } from "../lib/comparisons";
 import {
   emptyCatalogMessage,
   type ModelFavoritesView,
@@ -19,6 +20,7 @@ import { ModelFavoritesNotice } from "./ModelFavoritesNotice";
 export function ModelPickerDialog({
   choices,
   selections,
+  counts = {},
   unavailable,
   favorites = unavailableFavorites,
   onClose,
@@ -26,6 +28,7 @@ export function ModelPickerDialog({
 }: {
   choices: ModelChoice[];
   selections: string[];
+  counts?: Readonly<Record<string, number>>;
   unavailable: boolean;
   favorites?: ModelFavoritesView;
   onClose: () => void;
@@ -41,7 +44,8 @@ export function ModelPickerDialog({
     favorites,
   );
   const empty = emptyCatalogMessage(query, favoritesOnly, favorites);
-  const canApply = !unavailable && canApplyModels(pending, choices);
+  const count = selectedComparisonCount(pending, counts);
+  const canApply = !unavailable && canApplyModels(pending, choices, counts);
   const remove = (key: string) =>
     setPending((keys) => keys.filter((value) => value !== key));
   const toggle = (key: string) =>
@@ -49,7 +53,7 @@ export function ModelPickerDialog({
       if (keys.includes(key)) return keys.filter((value) => value !== key);
       if (
         unavailable ||
-        keys.length >= MODEL_LIMITS.max ||
+        selectedComparisonCount([...keys, key], counts) > MODEL_LIMITS.max ||
         !choices.some((choice) => choice.key === key && choice.selectable)
       )
         return keys;
@@ -75,8 +79,9 @@ export function ModelPickerDialog({
       }
     >
       <p className="mb-4 text-body-sm text-grey-600">
-        모델을 {MODEL_LIMITS.min}~{MODEL_LIMITS.max}개 선택하시기 바랍니다. 같은
-        모델도 Provider가 다르면 비교할 수 있습니다.
+        모델을 1개부터 선택해 적용할 수 있습니다. 실행에는 비교 항목{" "}
+        {MODEL_LIMITS.min}~{MODEL_LIMITS.max}개가 필요합니다. 같은 모델의 다른
+        설정은 선택 후 ‘다른 설정으로 비교’에서 추가할 수 있습니다.
       </p>
       <SearchField
         label="모델 검색어"
@@ -118,7 +123,7 @@ export function ModelPickerDialog({
       </p>
       <div className="my-4 rounded-control bg-grey-50 p-3">
         <p role="status" className="text-label font-semibold tabular-nums">
-          선택한 모델 {pending.length}/{MODEL_LIMITS.max}개
+          선택한 비교 항목 {count}/{MODEL_LIMITS.max}개
         </p>
         {pending.length > 0 ? (
           <ul
@@ -140,6 +145,11 @@ export function ModelPickerDialog({
                   >
                     <ModelCreatorBadge creator={choice?.creator} />
                     {label}
+                    {(counts[key] ?? 1) > 1 && (
+                      <span className="tabular-nums">
+                        ({counts[key]}개 항목)
+                      </span>
+                    )}
                     <span aria-hidden="true">×</span>
                   </Button>
                 </li>
@@ -159,7 +169,13 @@ export function ModelPickerDialog({
             선택할 수 없는 모델을 해제하고 다시 선택하시기 바랍니다.
           </p>
         )}
-        {pending.length >= MODEL_LIMITS.max && (
+        {Object.values(counts).some((value) => value > 1) && (
+          <p className="mt-2 text-caption text-grey-600">
+            같은 모델의 비교 항목은 함께 선택·해제합니다. 개별 항목은 본문에서
+            제거할 수 있습니다.
+          </p>
+        )}
+        {count >= MODEL_LIMITS.max && (
           <p className="mt-2 text-caption text-grey-600">
             다른 모델을 고르려면 선택한 모델을 먼저 해제하시기 바랍니다.
           </p>
@@ -182,6 +198,7 @@ export function ModelPickerDialog({
               unavailable={unavailable}
               favorites={favorites}
               onToggle={toggle}
+              counts={counts}
             />
           ) : (
             <div className="py-8 text-center">

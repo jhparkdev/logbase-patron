@@ -1,3 +1,4 @@
+import { selectedComparisonCount } from "./comparisons";
 import { MODEL_LIMITS } from "./limits";
 import type { ModelChoice } from "./presentation";
 
@@ -14,10 +15,15 @@ export function searchModels(choices: ModelChoice[], query: string) {
   });
 }
 
-export function canApplyModels(selections: string[], choices: ModelChoice[]) {
+export function canApplyModels(
+  selections: string[],
+  choices: ModelChoice[],
+  counts: Readonly<Record<string, number>> = {},
+) {
+  const count = selectedComparisonCount(selections, counts);
   return (
-    selections.length >= MODEL_LIMITS.min &&
-    selections.length <= MODEL_LIMITS.max &&
+    count >= 1 &&
+    count <= MODEL_LIMITS.max &&
     new Set(selections).size === selections.length &&
     selections.every((key) =>
       choices.some((choice) => choice.key === key && choice.selectable),

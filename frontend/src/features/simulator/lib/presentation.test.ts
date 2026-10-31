@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { createComparisons } from "./comparisons";
 import { createDefaultValues, simulatorFormSchema } from "./form";
 import { type ModelChoice, selectionIssues } from "./presentation";
 
@@ -14,7 +15,7 @@ const draft = () =>
   simulatorFormSchema.parse({
     ...createDefaultValues(),
     prompt: "작업",
-    selections: [model.key, "other:provider"],
+    comparisons: createComparisons([model.key, "other:provider"]),
   });
 const choices = () => [
   model,

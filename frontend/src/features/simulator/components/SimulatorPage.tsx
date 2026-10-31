@@ -9,13 +9,13 @@ import type { ModelFavoritesView } from "../lib/favorites";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
 import type { ModelChoice, ScenarioChoice } from "../lib/presentation";
 import { AdvancedSettings } from "./AdvancedSettings";
+import { ComparisonConfirmationDialog } from "./ComparisonConfirmationDialog";
 import { InputFields } from "./InputFields";
 import { ModelSelection } from "./ModelSelection";
 import {
   SimulationResults,
   type SimulationResultsProps,
 } from "./SimulationResults";
-import { SimulatorDialog } from "./SimulatorDialog";
 
 type SimulatorPageProps = Partial<SimulationResultsProps> & {
   choices?: ModelChoice[];
@@ -65,6 +65,7 @@ export function SimulatorPage({
             <legend className="sr-only">시뮬레이션 입력 및 비교 설정</legend>
             <InputFields scenarios={scenarios} />
             <AdvancedSettings
+              choices={choices}
               open={workflow.advancedOpen}
               onToggle={() => workflow.setAdvancedOpen(!workflow.advancedOpen)}
               scenario={workflow.selectedScenario}
@@ -129,35 +130,14 @@ export function SimulatorPage({
         </form>
       </FormProvider>
       <SimulationResults view={view} {...resultProps} />
-      <SimulatorDialog
-        open={!!workflow.pendingDraft}
-        title="비교를 실행합니다"
+      <ComparisonConfirmationDialog
+        draft={workflow.pendingDraft}
+        choices={choices}
+        scenarios={scenarios}
+        busy={workflow.busy}
         onClose={() => workflow.setPendingDraft(undefined)}
-        action={
-          <Button
-            disabled={workflow.busy}
-            onClick={() => void workflow.confirm()}
-          >
-            실행하기
-          </Button>
-        }
-      >
-        <p className="text-body-sm text-grey-700">
-          선택한 {workflow.pendingDraft?.selections.length}개 모델을 호출하며
-          비용이 발생할 수 있습니다. 취소 후에도 이미 처리된 호출에는 비용이
-          청구될 수 있습니다.
-        </p>
-        <ul className="mt-4 space-y-2 text-body-sm">
-          {workflow.pendingDraft?.selections.map((key) => {
-            const choice = choices.find((item) => item.key === key);
-            return (
-              <li key={key} className="rounded-lg bg-grey-50 px-3 py-2">
-                {choice?.name} · {choice?.provider}
-              </li>
-            );
-          })}
-        </ul>
-      </SimulatorDialog>
+        onConfirm={() => void workflow.confirm()}
+      />
     </>
   );
 }

@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { comparisonSchema } from "./comparisons";
 import { imageFilesSchema } from "./images";
 import { MODEL_LIMITS, TEMPERATURE, TEXT_LIMIT } from "./limits";
+import { parameterIssue } from "./parameters";
+import type { ModelChoice } from "./presentation";
 
 const optionalNumber = (valid: (value: number) => boolean, message: string) =>
   z
@@ -56,13 +59,19 @@ export const simulatorFormSchema = z
       (value) => Number.isSafeInteger(value) && value >= 1,
       "1 이상의 정수를 입력하시기 바랍니다.",
     ),
-    selections: z
-      .array(z.string().min(1, "비교 모델을 선택하시기 바랍니다."))
-      .min(MODEL_LIMITS.min, "모델을 2개 이상 선택하시기 바랍니다.")
-      .max(MODEL_LIMITS.max, "모델은 최대 4개까지 선택할 수 있습니다.")
+    reasoningEffort: z
+      .string()
+      .trim()
+      .transform((value) => value || undefined),
+    comparisons: z
+      .array(comparisonSchema)
+      .min(MODEL_LIMITS.min, "비교 항목을 2개 이상 선택하시기 바랍니다.")
+      .max(MODEL_LIMITS.max, "비교 항목은 최대 4개까지 추가할 수 있습니다.")
       .refine(
-        (values) => new Set(values).size === values.length,
-        "같은 모델과 Provider는 한 번만 선택하시기 바랍니다.",
+        (values) =>
+          new Set(values.map((item) => item.comparisonId)).size ===
+          values.length,
+        "비교 항목 식별자는 서로 달라야 합니다.",
       ),
     files: imageFilesSchema,
   })
@@ -78,6 +87,36 @@ export const simulatorFormSchema = z
 export type SimulatorFormValues = z.input<typeof simulatorFormSchema>;
 export type SimulatorDraft = z.output<typeof simulatorFormSchema>;
 
+export function simulatorSchemaFor(choices: ModelChoice[]) {
+  return simulatorFormSchema.superRefine((draft, context) => {
+    draft.comparisons.forEach((comparison, index) => {
+      if (comparison.settings.mode !== "custom") return;
+      const choice = choices.find((item) => item.key === comparison.modelKey);
+      if (!choice) return;
+      for (const key of [
+        "temperature",
+        "maxTokens",
+        "reasoningEffort",
+      ] as const) {
+        const value = comparison.settings[key];
+        if (value === undefined) continue;
+        const parameter = choice.tuningParameters?.find(
+          (item) => item.key === key,
+        );
+        const message = parameter
+          ? parameterIssue(parameter, value)
+          : "모델별 설정 지원 정보를 확인할 수 없습니다.";
+        if (message)
+          context.addIssue({
+            code: "custom",
+            path: ["comparisons", index, "settings", key],
+            message,
+          });
+      }
+    });
+  });
+}
+
 export function createDefaultValues(
   initialValues?: Partial<SimulatorFormValues>,
 ): SimulatorFormValues {
@@ -89,8 +128,13 @@ export function createDefaultValues(
     jsonSchema: "",
     temperature: "",
     maxTokens: "",
+    reasoningEffort: "",
     files: [],
     ...initialValues,
-    selections: initialValues?.selections?.filter(Boolean) ?? [],
+    comparisons:
+      initialValues?.comparisons?.map((item) => ({
+        ...item,
+        settings: { ...item.settings },
+      })) ?? [],
   };
 }

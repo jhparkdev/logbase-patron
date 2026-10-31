@@ -1,4 +1,11 @@
+import { requestedSettings } from "./comparisons";
 import type { SimulatorDraft } from "./form";
+import {
+  PARAMETER_LABELS,
+  PARAMETER_NAMES,
+  parameterIssue,
+  type TuningParameter,
+} from "./parameters";
 
 // 화면 전용 props다. HTTP 계약과 요청·응답 타입은 OpenAPI 준비 후 별도 adapter에서 연결한다.
 export type ModelChoice = {
@@ -11,6 +18,7 @@ export type ModelChoice = {
   unavailableReason?: string;
   supportsImages: boolean;
   supportedParameters: readonly string[];
+  tuningParameters?: readonly TuningParameter[];
 };
 export type ScenarioChoice = {
   key: string;
@@ -81,7 +89,10 @@ export function selectionIssues(
   scenarios: ScenarioChoice[],
 ): string[] {
   const issues: string[] = [];
-  const scenario = scenarios.find((item) => item.key === draft.scenarioKey);
+  const scenario =
+    draft.mode === "scenario"
+      ? scenarios.find((item) => item.key === draft.scenarioKey)
+      : undefined;
   if (draft.mode === "scenario" && !scenario)
     issues.push("시나리오를 다시 선택하시기 바랍니다.");
   if (
@@ -90,8 +101,9 @@ export function selectionIssues(
     !draft.files.length
   )
     issues.push("선택한 시나리오에 사용할 이미지를 추가하시기 바랍니다.");
-  for (const key of draft.selections) {
-    const choice = choices.find((item) => item.key === key);
+  const seen = new Set<string>();
+  for (const comparison of draft.comparisons) {
+    const choice = choices.find((item) => item.key === comparison.modelKey);
     if (!choice?.selectable) {
       issues.push(
         "선택할 수 없는 모델이 있습니다. 모델을 다시 선택하시기 바랍니다.",
@@ -100,16 +112,51 @@ export function selectionIssues(
     }
     if (draft.files.length && !choice.supportsImages)
       issues.push(`${choice.name}은 이미지 입력을 지원하지 않습니다.`);
-    if (
-      draft.temperature !== undefined &&
-      !choice.supportedParameters.includes("temperature")
-    )
-      issues.push(`${choice.name}은 Temperature 지정을 지원하지 않습니다.`);
-    if (
-      draft.maxTokens !== undefined &&
-      !choice.supportedParameters.includes("max_tokens")
-    )
-      issues.push(`${choice.name}은 최대 출력 토큰 지정을 지원하지 않습니다.`);
+    const settings = requestedSettings(comparison, draft, scenario?.defaults);
+    for (const key of [
+      "temperature",
+      "maxTokens",
+      "reasoningEffort",
+    ] as const) {
+      const value = settings[key];
+      if (value === undefined) continue;
+      const parameter = choice.tuningParameters?.find(
+        (item) => item.key === key,
+      );
+      if (
+        !parameter &&
+        !choice.supportedParameters.includes(PARAMETER_NAMES[key])
+      )
+        issues.push(
+          `${choice.name}은 ${PARAMETER_LABELS[key]} 지정을 지원하지 않습니다.`,
+        );
+      if (
+        comparison.settings.mode === "custom" &&
+        comparison.settings[key] !== undefined &&
+        !parameter
+      )
+        issues.push(
+          `${choice.name}의 모델별 설정 지원 정보를 확인할 수 없습니다.`,
+        );
+      if (
+        key === "reasoningEffort" &&
+        !parameter &&
+        choice.supportedParameters.includes(PARAMETER_NAMES[key])
+      )
+        issues.push(
+          `${choice.name}의 추론 강도 지원 선택지를 확인할 수 없습니다. 모델을 다시 선택하거나 추론 강도 설정을 해제하시기 바랍니다.`,
+        );
+      if (parameter) {
+        const issue = parameterIssue(parameter, value);
+        if (issue) issues.push(`${choice.name}: ${issue}`);
+      }
+    }
+    const fingerprint = JSON.stringify([comparison.modelKey, settings]);
+    if (seen.has(fingerprint))
+      issues.push(
+        "동일한 요청 설정을 가진 비교 항목이 있습니다. 설정을 변경하거나 항목을 제거하시기 바랍니다.",
+      );
+    seen.add(fingerprint);
     if (
       draft.jsonSchema.trim() &&
       !choice.supportedParameters.some(

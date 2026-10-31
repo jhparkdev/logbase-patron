@@ -1,3 +1,4 @@
+import { selectedComparisonCount } from "../lib/comparisons";
 import type { ModelFavoritesView } from "../lib/favorites";
 import { MODEL_LIMITS } from "../lib/limits";
 import type { ModelChoice } from "../lib/presentation";
@@ -10,12 +11,14 @@ export function ModelCatalogTable({
   unavailable,
   favorites,
   onToggle,
+  counts,
 }: {
   choices: ModelChoice[];
   pending: string[];
   unavailable: boolean;
   favorites: ModelFavoritesView;
   onToggle: (key: string) => void;
+  counts?: Readonly<Record<string, number>>;
 }) {
   return (
     <div className="max-h-64 overflow-y-auto rounded-control border border-grey-200">
@@ -57,7 +60,10 @@ export function ModelCatalogTable({
                       unavailable ||
                       (!checked &&
                         (!choice.selectable ||
-                          pending.length >= MODEL_LIMITS.max))
+                          selectedComparisonCount(
+                            [...pending, choice.key],
+                            counts,
+                          ) > MODEL_LIMITS.max))
                     }
                     onChange={() => onToggle(choice.key)}
                     className="size-4 accent-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"

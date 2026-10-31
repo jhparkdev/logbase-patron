@@ -59,7 +59,10 @@ test("P-04의 입력·모델 선택·결과를 같은 mock 실행 한 건으로 
   const selected = within(
     screen.getByRole("list", { name: "선택한 비교 모델" }),
   ).getAllByRole("listitem");
-  for (const [index, key] of previewData.initialValues.selections.entries()) {
+  for (const [
+    index,
+    { modelKey: key },
+  ] of previewData.initialValues.comparisons.entries()) {
     const choice = previewData.choices.find((item) => item.key === key);
     if (!choice) throw new Error("선택한 예시 모델이 없습니다.");
     expect(within(selected[index]).getByText(choice.name)).toBeDefined();
@@ -100,16 +103,16 @@ test("편집과 전체 응답 열기는 가능하고 실행·DB 호출은 하지
   expect(JSON.stringify(previewData.run)).toBe(original);
 });
 
-test("고급 설정은 기본 접힘이고 저장된 설정을 표시한다", () => {
+test("공통 설정은 기본 접힘이고 저장된 설정을 표시한다", () => {
   renderPage(<SimulatorPreview />);
-  const toggle = screen.getByRole("button", { name: /고급 설정/ });
+  const toggle = screen.getByRole("button", { name: /^공통 설정 선택사항$/ });
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   fireEvent.click(toggle);
-  expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
-    "0.3",
-  );
   expect(
-    (screen.getByLabelText("최대 출력 토큰") as HTMLInputElement).value,
+    (screen.getByLabelText("공통 Temperature") as HTMLInputElement).value,
+  ).toBe("0.3");
+  expect(
+    (screen.getByLabelText("공통 최대 출력 토큰") as HTMLInputElement).value,
   ).toBe("512");
 });
 
@@ -131,7 +134,7 @@ test("미리보기 즐겨찾기는 모달을 닫아도 유지하며 실제 조�
   const fetch = vi.fn();
   vi.stubGlobal("fetch", fetch);
   renderPage(<SimulatorPreview />);
-  const key = previewData.initialValues.selections[0];
+  const key = previewData.initialValues.comparisons[0].modelKey;
   const choice = previewData.choices.find((item) => item.key === key);
   if (!choice) throw new Error("선택한 예시 모델이 없습니다.");
   const label = `${choice.name} · ${choice.provider} 즐겨찾기`;
@@ -149,6 +152,37 @@ test("미리보기 즐겨찾기는 모달을 닫아도 유지하며 실제 조�
     within(screen.getByRole("list", { name: "선택한 비교 모델" })).getAllByRole(
       "listitem",
     ),
-  ).toHaveLength(previewData.initialValues.selections.length);
+  ).toHaveLength(previewData.initialValues.comparisons.length);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test("튜닝 예시에서는 비교 항목을 복제하고 개별값을 편집하되 실제 호출은 하지 않는다", () => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  renderPage(<SimulatorPreview />);
+  fireEvent.click(
+    screen.getByRole("button", { name: "비교 모델 1 다른 설정으로 비교" }),
+  );
+  const own = within(screen.getByRole("group", { name: "비교 항목 4 설정" }));
+  fireEvent.change(own.getByLabelText("Temperature"), {
+    target: { value: "0.7" },
+  });
+  fireEvent.change(own.getByLabelText("추론 강도"), {
+    target: { value: "high" },
+  });
+  expect((own.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
+    "0.7",
+  );
+  expect((own.getByLabelText("추론 강도") as HTMLSelectElement).value).toBe(
+    "high",
+  );
+  expect(
+    screen
+      .getByRole("button", { name: "비교 모델 2 다른 설정으로 비교" })
+      .hasAttribute("disabled"),
+  ).toBe(true);
+  expect(
+    screen.getByRole("button", { name: "비교 실행" }).hasAttribute("disabled"),
+  ).toBe(true);
   expect(fetch).not.toHaveBeenCalled();
 });

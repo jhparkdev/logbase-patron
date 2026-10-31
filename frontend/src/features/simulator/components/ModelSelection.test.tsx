@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeAll, expect, test } from "vitest";
+import { createComparisons } from "../lib/comparisons";
 import { createDefaultValues, type SimulatorFormValues } from "../lib/form";
 import type { ModelChoice } from "../lib/presentation";
 import { ModelSelection } from "./ModelSelection";
@@ -32,7 +33,9 @@ function Form({
   unavailable?: boolean;
 }) {
   const form = useForm<SimulatorFormValues>({
-    defaultValues: createDefaultValues({ selections }),
+    defaultValues: createDefaultValues({
+      comparisons: createComparisons(selections),
+    }),
   });
   return (
     <FormProvider {...form}>
@@ -68,12 +71,17 @@ function select(index: number) {
 test("한 모달에서 여러 Provider를 선택하고 적용할 때만 비교 모델에 반영한다", () => {
   render(<Form />);
   const dialog = openPicker();
-  select(0);
   expect(
     within(dialog)
       .getByRole("button", { name: "선택 적용" })
       .hasAttribute("disabled"),
   ).toBe(true);
+  select(0);
+  expect(
+    within(dialog)
+      .getByRole("button", { name: "선택 적용" })
+      .hasAttribute("disabled"),
+  ).toBe(false);
   select(1);
   expect(screen.queryByRole("list", { name: "선택한 비교 모델" })).toBeNull();
   fireEvent.click(within(dialog).getByRole("button", { name: "선택 적용" }));

@@ -15,6 +15,7 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
+import { createComparisons } from "../lib/comparisons";
 import type { SimulatorDraft } from "../lib/form";
 import { IMAGE_LIMITS, TEXT_LIMIT } from "../lib/limits";
 import type { ModelChoice } from "../lib/presentation";
@@ -93,43 +94,48 @@ test("API 미연결 화면은 가짜 모델과 실행 결과를 만들지 않는
   expect(screen.queryByText("모델 A")).toBeNull();
 });
 
-test("고급 설정은 닫혀 있고, 기본값은 비어 있으며 접어도 편집값이 유지된다", () => {
+test("공통 설정은 닫혀 있고, 기본값은 비어 있으며 접어도 편집값이 유지된다", () => {
   const onRun = vi.fn();
   render(<SimulatorPage choices={choices} onRun={onRun} />);
-  const toggle = screen.getByRole("button", { name: /고급 설정/ });
+  const toggle = screen.getByRole("button", { name: /^공통 설정 선택사항$/ });
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   fireEvent.click(toggle);
-  expect(screen.getByLabelText("Temperature").getAttribute("value")).toBe("");
-  fireEvent.change(screen.getByLabelText("Temperature"), {
+  expect(screen.getByLabelText("공통 Temperature").getAttribute("value")).toBe(
+    "",
+  );
+  fireEvent.change(screen.getByLabelText("공통 Temperature"), {
     target: { value: "0.7" },
   });
   expect(
     (
       screen.getByRole("slider", {
-        name: "Temperature 조절",
+        name: "공통 Temperature 조절",
       }) as HTMLInputElement
     ).value,
   ).toBe("0.7");
-  fireEvent.change(screen.getByRole("slider", { name: "Temperature 조절" }), {
-    target: { value: "1.2" },
-  });
-  expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
-    "1.2",
+  fireEvent.change(
+    screen.getByRole("slider", { name: "공통 Temperature 조절" }),
+    {
+      target: { value: "1.2" },
+    },
   );
+  expect(
+    (screen.getByLabelText("공통 Temperature") as HTMLInputElement).value,
+  ).toBe("1.2");
   fireEvent.click(toggle);
   fireEvent.click(toggle);
-  expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
-    "1.2",
-  );
+  expect(
+    (screen.getByLabelText("공통 Temperature") as HTMLInputElement).value,
+  ).toBe("1.2");
   expect(onRun).not.toHaveBeenCalled();
 });
 
-test("접힌 고급 설정의 오류를 펼쳐서 보여주고 제출한 뒤에만 검증한다", async () => {
+test("접힌 공통 설정의 오류를 펼쳐서 보여주고 제출한 뒤에만 검증한다", async () => {
   render(<SimulatorPage choices={choices} onRun={vi.fn()} />);
   fill();
-  const toggle = screen.getByRole("button", { name: /고급 설정/ });
+  const toggle = screen.getByRole("button", { name: /^공통 설정 선택사항$/ });
   fireEvent.click(toggle);
-  fireEvent.change(screen.getByLabelText("최대 출력 토큰"), {
+  fireEvent.change(screen.getByLabelText("공통 최대 출력 토큰"), {
     target: { value: "0" },
   });
   fireEvent.click(toggle);
@@ -163,7 +169,10 @@ test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번
   fireEvent.click(confirm);
   await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
   expect(onRun.mock.calls[0]?.[0]).toMatchObject({
-    selections: ["a:p1", "a:p2"],
+    comparisons: createComparisons(["a:p1", "a:p2"]).map((item) => ({
+      comparisonId: expect.any(String),
+      modelKey: item.modelKey,
+    })),
     temperature: undefined,
   });
   expect(
@@ -187,7 +196,9 @@ test("네 모델이 선택되어 있어도 검색으로 교체할 수 있고 하
     <SimulatorPage
       choices={catalog}
       onRun={vi.fn()}
-      initialValues={{ selections: ["a:p1", "a:p2", "c:p1", "d:p1"] }}
+      initialValues={{
+        comparisons: createComparisons(["a:p1", "a:p2", "c:p1", "d:p1"]),
+      }}
     />,
   );
   expect(
@@ -230,7 +241,7 @@ test.each([1, 2])(
     expect(onRun).not.toHaveBeenCalled();
 
     fireEvent.submit(run.closest("form") as HTMLFormElement);
-    await screen.findByText("모델을 2개 이상 선택하시기 바랍니다.");
+    await screen.findByText("비교 항목을 2개 이상 선택하시기 바랍니다.");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(onRun).not.toHaveBeenCalled();
 
@@ -250,11 +261,15 @@ test.each([1, 2])(
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
     await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
-    expect(onRun.mock.calls[0]?.[0].selections).toEqual([remaining, restored]);
+    expect(
+      onRun.mock.calls[0]?.[0].comparisons.map(
+        (item: SimulatorDraft["comparisons"][number]) => item.modelKey,
+      ),
+    ).toEqual([remaining, restored]);
   },
 );
 
-test("기존 DB 시나리오의 Prompt·Schema를 복원하고 고급 설정은 기본값을 따른다", () => {
+test("기존 DB 시나리오의 Prompt·Schema를 복원하고 공통 설정은 기본값을 따른다", () => {
   render(
     <SimulatorPage
       choices={dbMock.choices}
@@ -276,17 +291,17 @@ test("기존 DB 시나리오의 Prompt·Schema를 복원하고 고급 설정은 
   expect(
     (screen.getByLabelText(/JSON Schema/) as HTMLTextAreaElement).value,
   ).toBe(scenario.schemaText);
-  fireEvent.click(screen.getByRole("button", { name: /고급 설정/ }));
-  expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
-    "",
-  );
-  fireEvent.change(screen.getByLabelText("Temperature"), {
+  fireEvent.click(screen.getByRole("button", { name: /^공통 설정 선택사항$/ }));
+  expect(
+    (screen.getByLabelText("공통 Temperature") as HTMLInputElement).value,
+  ).toBe("");
+  fireEvent.change(screen.getByLabelText("공통 Temperature"), {
     target: { value: "0.3" },
   });
   fireEvent.click(screen.getByRole("button", { name: "기본 설정으로" }));
-  expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
-    "",
-  );
+  expect(
+    (screen.getByLabelText("공통 Temperature") as HTMLInputElement).value,
+  ).toBe("");
   expect((screen.getByLabelText("Prompt") as HTMLTextAreaElement).value).toBe(
     scenario.prompt,
   );
