@@ -1,9 +1,6 @@
 import { type ReactNode, useId } from "react";
-import { Button } from "../../../shared/components/ui/Button";
-import {
-  FIELD_BOX_CLASS,
-  FIELD_CLASS,
-} from "../../../shared/components/ui/fieldStyle";
+import { Button } from "./Button";
+import { FIELD_BOX_CLASS, FIELD_CLASS } from "./fieldStyle";
 
 // 상세 패널 폼이 함께 쓰는 조각: 입력 칸 모양, 라벨·검증 문구, 안내 상자, 아래 버튼 줄
 

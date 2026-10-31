@@ -2,16 +2,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import {
-  type SubscriptionFormValues,
-  subscriptionFormSchema,
-} from "../lib/forms";
-import {
   FIELD_INPUT_CLASS,
   FIELD_TEXTAREA_CLASS,
   FormActions,
   FormField,
   FormHint,
-} from "./PanelForm";
+} from "../../../shared/components/ui/PanelForm";
+import {
+  type SubscriptionFormValues,
+  subscriptionFormSchema,
+} from "../lib/forms";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "사용 중" },
