@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM 모델 전체 (설계서 v0.6, 테이블 22개).
+"""SQLAlchemy ORM 모델 전체 (설계서 v0.6 및 후속 시뮬레이터 설정).
 
 - 테이블·컬럼·제약은 설계 SQL(patron_schema_v0.6)과 같게 만든다. 제약 이름도 설계와 같다.
 - 상태값 목록은 아래 StrEnum에 한 번만 정의하고, CHECK 제약을 그 값으로 만든다.
@@ -537,6 +537,27 @@ class ModelRegistry(Base):
     updated_at: Mapped[datetime] = updated_at_column()
 
 
+class UserModelFavorite(Base):
+    """사용자가 직접 등록한 모델·실행 Provider 즐겨찾기. 해제 시 이 행만 삭제한다."""
+
+    __tablename__ = "user_model_favorites"
+    __table_args__ = (
+        CheckConstraint(
+            "execution_provider <> '' AND execution_provider = btrim(execution_provider)",
+            name="ck_user_model_favorites_provider",
+        ),
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, fk("users.user_id"), primary_key=True
+    )
+    model_id: Mapped[int] = mapped_column(
+        BigInteger, fk("models.model_id"), primary_key=True
+    )
+    execution_provider: Mapped[str] = mapped_column(Text, primary_key=True)
+    created_at: Mapped[datetime] = created_at_column()
+
+
 class ModelPrice(Base):
     """5.2 가격 기준정보 이력. 수정하지 않고 새 행을 추가한다. execution_provider NULL = 모델 대표가."""
 
@@ -689,6 +710,10 @@ class SimulationRun(Base):
         column_check("simulation_runs", "model_count", "model_count BETWEEN 2 AND 4"),
         in_check("simulation_runs", "status", SimulationStatus),
         in_check("simulation_runs", "data_source", DataSource),
+        CheckConstraint(
+            "jsonb_typeof(execution_config) = 'object'",
+            name="ck_simulation_runs_execution_config_object",
+        ),
         # 시나리오 실행에만 시나리오를 붙인다.
         CheckConstraint(
             f"(test_type = '{TestType.SCENARIO}' AND scenario_id IS NOT NULL) OR "
@@ -773,6 +798,10 @@ class AIRequest(Base):
         in_check("ai_requests", "cost_status", CostStatus),
         in_check("ai_requests", "cost_source", CostSource),
         in_check("ai_requests", "data_source", DataSource),
+        CheckConstraint(
+            "jsonb_typeof(execution_config) = 'object'",
+            name="ck_ai_requests_execution_config_object",
+        ),
         # 설계서 6.2 "DB가 직접 강제하는 규칙"
         # 1) 귀속 대상은 최대 1개
         CheckConstraint(
@@ -841,6 +870,12 @@ class AIRequest(Base):
         ),
         # simulation_results 복합 외래키의 대상
         UniqueConstraint("simulation_id", "request_id", name="uq_ai_requests_sim_req"),
+        UniqueConstraint(
+            "simulation_id",
+            "request_id",
+            "execution_config_hash",
+            name="uq_ai_requests_sim_req_config",
+        ),
         Index("ix_ai_requests_origin_time", "usage_origin", "requested_at"),
         Index("ix_ai_requests_customer_time", "customer_id", "requested_at"),
         Index("ix_ai_requests_project_time", "project_id", "requested_at"),
@@ -951,6 +986,12 @@ class AIRequest(Base):
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
 
+    # DB가 계산하므로 기존 호출 생성 코드도 해시를 보내지 않고 계속 사용할 수 있다.
+    execution_config_hash: Mapped[str] = mapped_column(
+        CHAR(SHA256_HEX_LENGTH),
+        Computed("simulation_execution_config_hash(execution_config)", persisted=True),
+    )
+
 
 class AIRequestPayload(Base):
     """6.3 호출 원문 (호출과 1:1). 이미지는 base64 대신 asset_id로 가리킨다."""
@@ -1046,6 +1087,18 @@ class SimulationResult(Base):
             name="fk_simulation_results_request",
             ondelete=RESTRICT,
         ),
+        # 호출 설정을 바꿔 결과의 중복 판정과 과거 적용값이 어긋나는 것을 막는다.
+        ForeignKeyConstraint(
+            ["simulation_id", "request_id", "execution_config_hash"],
+            [
+                "ai_requests.simulation_id",
+                "ai_requests.request_id",
+                "ai_requests.execution_config_hash",
+            ],
+            name="fk_simulation_results_request_config",
+            ondelete=RESTRICT,
+            onupdate=RESTRICT,
+        ),
         Index(
             "uq_sim_results_slot",
             "simulation_id",
@@ -1053,12 +1106,13 @@ class SimulationResult(Base):
             unique=True,
             postgresql_where=text("is_final_attempt"),
         ),
-        # 같은 모델은 실행 Provider가 다를 때만 한 실행에 두 번 넣을 수 있음
+        # 같은 모델·Provider도 실제 적용 설정이 다르면 별도 비교 대상으로 허용한다.
         Index(
-            "uq_sim_results_model_provider",
+            "uq_sim_results_model_provider_config",
             "simulation_id",
             "model_id",
             "execution_provider",
+            "execution_config_hash",
             unique=True,
             postgresql_where=text("is_final_attempt"),
         ),
@@ -1081,6 +1135,10 @@ class SimulationResult(Base):
     validation_errors: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     comparability_note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = created_at_column()
+    # BEFORE 트리거가 연결된 호출의 생성 해시를 복사한다. 클라이언트 값은 신뢰하지 않는다.
+    execution_config_hash: Mapped[str] = mapped_column(
+        CHAR(SHA256_HEX_LENGTH), server_default=FetchedValue()
+    )
 
 
 # ===========================================================================

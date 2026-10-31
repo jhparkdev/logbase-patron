@@ -19,20 +19,10 @@ def names(body: dict[str, Any]) -> list[str]:
 
 
 # ---------------------------------------------------------------
-# 로그인
-# ---------------------------------------------------------------
-async def test_로그인하지_않으면_401이다(client: AsyncClient) -> None:
-    response = await client.get(MODELS)
-
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert response.json()["code"] == "UNAUTHENTICATED"
-
-
-# ---------------------------------------------------------------
 # 응답 모양
 # ---------------------------------------------------------------
-async def test_등록한_모델이_없으면_빈_목록이다(authed_client: AsyncClient) -> None:
-    response = await authed_client.get(MODELS)
+async def test_등록한_모델이_없으면_빈_목록이다(client: AsyncClient) -> None:
+    response = await client.get(MODELS)
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {
@@ -44,7 +34,7 @@ async def test_등록한_모델이_없으면_빈_목록이다(authed_client: Asy
 
 
 async def test_모델_한_건의_필드를_돌려준다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     model = await factory.model(
         openrouter_model_id="vendor/a",
@@ -63,7 +53,7 @@ async def test_모델_한_건의_필드를_돌려준다(
         cache_read_price_per_token=Decimal("0.0000002"),
     )
 
-    body = (await authed_client.get(MODELS)).json()
+    body = (await client.get(MODELS)).json()
 
     assert body["total"] == 1
     item = body["items"][0]
@@ -82,7 +72,7 @@ async def test_모델_한_건의_필드를_돌려준다(
 
 
 async def test_금액은_문자열로_돌려준다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     model = await factory.model()
     await factory.model_price(
@@ -92,7 +82,7 @@ async def test_금액은_문자열로_돌려준다(
         cache_read_price_per_token=Decimal("0.0000002"),
     )
 
-    price = (await authed_client.get(MODELS)).json()["items"][0]["current_price"]
+    price = (await client.get(MODELS)).json()["items"][0]["current_price"]
 
     assert isinstance(price["input_price_per_token"], str)
     assert Decimal(price["input_price_per_token"]) == Decimal("0.000002")
@@ -103,27 +93,27 @@ async def test_금액은_문자열로_돌려준다(
 
 
 async def test_response_format이_없으면_JSON_Schema를_지원하지_않는다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     await factory.model(supported_parameters=["temperature"])
 
-    item = (await authed_client.get(MODELS)).json()["items"][0]
+    item = (await client.get(MODELS)).json()["items"][0]
 
     assert item["supports_json_schema"] is False
 
 
 async def test_가격이_없는_모델은_current_price가_null이다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     await factory.model()
 
-    item = (await authed_client.get(MODELS)).json()["items"][0]
+    item = (await client.get(MODELS)).json()["items"][0]
 
     assert item["current_price"] is None
 
 
 async def test_현재_가격은_종료되지_않은_대표가격이다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     model = await factory.model()
     model_id = model["model_id"]
@@ -146,7 +136,7 @@ async def test_현재_가격은_종료되지_않은_대표가격이다(
         effective_from=T0 + day,
     )
 
-    body = (await authed_client.get(MODELS)).json()
+    body = (await client.get(MODELS)).json()
 
     assert body["total"] == 1
     price = body["items"][0]["current_price"]
@@ -158,18 +148,18 @@ async def test_현재_가격은_종료되지_않은_대표가격이다(
 # 검색 조건
 # ---------------------------------------------------------------
 async def test_표시_이름은_부분_일치이고_대소문자를_구분하지_않는다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     await factory.model(display_name="GPT-4o Mini")
     await factory.model(display_name="Claude Sonnet")
 
-    body = (await authed_client.get(MODELS, params={"name": "gpt"})).json()
+    body = (await client.get(MODELS, params={"name": "gpt"})).json()
 
     assert names(body) == ["GPT-4o Mini"]
 
 
 async def test_모델_ID와_제공사로도_찾는다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     await factory.model(
         display_name="A", openrouter_model_id="openai/gpt-4o", provider="openai"
@@ -178,30 +168,30 @@ async def test_모델_ID와_제공사로도_찾는다(
         display_name="B", openrouter_model_id="mistralai/nemo", provider="mistralai"
     )
 
-    by_id = (await authed_client.get(MODELS, params={"model_id": "nemo"})).json()
-    by_provider = (await authed_client.get(MODELS, params={"provider": "open"})).json()
+    by_id = (await client.get(MODELS, params={"model_id": "nemo"})).json()
+    by_provider = (await client.get(MODELS, params={"provider": "open"})).json()
 
     assert names(by_id) == ["B"]
     assert names(by_provider) == ["A"]
 
 
 async def test_검색어의_퍼센트와_밑줄은_글자_그대로_찾는다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     await factory.model(display_name="100% 모델")
     await factory.model(display_name="a_b")
     await factory.model(display_name="axb")
     await factory.model(display_name="그 밖의 모델")
 
-    percent = (await authed_client.get(MODELS, params={"name": "%"})).json()
-    underscore = (await authed_client.get(MODELS, params={"name": "a_b"})).json()
+    percent = (await client.get(MODELS, params={"name": "%"})).json()
+    underscore = (await client.get(MODELS, params={"name": "a_b"})).json()
 
     assert names(percent) == ["100% 모델"]
     assert names(underscore) == ["a_b"]
 
 
 async def test_상태는_여러_개를_함께_고를_수_있다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     # 정렬 순서를 확인하는 테스트는 영문 이름을 쓴다. 한글 순서는 DB 정렬 규칙에 따라 달라진다.
     await factory.model(display_name="testing", status="TESTING")
@@ -209,7 +199,7 @@ async def test_상태는_여러_개를_함께_고를_수_있다(
     await factory.model(display_name="inactive", status="INACTIVE")
 
     params = {"status": ["ACTIVE", "INACTIVE"], "sort": "display_name", "order": "asc"}
-    body = (await authed_client.get(MODELS, params=params)).json()
+    body = (await client.get(MODELS, params=params)).json()
 
     assert names(body) == ["active", "inactive"]
     assert body["total"] == 2
@@ -219,15 +209,15 @@ async def test_상태는_여러_개를_함께_고를_수_있다(
 # 정렬
 # ---------------------------------------------------------------
 async def test_정렬_기준과_방향을_바꿀_수_있다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     for display_name in ("b", "a", "c"):
         await factory.model(display_name=display_name)
 
-    ascending = await authed_client.get(
+    ascending = await client.get(
         MODELS, params={"sort": "display_name", "order": "asc"}
     )
-    descending = await authed_client.get(
+    descending = await client.get(
         MODELS, params={"sort": "display_name", "order": "desc"}
     )
 
@@ -236,18 +226,18 @@ async def test_정렬_기준과_방향을_바꿀_수_있다(
 
 
 async def test_기본_정렬은_최근_등록순이다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     await factory.model(display_name="먼저", created_at=T0)
     await factory.model(display_name="나중", created_at=T0 + timedelta(days=1))
 
-    body = (await authed_client.get(MODELS)).json()
+    body = (await client.get(MODELS)).json()
 
     assert names(body) == ["나중", "먼저"]
 
 
 async def test_가격으로_정렬하면_가격이_없는_모델은_항상_뒤에_둔다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     cheap = await factory.model(display_name="싼 모델")
     pricey = await factory.model(display_name="비싼 모델")
@@ -259,10 +249,10 @@ async def test_가격으로_정렬하면_가격이_없는_모델은_항상_뒤�
         model_id=pricey["model_id"], input_price_per_token=Decimal("0.9")
     )
 
-    ascending = await authed_client.get(
+    ascending = await client.get(
         MODELS, params={"sort": "price_input", "order": "asc"}
     )
-    descending = await authed_client.get(
+    descending = await client.get(
         MODELS, params={"sort": "price_input", "order": "desc"}
     )
 
@@ -281,9 +271,9 @@ async def test_가격으로_정렬하면_가격이_없는_모델은_항상_뒤�
     ],
 )
 async def test_허용하지_않는_조건은_422이다(
-    authed_client: AsyncClient, params: dict[str, str]
+    client: AsyncClient, params: dict[str, str]
 ) -> None:
-    response = await authed_client.get(MODELS, params=params)
+    response = await client.get(MODELS, params=params)
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert response.json()["code"] == "VALIDATION_ERROR"
@@ -293,14 +283,14 @@ async def test_허용하지_않는_조건은_422이다(
 # 페이지
 # ---------------------------------------------------------------
 async def test_페이지로_나누어_total은_전체_개수를_돌려준다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     for number in range(1, 4):
         await factory.model(display_name=f"model {number}")
     base = {"sort": "display_name", "order": "asc", "page_size": 2}
 
-    first = (await authed_client.get(MODELS, params={**base, "page": 1})).json()
-    second = (await authed_client.get(MODELS, params={**base, "page": 2})).json()
+    first = (await client.get(MODELS, params={**base, "page": 1})).json()
+    second = (await client.get(MODELS, params={**base, "page": 2})).json()
 
     assert names(first) == ["model 1", "model 2"]
     assert names(second) == ["model 3"]
@@ -309,11 +299,11 @@ async def test_페이지로_나누어_total은_전체_개수를_돌려준다(
 
 
 async def test_마지막_페이지를_넘으면_빈_목록이고_total은_그대로다(
-    authed_client: AsyncClient, factory: Factory
+    client: AsyncClient, factory: Factory
 ) -> None:
     await factory.model()
 
-    body = (await authed_client.get(MODELS, params={"page": 5})).json()
+    body = (await client.get(MODELS, params={"page": 5})).json()
 
     assert body["items"] == []
     assert body["total"] == 1
@@ -329,14 +319,14 @@ async def test_마지막_페이지를_넘으면_빈_목록이고_total은_그대
     ],
 )
 async def test_페이지_범위를_벗어나면_422이다(
-    authed_client: AsyncClient, params: dict[str, int]
+    client: AsyncClient, params: dict[str, int]
 ) -> None:
-    response = await authed_client.get(MODELS, params=params)
+    response = await client.get(MODELS, params=params)
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
-async def test_한_페이지_최대_개수는_허용한다(authed_client: AsyncClient) -> None:
-    response = await authed_client.get(MODELS, params={"page_size": MAX_PAGE_SIZE})
+async def test_한_페이지_최대_개수는_허용한다(client: AsyncClient) -> None:
+    response = await client.get(MODELS, params={"page_size": MAX_PAGE_SIZE})
 
     assert response.status_code == status.HTTP_200_OK

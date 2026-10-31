@@ -1,23 +1,47 @@
-"""API 테스트 공용 fixture."""
+"""시뮬레이터 API 테스트들이 함께 쓰는 fixture."""
+
+from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
 
-from app import security
+from app.api.simulation_deps import get_simulation_manager
+from tests.api.simulation_helpers import FakeManager
+from tests.api.test_auth import log_in, make_user
 from tests.db_helpers import Factory
-
-PASSWORD = "correct-password"
-# 해시 계산이 느려서(Argon2) 한 번만 만든다.
-PASSWORD_HASH = security.hash_password(PASSWORD)
-LOGIN_PATH = "/api/auth/login"
 
 
 @pytest.fixture
-async def authed_client(client: AsyncClient, factory: Factory) -> AsyncClient:
-    """로그인한 관리자의 HTTP 클라이언트. 받은 세션 쿠키가 다음 요청에 자동으로 실린다."""
-    user = await factory.user(password_hash=PASSWORD_HASH)
-    response = await client.post(
-        LOGIN_PATH, json={"email": user["email"], "password": PASSWORD}
+def events() -> list[str]:
+    return []
+
+
+@pytest.fixture
+def manager(app: FastAPI, events: list[str]) -> FakeManager:
+    fake = FakeManager(events)
+    app.dependency_overrides[get_simulation_manager] = lambda: fake
+    return fake
+
+
+@pytest.fixture
+async def poc_setup(factory: Factory) -> None:
+    """시뮬레이터 호출을 귀속하는 PoC 프로젝트·서비스·Key."""
+    project = await factory.project(project_code="PRJ-PATRON-POC", project_type="POC")
+    await factory.service(service_code="PATRON_SIMULATOR", service_type="PATRON")
+    await factory.api_key(
+        project_id=project["project_id"], secret_ref="OPENROUTER_KEY_POC"
     )
-    assert response.status_code == 200
-    return client
+
+
+@pytest.fixture
+async def models(factory: Factory) -> list[int]:
+    rows = [await factory.model(status="ACTIVE") for _ in range(2)]
+    return [row["model_id"] for row in rows]
+
+
+@pytest.fixture
+async def signed_in(client: AsyncClient, factory: Factory) -> dict[str, Any]:
+    user = await make_user(factory)
+    assert (await log_in(client, user["email"])).status_code == 200
+    return user

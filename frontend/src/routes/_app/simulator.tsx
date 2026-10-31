@@ -1,6 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader } from "../../shared/components/ui/PageHeader";
+import { SimulatorPage } from "../../features/simulator/components/SimulatorPage";
+import { SimulatorRestore } from "../../features/simulator/components/SimulatorRestore";
+import { simulatorSearchSchema } from "../../features/simulator/lib/search";
 
 export const Route = createFileRoute("/_app/simulator")({
-  component: () => <PageHeader title="AI 모델 시뮬레이터" />,
+  validateSearch: simulatorSearchSchema,
+  component: SimulatorRoute,
 });
+
+function SimulatorRoute() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  if (search.sourceRun)
+    return <SimulatorRestore sourceKey={search.sourceRun} />;
+  return (
+    <SimulatorPage
+      sort={{ key: search.sort, direction: search.direction }}
+      onSort={(sort) => {
+        void navigate({
+          search: (previous) => ({
+            ...previous,
+            sort: sort.key,
+            direction: sort.direction,
+          }),
+        });
+      }}
+    />
+  );
+}

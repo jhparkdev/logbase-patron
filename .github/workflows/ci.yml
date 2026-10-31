@@ -1,11 +1,10 @@
 # 로컬과 CI가 같은 명령을 돌린다.
-# 프론트엔드 job은 frontend/package.json이 생긴 뒤에 추가한다.
 name: CI
 
-# 지금은 feature 브랜치에서 dev로 가는 PR만 검사한다.
+# 기능 브랜치에서 dev로 가는 PR과, 운영 배포 전 dev에서 main으로 가는 PR을 검사한다.
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, main]
 
 # 같은 브랜치에 새 push가 오면 진행 중인 이전 실행을 취소한다.
 concurrency:
@@ -71,3 +70,34 @@ jobs:
 
       - name: 테스트
         run: uv --directory backend run pytest -q
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"  # frontend/package.json engines(>=24)와 맞춘다
+
+      # corepack은 실행 위치(루트)의 package.json으로 버전을 정해 frontend의 버전을 못 읽는다.
+      # pnpm을 직접 설치하면 frontend/package.json의 devEngines를 보고 정확한 버전으로 바꿔 실행한다.
+      - name: pnpm 설치
+        run: npm install -g pnpm@12
+
+      - name: 의존성 설치
+        run: pnpm --dir frontend install
+
+      - name: 타입 검사
+        run: pnpm --dir frontend typecheck
+
+      - name: 린트
+        run: pnpm --dir frontend lint
+
+      - name: 테스트
+        run: pnpm --dir frontend test
+
+      - name: 빌드
+        run: pnpm --dir frontend build

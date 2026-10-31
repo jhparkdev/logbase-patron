@@ -4,7 +4,7 @@ import internalBudgetIcon from "../../../assets/internalBudget.svg";
 import logoMark from "../../../assets/logo.svg";
 import modelIcon from "../../../assets/model.svg";
 import simulatorIcon from "../../../assets/simulator.svg";
-import simulationHistoryIcon from "../../../assets/simulatorResult.svg";
+import simulatorResultIcon from "../../../assets/simulatorResult.svg";
 import { Icon } from "./Icon";
 
 const NAV_ITEMS = [
@@ -23,11 +23,15 @@ const NAV_ITEMS = [
   {
     to: "/simulation-history",
     label: "시뮬레이션 결과 이력",
-    icon: simulationHistoryIcon,
+    icon: simulatorResultIcon,
   },
 ] as const;
 
-export function Sidebar() {
+export function Sidebar({
+  activeTo,
+}: {
+  activeTo?: (typeof NAV_ITEMS)[number]["to"];
+} = {}) {
   return (
     <aside className="flex w-60 shrink-0 flex-col gap-6 bg-grey-900 px-3 py-4">
       <div className="flex items-center gap-2 px-2">
@@ -45,7 +49,14 @@ export function Sidebar() {
             to={item.to}
             className="flex items-center gap-2.5 rounded-control px-3 py-2 font-medium"
             activeProps={{ className: "bg-white/12 font-semibold text-white" }}
-            inactiveProps={{ className: "text-grey-400 hover:bg-white/8" }}
+            inactiveProps={
+              activeTo === item.to
+                ? {
+                    className: "bg-white/12 font-semibold text-white",
+                    "aria-current": "page",
+                  }
+                : { className: "text-grey-400 hover:bg-white/8" }
+            }
           >
             <Icon src={item.icon} className="size-4.5" />
             {item.label}

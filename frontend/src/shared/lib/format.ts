@@ -21,6 +21,8 @@ export function formatKstDateTime(utc: string): string {
   return `${part.year}-${part.month}-${part.day} ${part.hour}:${part.minute}:${part.second}`;
 }
 
+const GROUPING = new Intl.NumberFormat("ko-KR");
+
 /** 시안 기준 소수 자릿수: 합계·요약은 2자리, 호출 1건 비용은 4자리. */
 const USD_DIGITS = { summary: 2, perCall: 4 } as const;
 
@@ -49,8 +51,6 @@ export function formatUsd(
   const wholeText = GROUPING.format(BigInt(scaledText.slice(0, -digits)));
   return `${wholeText}.${scaledText.slice(-digits)}`;
 }
-
-const GROUPING = new Intl.NumberFormat("ko-KR");
 
 /** 건수와 토큰 수에 천 단위 쉼표를 붙인다. */
 export function formatCount(count: number): string {

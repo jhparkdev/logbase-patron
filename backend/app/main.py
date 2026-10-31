@@ -5,17 +5,17 @@
 
 from fastapi import Depends, FastAPI
 
-from app.api import auth, health, models
-from app.api.deps import get_current_user, require_allowed_origin
+from app.api import auth, health, models, simulations
+from app.api.deps import require_allowed_origin
 from app.api.errors import install_error_handlers
 
 # 배포 환경에서는 nginx가 /api/* 만 backend로 넘기므로 모든 라우트를 이 아래에 둔다.
 API_PREFIX = "/api"
 # 로그인 없이 부를 수 있는 라우터. CLAUDE.md의 예외(로그인·health·기록 API)만 둔다.
 PUBLIC_ROUTERS = (health.router, auth.public_router)
-# 로그인 세션을 요구하는 라우터. 새 기능 라우터는 여기에 추가한다.
+# 기능 라우터. 새 기능 라우터는 여기에 추가한다. 팀 결정으로 라우터 단위 로그인 검사는 하지 않는다.
 # (기록 API는 쿠키 대신 Ingest 토큰을 쓰므로 Origin 검사 없이 따로 등록한다.)
-PROTECTED_ROUTERS = (auth.router, models.router)
+PROTECTED_ROUTERS = (auth.router, simulations.router, models.router)
 
 
 def create_app() -> FastAPI:
@@ -28,11 +28,7 @@ def create_app() -> FastAPI:
     for router in PUBLIC_ROUTERS:
         app.include_router(router, prefix=API_PREFIX, dependencies=[origin_check])
     for router in PROTECTED_ROUTERS:
-        app.include_router(
-            router,
-            prefix=API_PREFIX,
-            dependencies=[origin_check, Depends(get_current_user)],
-        )
+        app.include_router(router, prefix=API_PREFIX, dependencies=[origin_check])
     return app
 
 
