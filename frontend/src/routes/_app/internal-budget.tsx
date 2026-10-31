@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { BudgetFilters } from "../../features/internal-budget/components/BudgetFilters";
 import { BudgetFullList } from "../../features/internal-budget/components/BudgetFullList";
 import { CostTrendCard } from "../../features/internal-budget/components/CostTrendCard";
-import { MemberUsageTable } from "../../features/internal-budget/components/MemberUsageTable";
 import { ProjectBudgetTable } from "../../features/internal-budget/components/ProjectBudgetTable";
 import { ProjectPanel } from "../../features/internal-budget/components/ProjectPanel";
 import { RequestHistoryTable } from "../../features/internal-budget/components/RequestHistoryTable";
@@ -56,7 +55,6 @@ function InternalBudgetPage() {
           <CostTrendCard />
           <ProjectBudgetTable month={month} />
           <SubscriptionTable />
-          <MemberUsageTable />
           <RequestHistoryTable />
         </>
       ) : (

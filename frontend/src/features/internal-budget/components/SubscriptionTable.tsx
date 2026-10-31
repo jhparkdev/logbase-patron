@@ -4,6 +4,7 @@ import { Button } from "../../../shared/components/ui/Button";
 import { Result } from "../../../shared/components/ui/Result";
 import { SectionCard } from "../../../shared/components/ui/SectionCard";
 import type { ListColumn, ListControls } from "../lib/list";
+import { MemberUsageSection } from "./MemberUsageSection";
 import { PendingTable } from "./PendingTable";
 import { ViewAllLink } from "./ViewAllLink";
 
@@ -19,7 +20,10 @@ const COLUMNS: ListColumn<"subscriptions">[] = [
   { key: "status", header: "상태" },
 ];
 
-/** 월 구독료 목록. list가 있으면 전체 목록이다. 등록 버튼은 주소에 남겨 등록 패널을 연다. */
+/**
+ * 월 구독료 목록. 요약 화면에서는 아래에 구성원별 Command Code 사용량을 함께 보여 주고,
+ * list가 있으면 구독료 전체 목록만 보여 준다. 등록 버튼은 주소에 남겨 등록 패널을 연다.
+ */
 export function SubscriptionTable({ list }: { list?: ListControls }) {
   const navigate = route.useNavigate();
   return (
@@ -53,6 +57,7 @@ export function SubscriptionTable({ list }: { list?: ListControls }) {
         }
         list={list}
       />
+      {!list && <MemberUsageSection />}
     </SectionCard>
   );
 }
