@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { customerUsageSearchSchema } from "./search";
+import {
+  customerRowsQuery,
+  customerSortOf,
+  customerUsageSearchSchema,
+  filterFormValues,
+  filterSearchParams,
+  requestRowsQuery,
+  requestSortOf,
+  usageFilterQuery,
+} from "./search";
 
 const RECENT_30_DAYS = { from: "2026-10-02", to: "2026-10-31" };
 const PERIOD = { from: "2026-10-01", to: "2026-10-20" };
@@ -82,5 +91,101 @@ describe("customerUsageSearchSchema 상세 패널", () => {
     for (const detail of [0, -1, 1.5, "abc"]) {
       expect(parse({ ...PERIOD, detail })).toEqual(PERIOD);
     }
+  });
+});
+
+describe("customerUsageSearchSchema 조회 조건", () => {
+  test("고객·서비스·모델은 1 이상의 번호만 받는다", () => {
+    expect(parse({ ...PERIOD, customer: 1, service: 2, model: 3 })).toEqual({
+      ...PERIOD,
+      customer: 1,
+      service: 2,
+      model: 3,
+    });
+    expect(parse({ ...PERIOD, customer: 0, service: "a" })).toEqual(PERIOD);
+  });
+
+  test("허용 목록 밖의 정렬은 버린다", () => {
+    expect(
+      parse({
+        ...PERIOD,
+        customersSort: "password",
+        requestsSort: "costStatus",
+      }),
+    ).toEqual(PERIOD);
+  });
+});
+
+describe("API 조회 조건", () => {
+  test("기간과 고른 번호를 API 이름으로 바꾼다", () => {
+    expect(usageFilterQuery(parse({ ...PERIOD, customer: 1 }))).toEqual({
+      start_date: PERIOD.from,
+      end_date: PERIOD.to,
+      customer_id: 1,
+      service_id: undefined,
+      model_id: undefined,
+    });
+  });
+
+  test("요약 화면은 미리보기이고 기본 정렬을 보낸다", () => {
+    const customers = customerRowsQuery(parse(PERIOD));
+    const requests = requestRowsQuery(parse(PERIOD));
+
+    expect(customers).toMatchObject({
+      preview: true,
+      sort: "confirmed",
+      order: "desc",
+    });
+    expect(customers).not.toHaveProperty("page");
+    expect(requests).toMatchObject({
+      preview: true,
+      sort: "requestedAt",
+      order: "desc",
+    });
+  });
+
+  test("전체보기인 표만 페이지를 보낸다", () => {
+    const search = parse({ ...PERIOD, view: "customers", page: 3 });
+
+    expect(customerRowsQuery(search)).toMatchObject({
+      preview: false,
+      page: 3,
+      page_size: 10,
+    });
+    expect(requestRowsQuery(search).preview).toBe(true);
+  });
+
+  test("표마다 정렬을 따로 읽는다", () => {
+    const search = parse({
+      ...PERIOD,
+      customersSort: "usage",
+      customersOrder: "asc",
+    });
+
+    expect(customerSortOf(search)).toEqual({ key: "usage", direction: "asc" });
+    expect(requestSortOf(search)).toEqual({
+      key: "requestedAt",
+      direction: "desc",
+    });
+  });
+});
+
+describe("조회 조건 폼", () => {
+  test("고르지 않은 칸은 빈 값이고, 조회하면 1페이지로 돌아간다", () => {
+    const values = filterFormValues(parse({ ...PERIOD, customer: 2 }));
+
+    expect(values).toEqual({
+      ...PERIOD,
+      customer: "2",
+      service: "",
+      model: "",
+    });
+    expect(filterSearchParams(values)).toEqual({
+      ...PERIOD,
+      customer: 2,
+      service: undefined,
+      model: undefined,
+      page: undefined,
+    });
   });
 });
