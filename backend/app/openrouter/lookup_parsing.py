@@ -83,8 +83,10 @@ def parse_models(body: dict[str, Any]) -> list[ModelInfo] | None:
         models.append(
             ModelInfo(
                 model_id=model_id,
+                name=get_str(item, "name"),
                 pricing=_parse_pricing(get_dict(item, "pricing")),
                 input_modalities=_str_list(architecture.get("input_modalities")),
+                output_modalities=_str_list(architecture.get("output_modalities")),
                 supported_parameters=_str_list(item.get("supported_parameters")),
                 context_length=get_int(item, "context_length"),
                 expiration_date=_parse_date(item.get("expiration_date")),

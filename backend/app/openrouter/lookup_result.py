@@ -28,9 +28,12 @@ class ModelInfo(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     model_id: str
+    # OpenRouter가 주는 사람이 읽는 이름(예: "OpenAI: GPT-4o"). 없으면 None이다.
+    name: str | None = None
     # 모델 대표 가격(토큰당 USD). 실제 처리 업체의 단가와 다를 수 있다.
     pricing: dict[str, Decimal]
     input_modalities: list[str]
+    output_modalities: list[str] = Field(default_factory=list)
     supported_parameters: list[str]
     context_length: int | None = None
     expiration_date: date | None = None
