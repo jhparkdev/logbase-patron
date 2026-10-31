@@ -47,7 +47,7 @@ export function UsageFilters({ period, onSubmit }: UsageFiltersProps) {
           options={[{ value: "", label: select.all }]}
           onChange={() => {}}
           disabled
-          className="w-44"
+          className="w-40"
         />
       ))}
       <PeriodField
