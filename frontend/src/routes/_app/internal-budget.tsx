@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BudgetFilters } from "../../features/internal-budget/components/BudgetFilters";
+import { BudgetFullList } from "../../features/internal-budget/components/BudgetFullList";
 import { CostTrendCard } from "../../features/internal-budget/components/CostTrendCard";
 import { MemberUsageTable } from "../../features/internal-budget/components/MemberUsageTable";
 import { ProjectBudgetTable } from "../../features/internal-budget/components/ProjectBudgetTable";
-import { RecentRequestTable } from "../../features/internal-budget/components/RecentRequestTable";
+import { RequestHistoryTable } from "../../features/internal-budget/components/RequestHistoryTable";
 import { SubscriptionTable } from "../../features/internal-budget/components/SubscriptionTable";
 import { SummarySkeleton } from "../../features/internal-budget/components/SummarySkeleton";
 import { parseBudgetSearch } from "../../features/internal-budget/lib/search";
@@ -18,6 +19,8 @@ export const Route = createFileRoute("/_app/internal-budget")({
 function InternalBudgetPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  // 예산은 월 단위라 조회 기간 종료일이 속한 달과 비교한다.
+  const month = search.to.slice(0, 7);
 
   return (
     <>
@@ -28,19 +31,26 @@ function InternalBudgetPage() {
       <BudgetFilters
         // 뒤로 가기처럼 주소가 바깥에서 바뀌면 폼을 새 값으로 다시 그린다.
         key={`${search.from}~${search.to}`}
-        period={search}
+        period={{ from: search.from, to: search.to }}
         onSubmit={(period) =>
-          navigate({ search: (prev) => ({ ...prev, ...period }) })
+          navigate({
+            search: (prev) => ({ ...prev, ...period, page: undefined }),
+          })
         }
       />
-      {/* 요약 값은 비용 요약 API가 생기면 채운다. 그 전까지는 불러오는 중 모양이다. */}
-      <SummarySkeleton />
-      <CostTrendCard />
-      {/* 예산은 월 단위라 조회 기간 종료일이 속한 달과 비교한다. */}
-      <ProjectBudgetTable month={search.to.slice(0, 7)} />
-      <SubscriptionTable />
-      <MemberUsageTable />
-      <RecentRequestTable />
+      {search.view === undefined ? (
+        <>
+          {/* 요약 값은 비용 요약 API가 생기면 채운다. 그 전까지는 불러오는 중 모양이다. */}
+          <SummarySkeleton />
+          <CostTrendCard />
+          <ProjectBudgetTable month={month} />
+          <SubscriptionTable />
+          <MemberUsageTable />
+          <RequestHistoryTable />
+        </>
+      ) : (
+        <BudgetFullList view={search.view} month={month} />
+      )}
     </>
   );
 }
