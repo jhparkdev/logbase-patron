@@ -3,6 +3,7 @@ import { CustomerUsageTable } from "../../features/customer-usage/components/Cus
 import { RequestTable } from "../../features/customer-usage/components/RequestTable";
 import { SummarySkeleton } from "../../features/customer-usage/components/SummarySkeleton";
 import { UsageFilters } from "../../features/customer-usage/components/UsageFilters";
+import { UsageFullList } from "../../features/customer-usage/components/UsageFullList";
 import { UsageTrendCard } from "../../features/customer-usage/components/UsageTrendCard";
 import { budgetMonthOf } from "../../features/customer-usage/lib/budget";
 import { customerUsageSearchSchema } from "../../features/customer-usage/lib/search";
@@ -14,8 +15,9 @@ export const Route = createFileRoute("/_app/customer-usage")({
 });
 
 function CustomerUsagePage() {
-  const { from, to } = Route.useSearch();
+  const { from, to, view } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const budgetMonth = budgetMonthOf({ from, to });
 
   return (
     <>
@@ -31,10 +33,16 @@ function CustomerUsagePage() {
           navigate({ search: (prev) => ({ ...prev, ...period }) })
         }
       />
-      <SummarySkeleton />
-      <UsageTrendCard />
-      <CustomerUsageTable budgetMonth={budgetMonthOf({ from, to })} />
-      <RequestTable />
+      {view === undefined ? (
+        <>
+          <SummarySkeleton />
+          <UsageTrendCard />
+          <CustomerUsageTable budgetMonth={budgetMonth} />
+          <RequestTable />
+        </>
+      ) : (
+        <UsageFullList view={view} budgetMonth={budgetMonth} />
+      )}
     </>
   );
 }

@@ -28,3 +28,6 @@ export const customerUsageSearchSchema = z
   });
 
 export type CustomerUsageSearch = z.output<typeof customerUsageSearchSchema>;
+
+/** 전체보기로 펼칠 수 있는 목록 */
+export type UsageListView = NonNullable<CustomerUsageSearch["view"]>;
