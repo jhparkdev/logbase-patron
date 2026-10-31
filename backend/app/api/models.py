@@ -54,6 +54,7 @@ async def list_models(
 ) -> ModelListResponse:
     page = await model_list.list_models(
         session,
+        q=query.q,
         name=query.name,
         model_id=query.model_id,
         provider=query.provider,

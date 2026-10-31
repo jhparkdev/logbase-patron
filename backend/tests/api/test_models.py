@@ -8,7 +8,7 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
-from app.schemas.models import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from app.schemas.models import DEFAULT_PAGE_SIZE, MAX_FILTER_LENGTH, MAX_PAGE_SIZE
 from tests.db_helpers import T0, Factory
 
 MODELS = "/api/models"
@@ -171,6 +171,73 @@ async def test_모델_ID와_제공사로도_찾는다(
 
     assert names(by_id) == ["B"]
     assert names(by_provider) == ["A"]
+
+
+async def test_q는_표시_이름이나_모델_ID_중_하나에만_맞아도_찾는다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(display_name="GPT Mini", openrouter_model_id="openai/mini")
+    await factory.model(display_name="Other", openrouter_model_id="acme/unique-id")
+    await factory.model(display_name="Nothing", openrouter_model_id="vendor/none")
+
+    by_name = (await client.get(MODELS, params={"q": "gpt"})).json()
+    by_id = (await client.get(MODELS, params={"q": "unique"})).json()
+
+    assert names(by_name) == ["GPT Mini"]
+    assert names(by_id) == ["Other"]
+
+
+async def test_q는_대소문자를_구분하지_않는다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(display_name="Target", openrouter_model_id="acme/Unique-ID")
+
+    body = (await client.get(MODELS, params={"q": "UNIQUE"})).json()
+
+    assert names(body) == ["Target"]
+
+
+async def test_q는_다른_조건과_함께_모두_맞아야_찾는다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(display_name="gpt active", status="ACTIVE")
+    await factory.model(display_name="gpt testing", status="TESTING")
+    await factory.model(display_name="other active", status="ACTIVE")
+
+    params = {"q": "gpt", "status": "ACTIVE"}
+    body = (await client.get(MODELS, params=params)).json()
+
+    assert names(body) == ["gpt active"]
+
+
+async def test_q의_퍼센트와_밑줄도_글자_그대로_찾는다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(display_name="100% 모델", openrouter_model_id="acme/a")
+    await factory.model(display_name="밑줄", openrouter_model_id="acme/a_b")
+    await factory.model(display_name="다른", openrouter_model_id="acme/axb")
+
+    percent = (await client.get(MODELS, params={"q": "%"})).json()
+    underscore = (await client.get(MODELS, params={"q": "a_b"})).json()
+
+    assert names(percent) == ["100% 모델"]
+    assert names(underscore) == ["밑줄"]
+
+
+@pytest.mark.parametrize(
+    ("q", "expected_status"),
+    [
+        ("", status.HTTP_422_UNPROCESSABLE_CONTENT),
+        ("x" * MAX_FILTER_LENGTH, status.HTTP_200_OK),
+        ("x" * (MAX_FILTER_LENGTH + 1), status.HTTP_422_UNPROCESSABLE_CONTENT),
+    ],
+)
+async def test_q의_글자수_경계(
+    client: AsyncClient, q: str, expected_status: int
+) -> None:
+    response = await client.get(MODELS, params={"q": q})
+
+    assert response.status_code == expected_status
 
 
 async def test_검색어의_퍼센트와_밑줄은_글자_그대로_찾는다(

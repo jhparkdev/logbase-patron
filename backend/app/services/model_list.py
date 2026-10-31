@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, and_, func, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -25,6 +25,7 @@ class ModelPage:
 async def list_models(
     session: AsyncSession,
     *,
+    q: str | None,
     name: str | None,
     model_id: str | None,
     provider: str | None,
@@ -57,6 +58,13 @@ async def list_models(
 
     # %와 _는 검색 기호가 아니라 글자 그대로 찾는다(autoescape).
     conditions: list[ColumnElement[bool]] = []
+    if q:
+        conditions.append(
+            or_(
+                ModelRegistry.display_name.icontains(q, autoescape=True),
+                ModelRegistry.openrouter_model_id.icontains(q, autoescape=True),
+            )
+        )
     if name:
         conditions.append(ModelRegistry.display_name.icontains(name, autoescape=True))
     if model_id:

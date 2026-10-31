@@ -41,6 +41,8 @@ class ModelListQuery(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    # 화면의 검색창 한 칸. 표시 이름 또는 모델 ID 중 하나에 들어 있으면 찾는다.
+    q: str | None = Field(default=None, min_length=1, max_length=MAX_FILTER_LENGTH)
     name: str | None = Field(default=None, min_length=1, max_length=MAX_FILTER_LENGTH)
     model_id: str | None = Field(
         default=None, min_length=1, max_length=MAX_FILTER_LENGTH
