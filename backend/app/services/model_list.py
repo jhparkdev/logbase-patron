@@ -22,6 +22,15 @@ class ModelPage:
     total: int
 
 
+def current_price_condition(price: type[ModelPrice]) -> ColumnElement[bool]:
+    """현재 가격 = 종료되지 않은 모델 대표가격(실행 업체가 비어 있는 행). 모델마다 최대 1개다."""
+    return and_(
+        price.model_id == ModelRegistry.model_id,
+        price.effective_to.is_(None),
+        price.execution_provider.is_(None),
+    )
+
+
 async def list_models(
     session: AsyncSession,
     *,
@@ -39,7 +48,6 @@ async def list_models(
 
     sort는 호출하는 쪽이 허용 목록(ModelSortField)으로 이미 검증한 값이다.
     """
-    # 현재 가격 = 종료되지 않은 모델 대표가격(실행 업체가 비어 있는 행). 모델마다 최대 1개다.
     price = aliased(ModelPrice)
     sort_columns: dict[str, ColumnElement[object]] = {
         "display_name": ModelRegistry.display_name,
@@ -87,14 +95,7 @@ async def list_models(
     direction = column.desc() if descending else column.asc()
     statement = (
         select(ModelRegistry, price)
-        .outerjoin(
-            price,
-            and_(
-                price.model_id == ModelRegistry.model_id,
-                price.effective_to.is_(None),
-                price.execution_provider.is_(None),
-            ),
-        )
+        .outerjoin(price, current_price_condition(price))
         .where(*conditions)
         # 값이 없는 행은 방향과 상관없이 뒤에 두고, 같은 값끼리는 ID순이라 페이지가 흔들리지 않는다.
         .order_by(direction.nulls_last(), ModelRegistry.model_id)

@@ -96,6 +96,14 @@ class ModelRead(BaseModel):
     updated_at: datetime
 
 
+class ModelDetailRead(ModelRead):
+    """상세 패널용. 목록의 한 줄에 활성화·비활성화·마지막 성공 테스트 시각이 더해진다."""
+
+    activated_at: datetime | None
+    deactivated_at: datetime | None
+    last_success_test_at: datetime | None
+
+
 class ModelListResponse(BaseModel):
     items: list[ModelRead]
     page: int
