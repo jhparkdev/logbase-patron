@@ -71,9 +71,7 @@ async def test_모델_한_건의_필드를_돌려준다(
     assert item["last_test_at"] is None
 
 
-async def test_금액은_문자열로_돌려준다(
-    client: AsyncClient, factory: Factory
-) -> None:
+async def test_금액은_문자열로_돌려준다(client: AsyncClient, factory: Factory) -> None:
     model = await factory.model()
     await factory.model_price(
         model_id=model["model_id"],
@@ -249,9 +247,7 @@ async def test_가격으로_정렬하면_가격이_없는_모델은_항상_뒤�
         model_id=pricey["model_id"], input_price_per_token=Decimal("0.9")
     )
 
-    ascending = await client.get(
-        MODELS, params={"sort": "price_input", "order": "asc"}
-    )
+    ascending = await client.get(MODELS, params={"sort": "price_input", "order": "asc"})
     descending = await client.get(
         MODELS, params={"sort": "price_input", "order": "desc"}
     )
