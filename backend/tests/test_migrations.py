@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from tests.db_helpers import Factory, expect_rejected
 
-# 설계서 v0.6의 테이블 22개와 뷰 2개
+# 설계서 v0.6과 후속 즐겨찾기 테이블, 뷰 2개
 DESIGN_TABLES = {
     "customers",
     "projects",
@@ -44,11 +44,13 @@ DESIGN_TABLES = {
     "key_usage_snapshots",
     "usage_reconciliations",
     "change_logs",
+    "user_model_favorites",
 }
 DESIGN_VIEWS = {"v_request_facts", "v_simulation_summary"}
 # Alembic이 "어디까지 적용했는지" 기록하는 테이블
 ALEMBIC_VERSION_TABLE = "alembic_version"
 NO_CHARGE_REVISION = "7b2e4f6a9c10"
+SIMULATOR_SETTINGS_REVISION = "264258125f67"
 
 
 def _schema_objects(database_url: URL) -> tuple[set[str], set[str]]:
@@ -62,7 +64,7 @@ def _schema_objects(database_url: URL) -> tuple[set[str], set[str]]:
 
 
 def test_upgrade_creates_design_tables_and_views(migrated_database: URL) -> None:
-    """최신 마이그레이션까지 적용하면 설계의 테이블 22개, 뷰 2개가 정확히 생긴다."""
+    """최신 마이그레이션의 테이블과 뷰가 정확히 생긴다."""
     tables, views = _schema_objects(migrated_database)
 
     assert tables == DESIGN_TABLES | {ALEMBIC_VERSION_TABLE}
@@ -195,3 +197,101 @@ async def test_no_charge_history_blocks_downgrade_without_changing_data_or_schem
         .one()
     )
     assert preserved == request
+
+
+def _run_settings_migration(session: Session, config: Config, *, upgrade: bool) -> None:
+    revision = ScriptDirectory.from_config(config).get_revision(
+        SIMULATOR_SETTINGS_REVISION
+    )
+    assert revision is not None
+    migrate = revision.module.upgrade if upgrade else revision.module.downgrade
+    with Operations.context(MigrationContext.configure(session.connection())):
+        migrate()
+
+
+async def test_settings_upgrade_preserves_old_rows_and_backfills_hashes(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    """이전 스키마에서 만든 행의 모든 기존 값을 보존하고 해시만 채운다."""
+    await db_session.run_sync(_run_settings_migration, alembic_config, upgrade=False)
+    run = await factory.simulation_run(execution_config={"temperature": 0.3})
+    request = await factory.ai_request(
+        usage_origin="SIMULATION",
+        simulation_id=run["simulation_id"],
+        execution_config={"temperature": 0.3, "reasoning": {"effort": "high"}},
+    )
+    result = await factory.simulation_result(
+        simulation_id=run["simulation_id"], request_id=request["request_id"]
+    )
+
+    await db_session.run_sync(_run_settings_migration, alembic_config, upgrade=True)
+    for table, key, original in (
+        ("simulation_runs", "simulation_id", run),
+        ("ai_requests", "request_id", request),
+        ("simulation_results", "request_id", result),
+    ):
+        saved = (
+            (
+                await db_session.execute(
+                    text(f"SELECT * FROM {table} WHERE {key} = :id"),
+                    {"id": original[key]},
+                )
+            )
+            .mappings()
+            .one()
+        )
+        assert {column: saved[column] for column in original} == dict(original)
+    assert (
+        await db_session.scalar(
+            text(
+                "SELECT result.execution_config_hash = request.execution_config_hash "
+                "FROM simulation_results result JOIN ai_requests request USING (request_id) "
+                "WHERE result.request_id = :id"
+            ),
+            {"id": request["request_id"]},
+        )
+        is True
+    )
+
+
+@pytest.mark.parametrize("saved_data", ["request", "favorite"])
+async def test_settings_downgrade_preserves_history_and_schema(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config, saved_data: str
+) -> None:
+    if saved_data == "request":
+        original = await factory.ai_request(execution_config={"max_tokens": 512})
+        query = text("SELECT * FROM ai_requests WHERE request_id = :id")
+        params = {"id": original["request_id"]}
+    else:
+        original = await factory.insert(
+            "user_model_favorites",
+            {
+                "user_id": (await factory.user())["user_id"],
+                "model_id": (await factory.model())["model_id"],
+                "execution_provider": "provider-a",
+            },
+        )
+        query = text("SELECT * FROM user_model_favorites WHERE user_id = :id")
+        params = {"id": original["user_id"]}
+    version = await db_session.scalar(text("SELECT version_num FROM alembic_version"))
+    with pytest.raises(
+        DBAPIError, match="Cannot downgrade: simulator settings"
+    ) as caught:
+        async with db_session.begin_nested():
+            await db_session.run_sync(
+                _run_settings_migration, alembic_config, upgrade=False
+            )
+    assert caught.value.orig.sqlstate == "23514"
+    assert (await db_session.execute(query, params)).mappings().one() == original
+    assert (
+        await db_session.scalar(text("SELECT version_num FROM alembic_version"))
+        == version
+    )
+    assert (
+        await db_session.scalar(
+            text(
+                "SELECT to_regclass('uq_sim_results_model_provider_config') IS NOT NULL"
+            )
+        )
+        is True
+    )
