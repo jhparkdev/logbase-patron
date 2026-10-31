@@ -1,20 +1,8 @@
 // @vitest-environment jsdom
-import {
-  createMemoryHistory,
-  createRouter,
-  RouterProvider,
-} from "@tanstack/react-router";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
-import { afterEach, beforeAll, expect, test, vi } from "vitest";
-import { routeTree } from "../../routeTree.gen";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { beforeAll, expect, test, vi } from "vitest";
+import { renderAt } from "../../test/renderAt";
 
-afterEach(cleanup);
 beforeAll(() => {
   window.scrollTo = vi.fn();
   HTMLDialogElement.prototype.showModal = function () {
@@ -24,14 +12,7 @@ beforeAll(() => {
     this.removeAttribute("open");
   };
 });
-function show(path: string) {
-  const router = createRouter({
-    routeTree,
-    history: createMemoryHistory({ initialEntries: [path] }),
-  });
-  render(<RouterProvider router={router} />);
-  return router;
-}
+const show = renderAt;
 
 test("실제 이력 화면의 조회 조건을 바꿔도 스크롤을 초기화하지 않는다", async () => {
   const router = show("/simulation-history?page=2");
