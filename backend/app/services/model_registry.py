@@ -2,10 +2,11 @@
 
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 
-from app.models import ConnectionTestStatus, ModelStatus
+from app.models import ModelStatus
 
 # OpenRouter 가격 항목 이름 -> 우리 가격 칸
 PROMPT_KEY = "prompt"
@@ -14,6 +15,9 @@ CACHE_READ_KEY = "input_cache_read"
 CACHE_WRITE_KEY = "input_cache_write"
 
 RESPONSE_FORMAT_PARAMETER = "response_format"
+
+# ACTIVE로 바꾸는 시점에 이 시간 안에 성공한 연결 테스트가 있어야 한다.
+ACTIVATION_TEST_WINDOW = timedelta(hours=24)
 
 # 관리자가 바꿀 수 있는 전이. 같은 상태로의 변경과 TESTING으로 돌아가는 전이는 없다.
 ALLOWED_TRANSITIONS = {
@@ -45,19 +49,24 @@ class PriceSnapshot:
     cache_write_price_per_token: Decimal | None
 
 
+def _tested_recently(last_success_test_at: datetime | None, now: datetime) -> bool:
+    """성공한 연결 테스트가 now로부터 24시간 이내(정확히 24시간 포함)에 있는지 본다."""
+    if last_success_test_at is None:
+        return False
+    return now - last_success_test_at <= ACTIVATION_TEST_WINDOW
+
+
 def check_status_change(
-    current: str, target: str, last_test_status: str | None
+    current: str, target: str, last_success_test_at: datetime | None, now: datetime
 ) -> StatusChangeError | None:
     """상태를 바꿀 수 있으면 None, 아니면 거절 사유를 돌려준다.
 
-    ACTIVE로 바꾸려면 마지막 연결 테스트가 성공이어야 한다 (U-29: 마지막 테스트 기준).
+    ACTIVE로 바꾸려면 바꾸는 시점(now)에서 24시간 이내에 성공한 연결 테스트가 있어야 한다.
+    그 뒤의 테스트가 실패했더라도 24시간 이내에 성공한 기록이 있으면 가능하다.
     """
     if (current, target) not in ALLOWED_TRANSITIONS:
         return StatusChangeError.INVALID_STATUS_TRANSITION
-    if (
-        target == ModelStatus.ACTIVE
-        and last_test_status != ConnectionTestStatus.SUCCESS
-    ):
+    if target == ModelStatus.ACTIVE and not _tested_recently(last_success_test_at, now):
         return StatusChangeError.TEST_NOT_PASSED
     return None
 
