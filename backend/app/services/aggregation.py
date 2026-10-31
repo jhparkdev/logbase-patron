@@ -15,6 +15,8 @@ from sqlalchemy import (
     ColumnElement,
     Date,
     Select,
+    case,
+    collate,
     func,
     or_,
     select,
@@ -63,6 +65,16 @@ KST_ZONE = "Asia/Seoul"
 HUNDRED = Decimal(100)
 CHANGE_PRECISION = Decimal("0.01")
 ZERO = Decimal(0)
+# 작업 유형 코드의 화면 표시 이름. 목록에 없는 코드는 내부 코드가 화면에 나가지 않게 기타로 보여 준다
+TASK_TYPE_LABELS = {
+    "PRODUCT_DESCRIPTION": "상품 설명 생성",
+    "CATALOG_SUMMARY": "카탈로그 요약",
+    "IMAGE_ANALYSIS": "이미지 분석",
+}
+OTHER_TASK_TYPE_LABEL = "기타"
+# DB 기본 정렬 규칙(en_US.utf8)은 띄어쓰기가 든 한글을 가나다순으로 정렬하지 않는다.
+# 한글 음절은 코드값 순서가 가나다순이고 고객 표의 메모리 정렬과도 같아 C 규칙을 쓴다
+CODE_POINT_COLLATION = "C"
 # 상태 정렬 순서는 심각한 정도다. 미설정은 값이 없어 어느 방향이든 맨 뒤에 둔다
 STATUS_SEVERITY = {
     BudgetStatus.NORMAL: 0,
@@ -77,6 +89,10 @@ class UsageFilter:
     customer_id: int | None = None
     service_id: int | None = None
     model_id: int | None = None
+
+
+def _by_name(column: Any) -> ColumnElement[str]:
+    return collate(column, CODE_POINT_COLLATION)
 
 
 def change_pct(current: Decimal, previous: Decimal) -> Decimal | None:
@@ -235,12 +251,12 @@ def _trend_point(day: date, row: Any | None) -> UsageTrendPoint:
 
 async def list_options(session: AsyncSession) -> UsageOptions:
     customers = await session.execute(
-        select(Customer.customer_id, Customer.name).order_by(Customer.name)
+        select(Customer.customer_id, Customer.name).order_by(_by_name(Customer.name))
     )
     services = await session.execute(
         select(Service.service_id, Service.name)
         .where(Service.service_type == ServiceType.CUSTOMER_FACING.value)
-        .order_by(Service.name)
+        .order_by(_by_name(Service.name))
     )
     used_by_customers = select(AIRequest.model_id).where(
         AIRequest.usage_origin == UsageOrigin.CUSTOMER_SERVICE.value
@@ -248,7 +264,7 @@ async def list_options(session: AsyncSession) -> UsageOptions:
     models = await session.execute(
         select(ModelRegistry.model_id, ModelRegistry.display_name)
         .where(ModelRegistry.model_id.in_(used_by_customers))
-        .order_by(ModelRegistry.display_name)
+        .order_by(_by_name(ModelRegistry.display_name))
     )
     return UsageOptions(
         customers=_options(customers),
@@ -451,6 +467,14 @@ def _model_column() -> ColumnElement[str]:
     return func.coalesce(AIRequest.actual_model, AIRequest.requested_model)
 
 
+def _task_type_label_column() -> ColumnElement[str | None]:
+    """표시 이름. 정렬도 이 값으로 해서 화면에 보이는 글자 순서와 맞춘다. 작업이 없으면 NULL이다."""
+    labels = [
+        (Task.task_type == code, label) for code, label in TASK_TYPE_LABELS.items()
+    ]
+    return case((Task.task_type.is_(None), None), *labels, else_=OTHER_TASK_TYPE_LABEL)
+
+
 def _tokens_column() -> ColumnElement[int]:
     # 어느 한쪽이 NULL이면 합도 NULL이다. 모르는 토큰을 0으로 더하지 않는다
     return AIRequest.input_tokens + AIRequest.output_tokens
@@ -468,6 +492,7 @@ def _request_rows() -> Select[Any]:
             _model_column().label("model"),
             AIRequest.task_id,
             Task.task_type,
+            _task_type_label_column().label("task_type_label"),
             _tokens_column().label("tokens"),
             AIRequest.cost_usd,
             AIRequest.cost_status,
@@ -484,10 +509,10 @@ def _request_order(query: RequestRowsQuery) -> list[Any]:
     """값이 없는 행(미확인 비용 등)은 방향과 관계없이 맨 뒤다. 끝의 두 열로 순서를 고정한다."""
     columns: dict[RequestRowSort, Any] = {
         RequestRowSort.REQUESTED_AT: AIRequest.requested_at,
-        RequestRowSort.CUSTOMER: Customer.name,
-        RequestRowSort.SERVICE: Service.name,
+        RequestRowSort.CUSTOMER: _by_name(Customer.name),
+        RequestRowSort.SERVICE: _by_name(Service.name),
         RequestRowSort.MODEL: _model_column(),
-        RequestRowSort.TASK_TYPE: Task.task_type,
+        RequestRowSort.TASK_TYPE: _by_name(_task_type_label_column()),
         RequestRowSort.TOKENS: _tokens_column(),
         RequestRowSort.COST: AIRequest.cost_usd,
         RequestRowSort.COST_STATUS: AIRequest.cost_status,
@@ -529,7 +554,7 @@ async def customer_detail(
         .join(Service, Service.service_id == AIRequest.service_id)
         .where(*_conditions(usage_filter))
         .group_by(AIRequest.service_id, Service.name)
-        .order_by(Service.name)
+        .order_by(_by_name(Service.name))
     )
     return CustomerUsageDetail(
         customer_id=customer_id,

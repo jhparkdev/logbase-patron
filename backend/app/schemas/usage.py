@@ -219,6 +219,7 @@ class CustomerRequestRow(BaseModel):
     model: str  # 실제 호출된 모델. 없으면 요청한 모델
     task_id: UUID | None
     task_type: str | None
+    task_type_label: str | None  # 화면에 보여 줄 이름. 작업이 없으면 null
     tokens: int | None  # 입력 + 출력. 어느 쪽이든 모르면 null
     cost_usd: Decimal | None
     cost_status: CostStatus

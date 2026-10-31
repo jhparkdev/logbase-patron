@@ -695,6 +695,114 @@ async def test_request_row_falls_back_to_requested_model_and_null_tokens(
     assert page.items[0].cost_usd is None
 
 
+@pytest.mark.parametrize(
+    ("task_type", "label"),
+    [
+        ("PRODUCT_DESCRIPTION", "상품 설명 생성"),
+        ("CATALOG_SUMMARY", "카탈로그 요약"),
+        ("IMAGE_ANALYSIS", "이미지 분석"),
+        ("NEW_INTERNAL_CODE", "기타"),  # 모르는 코드를 화면에 그대로 내보내지 않는다
+    ],
+)
+async def test_request_row_has_a_display_name_for_its_task_type(
+    db_session: AsyncSession, factory: Factory, task_type: str, label: str
+) -> None:
+    service = await factory.service()
+    task = await factory.task(
+        usage_origin="CUSTOMER_SERVICE",
+        service_id=service["service_id"],
+        task_type=task_type,
+    )
+    await customer_call(
+        factory, service_id=service["service_id"], task_id=task["task_id"]
+    )
+
+    page = await aggregation.list_requests(
+        db_session, OCTOBER_FILTER, RequestRowsQuery()
+    )
+
+    assert page.items[0].task_type == task_type
+    assert page.items[0].task_type_label == label
+
+
+async def test_request_without_a_task_has_no_task_type_label(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await customer_call(factory)
+
+    page = await aggregation.list_requests(
+        db_session, OCTOBER_FILTER, RequestRowsQuery()
+    )
+
+    assert page.items[0].task_type_label is None
+
+
+async def test_task_type_sorts_by_the_name_shown_on_screen_with_missing_last(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    service = await factory.service()
+    for task_type in ("PRODUCT_DESCRIPTION", "CATALOG_SUMMARY", "IMAGE_ANALYSIS"):
+        task = await factory.task(
+            usage_origin="CUSTOMER_SERVICE",
+            service_id=service["service_id"],
+            task_type=task_type,
+        )
+        await customer_call(
+            factory, service_id=service["service_id"], task_id=task["task_id"]
+        )
+    await customer_call(factory)
+
+    page = await aggregation.list_requests(
+        db_session,
+        OCTOBER_FILTER,
+        RequestRowsQuery(sort=RequestRowSort.TASK_TYPE, order=SortOrder.ASC),
+    )
+
+    assert [row.task_type_label for row in page.items] == [
+        "상품 설명 생성",
+        "이미지 분석",
+        "카탈로그 요약",
+        None,
+    ]
+
+
+async def test_korean_names_sort_in_dictionary_order(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    # 기본 정렬 규칙(en_US.utf8)은 띄어쓰기가 든 한글을 가나다순으로 정렬하지 않는다
+    names = ["상품 고객", "이미지 고객", "카탈로그 고객"]
+    for name in reversed(names):
+        customer = await factory.customer(name=name)
+        service = await factory.service(
+            name=name.replace("고객", "서비스"), service_type="CUSTOMER_FACING"
+        )
+        await customer_call(
+            factory,
+            customer_id=customer["customer_id"],
+            service_id=service["service_id"],
+        )
+
+    by_customer = await aggregation.list_requests(
+        db_session,
+        OCTOBER_FILTER,
+        RequestRowsQuery(sort=RequestRowSort.CUSTOMER, order=SortOrder.ASC),
+    )
+    by_service = await aggregation.list_requests(
+        db_session,
+        OCTOBER_FILTER,
+        RequestRowsQuery(sort=RequestRowSort.SERVICE, order=SortOrder.DESC),
+    )
+    options = await aggregation.list_options(db_session)
+
+    assert [row.customer_name for row in by_customer.items] == names
+    assert [row.service_name for row in by_service.items] == [
+        "카탈로그 서비스",
+        "이미지 서비스",
+        "상품 서비스",
+    ]
+    assert [o.name for o in options.customers if o.name in names] == names
+
+
 @pytest.mark.parametrize("order", [SortOrder.ASC, SortOrder.DESC])
 async def test_unknown_cost_sorts_last_in_both_directions(
     db_session: AsyncSession, factory: Factory, order: SortOrder

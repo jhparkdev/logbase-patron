@@ -85,6 +85,7 @@ def test_money_is_serialized_as_a_string_and_unknown_cost_stays_null() -> None:
         model="vendor/model",
         task_id=None,
         task_type=None,
+        task_type_label=None,
         tokens=None,
         cost_usd=None,
         cost_status=CostStatus.UNKNOWN,
