@@ -14,6 +14,8 @@ def build_request_body(
     provider_order: list[str] | None = None,
     allow_fallbacks: bool = False,
     stream: bool = False,
+    temperature: float | None = None,
+    reasoning_effort: str | None = None,
 ) -> dict[str, Any]:
     # 업체 자동 전환은 기본으로 끈다. 비교 조건이 바뀌지 않게 하기 위해서다.
     provider: dict[str, Any] = {"allow_fallbacks": allow_fallbacks}
@@ -29,6 +31,12 @@ def build_request_body(
 
     if stream:
         body["stream"] = True
+
+    # 값이 없는 것(None)만 보내지 않는다. 0도 유효한 값이라 `is not None`으로 구분한다.
+    if temperature is not None:
+        body["temperature"] = temperature
+    if reasoning_effort is not None:
+        body["reasoning"] = {"effort": reasoning_effort}
 
     if json_schema is not None:
         body["response_format"] = {

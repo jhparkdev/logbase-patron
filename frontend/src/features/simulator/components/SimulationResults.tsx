@@ -37,7 +37,7 @@ export function SimulationResults({
         {view.kind === "loading" ? (
           <div className="px-6 pb-6">
             <p role="status" className="mb-3 text-body-sm text-grey-600">
-              실행 결과를 불러오고 있어요
+              실행 결과를 불러오고 있습니다
             </p>
             <Skeleton className="h-24 w-full" />
           </div>
@@ -45,13 +45,13 @@ export function SimulationResults({
           <Result
             title={
               view.kind === "error"
-                ? "실행 결과를 불러오지 못했어요"
-                : "아직 실행 결과가 없어요"
+                ? "실행 결과를 불러오지 못했습니다"
+                : "아직 실행 결과가 없습니다"
             }
             description={
               view.kind === "error"
-                ? "잠시 후 다시 시도해 주세요."
-                : "비교를 실행하면 모델별 응답과 비용을 확인할 수 있어요."
+                ? "잠시 후 다시 시도하시기 바랍니다."
+                : "비교를 실행하면 모델별 응답과 비용을 확인할 수 있습니다."
             }
             action={
               view.kind === "error" && onRefresh ? (
@@ -142,8 +142,8 @@ export function SimulationResults({
       />
       {run.status.ongoing && (
         <p className="text-caption text-grey-600">
-          취소 요청 후에도 처리 중인 호출의 비용이 발생할 수 있어요. 최종 상태와
-          비용을 확인해 주세요.
+          취소 요청 후에도 처리 중인 호출의 비용이 발생할 수 있습니다. 최종
+          상태와 비용을 확인하시기 바랍니다.
         </p>
       )}
       <SimulatorDialog

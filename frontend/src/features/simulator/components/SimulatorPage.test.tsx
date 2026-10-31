@@ -15,6 +15,7 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
+import { createComparisons } from "../lib/comparisons";
 import type { SimulatorDraft } from "../lib/form";
 import { IMAGE_LIMITS, TEXT_LIMIT } from "../lib/limits";
 import type { ModelChoice } from "../lib/presentation";
@@ -74,12 +75,14 @@ function fill() {
   fireEvent.change(screen.getByLabelText("Prompt"), {
     target: { value: "요약해 주세요." },
   });
-  fireEvent.change(screen.getByLabelText("비교 모델 1"), {
-    target: { value: "a:p1" },
-  });
-  fireEvent.change(screen.getByLabelText("비교 모델 2"), {
-    target: { value: "a:p2" },
-  });
+  fireEvent.click(screen.getByRole("button", { name: "모델 검색" }));
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "모델 A · Provider 1" }),
+  );
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "모델 A · Provider 2" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "선택 적용" }));
 }
 
 test("API 미연결 화면은 가짜 모델과 실행 결과를 만들지 않는다", () => {
@@ -87,47 +90,52 @@ test("API 미연결 화면은 가짜 모델과 실행 결과를 만들지 않는
   expect(
     screen.getByRole("button", { name: "비교 실행" }).hasAttribute("disabled"),
   ).toBe(true);
-  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
   expect(screen.queryByText("모델 A")).toBeNull();
 });
 
-test("고급 설정은 닫혀 있고, 기본값은 비어 있으며 접어도 편집값이 유지된다", () => {
+test("공통 설정은 닫혀 있고, 기본값은 비어 있으며 접어도 편집값이 유지된다", () => {
   const onRun = vi.fn();
   render(<SimulatorPage choices={choices} onRun={onRun} />);
-  const toggle = screen.getByRole("button", { name: /고급 설정/ });
+  const toggle = screen.getByRole("button", { name: /^공통 설정 선택사항$/ });
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   fireEvent.click(toggle);
-  expect(screen.getByLabelText("Temperature").getAttribute("value")).toBe("");
-  fireEvent.change(screen.getByLabelText("Temperature"), {
+  expect(screen.getByLabelText("공통 Temperature").getAttribute("value")).toBe(
+    "",
+  );
+  fireEvent.change(screen.getByLabelText("공통 Temperature"), {
     target: { value: "0.7" },
   });
   expect(
     (
       screen.getByRole("slider", {
-        name: "Temperature 조절",
+        name: "공통 Temperature 조절",
       }) as HTMLInputElement
     ).value,
   ).toBe("0.7");
-  fireEvent.change(screen.getByRole("slider", { name: "Temperature 조절" }), {
-    target: { value: "1.2" },
-  });
-  expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
-    "1.2",
+  fireEvent.change(
+    screen.getByRole("slider", { name: "공통 Temperature 조절" }),
+    {
+      target: { value: "1.2" },
+    },
   );
+  expect(
+    (screen.getByLabelText("공통 Temperature") as HTMLInputElement).value,
+  ).toBe("1.2");
   fireEvent.click(toggle);
   fireEvent.click(toggle);
-  expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
-    "1.2",
-  );
+  expect(
+    (screen.getByLabelText("공통 Temperature") as HTMLInputElement).value,
+  ).toBe("1.2");
   expect(onRun).not.toHaveBeenCalled();
 });
 
-test("접힌 고급 설정의 오류를 펼쳐서 보여주고 제출한 뒤에만 검증한다", async () => {
+test("접힌 공통 설정의 오류를 펼쳐서 보여주고 제출한 뒤에만 검증한다", async () => {
   render(<SimulatorPage choices={choices} onRun={vi.fn()} />);
   fill();
-  const toggle = screen.getByRole("button", { name: /고급 설정/ });
+  const toggle = screen.getByRole("button", { name: /^공통 설정 선택사항$/ });
   fireEvent.click(toggle);
-  fireEvent.change(screen.getByLabelText("최대 출력 토큰"), {
+  fireEvent.change(screen.getByLabelText("공통 최대 출력 토큰"), {
     target: { value: "0" },
   });
   fireEvent.click(toggle);
@@ -136,7 +144,9 @@ test("접힌 고급 설정의 오류를 펼쳐서 보여주고 제출한 뒤에�
   await waitFor(() =>
     expect(toggle.getAttribute("aria-expanded")).toBe("true"),
   );
-  expect(screen.getByText("1 이상의 정수를 입력해 주세요.")).toBeDefined();
+  expect(
+    screen.getByText("1 이상의 정수를 입력하시기 바랍니다."),
+  ).toBeDefined();
 });
 
 test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번만 제출한다", async () => {
@@ -151,7 +161,7 @@ test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번
   fill();
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행할까요?",
+    name: "비교를 실행합니다",
   });
   expect(onRun).not.toHaveBeenCalled();
   const confirm = within(dialog).getByRole("button", { name: "실행하기" });
@@ -159,7 +169,10 @@ test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번
   fireEvent.click(confirm);
   await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
   expect(onRun.mock.calls[0]?.[0]).toMatchObject({
-    selections: ["a:p1", "a:p2"],
+    comparisons: createComparisons(["a:p1", "a:p2"]).map((item) => ({
+      comparisonId: expect.any(String),
+      modelKey: item.modelKey,
+    })),
     temperature: undefined,
   });
   expect(
@@ -171,16 +184,26 @@ test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "비교 실행" })).toBeDefined(),
   );
-  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
 });
 
-test("모델 칸을 최대 네 개까지 추가하고 하나만 남으면 실행을 막는다", () => {
-  render(<SimulatorPage choices={choices} onRun={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name: "모델 추가" }));
-  fireEvent.click(screen.getByRole("button", { name: "모델 추가" }));
+test("네 모델이 선택되어 있어도 검색으로 교체할 수 있고 하나만 남으면 실행을 막는다", () => {
+  const catalog = [
+    ...choices,
+    ...["c", "d"].map((name) => ({ ...choices[0], key: `${name}:p1`, name })),
+  ];
+  render(
+    <SimulatorPage
+      choices={catalog}
+      onRun={vi.fn()}
+      initialValues={{
+        comparisons: createComparisons(["a:p1", "a:p2", "c:p1", "d:p1"]),
+      }}
+    />,
+  );
   expect(
-    screen.getByRole("button", { name: "모델 추가" }).hasAttribute("disabled"),
-  ).toBe(true);
+    screen.getByRole("button", { name: "모델 검색" }).hasAttribute("disabled"),
+  ).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "비교 모델 4 제거" }));
   fireEvent.click(screen.getByRole("button", { name: "비교 모델 3 제거" }));
   fireEvent.click(screen.getByRole("button", { name: "비교 모델 2 제거" }));
@@ -201,11 +224,12 @@ test.each([1, 2])(
     fireEvent.click(
       screen.getByRole("button", { name: `비교 모델 ${removed} 제거` }),
     );
-    expect(screen.queryByLabelText("비교 모델 2")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "비교 모델 2" })).toBeNull();
     const remaining = removed === 1 ? "a:p2" : "a:p1";
+    const selected = screen.getByRole("list", { name: "선택한 비교 모델" });
     expect(
-      (screen.getByLabelText("비교 모델 1") as HTMLSelectElement).value,
-    ).toBe(remaining);
+      within(selected).getByText(removed === 1 ? "Provider 2" : "Provider 1"),
+    ).toBeDefined();
     expect(run.hasAttribute("disabled")).toBe(true);
     expect(
       screen
@@ -217,28 +241,35 @@ test.each([1, 2])(
     expect(onRun).not.toHaveBeenCalled();
 
     fireEvent.submit(run.closest("form") as HTMLFormElement);
-    await screen.findByText("모델을 2개 이상 선택해 주세요.");
+    await screen.findByText("비교 항목을 2개 이상 선택하시기 바랍니다.");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(onRun).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "모델 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "모델 검색" }));
     expect(run.hasAttribute("disabled")).toBe(true);
     const restored = removed === 1 ? "a:p1" : "a:p2";
-    fireEvent.change(screen.getByLabelText("비교 모델 2"), {
-      target: { value: restored },
-    });
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: `모델 A · Provider ${removed === 1 ? 1 : 2}`,
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "선택 적용" }));
     expect(run.hasAttribute("disabled")).toBe(false);
     fireEvent.click(run);
     const dialog = await screen.findByRole("dialog", {
-      name: "비교를 실행할까요?",
+      name: "비교를 실행합니다",
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
     await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
-    expect(onRun.mock.calls[0]?.[0].selections).toEqual([remaining, restored]);
+    expect(
+      onRun.mock.calls[0]?.[0].comparisons.map(
+        (item: SimulatorDraft["comparisons"][number]) => item.modelKey,
+      ),
+    ).toEqual([remaining, restored]);
   },
 );
 
-test("기존 DB 시나리오의 Prompt·Schema를 복원하고 고급 설정은 기본값을 따른다", () => {
+test("기존 DB 시나리오의 Prompt·Schema를 복원하고 공통 설정은 기본값을 따른다", () => {
   render(
     <SimulatorPage
       choices={dbMock.choices}
@@ -260,17 +291,17 @@ test("기존 DB 시나리오의 Prompt·Schema를 복원하고 고급 설정은 
   expect(
     (screen.getByLabelText(/JSON Schema/) as HTMLTextAreaElement).value,
   ).toBe(scenario.schemaText);
-  fireEvent.click(screen.getByRole("button", { name: /고급 설정/ }));
-  expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
-    "",
-  );
-  fireEvent.change(screen.getByLabelText("Temperature"), {
+  fireEvent.click(screen.getByRole("button", { name: /^공통 설정 선택사항$/ }));
+  expect(
+    (screen.getByLabelText("공통 Temperature") as HTMLInputElement).value,
+  ).toBe("");
+  fireEvent.change(screen.getByLabelText("공통 Temperature"), {
     target: { value: "0.3" },
   });
   fireEvent.click(screen.getByRole("button", { name: "기본 설정으로" }));
-  expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
-    "",
-  );
+  expect(
+    (screen.getByLabelText("공통 Temperature") as HTMLInputElement).value,
+  ).toBe("");
   expect((screen.getByLabelText("Prompt") as HTMLTextAreaElement).value).toBe(
     scenario.prompt,
   );
@@ -290,7 +321,7 @@ test("이미지를 지원하지 않는 모델은 실행 전 안내한다", async
   });
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   expect(
-    await screen.findByText("모델 A은 이미지 입력을 지원하지 않아요."),
+    await screen.findByText("모델 A은 이미지 입력을 지원하지 않습니다."),
   ).toBeDefined();
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(onRun).not.toHaveBeenCalled();
@@ -302,7 +333,7 @@ test("확인창을 연 뒤 모델이 비활성화되면 호출하지 않는다",
   fill();
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행할까요?",
+    name: "비교를 실행합니다",
   });
   page.rerender(
     <SimulatorPage
@@ -313,7 +344,7 @@ test("확인창을 연 뒤 모델이 비활성화되면 호출하지 않는다",
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   expect(
     await screen.findByText(
-      "선택할 수 없는 모델이 있어요. 모델을 다시 선택해 주세요.",
+      "선택할 수 없는 모델이 있습니다. 모델을 다시 선택하시기 바랍니다.",
     ),
   ).toBeDefined();
   expect(onRun).not.toHaveBeenCalled();
@@ -325,16 +356,16 @@ test("실행 요청 실패에서 내부 오류를 노출하거나 성공 결과�
   fill();
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행할까요?",
+    name: "비교를 실행합니다",
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   expect(
     await screen.findByText(
-      "실행 요청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.",
+      "실행 요청을 보내지 못했습니다. 잠시 후 다시 시도하시기 바랍니다.",
     ),
   ).toBeDefined();
   expect(screen.queryByText("internal-secret")).toBeNull();
-  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
 });
 
 test("이미지 형식 오류를 선택 즉시 알리고 목록에 추가하지 않는다", async () => {
@@ -347,7 +378,7 @@ test("이미지 형식 오류를 선택 즉시 알리고 목록에 추가하지 
   });
   expect(await screen.findByRole("alert")).toHaveProperty(
     "textContent",
-    "JPG·PNG·WebP 파일을 선택해 주세요.",
+    "JPG·PNG·WebP 파일을 선택하시기 바랍니다.",
   );
   expect(screen.queryByText("invalid.svg")).toBeNull();
   expect(chooser.getAttribute("aria-invalid")).toBe("true");
@@ -387,7 +418,7 @@ test("이미지 개수 초과 시 기존 선택을 보존하고 제거·재선�
     target: { files: [png("third.png"), png("fourth.png"), png("fifth.png")] },
   });
   expect(
-    await screen.findByText("이미지는 최대 4개까지 선택할 수 있어요."),
+    await screen.findByText("이미지는 최대 4개까지 선택할 수 있습니다."),
   ).toBeDefined();
   expect(screen.getByText("first.png")).toBeDefined();
   expect(screen.getByText("second.png")).toBeDefined();
@@ -418,7 +449,7 @@ test.each(["prompt", "text"] as const)(
     expect(screen.queryByRole("alert")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
     expect(
-      await screen.findByText("2,000자 이내로 입력해 주세요."),
+      await screen.findByText("2,000자 이내로 입력하시기 바랍니다."),
     ).toBeDefined();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(onRun).not.toHaveBeenCalled();

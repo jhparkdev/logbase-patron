@@ -51,9 +51,9 @@ export function ResponseCards({
             <p className="mb-2 text-label font-semibold">응답 내용</p>
             <div className="max-h-36 overflow-hidden whitespace-pre-wrap break-words rounded-lg bg-grey-50 p-3 text-body-sm text-grey-700">
               {slot.response === null
-                ? "아직 응답을 받지 못했어요."
+                ? "아직 응답을 받지 못했습니다."
                 : slot.response === ""
-                  ? "빈 응답을 받았어요."
+                  ? "빈 응답을 받았습니다."
                   : slot.response}
             </div>
           </div>

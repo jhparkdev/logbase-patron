@@ -151,10 +151,10 @@ test.each(["loading", "error", "empty"] as const)(
     expect(
       screen.getByText(
         kind === "loading"
-          ? "실행 결과를 불러오고 있어요"
+          ? "실행 결과를 불러오고 있습니다"
           : kind === "error"
-            ? "실행 결과를 불러오지 못했어요"
-            : "아직 실행 결과가 없어요",
+            ? "실행 결과를 불러오지 못했습니다"
+            : "아직 실행 결과가 없습니다",
       ),
     ).toBeDefined();
   },
