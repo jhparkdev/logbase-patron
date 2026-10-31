@@ -18,6 +18,12 @@ test("주소에 기간이 없으면 KST 오늘을 포함한 최근 30일을 칸�
   expect(to.value).toBe("2026-10-31");
 });
 
+test("고객별 사용 현황은 조회 기간 종료일이 속한 달의 예산 기준임을 알린다", async () => {
+  renderAt("/customer-usage?from=2026-09-20&to=2026-10-15");
+
+  expect(await screen.findByText("2026-10 기준")).toBeTruthy();
+});
+
 test("조회를 눌러야 바꾼 기간이 주소에 남는다", async () => {
   const router = renderAt("/customer-usage?from=2026-10-01&to=2026-10-15");
 

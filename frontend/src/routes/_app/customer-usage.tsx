@@ -1,5 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { CustomerUsageTable } from "../../features/customer-usage/components/CustomerUsageTable";
+import { RequestTable } from "../../features/customer-usage/components/RequestTable";
+import { SummarySkeleton } from "../../features/customer-usage/components/SummarySkeleton";
 import { UsageFilters } from "../../features/customer-usage/components/UsageFilters";
+import { UsageTrendCard } from "../../features/customer-usage/components/UsageTrendCard";
+import { budgetMonthOf } from "../../features/customer-usage/lib/budget";
 import { customerUsageSearchSchema } from "../../features/customer-usage/lib/search";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 
@@ -26,6 +31,10 @@ function CustomerUsagePage() {
           navigate({ search: (prev) => ({ ...prev, ...period }) })
         }
       />
+      <SummarySkeleton />
+      <UsageTrendCard />
+      <CustomerUsageTable budgetMonth={budgetMonthOf({ from, to })} />
+      <RequestTable />
     </>
   );
 }
