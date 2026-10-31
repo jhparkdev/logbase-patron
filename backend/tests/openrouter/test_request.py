@@ -76,3 +76,53 @@ def test_스트리밍을_켜면_stream을_true로_보낸다() -> None:
     )
 
     assert body["stream"] is True
+
+
+def test_temperature를_주면_요청에_담는다() -> None:
+    body = build_request_body(
+        model_id=MODEL_ID, messages=MESSAGES, max_tokens=100, temperature=0.2
+    )
+
+    assert body["temperature"] == 0.2
+
+
+def test_temperature가_0이어도_요청에_담는다() -> None:
+    # 0은 "결정적으로 답하라"는 유효한 값이라 값이 없는 것(None)과 구분한다.
+    body = build_request_body(
+        model_id=MODEL_ID, messages=MESSAGES, max_tokens=100, temperature=0
+    )
+
+    assert body["temperature"] == 0
+
+
+def test_temperature가_없으면_요청에_담지_않는다() -> None:
+    body = build_request_body(model_id=MODEL_ID, messages=MESSAGES, max_tokens=100)
+
+    assert "temperature" not in body
+
+
+def test_reasoning_effort를_주면_reasoning_객체의_effort로_담는다() -> None:
+    body = build_request_body(
+        model_id=MODEL_ID, messages=MESSAGES, max_tokens=100, reasoning_effort="high"
+    )
+
+    assert body["reasoning"] == {"effort": "high"}
+
+
+def test_reasoning_effort가_없으면_reasoning을_보내지_않는다() -> None:
+    body = build_request_body(model_id=MODEL_ID, messages=MESSAGES, max_tokens=100)
+
+    assert "reasoning" not in body
+
+
+def test_온도와_추론_설정만으로는_require_parameters를_켜지_않는다() -> None:
+    # 지원하지 않는 모델에 보냈을 때 무시할지 실패시킬지는 아직 정해지지 않아 기존 동작을 바꾸지 않는다.
+    body = build_request_body(
+        model_id=MODEL_ID,
+        messages=MESSAGES,
+        max_tokens=100,
+        temperature=0.2,
+        reasoning_effort="low",
+    )
+
+    assert "require_parameters" not in body["provider"]

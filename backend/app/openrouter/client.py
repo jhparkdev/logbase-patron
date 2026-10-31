@@ -143,6 +143,8 @@ class OpenRouterClient:
         json_schema: dict[str, Any] | None = None,
         provider_order: list[str] | None = None,
         allow_fallbacks: bool = False,
+        temperature: float | None = None,
+        reasoning_effort: str | None = None,
         cancel: asyncio.Event | None = None,
         stream: bool = False,
         on_generation_id: GenerationIdCallback | None = None,
@@ -151,6 +153,10 @@ class OpenRouterClient:
 
         cancel 신호가 켜지면 호출을 멈추고 CANCELLED 결과를 돌려준다.
         신호가 없으면(None) 취소하지 않는다.
+
+        temperature(0~2)와 reasoning_effort(max, xhigh, high, medium, low, minimal, none)는
+        값을 주었을 때만 요청에 넣는다. 값의 범위는 호출하는 쪽이 검증하며, 모델이 지원하지
+        않는 설정은 OpenRouter가 무시할 수 있다(아직 확인하지 못함).
 
         stream이 True이면 답을 조각으로 받는다. 이때 timeout_seconds는 한 번 읽는
         시간이 아니라 호출 전체의 제한 시간이다. on_generation_id는 스트리밍일 때만
@@ -166,6 +172,8 @@ class OpenRouterClient:
             provider_order=provider_order,
             allow_fallbacks=allow_fallbacks,
             stream=stream,
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
         )
 
         if cancel is not None and cancel.is_set():
