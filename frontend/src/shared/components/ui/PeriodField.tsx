@@ -1,4 +1,4 @@
-import { type ComponentProps, useId } from "react";
+import type { ComponentProps } from "react";
 
 type PeriodFieldProps = {
   /** 묶음 이름. 예: 기간 */
@@ -6,8 +6,11 @@ type PeriodFieldProps = {
   /** 시작일 칸에 넘길 속성. React Hook Form의 register("from") 결과를 그대로 넘길 수 있다. */
   fromInput: ComponentProps<"input">;
   toInput: ComponentProps<"input">;
-  /** 기간 검증 문구. 있으면 두 칸을 잘못된 입력으로 표시한다. */
-  error?: string;
+  /**
+   * 기간 오류 문구의 id. 있으면 두 칸을 잘못된 입력으로 표시하고 문구와 연결한다.
+   * 문구는 쓰는 쪽이 그린다. 문구 때문에 칸 높이가 늘어 옆 칸과 줄이 어긋나지 않게 하려는 것이다.
+   */
+  errorId?: string;
 };
 
 const INPUT_CLASS =
@@ -18,12 +21,11 @@ export function PeriodField({
   label,
   fromInput,
   toInput,
-  error,
+  errorId,
 }: PeriodFieldProps) {
-  const errorId = useId();
   const invalidProps = {
-    "aria-invalid": error !== undefined,
-    "aria-describedby": error === undefined ? undefined : errorId,
+    "aria-invalid": errorId !== undefined,
+    "aria-describedby": errorId,
   };
 
   return (
@@ -50,15 +52,6 @@ export function PeriodField({
           {...toInput}
         />
       </div>
-      {error !== undefined && (
-        <p
-          id={errorId}
-          role="alert"
-          className="mt-1.5 text-label font-medium text-red-600"
-        >
-          {error}
-        </p>
-      )}
     </fieldset>
   );
 }

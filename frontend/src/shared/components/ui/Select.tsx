@@ -1,15 +1,18 @@
+import { useId } from "react";
 import dropDownIcon from "../../../assets/dropDown.svg";
 import { Icon } from "./Icon";
 
 type SelectProps = {
-  /** 화면 낭독기가 읽는 이름. 예: Provider */
+  /** 선택 상자의 이름. 예: Provider */
   label: string;
+  /** 켜면 이름을 상자 위에 라벨로 보여 준다. 끄면 화면 낭독기만 읽는다. */
+  showLabel?: boolean;
   value: string;
   /** "전체" 같은 기본 항목도 여기에 넣는다(값은 빈 문자열). */
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
   disabled?: boolean;
-  /** 너비처럼 놓이는 자리에서 정할 값. 예: w-56 */
+  /** 상자 너비처럼 놓이는 자리에서 정할 값. 예: w-56 */
   className?: string;
 };
 
@@ -19,16 +22,19 @@ type SelectProps = {
  */
 export function Select({
   label,
+  showLabel,
   value,
   options,
   onChange,
   disabled = false,
   className = "",
 }: SelectProps) {
-  return (
+  const selectId = useId();
+  const box = (
     <div className={`relative shrink-0 ${className}`}>
       <select
-        aria-label={label}
+        id={selectId}
+        aria-label={showLabel ? undefined : label}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
@@ -44,6 +50,21 @@ export function Select({
         src={dropDownIcon}
         className="pointer-events-none absolute top-1/2 right-3 h-2 w-3 -translate-y-1/2 text-grey-600"
       />
+    </div>
+  );
+
+  if (!showLabel) {
+    return box;
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label
+        htmlFor={selectId}
+        className="text-label font-medium text-grey-700"
+      >
+        {label}
+      </label>
+      {box}
     </div>
   );
 }

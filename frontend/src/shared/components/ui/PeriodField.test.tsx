@@ -28,19 +28,21 @@ test("기간 묶음 안에 시작일과 종료일 칸을 보여 준다", () => {
   expect(from.value).toBe("2026-10-01");
   expect(to.value).toBe("2026-10-31");
   expect(from.getAttribute("aria-invalid")).toBe("false");
-  expect(screen.queryByRole("alert")).toBeNull();
+  expect(from.getAttribute("aria-describedby")).toBeNull();
 });
 
-test("오류가 있으면 문구를 보여 주고 두 칸을 잘못된 입력으로 표시한다", () => {
-  const message = "기간은 최대 366일까지 조회할 수 있어요. 기간을 줄여 주세요.";
+test("오류 문구의 id를 받으면 두 칸을 잘못된 입력으로 표시하고 문구와 연결한다", () => {
   render(
-    <PeriodField label="기간" fromInput={{}} toInput={{}} error={message} />,
+    <PeriodField
+      label="기간"
+      fromInput={{}}
+      toInput={{}}
+      errorId="period-error"
+    />,
   );
 
-  const alert = screen.getByRole("alert");
-  expect(alert.textContent).toBe(message);
   for (const input of [inputs().from, inputs().to]) {
     expect(input.getAttribute("aria-invalid")).toBe("true");
-    expect(input.getAttribute("aria-describedby")).toBe(alert.id);
+    expect(input.getAttribute("aria-describedby")).toBe("period-error");
   }
 });
