@@ -112,20 +112,7 @@ async def create_simulation(
     json_schema = resolve_json_schema(
         request.json_schema, scenario.default_json_schema if scenario else None
     )
-    # 중복은 실행 공통 설정·시나리오 기본값과 합친 적용 설정으로 판단한다(DB 제약과 같은 기준).
-    # 저장 전에 판단해야 거절되었을 때 아무것도 남지 않는다
-    slot_configs = [
-        resolve_slot_config(
-            execution_config, chosen.execution_config.model_dump(exclude_none=True)
-        )
-        for chosen in request.models
-    ]
-    validate_model_selection(
-        [
-            ModelSelection(chosen.model_id, chosen.execution_provider, config)
-            for chosen, config in zip(request.models, slot_configs, strict=True)
-        ]
-    )
+    slot_configs = _resolve_slot_configs(request.models, execution_config)
     shared = _RunValues(
         simulation_id=deps.new_id(),
         context=context,
@@ -183,8 +170,31 @@ async def create_simulation(
         ),
         json_schema=json_schema,
         allow_fallbacks=request.routing_policy.allow_fallbacks,
-        images=tuple(images),
+        images=images,
     )
+
+
+def _resolve_slot_configs(
+    chosen_models: Sequence[ModelSelectionRequest], run_config: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """칸마다 적용할 설정을 정하고, 모델·Provider·설정이 모두 같은 칸이 있으면 거절한다.
+
+    중복은 실행 공통 설정·시나리오 기본값과 합친 적용 설정으로 판단한다(DB 제약과 같은 기준).
+    저장 전에 판단해야 거절되었을 때 아무것도 남지 않는다.
+    """
+    configs = [
+        resolve_slot_config(
+            run_config, chosen.execution_config.model_dump(exclude_none=True)
+        )
+        for chosen in chosen_models
+    ]
+    validate_model_selection(
+        [
+            ModelSelection(chosen.model_id, chosen.execution_provider, config)
+            for chosen, config in zip(chosen_models, configs, strict=True)
+        ]
+    )
+    return configs
 
 
 def comparability_notes(
@@ -294,20 +304,20 @@ async def _check_rerun_source(
 
 async def _find_images(
     request: SimulationCreateRequest, deps: IntakeDeps
-) -> list[ImageRef]:
+) -> tuple[ImageRef, ...]:
     """요청한 순서대로 이미지를 돌려준다. 하나라도 올려 둔 적이 없으면 거절한다."""
     if not request.asset_ids:
-        return []
+        return ()
     found = await deps.lookup.find_images(request.asset_ids)
     missing = [asset_id for asset_id in request.asset_ids if asset_id not in found]
     if missing:
         raise ImageNotFoundError(missing)
-    return [found[asset_id] for asset_id in request.asset_ids]
+    return tuple(found[asset_id] for asset_id in request.asset_ids)
 
 
 def _check_image_rules(
     scenario: ScenarioInfo | None,
-    images: list[ImageRef],
+    images: Sequence[ImageRef],
     models: dict[int, ModelInfo],
 ) -> None:
     """이미지가 필요한 시나리오에는 이미지가, 이미지를 보내면 이미지를 받는 모델만 있어야 한다.

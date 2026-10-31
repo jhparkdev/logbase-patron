@@ -19,6 +19,9 @@ class ModelFavoriteKey(BaseModel):
 
 
 class ModelFavoriteRead(ModelFavoriteKey):
+    # 서비스가 돌려주는 ORM 행(user_model_favorites)을 그대로 읽는다
+    model_config = ConfigDict(from_attributes=True)
+
     created_at: datetime
 
 

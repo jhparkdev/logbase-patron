@@ -130,8 +130,9 @@ def resolve_execution_config(
     최대 토큰은 call_model 이 반드시 받으므로 아무도 정하지 않으면 기본값을 쓴다.
     temperature 와 reasoning_effort 는 아무도 정하지 않으면 담지 않고 모델 기본값에 맡긴다.
     """
-    merged = {"max_tokens": DEFAULT_MAX_TOKENS, **(scenario_default or {}), **requested}
-    return {key: merged[key] for key in SENT_EXECUTION_SETTINGS if key in merged}
+    return _sent_only(
+        {"max_tokens": DEFAULT_MAX_TOKENS, **(scenario_default or {}), **requested}
+    )
 
 
 def resolve_slot_config(
@@ -141,7 +142,10 @@ def resolve_slot_config(
 
     기록(ai_requests)에도 이 값이 그대로 남고, 같은 모델·Provider 의 중복 판정도 이 값으로 한다.
     """
-    merged = {**run_config, **slot_override}
+    return _sent_only({**run_config, **slot_override})
+
+
+def _sent_only(merged: Mapping[str, Any]) -> dict[str, Any]:
     return {key: merged[key] for key in SENT_EXECUTION_SETTINGS if key in merged}
 
 

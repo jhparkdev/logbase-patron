@@ -101,7 +101,7 @@ async def get_rerun_draft(
         run,
         await _past_slots(session, simulation_id),
         asset_ids=[asset_id for asset_id, _ in assets],
-        assets_available=await _all_stored(storage, [path for _, path in assets]),
+        assets_available=all([await storage.exists(path) for _, path in assets]),
     )
 
 
@@ -119,13 +119,6 @@ async def _past_assets(
         .order_by(SimulationRunAsset.sort_order)
     )
     return [(asset_id, path) for asset_id, path in rows]
-
-
-async def _all_stored(storage: ImageStorage, paths: Sequence[str]) -> bool:
-    for path in paths:
-        if not await storage.exists(path):
-            return False
-    return True
 
 
 async def _past_slots(

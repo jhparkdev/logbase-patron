@@ -24,11 +24,7 @@ async def list_model_favorites(
     user: CurrentUserDep, session: SessionDep
 ) -> ModelFavoriteList:
     rows = await model_favorites.list_favorites(session, user.user_id)
-    return ModelFavoriteList(
-        items=[
-            ModelFavoriteRead.model_validate(row, from_attributes=True) for row in rows
-        ]
-    )
+    return ModelFavoriteList(items=[ModelFavoriteRead.model_validate(r) for r in rows])
 
 
 @router.post(
@@ -59,7 +55,7 @@ async def add_model_favorite(
     await session.commit()
     if not created:
         response.status_code = status.HTTP_200_OK
-    return ModelFavoriteRead.model_validate(row, from_attributes=True)
+    return ModelFavoriteRead.model_validate(row)
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
