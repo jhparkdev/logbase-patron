@@ -75,7 +75,7 @@ test("주소로 복원한 상세를 닫아도 조회 기간·필터·정렬·선
 test("서비스의 재실행 주소에는 원본 ID만 전달하고 API가 없으면 복원 완료로 표시하지 않는다", async () => {
   const router = show("/simulator?sourceRun=run-1");
   expect(
-    await screen.findByText("재실행 조건 불러오기를 준비하고 있어요"),
+    await screen.findByText("재실행 조건 불러오기를 준비하고 있습니다"),
   ).toBeDefined();
   expect(screen.queryByLabelText("Prompt")).toBeNull();
   fireEvent.click(screen.getByRole("link", { name: "새 조건으로 준비하기" }));
