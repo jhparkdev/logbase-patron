@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { currentMonthPeriod, kstToday, periodSchema } from "./period";
+import {
+  currentMonthPeriod,
+  kstToday,
+  periodSchema,
+  recentPeriod,
+} from "./period";
 
 describe("kstToday", () => {
   test("UTC 15시(KST 자정) 바로 전까지는 같은 날이다", () => {
@@ -24,6 +29,41 @@ describe("currentMonthPeriod", () => {
     expect(currentMonthPeriod(new Date("2026-10-31T15:00:00Z"))).toEqual({
       from: "2026-11-01",
       to: "2026-11-01",
+    });
+  });
+});
+
+describe("recentPeriod", () => {
+  test("KST 오늘을 포함해 N일이다", () => {
+    expect(recentPeriod(new Date("2026-10-31T03:00:00Z"), 30)).toEqual({
+      from: "2026-10-02",
+      to: "2026-10-31",
+    });
+  });
+
+  test("KST 자정 바로 전까지는 그날이 종료일이고, 자정부터 다음 날이다", () => {
+    expect(recentPeriod(new Date("2026-10-31T14:59:59Z"), 30)).toEqual({
+      from: "2026-10-02",
+      to: "2026-10-31",
+    });
+    expect(recentPeriod(new Date("2026-10-31T15:00:00Z"), 30)).toEqual({
+      from: "2026-10-03",
+      to: "2026-11-01",
+    });
+  });
+
+  test("달과 해를 넘겨도 날짜 수로 센다", () => {
+    expect(recentPeriod(new Date("2026-03-01T03:00:00Z"), 30)).toEqual({
+      from: "2026-01-31",
+      to: "2026-03-01",
+    });
+    expect(recentPeriod(new Date("2028-03-01T03:00:00Z"), 30)).toEqual({
+      from: "2028-02-01",
+      to: "2028-03-01",
+    }); // 윤년 2월 29일
+    expect(recentPeriod(new Date("2027-01-10T03:00:00Z"), 30)).toEqual({
+      from: "2026-12-12",
+      to: "2027-01-10",
     });
   });
 });
