@@ -1,13 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
-import { type BudgetFormValues, budgetFormSchema } from "../lib/forms";
+import { type BudgetFormValues, budgetFormSchema } from "../../lib/budget";
 import {
   FIELD_INPUT_CLASS,
   FormActions,
   FormField,
   FormHint,
-} from "./PanelForm";
+} from "../ui/PanelForm";
 
 type BudgetFormProps = {
   /** 적용 시작 월의 처음 값 "YYYY-MM" */
@@ -17,7 +17,7 @@ type BudgetFormProps = {
   onClose: () => void;
 };
 
-/** 프로젝트 월 예산 입력. 저장을 누를 때만 검증한다. */
+/** 월 예산 입력(고객·프로젝트 공용). 저장을 누를 때만 검증한다. */
 export function BudgetForm({
   defaultMonth,
   onSubmit,

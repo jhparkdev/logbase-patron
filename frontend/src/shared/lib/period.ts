@@ -24,6 +24,15 @@ function toUtcMidnight(date: string): number {
   return Date.parse(`${date}T00:00:00Z`);
 }
 
+/** KST 오늘을 포함한 최근 days일. 백엔드 services/simulation_period.py의 기본 기간과 같은 방식이다. */
+export function recentPeriod(now: Date, days: number): Period {
+  const today = kstToday(now);
+  const from = new Date(toUtcMidnight(today) - (days - 1) * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+  return { from, to: today };
+}
+
 const calendarDate = z
   .string()
   .refine(
