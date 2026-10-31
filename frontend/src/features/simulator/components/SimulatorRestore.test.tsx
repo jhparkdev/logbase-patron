@@ -35,7 +35,7 @@ function show(ui: ReactNode) {
 test("API 미연결 상태에서는 복원 성공으로 표시하거나 빈 폼에서 실행하지 않는다", () => {
   show(<SimulatorRestore sourceKey="run-1" />);
   expect(
-    screen.getByText("재실행 조건 불러오기를 준비하고 있어요"),
+    screen.getByText("재실행 조건 불러오기를 준비하고 있습니다"),
   ).toBeDefined();
   expect(screen.queryByLabelText("Prompt")).toBeNull();
 });
@@ -69,7 +69,7 @@ test("원문과 파라미터를 P-04에 복원하고 원본 결과 없이 새 �
   expect((screen.getByLabelText("Temperature") as HTMLInputElement).value).toBe(
     "0.3",
   );
-  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
   expect(
     screen.getByRole("button", { name: "비교 실행" }).hasAttribute("disabled"),
   ).toBe(true);

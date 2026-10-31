@@ -8,16 +8,16 @@ export const imageFilesSchema = z
       .instanceof(File)
       .refine(
         (file) => IMAGE_LIMITS.mimeTypes.some((type) => type === file.type),
-        "JPG·PNG·WebP 파일을 선택해 주세요.",
+        "JPG·PNG·WebP 파일을 선택하시기 바랍니다.",
       )
       .refine(
         (file) => file.size > 0 && file.size <= IMAGE_LIMITS.maxBytes,
-        `빈 파일은 사용할 수 없어요. 파일당 ${IMAGE_LIMITS.maxBytes / 1024 / 1024}MiB 이하로 선택해 주세요.`,
+        `빈 파일은 사용할 수 없습니다. 파일당 ${IMAGE_LIMITS.maxBytes / 1024 / 1024}MiB 이하로 선택하시기 바랍니다.`,
       ),
   )
   .max(
     IMAGE_LIMITS.maxCount,
-    `이미지는 최대 ${IMAGE_LIMITS.maxCount}개까지 선택할 수 있어요.`,
+    `이미지는 최대 ${IMAGE_LIMITS.maxCount}개까지 선택할 수 있습니다.`,
   );
 
 export function fileKey(file: File) {

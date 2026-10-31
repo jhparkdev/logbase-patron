@@ -124,7 +124,7 @@ test("미리보기를 열어도 실제 서비스 페이지의 초기 데이터�
     (screen.getByLabelText("입력 텍스트 (선택사항)") as HTMLTextAreaElement)
       .value,
   ).toBe("");
-  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
 });
 
 test("미리보기 즐겨찾기는 모달을 닫아도 유지하며 실제 조회·저장을 하지 않는다", () => {

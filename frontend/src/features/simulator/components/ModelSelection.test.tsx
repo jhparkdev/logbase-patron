@@ -137,7 +137,7 @@ test("모델명과 Provider를 검색하고 검색 밖의 선택을 유지한다
   expect(within(dialog).getAllByRole("checkbox")).toHaveLength(1);
   fireEvent.click(result);
   fireEvent.change(input, { target: { value: "찾을 수 없는 검색어" } });
-  expect(await within(dialog).findByText("검색 결과가 없어요")).toBeDefined();
+  expect(await within(dialog).findByText("검색 결과가 없습니다")).toBeDefined();
   fireEvent.click(within(dialog).getByRole("button", { name: "선택 적용" }));
   expect(
     within(screen.getByRole("list", { name: "선택한 비교 모델" })).getAllByRole(

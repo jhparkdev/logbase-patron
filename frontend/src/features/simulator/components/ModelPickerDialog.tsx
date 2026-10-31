@@ -62,6 +62,7 @@ export function ModelPickerDialog({
       open
       title="비교 모델 선택"
       onClose={onClose}
+      showTopClose
       action={
         <Button
           disabled={!canApply}
@@ -74,8 +75,8 @@ export function ModelPickerDialog({
       }
     >
       <p className="mb-4 text-body-sm text-grey-600">
-        모델을 {MODEL_LIMITS.min}~{MODEL_LIMITS.max}개 선택해 주세요. 같은
-        모델도 Provider가 다르면 비교할 수 있어요.
+        모델을 {MODEL_LIMITS.min}~{MODEL_LIMITS.max}개 선택하시기 바랍니다. 같은
+        모델도 Provider가 다르면 비교할 수 있습니다.
       </p>
       <SearchField
         label="모델 검색어"
@@ -112,8 +113,8 @@ export function ModelPickerDialog({
         </Button>
       </fieldset>
       <p className="mt-2 text-caption text-grey-600">
-        별 버튼으로 즐겨찾기를 관리해요. 즐겨찾기 변경은 선택 적용·닫기와 별도로
-        처리돼요.
+        별 버튼으로 즐겨찾기를 관리합니다. 즐겨찾기 변경은 선택 적용·닫기와
+        별도로 처리됩니다.
       </p>
       <div className="my-4 rounded-control bg-grey-50 p-3">
         <p role="status" className="text-label font-semibold tabular-nums">
@@ -147,7 +148,7 @@ export function ModelPickerDialog({
           </ul>
         ) : (
           <p className="mt-1 text-caption text-grey-600">
-            아래 목록에서 비교할 모델을 선택해 주세요.
+            아래 목록에서 비교할 모델을 선택하시기 바랍니다.
           </p>
         )}
         {pending.some(
@@ -155,12 +156,12 @@ export function ModelPickerDialog({
             !choices.some((choice) => choice.key === key && choice.selectable),
         ) && (
           <p role="alert" className="mt-2 text-caption text-red-600">
-            선택할 수 없는 모델을 해제하고 다시 선택해 주세요.
+            선택할 수 없는 모델을 해제하고 다시 선택하시기 바랍니다.
           </p>
         )}
         {pending.length >= MODEL_LIMITS.max && (
           <p className="mt-2 text-caption text-grey-600">
-            다른 모델을 고르려면 선택한 모델을 먼저 해제해 주세요.
+            다른 모델을 고르려면 선택한 모델을 먼저 해제하시기 바랍니다.
           </p>
         )}
       </div>

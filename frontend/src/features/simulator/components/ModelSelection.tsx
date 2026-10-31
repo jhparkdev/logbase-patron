@@ -41,7 +41,7 @@ export function ModelSelection({
   };
   return (
     <section className="border-t border-grey-100 pt-5">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         <h3 className="text-label font-semibold">
           모델 선택{" "}
           <span className="font-normal text-grey-600">
@@ -117,7 +117,7 @@ export function ModelSelection({
         </ul>
       ) : (
         <p className="rounded-control border border-dashed border-grey-200 p-5 text-body-sm text-grey-600">
-          모델 검색에서 비교할 모델을 한 번에 선택해 주세요.
+          모델 검색에서 비교할 모델을 한 번에 선택하시기 바랍니다.
         </p>
       )}
       <FieldError

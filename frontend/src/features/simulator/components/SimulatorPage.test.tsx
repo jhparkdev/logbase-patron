@@ -89,7 +89,7 @@ test("API 미연결 화면은 가짜 모델과 실행 결과를 만들지 않는
   expect(
     screen.getByRole("button", { name: "비교 실행" }).hasAttribute("disabled"),
   ).toBe(true);
-  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
   expect(screen.queryByText("모델 A")).toBeNull();
 });
 
@@ -138,7 +138,9 @@ test("접힌 고급 설정의 오류를 펼쳐서 보여주고 제출한 뒤에�
   await waitFor(() =>
     expect(toggle.getAttribute("aria-expanded")).toBe("true"),
   );
-  expect(screen.getByText("1 이상의 정수를 입력해 주세요.")).toBeDefined();
+  expect(
+    screen.getByText("1 이상의 정수를 입력하시기 바랍니다."),
+  ).toBeDefined();
 });
 
 test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번만 제출한다", async () => {
@@ -153,7 +155,7 @@ test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번
   fill();
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행할까요?",
+    name: "비교를 실행합니다",
   });
   expect(onRun).not.toHaveBeenCalled();
   const confirm = within(dialog).getByRole("button", { name: "실행하기" });
@@ -173,7 +175,7 @@ test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "비교 실행" })).toBeDefined(),
   );
-  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
 });
 
 test("네 모델이 선택되어 있어도 검색으로 교체할 수 있고 하나만 남으면 실행을 막는다", () => {
@@ -228,7 +230,7 @@ test.each([1, 2])(
     expect(onRun).not.toHaveBeenCalled();
 
     fireEvent.submit(run.closest("form") as HTMLFormElement);
-    await screen.findByText("모델을 2개 이상 선택해 주세요.");
+    await screen.findByText("모델을 2개 이상 선택하시기 바랍니다.");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(onRun).not.toHaveBeenCalled();
 
@@ -244,7 +246,7 @@ test.each([1, 2])(
     expect(run.hasAttribute("disabled")).toBe(false);
     fireEvent.click(run);
     const dialog = await screen.findByRole("dialog", {
-      name: "비교를 실행할까요?",
+      name: "비교를 실행합니다",
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
     await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
@@ -304,7 +306,7 @@ test("이미지를 지원하지 않는 모델은 실행 전 안내한다", async
   });
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   expect(
-    await screen.findByText("모델 A은 이미지 입력을 지원하지 않아요."),
+    await screen.findByText("모델 A은 이미지 입력을 지원하지 않습니다."),
   ).toBeDefined();
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(onRun).not.toHaveBeenCalled();
@@ -316,7 +318,7 @@ test("확인창을 연 뒤 모델이 비활성화되면 호출하지 않는다",
   fill();
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행할까요?",
+    name: "비교를 실행합니다",
   });
   page.rerender(
     <SimulatorPage
@@ -327,7 +329,7 @@ test("확인창을 연 뒤 모델이 비활성화되면 호출하지 않는다",
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   expect(
     await screen.findByText(
-      "선택할 수 없는 모델이 있어요. 모델을 다시 선택해 주세요.",
+      "선택할 수 없는 모델이 있습니다. 모델을 다시 선택하시기 바랍니다.",
     ),
   ).toBeDefined();
   expect(onRun).not.toHaveBeenCalled();
@@ -339,16 +341,16 @@ test("실행 요청 실패에서 내부 오류를 노출하거나 성공 결과�
   fill();
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행할까요?",
+    name: "비교를 실행합니다",
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   expect(
     await screen.findByText(
-      "실행 요청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.",
+      "실행 요청을 보내지 못했습니다. 잠시 후 다시 시도하시기 바랍니다.",
     ),
   ).toBeDefined();
   expect(screen.queryByText("internal-secret")).toBeNull();
-  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
 });
 
 test("이미지 형식 오류를 선택 즉시 알리고 목록에 추가하지 않는다", async () => {
@@ -361,7 +363,7 @@ test("이미지 형식 오류를 선택 즉시 알리고 목록에 추가하지 
   });
   expect(await screen.findByRole("alert")).toHaveProperty(
     "textContent",
-    "JPG·PNG·WebP 파일을 선택해 주세요.",
+    "JPG·PNG·WebP 파일을 선택하시기 바랍니다.",
   );
   expect(screen.queryByText("invalid.svg")).toBeNull();
   expect(chooser.getAttribute("aria-invalid")).toBe("true");
@@ -401,7 +403,7 @@ test("이미지 개수 초과 시 기존 선택을 보존하고 제거·재선�
     target: { files: [png("third.png"), png("fourth.png"), png("fifth.png")] },
   });
   expect(
-    await screen.findByText("이미지는 최대 4개까지 선택할 수 있어요."),
+    await screen.findByText("이미지는 최대 4개까지 선택할 수 있습니다."),
   ).toBeDefined();
   expect(screen.getByText("first.png")).toBeDefined();
   expect(screen.getByText("second.png")).toBeDefined();
@@ -432,7 +434,7 @@ test.each(["prompt", "text"] as const)(
     expect(screen.queryByRole("alert")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
     expect(
-      await screen.findByText("2,000자 이내로 입력해 주세요."),
+      await screen.findByText("2,000자 이내로 입력하시기 바랍니다."),
     ).toBeDefined();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(onRun).not.toHaveBeenCalled();

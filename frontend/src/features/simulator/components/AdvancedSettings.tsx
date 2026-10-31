@@ -77,7 +77,7 @@ export function AdvancedSettings({
                     aria-label="Temperature 조절"
                     aria-valuetext={
                       temperature.trim() === ""
-                        ? "기본값 사용. 조절하면 직접 지정해요."
+                        ? "기본값 사용. 조절하면 직접 지정합니다."
                         : temperature
                     }
                     min={TEMPERATURE.min}

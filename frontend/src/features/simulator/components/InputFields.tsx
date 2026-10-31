@@ -64,7 +64,7 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
               aria-describedby="sim-scenario-error"
               className={controlClass}
             >
-              <option value="">시나리오를 선택해 주세요</option>
+              <option value="">시나리오를 선택하시기 바랍니다</option>
               {scenarios.map((item) => (
                 <option key={item.key} value={item.key}>
                   {item.name}
@@ -90,7 +90,7 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
             {...register("text")}
             id="sim-text"
             rows={4}
-            placeholder="분석할 텍스트를 입력해 주세요"
+            placeholder="분석할 텍스트를 입력하시기 바랍니다"
             aria-invalid={!!errors.text}
             aria-describedby="sim-text-count sim-text-error"
             className={`${controlClass} resize-y`}
@@ -110,7 +110,7 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
           {...register("prompt")}
           id="sim-prompt"
           rows={9}
-          placeholder="모델이 수행할 작업을 입력해 주세요"
+          placeholder="모델이 수행할 작업을 입력하시기 바랍니다"
           aria-invalid={!!errors.prompt}
           aria-describedby="sim-prompt-count sim-prompt-error"
           className={`${controlClass} resize-y`}
@@ -177,7 +177,7 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
           id="sim-schema"
           rows={4}
           spellCheck={false}
-          placeholder="출력 형식을 검증할 Schema를 입력해 주세요"
+          placeholder="출력 형식을 검증할 Schema를 입력하시기 바랍니다"
           aria-invalid={!!errors.jsonSchema}
           aria-describedby="sim-schema-error"
           className={`${controlClass} resize-y font-mono`}

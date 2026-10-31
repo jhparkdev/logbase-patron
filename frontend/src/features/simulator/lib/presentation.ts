@@ -83,31 +83,33 @@ export function selectionIssues(
   const issues: string[] = [];
   const scenario = scenarios.find((item) => item.key === draft.scenarioKey);
   if (draft.mode === "scenario" && !scenario)
-    issues.push("시나리오를 다시 선택해 주세요.");
+    issues.push("시나리오를 다시 선택하시기 바랍니다.");
   if (
     draft.mode === "scenario" &&
     scenario?.imageRequired &&
     !draft.files.length
   )
-    issues.push("선택한 시나리오에 사용할 이미지를 추가해 주세요.");
+    issues.push("선택한 시나리오에 사용할 이미지를 추가하시기 바랍니다.");
   for (const key of draft.selections) {
     const choice = choices.find((item) => item.key === key);
     if (!choice?.selectable) {
-      issues.push("선택할 수 없는 모델이 있어요. 모델을 다시 선택해 주세요.");
+      issues.push(
+        "선택할 수 없는 모델이 있습니다. 모델을 다시 선택하시기 바랍니다.",
+      );
       continue;
     }
     if (draft.files.length && !choice.supportsImages)
-      issues.push(`${choice.name}은 이미지 입력을 지원하지 않아요.`);
+      issues.push(`${choice.name}은 이미지 입력을 지원하지 않습니다.`);
     if (
       draft.temperature !== undefined &&
       !choice.supportedParameters.includes("temperature")
     )
-      issues.push(`${choice.name}은 Temperature 지정을 지원하지 않아요.`);
+      issues.push(`${choice.name}은 Temperature 지정을 지원하지 않습니다.`);
     if (
       draft.maxTokens !== undefined &&
       !choice.supportedParameters.includes("max_tokens")
     )
-      issues.push(`${choice.name}은 최대 출력 토큰 지정을 지원하지 않아요.`);
+      issues.push(`${choice.name}은 최대 출력 토큰 지정을 지원하지 않습니다.`);
     if (
       draft.jsonSchema.trim() &&
       !choice.supportedParameters.some(
@@ -115,7 +117,7 @@ export function selectionIssues(
           value === "response_format" || value === "structured_outputs",
       )
     )
-      issues.push(`${choice.name}은 구조화 출력 설정을 지원하지 않아요.`);
+      issues.push(`${choice.name}은 구조화 출력 설정을 지원하지 않습니다.`);
   }
   return [...new Set(issues)];
 }
