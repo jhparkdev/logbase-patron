@@ -3,6 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -12,6 +13,13 @@ from app.models import ConnectionTestStatus, ModelStatus, PriceSource, PriceStat
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 MAX_FILTER_LENGTH = 100
+# 건너뛸 개수(page × page_size)와 모델 번호가 DB의 정수(bigint) 범위를 넘지 않게 하는 상한
+MAX_PAGE = 100_000
+MAX_MODEL_ID = 2**63 - 1
+# PostgreSQL은 문자열에 NUL 문자가 들어 있으면 오류를 내므로 검색어에서 거절한다.
+SearchText = Annotated[
+    str, Field(min_length=1, max_length=MAX_FILTER_LENGTH, pattern=r"^[^\x00]+$")
+]
 
 
 class SortOrder(StrEnum):
@@ -42,18 +50,14 @@ class ModelListQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # 화면의 검색창 한 칸. 표시 이름 또는 모델 ID 중 하나에 들어 있으면 찾는다.
-    q: str | None = Field(default=None, min_length=1, max_length=MAX_FILTER_LENGTH)
-    name: str | None = Field(default=None, min_length=1, max_length=MAX_FILTER_LENGTH)
-    model_id: str | None = Field(
-        default=None, min_length=1, max_length=MAX_FILTER_LENGTH
-    )
-    provider: str | None = Field(
-        default=None, min_length=1, max_length=MAX_FILTER_LENGTH
-    )
+    q: SearchText | None = None
+    name: SearchText | None = None
+    model_id: SearchText | None = None
+    provider: SearchText | None = None
     status: list[ModelStatus] = Field(default_factory=list)
     sort: ModelSortField = ModelSortField.CREATED_AT
     order: SortOrder = SortOrder.DESC
-    page: int = Field(default=1, ge=1)
+    page: int = Field(default=1, ge=1, le=MAX_PAGE)
     page_size: int = Field(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE)
 
 

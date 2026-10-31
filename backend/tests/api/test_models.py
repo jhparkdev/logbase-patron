@@ -8,7 +8,13 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
-from app.schemas.models import DEFAULT_PAGE_SIZE, MAX_FILTER_LENGTH, MAX_PAGE_SIZE
+from app.schemas.models import (
+    DEFAULT_PAGE_SIZE,
+    MAX_FILTER_LENGTH,
+    MAX_MODEL_ID,
+    MAX_PAGE,
+    MAX_PAGE_SIZE,
+)
 from tests.db_helpers import T0, Factory
 
 MODELS = "/api/models"
@@ -395,6 +401,33 @@ async def test_한_페이지_최대_개수는_허용한다(client: AsyncClient) 
     assert response.status_code == status.HTTP_200_OK
 
 
+@pytest.mark.parametrize(
+    ("page", "expected_status"),
+    [
+        (MAX_PAGE, status.HTTP_200_OK),
+        (MAX_PAGE + 1, status.HTTP_422_UNPROCESSABLE_CONTENT),
+    ],
+)
+async def test_page의_상한_경계(
+    client: AsyncClient, page: int, expected_status: int
+) -> None:
+    params = {"page": page, "page_size": MAX_PAGE_SIZE}
+
+    response = await client.get(MODELS, params=params)
+
+    assert response.status_code == expected_status
+
+
+@pytest.mark.parametrize("name", ["q", "name", "model_id", "provider"])
+async def test_검색어에_NUL_문자가_있으면_422이다(
+    client: AsyncClient, name: str
+) -> None:
+    response = await client.get(MODELS, params={name: "a\x00b"})
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()["code"] == "VALIDATION_ERROR"
+
+
 # ---------------------------------------------------------------
 # 상세 조회
 # ---------------------------------------------------------------
@@ -493,7 +526,7 @@ async def test_가격이_없는_모델의_상세는_current_price가_null이다(
     assert detail["current_price"] is None
 
 
-@pytest.mark.parametrize("model_id", [1, 999999])
+@pytest.mark.parametrize("model_id", [1, 999999, MAX_MODEL_ID])
 async def test_없는_모델_번호는_404이다(client: AsyncClient, model_id: int) -> None:
     response = await client.get(detail_url(model_id))
 
@@ -504,7 +537,10 @@ async def test_없는_모델_번호는_404이다(client: AsyncClient, model_id: 
     }
 
 
-@pytest.mark.parametrize("model_id", ["abc", "0", "-1", "1.5"])
+@pytest.mark.parametrize(
+    "model_id",
+    ["abc", "0", "-1", "1.5", str(MAX_MODEL_ID + 1), "99999999999999999999"],
+)
 async def test_올바르지_않은_모델_번호는_422이다(
     client: AsyncClient, model_id: str
 ) -> None:

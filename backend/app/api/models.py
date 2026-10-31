@@ -8,6 +8,7 @@ from app.api.errors import ApiError
 from app.db import SessionDep
 from app.schemas.common import ErrorCode, ErrorResponse
 from app.schemas.models import (
+    MAX_MODEL_ID,
     ModelDetailRead,
     ModelListQuery,
     ModelListResponse,
@@ -91,7 +92,7 @@ async def list_models(
 
 @router.get("/{model_id}", responses=DETAIL_ERROR_RESPONSES)
 async def read_model(
-    model_id: Annotated[int, Path(ge=1)], session: SessionDep
+    model_id: Annotated[int, Path(ge=1, le=MAX_MODEL_ID)], session: SessionDep
 ) -> ModelDetailRead:
     item = await model_detail.get_model(session, model_id)
     if item is None:
