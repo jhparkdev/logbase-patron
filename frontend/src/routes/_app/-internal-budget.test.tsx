@@ -64,3 +64,9 @@ test("366일을 넘는 기간은 조회하지 않고 줄여 달라고 안내한�
     to: "2026-10-15",
   });
 });
+
+test("예산 현황은 조회 기간 종료일이 속한 달 기준임을 알린다", async () => {
+  renderAt("/internal-budget?from=2026-09-01&to=2026-10-15");
+
+  expect(await screen.findByText(/2026-10 기준/)).toBeTruthy();
+});

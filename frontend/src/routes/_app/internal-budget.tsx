@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BudgetFilters } from "../../features/internal-budget/components/BudgetFilters";
+import { CostTrendCard } from "../../features/internal-budget/components/CostTrendCard";
+import { MemberUsageTable } from "../../features/internal-budget/components/MemberUsageTable";
+import { ProjectBudgetTable } from "../../features/internal-budget/components/ProjectBudgetTable";
+import { RecentRequestTable } from "../../features/internal-budget/components/RecentRequestTable";
+import { SubscriptionTable } from "../../features/internal-budget/components/SubscriptionTable";
+import { SummarySkeleton } from "../../features/internal-budget/components/SummarySkeleton";
 import { parseBudgetSearch } from "../../features/internal-budget/lib/search";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 
@@ -27,6 +33,14 @@ function InternalBudgetPage() {
           navigate({ search: (prev) => ({ ...prev, ...period }) })
         }
       />
+      {/* 요약 값은 비용 요약 API가 생기면 채운다. 그 전까지는 불러오는 중 모양이다. */}
+      <SummarySkeleton />
+      <CostTrendCard />
+      {/* 예산은 월 단위라 조회 기간 종료일이 속한 달과 비교한다. */}
+      <ProjectBudgetTable month={search.to.slice(0, 7)} />
+      <SubscriptionTable />
+      <MemberUsageTable />
+      <RecentRequestTable />
     </>
   );
 }
