@@ -86,7 +86,7 @@ class RerunRoutingPolicy(BaseModel):
 class RerunBlockReason(StrEnum):
     """재실행을 시작할 수 없는 사유. 모델 상태는 사유가 아니다(교체·제외하면 되므로)."""
 
-    INPUT_MISSING = "INPUT_MISSING"  # 저장된 입력을 복원할 수 없다
+    INPUT_MISSING = "INPUT_MISSING"  # 저장된 입력(이미지 파일)을 더는 구할 수 없다
 
 
 class RerunModel(BaseModel):
@@ -126,6 +126,8 @@ class SimulationRerunDraft(BaseModel):
         list[RerunModel],
         Field(min_length=MIN_MODEL_COUNT, max_length=MAX_MODEL_COUNT),
     ]
+    # 과거 실행에 쓴 이미지(올린 순서). 새 실행 요청에 그대로 보내면 같은 이미지로 다시 돌린다
+    asset_ids: list[UUID]
     rerunnable: bool
     blocked_reason: RerunBlockReason | None
 

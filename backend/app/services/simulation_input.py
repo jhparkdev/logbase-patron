@@ -1,9 +1,10 @@
 import hashlib
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.schemas.simulation import MAX_TOKENS_LIMIT
+from app.services.simulation_ports import ImageRef
 
 # 팀이 정한 임시 수치(결정됨)와 하트비트 주기
 SIMULATION_TIMEOUT_SECONDS = 180
@@ -18,6 +19,13 @@ DEFAULT_MAX_TOKENS = MAX_TOKENS_LIMIT
 SENT_EXECUTION_SETTINGS = ("max_tokens", "temperature", "reasoning_effort")
 
 _PLACEHOLDER = re.compile(r"\{\{[^{}]+\}\}")
+
+# DB 에 남는 메시지에서 이미지를 가리키는 표시. 이미지 내용 대신 asset_id 만 넣는다
+IMAGE_REF_PREFIX = "asset:"
+
+
+class MissingImageDataError(LookupError):
+    """메시지가 가리키는 이미지의 내용을 구하지 못했다. 참조 표시 그대로 모델에 보내지 않으려고 멈춘다."""
 
 
 class InputRequiredError(ValueError):
@@ -54,9 +62,55 @@ def build_prompt_text(prompt_text: str, input_text: str | None) -> str:
     return f"{prompt_text}\n\n{input_text}"
 
 
-def build_messages(text: str) -> list[dict[str, str]]:
-    """call_model 이 받는 형태: {role, content} 딕셔너리의 목록. 사용자 메시지 하나다."""
-    return [{"role": "user", "content": text}]
+def build_messages(text: str, images: Sequence[ImageRef] = ()) -> list[dict[str, Any]]:
+    """call_model 이 받는 형태: {role, content} 딕셔너리의 목록. 사용자 메시지 하나다.
+
+    이미지가 있으면 content 가 글과 이미지 조각의 목록이 된다(OpenRouter 의 image_url 형식).
+    이 값이 DB 에 저장되므로 이미지는 내용이 아니라 참조(asset:<asset_id>)로만 넣는다.
+    모델에 보낼 때는 inline_images 로 내용으로 바꾼다.
+    """
+    if not images:
+        return [{"role": "user", "content": text}]
+    parts: list[dict[str, Any]] = [{"type": "text", "text": text}]
+    parts.extend(
+        {
+            "type": "image_url",
+            "image_url": {"url": f"{IMAGE_REF_PREFIX}{image.asset_id}"},
+        }
+        for image in images
+    )
+    return [{"role": "user", "content": parts}]
+
+
+def inline_images(
+    messages: Sequence[Mapping[str, Any]], data_urls: Mapping[str, str]
+) -> list[dict[str, Any]]:
+    """저장용 메시지의 이미지 참조를 내용(data URL)으로 바꾼 복사본을 만든다. 원본은 바꾸지 않는다.
+
+    data_urls 는 asset_id(문자열) → data URL 이다. 내용이 없는 참조가 있으면 그대로 보내지 않고 멈춘다.
+    """
+    return [
+        {**message, "content": _inline_content(message["content"], data_urls)}
+        for message in messages
+    ]
+
+
+def _inline_content(content: Any, data_urls: Mapping[str, str]) -> Any:
+    if not isinstance(content, list):
+        return content
+    return [_inline_part(part, data_urls) for part in content]
+
+
+def _inline_part(part: Mapping[str, Any], data_urls: Mapping[str, str]) -> Any:
+    if part.get("type") != "image_url":
+        return part
+    url = part["image_url"]["url"]
+    if not url.startswith(IMAGE_REF_PREFIX):
+        return part
+    asset_id = url.removeprefix(IMAGE_REF_PREFIX)
+    if asset_id not in data_urls:
+        raise MissingImageDataError(asset_id)
+    return {**part, "image_url": {**part["image_url"], "url": data_urls[asset_id]}}
 
 
 def compute_input_hash(prompt_text: str, input_text: str | None) -> str:

@@ -3,6 +3,7 @@ from enum import StrEnum
 from typing import Literal
 
 from app.schemas.common import ErrorCode, ErrorResponse
+from app.schemas.simulation_image import MAX_IMAGE_BYTES
 from app.services.simulation_period import MAX_PERIOD_DAYS, InvalidPeriodReason
 
 
@@ -19,6 +20,13 @@ class SimulationErrorCode(StrEnum):
     SCENARIO_NOT_FOUND = "SCENARIO_NOT_FOUND"
     MODEL_NOT_FOUND = "MODEL_NOT_FOUND"
     MODEL_NOT_ACTIVE = "MODEL_NOT_ACTIVE"
+    # 이미지를 보냈는데 고른 모델 중에 이미지를 받지 못하는 모델이 있다
+    MODEL_IMAGE_NOT_SUPPORTED = "MODEL_IMAGE_NOT_SUPPORTED"
+    IMAGE_REQUIRED = "IMAGE_REQUIRED"  # 이미지가 필요한 시나리오인데 이미지가 없음
+    IMAGE_NOT_FOUND = "IMAGE_NOT_FOUND"  # 올리지 않았거나 없는 asset_id
+    IMAGE_EMPTY = "IMAGE_EMPTY"  # 빈 파일을 올림
+    IMAGE_TOO_LARGE = "IMAGE_TOO_LARGE"  # 파일이 한도보다 큼
+    IMAGE_TYPE_NOT_SUPPORTED = "IMAGE_TYPE_NOT_SUPPORTED"  # JPG·PNG·WebP 가 아님
     PROVIDER_NOT_AVAILABLE = "PROVIDER_NOT_AVAILABLE"
     PERIOD_INCOMPLETE = "PERIOD_INCOMPLETE"
     PERIOD_START_AFTER_END = "PERIOD_START_AFTER_END"
@@ -63,6 +71,25 @@ ERROR_SPECS: dict[SimulationErrorCode, ErrorSpec] = {
     ),
     SimulationErrorCode.MODEL_NOT_ACTIVE: ErrorSpec(
         422, "사용 중이 아닌 모델은 비교 실행에 쓸 수 없습니다."
+    ),
+    SimulationErrorCode.MODEL_IMAGE_NOT_SUPPORTED: ErrorSpec(
+        422, "이미지를 지원하지 않는 모델이 있습니다. 해당 모델을 빼 주세요."
+    ),
+    SimulationErrorCode.IMAGE_REQUIRED: ErrorSpec(
+        422, "이 시나리오는 이미지가 필요합니다. 이미지를 올려 주세요."
+    ),
+    SimulationErrorCode.IMAGE_NOT_FOUND: ErrorSpec(
+        422, "올리지 않은 이미지가 있습니다. 이미지를 다시 올려 주세요."
+    ),
+    SimulationErrorCode.IMAGE_EMPTY: ErrorSpec(
+        422, "빈 파일은 올릴 수 없습니다. 다른 이미지를 선택해 주세요."
+    ),
+    SimulationErrorCode.IMAGE_TOO_LARGE: ErrorSpec(
+        413,
+        f"이미지는 파일당 {MAX_IMAGE_BYTES // 1024 // 1024}MiB 이하만 올릴 수 있습니다.",
+    ),
+    SimulationErrorCode.IMAGE_TYPE_NOT_SUPPORTED: ErrorSpec(
+        415, "JPG·PNG·WebP 이미지만 올릴 수 있습니다."
     ),
     SimulationErrorCode.PROVIDER_NOT_AVAILABLE: ErrorSpec(
         422, "선택한 모델에서 사용할 수 없는 Provider 입니다."

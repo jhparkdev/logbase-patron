@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
 import httpx
@@ -14,7 +15,9 @@ from pydantic import SecretStr
 from app.api.deps import NowDep, SettingsDep
 from app.db import get_sessionmaker
 from app.openrouter.client import OpenRouterClient
+from app.services.image_storage import ImageStorage, LocalImageStorage
 from app.services.simulation_cancel_service import CancelDeps
+from app.services.simulation_image_source import StorageImageSource
 from app.services.simulation_manager import SimulationManager
 from app.services.simulation_ports import ModelCaller, SimulationDeps
 from app.services.simulation_recorders import ScopedRequestRecorder
@@ -46,16 +49,29 @@ def get_cancel_registry() -> CancelRegistry:
     return CancelRegistry()
 
 
+def get_image_storage(settings: SettingsDep) -> ImageStorage:
+    """이미지 저장소. 지금은 로컬 폴더이고, GCS 를 쓰게 되면 여기서 설정에 따라 바꿔 끼운다.
+
+    테스트는 app.dependency_overrides 로 임시 폴더를 쓰는 저장소로 바꿔 끼운다.
+    """
+    return LocalImageStorage(settings.image_storage_dir)
+
+
+ImageStorageDep = Annotated[ImageStorage, Depends(get_image_storage)]
+
+
 def get_simulation_manager(settings: SettingsDep) -> SimulationManager:
     """설정을 의존성으로 받아, 테스트가 바꿔 끼운 설정(Key 없음)을 따르게 한다.
 
     테스트는 app.dependency_overrides 로 바꿔 끼운다.
     """
-    return _shared_manager(settings.openrouter_api_key)
+    return _shared_manager(settings.openrouter_api_key, settings.image_storage_dir)
 
 
 @lru_cache
-def _shared_manager(api_key: SecretStr | None) -> SimulationManager:
+def _shared_manager(
+    api_key: SecretStr | None, image_storage_dir: Path
+) -> SimulationManager:
     """프로세스에 하나만 둔다. 모델 호출기가 연결되어야 만들어진다."""
     sessions = get_sessionmaker()
     return SimulationManager(
@@ -64,6 +80,7 @@ def _shared_manager(api_key: SecretStr | None) -> SimulationManager:
             recorder=ScopedRequestRecorder(sessions),
             store=ScopedSimulationStore(sessions),
             now=lambda: datetime.now(UTC),
+            images=StorageImageSource(LocalImageStorage(image_storage_dir)),
         ),
         registry=get_cancel_registry(),
     )

@@ -9,11 +9,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import exists, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     AIRequest,
+    InputAsset,
     ModelRegistry,
     ModelStatus,
     SimulationResult,
@@ -27,6 +28,7 @@ from app.schemas.simulation_history import (
     RerunRoutingPolicy,
     SimulationRerunDraft,
 )
+from app.services.image_storage import ImageStorage
 from app.services.simulation_validation import is_model_selectable
 
 
@@ -42,13 +44,19 @@ class PastSlot:
 
 
 def build_rerun_draft(
-    run: SimulationRun, slots: Sequence[PastSlot], *, has_input_assets: bool
+    run: SimulationRun,
+    slots: Sequence[PastSlot],
+    *,
+    asset_ids: Sequence[uuid.UUID] = (),
+    assets_available: bool = True,
 ) -> SimulationRerunDraft:
-    """과거 실행 행과 칸들로 초안을 만든다. slots 는 칸 번호 순서여야 한다.
+    """과거 실행 행과 칸들로 초안을 만든다. slots 는 칸 번호 순서, asset_ids 는 올린 순서여야 한다.
 
-    첨부 이미지가 있던 실행은 막는다. 새 실행 요청에는 이미지 칸이 없어 같은 입력으로 돌릴 수 없다.
+    이미지 파일을 더는 구할 수 없으면 막는다. 같은 입력이 아닌 채로 돌리면 비교가 달라지기 때문이다.
     """
-    blocked = RerunBlockReason.INPUT_MISSING if has_input_assets else None
+    blocked = (
+        RerunBlockReason.INPUT_MISSING if asset_ids and not assets_available else None
+    )
     return SimulationRerunDraft(
         rerun_of_simulation_id=run.simulation_id,
         test_type=run.test_type,
@@ -64,6 +72,7 @@ def build_rerun_draft(
             )
         ),
         models=[_to_rerun_model(slot) for slot in slots],
+        asset_ids=list(asset_ids),
         rerunnable=blocked is None,
         blocked_reason=blocked,
     )
@@ -81,20 +90,42 @@ def _to_rerun_model(slot: PastSlot) -> RerunModel:
 
 
 async def get_rerun_draft(
-    session: AsyncSession, simulation_id: uuid.UUID
+    session: AsyncSession, simulation_id: uuid.UUID, storage: ImageStorage
 ) -> SimulationRerunDraft | None:
     """재실행 초안. 없는 실행이면 None."""
     run = await session.get(SimulationRun, simulation_id)
     if run is None:
         return None
-    has_input_assets = await session.scalar(
-        select(exists().where(SimulationRunAsset.simulation_id == simulation_id))
-    )
+    assets = await _past_assets(session, simulation_id)
     return build_rerun_draft(
         run,
         await _past_slots(session, simulation_id),
-        has_input_assets=bool(has_input_assets),
+        asset_ids=[asset_id for asset_id, _ in assets],
+        assets_available=await _all_stored(storage, [path for _, path in assets]),
     )
+
+
+async def _past_assets(
+    session: AsyncSession, simulation_id: uuid.UUID
+) -> list[tuple[uuid.UUID, str]]:
+    """과거 실행에 쓴 이미지의 (asset_id, 저장 경로). 올린 순서다."""
+    rows = await session.execute(
+        select(InputAsset.asset_id, InputAsset.storage_path)
+        .join(
+            SimulationRunAsset,
+            SimulationRunAsset.asset_id == InputAsset.asset_id,
+        )
+        .where(SimulationRunAsset.simulation_id == simulation_id)
+        .order_by(SimulationRunAsset.sort_order)
+    )
+    return [(asset_id, path) for asset_id, path in rows]
+
+
+async def _all_stored(storage: ImageStorage, paths: Sequence[str]) -> bool:
+    for path in paths:
+        if not await storage.exists(path):
+            return False
+    return True
 
 
 async def _past_slots(

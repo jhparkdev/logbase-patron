@@ -13,6 +13,7 @@ from app.openrouter.result import CallResult, CallStatus
 from app.services.simulation_input import (
     HEARTBEAT_INTERVAL_SECONDS,
     SIMULATION_TIMEOUT_SECONDS,
+    inline_images,
 )
 from app.services.simulation_outcome import to_slot_record
 from app.services.simulation_ports import (
@@ -47,8 +48,12 @@ async def run_simulation(
     heartbeat = asyncio.create_task(
         _beat(deps.store, job.simulation_id, deps.now, heartbeat_interval_seconds)
     )
+    # 이미지는 실행당 한 번만 읽어 모든 칸이 나눠 쓴다. 칸마다 읽으면 같은 파일을 모델 수만큼 읽는다
+    to_send = await _messages_to_send(job, deps)
     slot_runs = [
-        _run_slot(slot, job, deps, _cancel_signal(events, slot), timeout_seconds)
+        _run_slot(
+            slot, job, deps, _cancel_signal(events, slot), timeout_seconds, to_send
+        )
         for slot in job.slots
     ]
     try:
@@ -113,6 +118,31 @@ def _log_unrecorded_slots(
             )
 
 
+class _ImagesUnavailableError(RuntimeError):
+    """이미지 내용을 읽지 못했다. 모델은 질문의 일부만 보게 되므로 호출하지 않는다."""
+
+
+async def _messages_to_send(
+    job: SimulationJob, deps: SimulationDeps
+) -> list[dict[str, Any]] | None:
+    """모델에 보낼 메시지. 저장용 메시지의 이미지 참조를 내용으로 바꾼다. 읽지 못하면 None."""
+    if not job.images:
+        return job.messages
+    try:
+        data_urls = {
+            str(image.asset_id): await deps.images.data_url(image)
+            for image in job.images
+        }
+        return inline_images(job.messages, data_urls)
+    except Exception as error:  # noqa: BLE001 - 이미지를 못 읽으면 모든 칸이 같은 이유로 실패한다
+        logger.error(
+            "images unreadable: simulation_id=%s error=%s",
+            job.simulation_id,
+            type(error).__name__,
+        )
+        return None
+
+
 def _call_settings(slot: SlotPlan) -> dict[str, Any]:
     """칸의 적용 설정을 call_model 인자로 바꾼다. 아무도 정하지 않은 값은 인자로 보내지 않는다."""
     config = slot.execution_config
@@ -129,15 +159,18 @@ async def _run_slot(
     deps: SimulationDeps,
     cancel: asyncio.Event,
     timeout_seconds: float,
+    to_send: list[dict[str, Any]] | None,
 ) -> None:
     started_at = deps.now()
     if not await deps.recorder.mark_running(slot.request_id, started_at):
         return  # 시작 전에 이미 취소되었다
     try:
+        if to_send is None:
+            raise _ImagesUnavailableError
         result = await deps.caller(
             request_id=slot.request_id,
             model_id=slot.openrouter_model_id,
-            messages=job.messages,
+            messages=to_send,
             timeout_seconds=timeout_seconds,
             json_schema=job.json_schema,
             provider_order=[slot.execution_provider],

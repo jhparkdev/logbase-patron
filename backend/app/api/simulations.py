@@ -8,10 +8,12 @@ from fastapi import APIRouter, Query, Request, Response, status
 from app.api.deps import DevUserDep, NowDep
 from app.api.simulation_deps import (
     CancelDepsDep,
+    ImageStorageDep,
     SimulationManagerDep,
     recovery_lifespan,
 )
 from app.api.simulation_errors import SimulationRoute
+from app.api.simulation_images import router as images_router
 from app.db import SessionDep
 from app.schemas.simulation import SimulationAccepted, SimulationCreateRequest
 from app.schemas.simulation_cancel import (
@@ -133,10 +135,10 @@ async def read_simulation_run(
     responses={**_NOT_FOUND, **_INVALID_REQUEST},
 )
 async def read_rerun_draft(
-    simulation_id: uuid.UUID, session: SessionDep
+    simulation_id: uuid.UUID, session: SessionDep, storage: ImageStorageDep
 ) -> SimulationRerunDraft:
     """재실행 초안. 과거 입력으로 화면 입력칸을 채운다. 실행은 사용자가 새 실행 요청으로 보낼 때 시작한다."""
-    draft = await get_rerun_draft(session, simulation_id)
+    draft = await get_rerun_draft(session, simulation_id, storage)
     if draft is None:
         raise SimulationNotFoundError
     return draft
@@ -178,3 +180,7 @@ def _to_cancel_response(report: CancelReport) -> SimulationCancelResponse:
             for outcome in report.outcomes
         ],
     )
+
+
+# 경로가 /{simulation_id} 와 겹치지 않는 /images 는 끝에 붙인다
+router.include_router(images_router)

@@ -38,7 +38,7 @@ from tests.api.simulation_helpers import (
 from tests.api.test_auth import log_in, make_user
 from tests.conftest import TEST_BASE_URL, TEST_ORIGIN
 from tests.db_helpers import T0, Factory
-from tests.services.simulation_fakes import FakeCaller
+from tests.services.simulation_fakes import FakeCaller, FakeImageSource
 
 TEMPLATE = "다음 상품 정보로 작성하세요.\n{{product_info}}"
 
@@ -278,6 +278,7 @@ async def test_after_the_answer_the_run_finishes_in_the_database(
             recorder=ScopedRequestRecorder(sessions),  # type: ignore[arg-type]
             store=ScopedSimulationStore(sessions),  # type: ignore[arg-type]
             now=lambda: T0 + timedelta(seconds=5),
+            images=FakeImageSource(),
         )
     )
     app.dependency_overrides[get_simulation_manager] = lambda: manager
@@ -377,6 +378,9 @@ def test_every_simulator_error_is_documented_as_code_and_message() -> None:
 def test_validation_failures_carry_the_code_the_server_actually_sends() -> None:
     # 형식 검증 실패는 공통 코드 VALIDATION_ERROR 로 나간다(모델 수, 글자 수, 잘못된 정렬 키 등)
     for method, path, operation in simulator_operations():
+        # 받는 값이 없는 조회(이미지 한도)는 형식 검증으로 실패할 수 없다
+        if not operation.get("parameters") and not operation.get("requestBody"):
+            continue
         assert "422" in operation["responses"], (method, path)
         codes = code_values(error_schema(operation["responses"]["422"]))
         assert "VALIDATION_ERROR" in codes, (method, path)

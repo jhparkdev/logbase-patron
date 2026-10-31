@@ -433,3 +433,50 @@ def schema_ref(options: dict[str, object]) -> dict[str, object]:
     name = str(options["$ref"]).rsplit("/", 1)[-1]
     defs = SimulationCreateRequest.model_json_schema()["$defs"]
     return defs[name]
+
+
+# --- 이미지(asset_ids) ---
+
+
+def create_with_assets(count: int) -> dict[str, object]:
+    return {
+        "test_type": "CUSTOM",
+        "prompt_text": "이 사진을 설명해 주세요",
+        "models": [selection(GPT), selection(CLAUDE)],
+        "asset_ids": [f"0192a3c4-0000-7000-8000-{n:012d}" for n in range(count)],
+    }
+
+
+def test_a_run_without_images_has_an_empty_list() -> None:
+    body = create_with_assets(0)
+    del body["asset_ids"]
+
+    assert SimulationCreateRequest(**body).asset_ids == []  # type: ignore[arg-type]
+
+
+# 이미지 수 경계: 바로 전, 정확히 그 값, 바로 후
+@pytest.mark.parametrize("count", [3, 4])
+def test_up_to_the_image_limit_is_accepted(count: int) -> None:
+    request = SimulationCreateRequest(**create_with_assets(count))  # type: ignore[arg-type]
+
+    assert len(request.asset_ids) == count
+
+
+def test_one_image_over_the_limit_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        SimulationCreateRequest(**create_with_assets(5))  # type: ignore[arg-type]
+
+
+def test_the_same_image_twice_is_rejected() -> None:
+    body = create_with_assets(1)
+    body["asset_ids"] = [body["asset_ids"][0]] * 2  # type: ignore[index]
+
+    with pytest.raises(ValidationError, match="두 번"):
+        SimulationCreateRequest(**body)  # type: ignore[arg-type]
+
+
+def test_the_image_limit_reaches_the_screen_through_openapi() -> None:
+    # 화면이 숫자를 따로 정하지 않고 계약에서 읽을 수 있어야 한다
+    schema = SimulationCreateRequest.model_json_schema()
+
+    assert schema["properties"]["asset_ids"]["maxItems"] == 4

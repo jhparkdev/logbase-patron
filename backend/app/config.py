@@ -10,6 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # (이 파일 위치 backend/app/config.py에서 두 단계 위가 저장소 루트)
 # 배포 환경에는 이 파일이 없고 환경변수만 있다.
 ROOT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+# 개발에서 업로드 이미지를 두는 기본 폴더. 저장소 밖에 두어 실수로 커밋되지 않게 하고,
+# 프로젝트 폴더를 지우거나 다시 받아도 입력 이력이 가리키는 파일이 사라지지 않게 한다
+DEFAULT_IMAGE_STORAGE_DIR = Path.home() / ".patron-uploads"
 
 
 class Settings(BaseSettings):
@@ -41,6 +44,9 @@ class Settings(BaseSettings):
     # OpenRouter Key 원문. 로컬에서는 작업할 때만 넣고 끝나면 지우므로 없어도 앱은 뜬다.
     # 없으면 비교 실행 접수만 거절한다(app/api/simulation_deps.py).
     openrouter_api_key: SecretStr | None = None
+    # 시뮬레이터 이미지를 두는 로컬 폴더. 개발용이다(Cloud Run 의 디스크는 임시라서 배포에서는
+    # GCS 저장소로 바꿀 예정). DB 에는 이 폴더 안의 상대 경로와 해시만 남는다.
+    image_storage_dir: Path = DEFAULT_IMAGE_STORAGE_DIR
 
 
 @lru_cache

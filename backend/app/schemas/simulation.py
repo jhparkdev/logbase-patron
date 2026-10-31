@@ -15,6 +15,7 @@ from pydantic import (
 )
 
 from app.models import TestType
+from app.schemas.simulation_image import MAX_IMAGE_COUNT
 
 # 모델 선택 규칙은 services 의 순수 검증 모듈에 한 번만 정의하고 여기서는 가져다 쓴다.
 # 그 모듈이 schemas 를 가져오게 만들면 순환 import 가 되므로 그러지 않는다.
@@ -129,6 +130,18 @@ class SimulationCreateRequest(BaseModel):
     execution_config: ExecutionConfig = Field(default_factory=ExecutionConfig)
     routing_policy: RoutingPolicy = Field(default_factory=RoutingPolicy)
     models: ModelSelections
+    # 먼저 올려 둔 이미지(POST /simulations/images 의 asset_id). 순서가 곧 모델에 보내는 순서다.
+    # 올린 적 없는 ID 인지는 DB 가 필요해 서비스가 확인한다
+    asset_ids: Annotated[list[UUID], Field(max_length=MAX_IMAGE_COUNT)] = Field(
+        default_factory=list
+    )
+
+    @model_validator(mode="after")
+    def _no_image_twice(self) -> Self:
+        # 같은 이미지를 두 번 보내면 모델이 두 장으로 읽고 비용도 두 번 나간다
+        if len(set(self.asset_ids)) != len(self.asset_ids):
+            raise ValueError("같은 이미지를 두 번 보낼 수 없다")
+        return self
 
     @model_validator(mode="after")
     def _scenario_matches_test_type(self) -> Self:

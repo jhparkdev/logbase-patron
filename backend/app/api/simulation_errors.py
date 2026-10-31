@@ -23,10 +23,18 @@ from app.services.simulation_cancel_service import (
     SlotNotFoundError,
 )
 from app.services.simulation_create import (
+    ImageNotFoundError,
+    ImageRequiredError,
+    ModelImageUnsupportedError,
     ModelNotActiveError,
     ModelNotFoundError,
     RerunSourceNotFoundError,
     ScenarioNotFoundError,
+)
+from app.services.simulation_image_check import (
+    EmptyImageError,
+    ImageTooLargeError,
+    UnsupportedImageTypeError,
 )
 from app.services.simulation_input import InputRequiredError
 from app.services.simulation_lookup import SimulatorContextMissingError
@@ -44,6 +52,12 @@ _CODE_OF_ERROR: dict[type[Exception], SimulationErrorCode] = {
     RerunSourceNotFoundError: C.RERUN_SOURCE_NOT_FOUND,
     ModelNotFoundError: C.MODEL_NOT_FOUND,
     ModelNotActiveError: C.MODEL_NOT_ACTIVE,
+    ModelImageUnsupportedError: C.MODEL_IMAGE_NOT_SUPPORTED,
+    ImageRequiredError: C.IMAGE_REQUIRED,
+    ImageNotFoundError: C.IMAGE_NOT_FOUND,
+    EmptyImageError: C.IMAGE_EMPTY,
+    ImageTooLargeError: C.IMAGE_TOO_LARGE,
+    UnsupportedImageTypeError: C.IMAGE_TYPE_NOT_SUPPORTED,
     SimulationNotFoundError: C.SIMULATION_NOT_FOUND,
     SlotNotFoundError: C.SLOT_NOT_FOUND,
 }

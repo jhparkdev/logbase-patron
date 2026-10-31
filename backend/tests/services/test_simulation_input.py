@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 
 from app.services.simulation_input import (
@@ -5,16 +7,19 @@ from app.services.simulation_input import (
     HEARTBEAT_INTERVAL_SECONDS,
     SIMULATION_TIMEOUT_SECONDS,
     InputRequiredError,
+    MissingImageDataError,
     build_messages,
     build_prompt_text,
     build_request_routing_policy,
     build_run_routing_policy,
     compute_input_hash,
+    inline_images,
     resolve_execution_config,
     resolve_json_schema,
     resolve_slot_config,
     validate_input_present,
 )
+from app.services.simulation_ports import ImageRef
 
 TEMPLATE = (
     "다음 상품 정보로 상세 설명 3문단과 마케팅 문구 1줄을 작성하세요.\n{{product_info}}"
@@ -224,3 +229,68 @@ def test_request_routing_policy_pins_the_chosen_provider() -> None:
     }
     # 실행 전체 정책은 바뀌지 않는다
     assert "order" not in run_policy
+
+
+# --- 이미지가 든 메시지 ---
+
+IMAGE_A = ImageRef(uuid.UUID(int=1), "simulator/a.png", "image/png", "a" * 64)
+IMAGE_B = ImageRef(uuid.UUID(int=2), "simulator/b.jpg", "image/jpeg", "b" * 64)
+
+
+def test_images_are_put_in_the_message_as_references_not_bytes() -> None:
+    # DB 에 남는 모양이다. 이미지 내용이 들어가면 "이미지는 DB 에 직접 넣지 않는다"를 어긴다
+    messages = build_messages("이 옷을 설명해 주세요", [IMAGE_A, IMAGE_B])
+
+    assert messages == [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "이 옷을 설명해 주세요"},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"asset:{IMAGE_A.asset_id}"},
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"asset:{IMAGE_B.asset_id}"},
+                },
+            ],
+        }
+    ]
+
+
+def test_inlining_swaps_each_reference_for_its_data_url() -> None:
+    stored = build_messages("질문", [IMAGE_A, IMAGE_B])
+    data_urls = {
+        str(IMAGE_A.asset_id): "data:image/png;base64,AAAA",
+        str(IMAGE_B.asset_id): "data:image/jpeg;base64,BBBB",
+    }
+
+    sent = inline_images(stored, data_urls)
+
+    parts = sent[0]["content"]
+    assert parts[0] == {"type": "text", "text": "질문"}
+    assert parts[1]["image_url"]["url"] == "data:image/png;base64,AAAA"
+    assert parts[2]["image_url"]["url"] == "data:image/jpeg;base64,BBBB"
+
+
+def test_inlining_leaves_the_stored_messages_untouched() -> None:
+    # 저장할 메시지와 보낼 메시지는 따로다. 보낼 것을 만들다 저장할 것이 바뀌면 이미지 내용이 DB 에 들어간다
+    stored = build_messages("질문", [IMAGE_A])
+
+    inline_images(stored, {str(IMAGE_A.asset_id): "data:image/png;base64,AAAA"})
+
+    assert stored[0]["content"][1]["image_url"]["url"] == f"asset:{IMAGE_A.asset_id}"
+
+
+def test_inlining_a_text_only_message_changes_nothing() -> None:
+    messages = build_messages("안녕")
+
+    assert inline_images(messages, {}) == messages
+
+
+def test_inlining_without_the_image_content_fails_instead_of_sending_a_reference() -> (
+    None
+):
+    with pytest.raises(MissingImageDataError):
+        inline_images(build_messages("질문", [IMAGE_A]), {})

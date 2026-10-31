@@ -10,7 +10,9 @@ from typing import Any
 
 from app.models import ModelStatus, RequestStatus, SimulationStatus
 from app.openrouter.result import CallResult, CallStatus, CostSource, CostStatus
+from app.services.simulation_input import build_messages
 from app.services.simulation_ports import (
+    ImageRef,
     ModelInfo,
     NewRequest,
     NewResult,
@@ -88,7 +90,7 @@ class FakeRecorder:
             s.request_id: R.PENDING for s in slots
         }
         self.records: dict[uuid.UUID, SlotRecord] = {}
-        self.payloads: dict[uuid.UUID, tuple[list[dict[str, str]], str | None]] = {}
+        self.payloads: dict[uuid.UUID, tuple[list[dict[str, Any]], str | None]] = {}
         self.fail_on_record: set[uuid.UUID] = set()
         self.late: dict[uuid.UUID, SlotRecord] = {}
 
@@ -116,7 +118,7 @@ class FakeRecorder:
     async def save_payload(
         self,
         request_id: uuid.UUID,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         response_text: str | None,
     ) -> None:
         self.payloads[request_id] = (messages, response_text)
@@ -124,7 +126,7 @@ class FakeRecorder:
     async def keep_late_result(
         self,
         request_id: uuid.UUID,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         record: SlotRecord,
     ) -> None:
         if self.statuses[request_id] == R.CANCELLED:
@@ -135,6 +137,20 @@ class FakeRecorder:
             self.statuses[request_id] = R.CANCELLED
             return True
         return False
+
+
+class FakeImageSource:
+    """저장소를 읽는 대신 asset_id 로 정해 둔 data URL 을 돌려준다. 읽은 이미지를 기록한다."""
+
+    def __init__(self) -> None:
+        self.loaded: list[uuid.UUID] = []
+        self.failing: set[uuid.UUID] = set()
+
+    async def data_url(self, image: ImageRef) -> str:
+        self.loaded.append(image.asset_id)
+        if image.asset_id in self.failing:
+            raise OSError("저장소 오류")
+        return f"data:{image.mime_type};base64,{image.asset_id.hex}"
 
 
 class FakeStore:
@@ -150,6 +166,7 @@ class FakeStore:
         self.results: list[NewResult] = []
         self.known_simulations: set[uuid.UUID] = set()
         self.slot_numbers: dict[uuid.UUID, int] = {}
+        self.run_assets: list[tuple[uuid.UUID, list[uuid.UUID]]] = []
 
     async def insert_run(self, run: NewRun) -> None:
         self.runs.append(run)
@@ -158,6 +175,11 @@ class FakeStore:
         self.results.append(result)
         self.known_simulations.add(result.simulation_id)
         self.slot_numbers[result.request_id] = result.slot_no
+
+    async def insert_run_assets(
+        self, simulation_id: uuid.UUID, asset_ids: Sequence[uuid.UUID]
+    ) -> None:
+        self.run_assets.append((simulation_id, list(asset_ids)))
 
     async def list_slots(self, simulation_id: uuid.UUID) -> list[SlotState] | None:
         if simulation_id not in self.known_simulations:
@@ -211,19 +233,22 @@ class Harness:
         json_schema: dict[str, Any] | None = None,
         allow_fallbacks: bool = False,
         max_tokens: int = 4096,
+        images: Sequence[ImageRef] = (),
     ) -> None:
         self.slots = make_slots(count, max_tokens)
         self.caller = FakeCaller(behaviors)
         self.recorder = FakeRecorder(self.slots)
         self.store = FakeStore(self.recorder)
+        self.images = FakeImageSource()
         self.store.slot_numbers = {s.request_id: s.slot_no for s in self.slots}
-        self.messages = [{"role": "user", "content": "질문"}]
+        self.messages: list[dict[str, Any]] = build_messages("질문", images)
         self.job = SimulationJob(
             simulation_id=uuid.uuid4(),
             slots=self.slots,
             messages=self.messages,
             json_schema=json_schema,
             allow_fallbacks=allow_fallbacks,
+            images=images,
         )
         self.store.known_simulations.add(self.job.simulation_id)
         self.deps = SimulationDeps(
@@ -231,6 +256,7 @@ class Harness:
             recorder=self.recorder,
             store=self.store,
             now=lambda: NOW,
+            images=self.images,
         )
 
     def model(self, slot_no: int) -> str:
@@ -280,10 +306,12 @@ class FakeLookup:
                 openrouter_model_id=f"vendor/model-{n}",
                 display_name=f"Model {n}",
                 status=ModelStatus.ACTIVE,
+                supports_images=True,
             )
             for n in range(1, 5)
         }
         self.simulations: set[uuid.UUID] = set()
+        self.images: dict[uuid.UUID, ImageRef] = {}
         self.context = SimulatorContext(project_id=3, key_id=1, service_id=4)
 
     async def find_scenario(self, scenario_id: int) -> ScenarioInfo | None:
@@ -294,6 +322,11 @@ class FakeLookup:
 
     async def simulation_exists(self, simulation_id: uuid.UUID) -> bool:
         return simulation_id in self.simulations
+
+    async def find_images(
+        self, asset_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, ImageRef]:
+        return {aid: self.images[aid] for aid in asset_ids if aid in self.images}
 
     async def simulator_context(self) -> SimulatorContext:
         return self.context

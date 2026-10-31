@@ -19,6 +19,7 @@ from app.models import (
     CostStatus,
     DataSource,
     ErrorType,
+    InputType,
     ModelStatus,
     RequestStatus,
     SimulationStatus,
@@ -72,14 +73,29 @@ class SlotPlan:
 
 
 @dataclass(frozen=True)
+class ImageRef:
+    """올려 둔 이미지 한 장을 가리키는 값. 파일 내용은 저장소에 있고 여기에는 위치와 해시만 있다."""
+
+    asset_id: uuid.UUID
+    storage_path: str
+    mime_type: str
+    sha256: str
+
+
+@dataclass(frozen=True)
 class SimulationJob:
-    """실행할 비교 한 건. 모든 칸에 같은 입력을 보낸다."""
+    """실행할 비교 한 건. 모든 칸에 같은 입력을 보낸다.
+
+    messages 는 DB 에 남는 모양이다. 이미지는 내용이 아니라 참조(asset:<asset_id>)로 들어 있고,
+    모델을 부르기 직전에만 내용(data URL)으로 바꿔 보낸다. 이미지 내용이 DB 에 들어가지 않게 하기 위해서다.
+    """
 
     simulation_id: uuid.UUID
     slots: Sequence[SlotPlan]
-    messages: list[dict[str, str]]
+    messages: list[dict[str, Any]]
     json_schema: dict[str, Any] | None
     allow_fallbacks: bool
+    images: Sequence[ImageRef] = ()
 
 
 @dataclass(frozen=True)
@@ -90,6 +106,7 @@ class ScenarioInfo:
     is_active: bool
     default_json_schema: dict[str, Any] | None
     default_execution_config: Mapping[str, Any]
+    input_type: InputType = InputType.TEXT
 
 
 @dataclass(frozen=True)
@@ -100,6 +117,7 @@ class ModelInfo:
     openrouter_model_id: str
     display_name: str
     status: ModelStatus
+    supports_images: bool = False  # 입력 형식(input_modalities)에 image 가 있다
 
 
 @dataclass(frozen=True)
@@ -227,14 +245,14 @@ class RequestRecorder(Protocol):
     async def save_payload(
         self,
         request_id: uuid.UUID,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         response_text: str | None,
     ) -> None: ...
 
     async def keep_late_result(
         self,
         request_id: uuid.UUID,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         record: SlotRecord,
     ) -> None:
         """취소로 먼저 끝난 칸에 늦게 온 결과를 비용 대조용으로만 남긴다(J-03). 상태·비용은 그대로다."""
@@ -247,6 +265,12 @@ class SimulationStore(Protocol):
     async def insert_run(self, run: NewRun) -> None: ...
 
     async def insert_result(self, result: NewResult) -> None: ...
+
+    async def insert_run_assets(
+        self, simulation_id: uuid.UUID, asset_ids: Sequence[uuid.UUID]
+    ) -> None:
+        """실행에 쓴 이미지를 순서대로 연결한다(sort_order 는 1부터)."""
+        ...
 
     async def mark_started(self, simulation_id: uuid.UUID, now: datetime) -> None: ...
 
@@ -280,7 +304,17 @@ class SimulationLookup(Protocol):
 
     async def simulation_exists(self, simulation_id: uuid.UUID) -> bool: ...
 
+    async def find_images(
+        self, asset_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, ImageRef]: ...
+
     async def simulator_context(self) -> SimulatorContext: ...
+
+
+class ImageSource(Protocol):
+    """저장된 이미지 내용을 모델에 보낼 모양(data URL)으로 읽어 온다."""
+
+    async def data_url(self, image: ImageRef) -> str: ...
 
 
 @dataclass(frozen=True)
@@ -300,3 +334,4 @@ class SimulationDeps:
     recorder: RequestRecorder
     store: SimulationStore
     now: Callable[[], datetime]  # 현재 시각은 주입한다
+    images: ImageSource

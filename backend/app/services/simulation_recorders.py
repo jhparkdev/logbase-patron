@@ -12,6 +12,7 @@
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -48,7 +49,7 @@ class SessionRequestRecorder:
     async def save_payload(
         self,
         request_id: uuid.UUID,
-        messages: Sequence[dict[str, str]],
+        messages: Sequence[dict[str, Any]],
         response_text: str | None,
     ) -> None:
         await requests.save_payload(self._session, request_id, messages, response_text)
@@ -56,7 +57,7 @@ class SessionRequestRecorder:
     async def keep_late_result(
         self,
         request_id: uuid.UUID,
-        messages: Sequence[dict[str, str]],
+        messages: Sequence[dict[str, Any]],
         record: SlotRecord,
     ) -> None:
         kept = await simulation_requests.keep_late_generation_id(
@@ -96,7 +97,7 @@ class ScopedRequestRecorder:
     async def save_payload(
         self,
         request_id: uuid.UUID,
-        messages: Sequence[dict[str, str]],
+        messages: Sequence[dict[str, Any]],
         response_text: str | None,
     ) -> None:
         async with self._sessions.begin() as session:
@@ -107,7 +108,7 @@ class ScopedRequestRecorder:
     async def keep_late_result(
         self,
         request_id: uuid.UUID,
-        messages: Sequence[dict[str, str]],
+        messages: Sequence[dict[str, Any]],
         record: SlotRecord,
     ) -> None:
         async with self._sessions.begin() as session:

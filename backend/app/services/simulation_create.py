@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from app.models import CallPurpose, DataSource, UsageOrigin
+from app.models import CallPurpose, DataSource, InputType, UsageOrigin
 from app.models import TestType as RunType
 from app.schemas.simulation import ModelSelectionRequest, SimulationCreateRequest
 from app.services.simulation_input import (
@@ -20,6 +20,7 @@ from app.services.simulation_input import (
     validate_input_present,
 )
 from app.services.simulation_ports import (
+    ImageRef,
     IntakeDeps,
     ModelInfo,
     NewRequest,
@@ -65,6 +66,29 @@ class ModelNotActiveError(ValueError):
         self.model_ids = model_ids
 
 
+class ImageNotFoundError(LookupError):
+    """올리지 않았거나 없는 이미지(asset_id)를 골랐다."""
+
+    def __init__(self, asset_ids: list[uuid.UUID]) -> None:
+        super().__init__("올리지 않은 이미지다")
+        self.asset_ids = asset_ids
+
+
+class ImageRequiredError(ValueError):
+    """이미지가 필요한 시나리오인데 이미지를 보내지 않았다."""
+
+    def __init__(self) -> None:
+        super().__init__("이미지가 필요한 시나리오다")
+
+
+class ModelImageUnsupportedError(ValueError):
+    """이미지를 보냈는데 고른 모델 중에 이미지를 받지 못하는 모델이 있다."""
+
+    def __init__(self, model_ids: list[int]) -> None:
+        super().__init__("이미지를 지원하지 않는 모델이다")
+        self.model_ids = model_ids
+
+
 async def create_simulation(
     request: SimulationCreateRequest, *, executed_by: int, deps: IntakeDeps
 ) -> SimulationJob:
@@ -77,6 +101,8 @@ async def create_simulation(
     scenario = await _find_scenario(request, deps)
     await _check_rerun_source(request, deps)
     models = await _find_selectable_models(request, deps)
+    images = await _find_images(request, deps)
+    _check_image_rules(scenario, images, models)
     context = await deps.lookup.simulator_context()
 
     execution_config = resolve_execution_config(
@@ -133,6 +159,10 @@ async def create_simulation(
             data_source=RUN_DATA_SOURCE,
         )
     )
+    if images:
+        await deps.store.insert_run_assets(
+            shared.simulation_id, [image.asset_id for image in images]
+        )
     notes = comparability_notes(
         [(chosen.model_id, chosen.execution_provider) for chosen in request.models]
     )
@@ -149,10 +179,11 @@ async def create_simulation(
         simulation_id=shared.simulation_id,
         slots=slots,
         messages=build_messages(
-            build_prompt_text(request.prompt_text, request.input_text)
+            build_prompt_text(request.prompt_text, request.input_text), images
         ),
         json_schema=json_schema,
         allow_fallbacks=request.routing_policy.allow_fallbacks,
+        images=tuple(images),
     )
 
 
@@ -259,6 +290,38 @@ async def _check_rerun_source(
     source = request.rerun_of_simulation_id
     if source is not None and not await deps.lookup.simulation_exists(source):
         raise RerunSourceNotFoundError
+
+
+async def _find_images(
+    request: SimulationCreateRequest, deps: IntakeDeps
+) -> list[ImageRef]:
+    """요청한 순서대로 이미지를 돌려준다. 하나라도 올려 둔 적이 없으면 거절한다."""
+    if not request.asset_ids:
+        return []
+    found = await deps.lookup.find_images(request.asset_ids)
+    missing = [asset_id for asset_id in request.asset_ids if asset_id not in found]
+    if missing:
+        raise ImageNotFoundError(missing)
+    return [found[asset_id] for asset_id in request.asset_ids]
+
+
+def _check_image_rules(
+    scenario: ScenarioInfo | None,
+    images: list[ImageRef],
+    models: dict[int, ModelInfo],
+) -> None:
+    """이미지가 필요한 시나리오에는 이미지가, 이미지를 보내면 이미지를 받는 모델만 있어야 한다.
+
+    모델 호출 비용이 나가기 전에 접수에서 막는다. 사용자는 고쳐서 다시 보낼 수 있다.
+    """
+    if scenario and scenario.input_type != InputType.TEXT and not images:
+        raise ImageRequiredError
+    if images:
+        unsupported = [
+            mid for mid, model in models.items() if not model.supports_images
+        ]
+        if unsupported:
+            raise ModelImageUnsupportedError(unsupported)
 
 
 async def _find_selectable_models(
