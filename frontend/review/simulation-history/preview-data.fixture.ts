@@ -4,6 +4,7 @@ import type {
 } from "../../src/features/simulation-history/lib/presentation";
 import type { HistorySearch } from "../../src/features/simulation-history/lib/search";
 import { dbMock } from "../../src/features/simulator/components/dbMock.fixture";
+import { createComparisons } from "../../src/features/simulator/lib/comparisons";
 import { createDefaultValues } from "../../src/features/simulator/lib/form";
 import type { RunView } from "../../src/features/simulator/lib/presentation";
 import { historyInputSnapshots } from "./history-inputs.fixture";
@@ -102,7 +103,9 @@ export function rerunSnapshot(key: string) {
     jsonSchema: input.jsonSchema,
     temperature: input.temperature,
     maxTokens: input.maxTokens,
-    selections: run.slots.map((slot) => choiceFor(slot)?.key ?? ""),
+    comparisons: createComparisons(
+      run.slots.map((slot) => choiceFor(slot)?.key ?? ""),
+    ),
   });
 }
 

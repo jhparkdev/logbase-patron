@@ -5,7 +5,7 @@ import {
   createDefaultValues,
   type SimulatorDraft,
   type SimulatorFormValues,
-  simulatorFormSchema,
+  simulatorSchemaFor,
 } from "../lib/form";
 import { MODEL_LIMITS } from "../lib/limits";
 import {
@@ -28,7 +28,7 @@ export function useSimulatorForm({
   initialValues?: Partial<SimulatorFormValues>;
 }) {
   const form = useForm<SimulatorFormValues, unknown, SimulatorDraft>({
-    resolver: zodResolver(simulatorFormSchema),
+    resolver: zodResolver(simulatorSchemaFor(choices)),
     defaultValues: createDefaultValues(initialValues),
     mode: "onSubmit",
     reValidateMode: "onSubmit",
@@ -40,11 +40,11 @@ export function useSimulatorForm({
   const [submitting, setSubmitting] = useState(false);
   const [issues, setIssues] = useState<string[]>([]);
   const sending = useRef(false);
-  const [selections, mode, scenarioKey] = useWatch({
+  const [comparisons, mode, scenarioKey] = useWatch({
     control: form.control,
-    name: ["selections", "mode", "scenarioKey"],
+    name: ["comparisons", "mode", "scenarioKey"],
   });
-  const count = selections.filter(Boolean).length;
+  const count = comparisons.filter((item) => item.modelKey).length;
   const busy = submitting || running;
   const selectedScenario =
     mode === "scenario"
@@ -59,7 +59,8 @@ export function useSimulatorForm({
     },
     (errors) => {
       setIssues([]);
-      if (errors.temperature || errors.maxTokens) setAdvancedOpen(true);
+      if (errors.temperature || errors.maxTokens || errors.reasoningEffort)
+        setAdvancedOpen(true);
       else if (errors.prompt) form.setFocus("prompt");
       else if (errors.jsonSchema) form.setFocus("jsonSchema");
     },
@@ -78,7 +79,9 @@ export function useSimulatorForm({
     try {
       await onRun(pendingDraft);
     } catch {
-      setIssues(["실행 요청을 보내지 못했어요. 잠시 후 다시 시도해 주세요."]);
+      setIssues([
+        "실행 요청을 보내지 못했습니다. 잠시 후 다시 시도하시기 바랍니다.",
+      ]);
     } finally {
       sending.current = false;
       setSubmitting(false);

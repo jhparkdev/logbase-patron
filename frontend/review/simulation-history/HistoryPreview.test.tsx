@@ -241,7 +241,7 @@ test("다시 준비하면 원문은 URL에 넣지 않고 P-04 폼으로 복원�
   ).toContain("린넨 셔츠 원피스");
   expect(router.state.location.search).toMatchObject({ rerun: runKey });
   expect(router.state.location.href).not.toContain("린넨");
-  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
   expect(
     screen.getByRole("button", { name: "비교 실행" }).hasAttribute("disabled"),
   ).toBe(true);
