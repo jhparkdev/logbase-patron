@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import searchIcon from "../../../assets/search.svg";
 import { Button } from "../../../shared/components/ui/Button";
+import type { ModelFavoritesView } from "../lib/favorites";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
 import { MODEL_LIMITS } from "../lib/limits";
 import type { ModelChoice } from "../lib/presentation";
@@ -11,9 +12,11 @@ import { ModelPickerDialog } from "./ModelPickerDialog";
 export function ModelSelection({
   choices,
   unavailable,
+  favorites,
 }: {
   choices: ModelChoice[];
   unavailable: boolean;
+  favorites?: ModelFavoritesView;
 }) {
   const {
     control,
@@ -122,6 +125,7 @@ export function ModelSelection({
           choices={choices}
           selections={selections}
           unavailable={unavailable}
+          favorites={favorites}
           onClose={() => setPickerOpen(false)}
           onApply={apply}
         />

@@ -5,6 +5,7 @@ import { PageHeader } from "../../../shared/components/ui/PageHeader";
 import { Result } from "../../../shared/components/ui/Result";
 import { Skeleton } from "../../../shared/components/ui/Skeleton";
 import { useSimulatorForm } from "../hooks/useSimulatorForm";
+import type { ModelFavoritesView } from "../lib/favorites";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
 import type { ModelChoice, ScenarioChoice } from "../lib/presentation";
 import { AdvancedSettings } from "./AdvancedSettings";
@@ -23,6 +24,7 @@ type SimulatorPageProps = Partial<SimulationResultsProps> & {
   onRetryCatalog?: () => void;
   onRun?: (draft: SimulatorDraft) => void | Promise<void>;
   initialValues?: Partial<SimulatorFormValues>;
+  favorites?: ModelFavoritesView;
 };
 
 export function SimulatorPage({
@@ -32,6 +34,7 @@ export function SimulatorPage({
   onRetryCatalog,
   onRun,
   initialValues,
+  favorites,
   view = { kind: "empty" },
   ...resultProps
 }: SimulatorPageProps) {
@@ -93,7 +96,11 @@ export function SimulatorPage({
                 description="AI 모델 관리에서 활성 모델을 확인해 주세요."
               />
             )}
-            <ModelSelection choices={choices} unavailable={state !== "ready"} />
+            <ModelSelection
+              choices={choices}
+              unavailable={state !== "ready"}
+              favorites={favorites}
+            />
             {workflow.issues.length > 0 && (
               <div
                 role="alert"

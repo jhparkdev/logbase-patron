@@ -4,6 +4,7 @@ import { Notice } from "../../../shared/components/ui/Notice";
 import { PageHeader } from "../../../shared/components/ui/PageHeader";
 import { Result } from "../../../shared/components/ui/Result";
 import { Skeleton } from "../../../shared/components/ui/Skeleton";
+import type { ModelFavoritesView } from "../lib/favorites";
 import type { SimulatorFormValues } from "../lib/form";
 import type { ModelChoice, ScenarioChoice } from "../lib/presentation";
 import { restoreRerunValues } from "../lib/rerun";
@@ -24,10 +25,12 @@ export function SimulatorRestore({
   sourceKey,
   view = { kind: "unavailable" },
   onRetry,
+  favorites,
 }: {
   sourceKey: string;
   view?: SimulatorRestoreView;
   onRetry?: () => void;
+  favorites?: ModelFavoritesView;
 }) {
   if (view.kind !== "ready" || view.key !== sourceKey)
     return (
@@ -96,6 +99,7 @@ export function SimulatorRestore({
         initialValues={restored.values}
         choices={view.choices}
         scenarios={view.scenarios}
+        favorites={favorites}
       />
     </>
   );

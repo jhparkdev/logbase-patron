@@ -126,3 +126,29 @@ test("미리보기를 열어도 실제 서비스 페이지의 초기 데이터�
   ).toBe("");
   expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
 });
+
+test("미리보기 즐겨찾기는 모달을 닫아도 유지하며 실제 조회·저장을 하지 않는다", () => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  renderPage(<SimulatorPreview />);
+  const key = previewData.initialValues.selections[0];
+  const choice = previewData.choices.find((item) => item.key === key);
+  if (!choice) throw new Error("선택한 예시 모델이 없습니다.");
+  const label = `${choice.name} · ${choice.provider} 즐겨찾기`;
+  fireEvent.click(screen.getByRole("button", { name: "모델 검색" }));
+  fireEvent.click(screen.getByRole("button", { name: label }));
+  fireEvent.click(screen.getByRole("button", { name: "즐겨찾기 목록" }));
+  expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+  fireEvent.click(screen.getByRole("button", { name: "모델 검색" }));
+  expect(
+    screen.getByRole("button", { name: label }).getAttribute("aria-pressed"),
+  ).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+  expect(
+    within(screen.getByRole("list", { name: "선택한 비교 모델" })).getAllByRole(
+      "listitem",
+    ),
+  ).toHaveLength(previewData.initialValues.selections.length);
+  expect(fetch).not.toHaveBeenCalled();
+});

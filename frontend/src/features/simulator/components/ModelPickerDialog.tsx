@@ -3,30 +3,43 @@ import { createPortal } from "react-dom";
 import { Button } from "../../../shared/components/ui/Button";
 import { Dialog } from "../../../shared/components/ui/Dialog";
 import { SearchField } from "../../../shared/components/ui/SearchField";
-import { MODEL_LIMITS } from "../lib/limits";
 import {
-  canApplyModels,
-  searchModels,
-  selectedModelKeys,
-} from "../lib/model-selection";
+  emptyCatalogMessage,
+  type ModelFavoritesView,
+  searchFavoriteModels,
+  unavailableFavorites,
+} from "../lib/favorites";
+import { MODEL_LIMITS } from "../lib/limits";
+import { canApplyModels, selectedModelKeys } from "../lib/model-selection";
 import type { ModelChoice } from "../lib/presentation";
+import { ModelCatalogTable } from "./ModelCatalogTable";
+import { ModelFavoritesNotice } from "./ModelFavoritesNotice";
 
 export function ModelPickerDialog({
   choices,
   selections,
   unavailable,
+  favorites = unavailableFavorites,
   onClose,
   onApply,
 }: {
   choices: ModelChoice[];
   selections: string[];
   unavailable: boolean;
+  favorites?: ModelFavoritesView;
   onClose: () => void;
   onApply: (keys: string[]) => void;
 }) {
   const [pending, setPending] = useState(() => selectedModelKeys(selections));
   const [query, setQuery] = useState("");
-  const matches = searchModels(choices, query);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const matches = searchFavoriteModels(
+    choices,
+    query,
+    favoritesOnly,
+    favorites,
+  );
+  const empty = emptyCatalogMessage(query, favoritesOnly, favorites);
   const canApply = !unavailable && canApplyModels(pending, choices);
   const remove = (key: string) =>
     setPending((keys) => keys.filter((value) => value !== key));
@@ -69,6 +82,38 @@ export function ModelPickerDialog({
         value={query}
         onSearch={setQuery}
       />
+      <fieldset aria-label="모델 목록 범위" className="mt-3 flex gap-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          aria-label="전체 모델 목록"
+          aria-pressed={!favoritesOnly}
+          className="aria-pressed:bg-brand-weak aria-pressed:text-blue-600"
+          onClick={() => setFavoritesOnly(false)}
+        >
+          전체 모델
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          aria-label="즐겨찾기 목록"
+          aria-pressed={favoritesOnly}
+          className="aria-pressed:bg-brand-weak aria-pressed:text-blue-600"
+          onClick={() => setFavoritesOnly(true)}
+        >
+          즐겨찾기
+          {favorites.kind === "ready" && (
+            <span className="tabular-nums">
+              {" "}
+              {new Set(favorites.keys).size}
+            </span>
+          )}
+        </Button>
+      </fieldset>
+      <p className="mt-2 text-caption text-grey-600">
+        별 버튼으로 즐겨찾기를 관리해요. 즐겨찾기 변경은 선택 적용·닫기와 별도로
+        처리돼요.
+      </p>
       <div className="my-4 rounded-control bg-grey-50 p-3">
         <p role="status" className="text-label font-semibold tabular-nums">
           선택한 모델 {pending.length}/{MODEL_LIMITS.max}개
@@ -117,81 +162,33 @@ export function ModelPickerDialog({
           </p>
         )}
       </div>
-      <p role="status" className="mb-2 text-caption text-grey-600 tabular-nums">
-        검색 결과 {matches.length}개
-      </p>
-      {matches.length > 0 ? (
-        <div className="max-h-64 overflow-y-auto rounded-control border border-grey-200">
-          <table className="w-full text-left text-body-sm">
-            <caption className="sr-only">비교할 모델 카탈로그</caption>
-            <thead className="sticky top-0 bg-grey-50 text-label text-grey-600">
-              <tr>
-                <th scope="col" className="p-3">
-                  선택
-                </th>
-                <th scope="col" className="p-3">
-                  모델
-                </th>
-                <th scope="col" className="p-3">
-                  Provider
-                </th>
-                <th scope="col" className="p-3">
-                  입력 지원
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {matches.map((choice) => {
-                const checked = pending.includes(choice.key);
-                return (
-                  <tr
-                    key={choice.key}
-                    className="border-t border-grey-100 hover:bg-grey-50"
-                  >
-                    <td className="p-3">
-                      <input
-                        type="checkbox"
-                        aria-label={`${choice.name} · ${choice.provider}`}
-                        checked={checked}
-                        disabled={
-                          unavailable ||
-                          (!checked &&
-                            (!choice.selectable ||
-                              pending.length >= MODEL_LIMITS.max))
-                        }
-                        onChange={() => toggle(choice.key)}
-                        className="size-4 accent-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                      />
-                    </td>
-                    <th scope="row" className="p-3 font-semibold">
-                      {choice.name}
-                      {!choice.selectable && (
-                        <p className="mt-1 text-caption font-normal text-grey-600">
-                          {choice.unavailableReason ?? "선택 불가"}
-                        </p>
-                      )}
-                    </th>
-                    <td className="p-3 text-grey-700">{choice.provider}</td>
-                    <td className="p-3 text-grey-600">
-                      {choice.supportsImages ? "텍스트·이미지" : "텍스트"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {favoritesOnly && favorites.kind !== "ready" ? (
+        <ModelFavoritesNotice favorites={favorites} />
       ) : (
-        <div className="py-8 text-center">
-          <p className="font-semibold">
-            {query ? "검색 결과가 없어요" : "선택할 수 있는 모델이 없어요"}
+        <>
+          <p
+            role="status"
+            className="mb-2 text-caption text-grey-600 tabular-nums"
+          >
+            검색 결과 {matches.length}개
           </p>
-          <p className="mt-1 text-body-sm text-grey-600">
-            {query
-              ? "다른 모델명이나 Provider로 검색해 주세요."
-              : "AI 모델 관리에서 모델 목록을 확인해 주세요."}
-          </p>
-        </div>
+          {matches.length > 0 ? (
+            <ModelCatalogTable
+              choices={matches}
+              pending={pending}
+              unavailable={unavailable}
+              favorites={favorites}
+              onToggle={toggle}
+            />
+          ) : (
+            <div className="py-8 text-center">
+              <p className="font-semibold">{empty.title}</p>
+              <p className="mt-1 text-body-sm text-grey-600">
+                {empty.description}
+              </p>
+            </div>
+          )}
+        </>
       )}
     </Dialog>,
     document.body,
