@@ -8,7 +8,8 @@ export function PreviewLayout() {
         <p>
           <strong>P-04 데이터 표시 예시</strong> · 기존 mock 한 건의 입력과
           결과입니다. 편집해도 저장된 결과는 바뀌지 않습니다. 실제 AI 호출은
-          하지 않습니다.
+          하지 않습니다. 모델별 튜닝의 지원 항목·범위·선택지는 검토용
+          예시입니다.
         </p>
         <a
           href="/simulator"
