@@ -1,5 +1,6 @@
 import { useId } from "react";
 import dropDownIcon from "../../../assets/dropDown.svg";
+import { FIELD_CLASS } from "./fieldStyle";
 import { Icon } from "./Icon";
 
 type SelectProps = {
@@ -38,7 +39,7 @@ export function Select({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9.5 w-full appearance-none rounded-control border border-neutral-weak bg-grey-50 pr-9 pl-3 text-body-sm focus-visible:border-brand focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className={`${FIELD_CLASS} w-full appearance-none pr-9 pl-3 disabled:cursor-not-allowed disabled:opacity-60`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

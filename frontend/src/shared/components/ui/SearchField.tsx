@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import searchIcon from "../../../assets/search.svg";
+import { FIELD_CLASS } from "./fieldStyle";
 import { Icon } from "./Icon";
 
 /** 입력이 이만큼 멈추면 검색한다. 글자마다 요청하지 않기 위해서다. */
@@ -51,7 +52,7 @@ export function SearchField({
             SEARCH_DELAY_MS,
           );
         }}
-        className="h-9.5 w-full rounded-control border border-neutral-weak bg-grey-50 pr-3 pl-9 text-body-sm placeholder:text-grey-500 focus-visible:border-brand focus-visible:outline-none"
+        className={`${FIELD_CLASS} w-full pr-3 pl-9 placeholder:text-grey-500`}
       />
     </div>
   );

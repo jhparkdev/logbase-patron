@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { FIELD_CLASS } from "./fieldStyle";
 
 type PeriodFieldProps = {
   /** 묶음 이름. 예: 기간 */
@@ -13,8 +14,7 @@ type PeriodFieldProps = {
   errorId?: string;
 };
 
-const INPUT_CLASS =
-  "h-9.5 rounded-control border border-neutral-weak bg-grey-50 px-3 text-body-sm focus-visible:border-brand focus-visible:outline-none aria-invalid:border-red-500";
+const INPUT_CLASS = `${FIELD_CLASS} px-3`;
 
 /** 시작일 ~ 종료일 두 칸. 날짜는 KST 달력 기준 "YYYY-MM-DD"다. */
 export function PeriodField({

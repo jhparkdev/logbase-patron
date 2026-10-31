@@ -1,14 +1,16 @@
 import { type ReactNode, useId } from "react";
 import { Button } from "../../../shared/components/ui/Button";
+import {
+  FIELD_BOX_CLASS,
+  FIELD_CLASS,
+} from "../../../shared/components/ui/fieldStyle";
 
 // 상세 패널 폼이 함께 쓰는 조각: 입력 칸 모양, 라벨·검증 문구, 안내 상자, 아래 버튼 줄
 
-const FIELD_BOX_CLASS =
-  "w-full rounded-control border border-neutral-weak bg-grey-50 px-3 text-body-sm focus-visible:border-brand focus-visible:outline-none aria-invalid:border-red-500";
-/** 한 줄 입력 칸. 잘못된 입력이면 빨간 테두리를 그린다. */
-export const FIELD_INPUT_CLASS = `h-9.5 ${FIELD_BOX_CLASS}`;
+/** 한 줄 입력 칸 */
+export const FIELD_INPUT_CLASS = `${FIELD_CLASS} w-full px-3`;
 /** 여러 줄 입력 칸. 높이는 rows로 정한다. */
-export const FIELD_TEXTAREA_CLASS = `py-2.5 ${FIELD_BOX_CLASS}`;
+export const FIELD_TEXTAREA_CLASS = `${FIELD_BOX_CLASS} w-full px-3 py-2.5`;
 
 type FieldControlProps = {
   id: string;
