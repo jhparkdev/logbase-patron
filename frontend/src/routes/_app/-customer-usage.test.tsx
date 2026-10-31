@@ -1,12 +1,49 @@
 // @vitest-environment jsdom
-import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeAll, expect, test, vi } from "vitest";
 import { changePeriod, periodInputs } from "../../test/periodInputs";
 import { renderAt, routeMatch } from "../../test/renderAt";
 
 const ROUTE_ID = "/_app/customer-usage";
 
+// jsdom에는 모달 dialog 열기가 없어서, 브라우저처럼 open 속성만 켠다.
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true;
+  };
+});
+
 afterEach(() => vi.useRealTimers());
+
+test("상세 패널은 조회 종료일이 속한 달의 사용 요약과 월 예산 입력을 보여 준다", async () => {
+  renderAt("/customer-usage?from=2026-09-20&to=2026-10-15&detail=3");
+
+  const panel = await screen.findByRole("dialog", { name: "고객 상세" });
+  expect(
+    within(panel).getByRole("heading", { name: "2026-10 사용 요약" }),
+  ).toBeTruthy();
+  expect(
+    within(panel).getByLabelText<HTMLInputElement>("적용 시작 월").value,
+  ).toBe("2026-10");
+});
+
+test("상세 패널을 닫으면 패널 값만 지우고 조회 조건과 전체보기는 그대로다", async () => {
+  const router = renderAt(
+    "/customer-usage?from=2026-10-01&to=2026-10-15&view=customers&detail=3",
+  );
+
+  const panel = await screen.findByRole("dialog", { name: "고객 상세" });
+  fireEvent.click(within(panel).getAllByRole("button", { name: "닫기" })[0]);
+
+  await waitFor(() =>
+    expect(routeMatch(router, ROUTE_ID)?.search).toEqual({
+      from: "2026-10-01",
+      to: "2026-10-15",
+      view: "customers",
+    }),
+  );
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
 
 test("주소에 기간이 없으면 KST 오늘을 포함한 최근 30일을 칸에 보여 준다", async () => {
   // 화면 동작은 그대로 두고 현재 날짜만 고정한다.

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { CustomerPanel } from "../../features/customer-usage/components/CustomerPanel";
 import { CustomerUsageTable } from "../../features/customer-usage/components/CustomerUsageTable";
 import { RequestTable } from "../../features/customer-usage/components/RequestTable";
 import { SummarySkeleton } from "../../features/customer-usage/components/SummarySkeleton";
@@ -15,7 +16,7 @@ export const Route = createFileRoute("/_app/customer-usage")({
 });
 
 function CustomerUsagePage() {
-  const { from, to, view } = Route.useSearch();
+  const { from, to, view, detail } = Route.useSearch();
   const navigate = Route.useNavigate();
   const budgetMonth = budgetMonthOf({ from, to });
 
@@ -42,6 +43,14 @@ function CustomerUsagePage() {
         </>
       ) : (
         <UsageFullList view={view} budgetMonth={budgetMonth} />
+      )}
+      {detail !== undefined && (
+        <CustomerPanel
+          budgetMonth={budgetMonth}
+          onClose={() =>
+            navigate({ search: (prev) => ({ ...prev, detail: undefined }) })
+          }
+        />
       )}
     </>
   );

@@ -16,14 +16,16 @@ export const customerUsageSearchSchema = z
     to: z.string().optional().catch(undefined),
     /** 없으면 요약 화면, 있으면 그 목록의 전체보기 */
     view: z.enum(["customers", "requests"]).optional().catch(undefined),
+    /** 상세 패널을 연 고객 번호(customers.customer_id). 요약 화면과 전체보기 어디서든 연다. */
+    detail: z.number().int().min(1).optional().catch(undefined),
   })
-  .transform(({ from, to, view }) => {
+  .transform(({ from, to, ...rest }) => {
     const period = periodSchema.safeParse({ from, to });
     return {
       ...(period.success
         ? period.data
         : recentPeriod(new Date(), DEFAULT_PERIOD_DAYS)),
-      view,
+      ...rest,
     };
   });
 

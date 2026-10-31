@@ -61,9 +61,26 @@ describe("customerUsageSearchSchema 전체보기", () => {
     }
   });
 
+  test("전체보기에서도 상세 패널 값을 받는다", () => {
+    expect(parse({ ...PERIOD, view: "customers", detail: 3 })).toEqual({
+      ...PERIOD,
+      view: "customers",
+      detail: 3,
+    });
+  });
+
   test("없는 목록 이름은 버린다", () => {
     for (const view of ["projects", 1]) {
       expect(parse({ ...PERIOD, view })).toEqual(PERIOD);
+    }
+  });
+});
+
+describe("customerUsageSearchSchema 상세 패널", () => {
+  test("상세 패널을 연 고객 번호는 1 이상의 정수만 받는다", () => {
+    expect(parse({ ...PERIOD, detail: 3 })).toEqual({ ...PERIOD, detail: 3 });
+    for (const detail of [0, -1, 1.5, "abc"]) {
+      expect(parse({ ...PERIOD, detail })).toEqual(PERIOD);
     }
   });
 });
