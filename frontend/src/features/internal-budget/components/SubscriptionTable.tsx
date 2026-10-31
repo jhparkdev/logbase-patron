@@ -1,3 +1,4 @@
+import { getRouteApi } from "@tanstack/react-router";
 import plusIcon from "../../../assets/plus.svg";
 import { Button } from "../../../shared/components/ui/Button";
 import { Result } from "../../../shared/components/ui/Result";
@@ -8,6 +9,8 @@ import { ViewAllLink } from "./ViewAllLink";
 
 const TITLE = "구독료 관리";
 
+const route = getRouteApi("/_app/internal-budget");
+
 const COLUMNS: ListColumn<"subscriptions">[] = [
   { key: "tool", header: "도구명" },
   { key: "month", header: "적용 월" },
@@ -16,8 +19,9 @@ const COLUMNS: ListColumn<"subscriptions">[] = [
   { key: "status", header: "상태" },
 ];
 
-/** 월 구독료 목록. list가 있으면 전체 목록이다. 등록 버튼은 등록 패널이 생기면 켠다. */
+/** 월 구독료 목록. list가 있으면 전체 목록이다. 등록 버튼은 주소에 남겨 등록 패널을 연다. */
 export function SubscriptionTable({ list }: { list?: ListControls }) {
+  const navigate = route.useNavigate();
   return (
     <SectionCard
       title={TITLE}
@@ -25,7 +29,14 @@ export function SubscriptionTable({ list }: { list?: ListControls }) {
       action={
         <div className="flex items-center gap-4">
           {!list && <ViewAllLink view="subscriptions" title={TITLE} />}
-          <Button variant="secondary" size="sm" icon={plusIcon} disabled>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={plusIcon}
+            onClick={() =>
+              navigate({ search: (prev) => ({ ...prev, subscription: "new" }) })
+            }
+          >
             구독료 등록
           </Button>
         </div>

@@ -28,10 +28,14 @@ export type BudgetSearch = Period & {
   sort?: string;
   order?: "asc" | "desc";
   page?: number;
+  /** 상세 패널을 연 프로젝트 번호(projects.project_id) */
+  project?: number;
+  /** "new"면 구독료 등록 패널을 연다. */
+  subscription?: "new";
 };
 
 const orderSchema = z.enum(["asc", "desc"]);
-const pageSchema = z.number().int().min(1);
+const positiveIntSchema = z.number().int().min(1);
 
 function isListView(value: unknown): value is BudgetListView {
   return typeof value === "string" && Object.hasOwn(BUDGET_LIST_SORTS, value);
@@ -49,9 +53,14 @@ export function parseBudgetSearch(
   const period = parsedPeriod.success
     ? parsedPeriod.data
     : currentMonthPeriod(now);
+  // 상세 패널은 요약 화면과 전체 목록 어디서든 연다.
+  const panels = {
+    project: positiveIntSchema.safeParse(raw.project).data,
+    subscription: raw.subscription === "new" ? ("new" as const) : undefined,
+  };
 
   if (!isListView(raw.view)) {
-    return period;
+    return { ...period, ...panels };
   }
   const view = raw.view;
   const sortKeys: readonly string[] = BUDGET_LIST_SORTS[view];
@@ -65,6 +74,7 @@ export function parseBudgetSearch(
     view,
     // 정렬은 칸과 방향이 함께 있을 때만 쓴다.
     ...(sort !== undefined && order !== undefined && { sort, order }),
-    page: pageSchema.safeParse(raw.page).data,
+    page: positiveIntSchema.safeParse(raw.page).data,
+    ...panels,
   };
 }

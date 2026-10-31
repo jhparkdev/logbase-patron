@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { beforeAll, expect, test } from "vitest";
 import { renderAt } from "../../test/renderAt";
+
+// jsdom에는 모달 dialog 열기가 없어서, 브라우저처럼 open 속성만 켠다.
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true;
+  };
+});
 
 type Router = ReturnType<typeof renderAt>;
 
@@ -137,4 +144,31 @@ test("요약으로 돌아가면 조회 기간만 남긴다", async () => {
       to: "2026-10-15",
     }),
   );
+});
+
+test("주소에 프로젝트 번호가 있으면 프로젝트 상세 패널을 열고, 닫으면 그 값만 지운다", async () => {
+  const router = renderAt(`/internal-budget?${PERIOD}&project=3`);
+
+  await screen.findByRole("dialog", { name: "프로젝트 상세" });
+  // 패널 머리의 X. 폼 아래에도 같은 동작의 "닫기"가 있다.
+  fireEvent.click(screen.getAllByRole("button", { name: "닫기" })[0]);
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(appliedSearch(router)).toEqual({
+    from: "2026-10-01",
+    to: "2026-10-15",
+  });
+});
+
+test("구독료 등록을 누르면 등록 패널이 열리고 주소에 남는다", async () => {
+  const router = renderAt(`/internal-budget?${PERIOD}`);
+
+  fireEvent.click(await screen.findByRole("button", { name: "구독료 등록" }));
+
+  await screen.findByRole("dialog", { name: "구독료 등록" });
+  expect(appliedSearch(router)).toEqual({
+    from: "2026-10-01",
+    to: "2026-10-15",
+    subscription: "new",
+  });
 });

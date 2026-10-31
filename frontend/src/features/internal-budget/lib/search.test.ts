@@ -70,3 +70,25 @@ describe("parseBudgetSearch 전체 목록", () => {
     }
   });
 });
+
+describe("parseBudgetSearch 상세 패널", () => {
+  const PERIOD = { from: "2026-10-01", to: "2026-10-20" };
+
+  test("프로젝트 번호는 1 이상의 정수만, 구독료는 new만 받는다", () => {
+    expect(
+      parseBudgetSearch({ ...PERIOD, project: 3, subscription: "new" }, NOW),
+    ).toEqual({ ...PERIOD, project: 3, subscription: "new" });
+    for (const project of [0, -1, 1.5, "abc"]) {
+      expect(parseBudgetSearch({ ...PERIOD, project }, NOW)).toEqual(PERIOD);
+    }
+    expect(parseBudgetSearch({ ...PERIOD, subscription: 7 }, NOW)).toEqual(
+      PERIOD,
+    );
+  });
+
+  test("전체 목록에서도 패널 값을 받는다", () => {
+    expect(
+      parseBudgetSearch({ ...PERIOD, view: "projects", project: 3 }, NOW),
+    ).toEqual({ ...PERIOD, view: "projects", project: 3 });
+  });
+});
