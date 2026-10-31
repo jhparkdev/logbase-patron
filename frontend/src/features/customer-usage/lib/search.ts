@@ -10,6 +10,8 @@ const DEFAULT_PERIOD_DAYS = 30;
  */
 export const customerUsageSearchSchema = z
   .object({
+    // 문자열이 아닌 값은 여기서 버려 화면이 검증 오류로 멈추지 않게 한다.
+    // 날짜 형식과 기간 규칙은 시작일·종료일을 함께 봐야 해서 아래에서 검사한다.
     from: z.string().optional().catch(undefined),
     to: z.string().optional().catch(undefined),
     /** 없으면 요약 화면, 있으면 그 목록의 전체보기 */
