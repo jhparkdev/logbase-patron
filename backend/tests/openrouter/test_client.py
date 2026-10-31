@@ -165,6 +165,38 @@ async def test_업체_고정과_JSON_Schema를_요청에_담아_보낸다(
     assert body["response_format"]["type"] == "json_schema"
 
 
+async def test_temperature와_reasoning_effort를_요청에_담아_보낸다(
+    make_client: ClientFactory,
+) -> None:
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return respond_success(request)
+
+    await call(make_client(handler), temperature=0.2, reasoning_effort="high")
+
+    body = json.loads(captured[0].content)
+    assert body["temperature"] == 0.2
+    assert body["reasoning"] == {"effort": "high"}
+
+
+async def test_temperature와_reasoning_effort를_주지_않으면_요청에_없다(
+    make_client: ClientFactory,
+) -> None:
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return respond_success(request)
+
+    await call(make_client(handler))
+
+    body = json.loads(captured[0].content)
+    assert "temperature" not in body
+    assert "reasoning" not in body
+
+
 # ---------------------------------------------------------------
 # HTTP 오류 응답: 예외를 던지지 않고 실패 결과로 돌려준다
 # ---------------------------------------------------------------
