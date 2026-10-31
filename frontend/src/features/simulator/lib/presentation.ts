@@ -5,6 +5,8 @@ export type ModelChoice = {
   key: string;
   name: string;
   provider: string;
+  // models.provider(제작사)를 adapter가 별도로 전달한다. 위 provider는 실행 업체다.
+  creator?: string;
   selectable: boolean;
   unavailableReason?: string;
   supportsImages: boolean;

@@ -8,7 +8,8 @@ export function selectedModelKeys(selections: string[]) {
 export function searchModels(choices: ModelChoice[], query: string) {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/);
   return choices.filter((choice) => {
-    const label = `${choice.name} ${choice.provider}`.toLocaleLowerCase();
+    const label =
+      `${choice.name} ${choice.creator ?? ""} ${choice.provider}`.toLocaleLowerCase();
     return terms.every((term) => label.includes(term));
   });
 }

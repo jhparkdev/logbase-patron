@@ -12,6 +12,7 @@ const choices: ModelChoice[] = [0, 1, 2].map((index) => ({
   selectable: index !== 2,
   supportsImages: false,
   supportedParameters: [],
+  creator: "mistralai",
 }));
 const onApply = vi.fn();
 const onClose = vi.fn();
@@ -71,6 +72,15 @@ test("즐겨찾기는 모델·Provider별로 구별하며 저장 이벤트와 �
   expect(screen.getByText("아직 즐겨찾기한 모델이 없어요")).toBeDefined();
   fireEvent.click(screen.getByRole("button", { name: "선택 적용" }));
   expect(onApply).toHaveBeenCalledWith(["a:p0", "a:p1"]);
+});
+
+test("같은 제작사의 여러 실행 Provider는 같은 배지로 구분하며 Provider 이름은 유지한다", () => {
+  render(picker());
+  const badges = screen.getAllByText("mistralai");
+  expect(badges.length).toBeGreaterThanOrEqual(choices.length);
+  expect(new Set(badges.map((badge) => badge.className)).size).toBe(1);
+  for (const choice of choices)
+    expect(screen.getByText(choice.provider)).toBeDefined();
 });
 
 test("즐겨찾기 목록에서도 검색하고 결과 없음과 빈 즐겨찾기를 구분한다", async () => {

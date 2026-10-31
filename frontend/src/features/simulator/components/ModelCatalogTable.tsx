@@ -1,6 +1,7 @@
 import type { ModelFavoritesView } from "../lib/favorites";
 import { MODEL_LIMITS } from "../lib/limits";
 import type { ModelChoice } from "../lib/presentation";
+import { ModelCreatorBadge } from "./ModelCreatorBadge";
 import { ModelFavoriteButton } from "./ModelFavoriteButton";
 
 export function ModelCatalogTable({
@@ -64,6 +65,9 @@ export function ModelCatalogTable({
                 </td>
                 <th scope="row" className="p-3 font-semibold">
                   {choice.name}
+                  <div className="mt-1">
+                    <ModelCreatorBadge creator={choice.creator} />
+                  </div>
                   {!choice.selectable && (
                     <p className="mt-1 text-caption font-normal text-grey-600">
                       {choice.unavailableReason ?? "선택 불가"}

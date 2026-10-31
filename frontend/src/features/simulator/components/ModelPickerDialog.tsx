@@ -13,6 +13,7 @@ import { MODEL_LIMITS } from "../lib/limits";
 import { canApplyModels, selectedModelKeys } from "../lib/model-selection";
 import type { ModelChoice } from "../lib/presentation";
 import { ModelCatalogTable } from "./ModelCatalogTable";
+import { ModelCreatorBadge } from "./ModelCreatorBadge";
 import { ModelFavoritesNotice } from "./ModelFavoritesNotice";
 
 export function ModelPickerDialog({
@@ -78,7 +79,7 @@ export function ModelPickerDialog({
       </p>
       <SearchField
         label="모델 검색어"
-        placeholder="모델명 또는 Provider 검색"
+        placeholder="모델명·제작사·Provider 검색"
         value={query}
         onSearch={setQuery}
       />
@@ -136,6 +137,7 @@ export function ModelPickerDialog({
                     aria-label={`${label} 선택 해제`}
                     onClick={() => remove(key)}
                   >
+                    <ModelCreatorBadge creator={choice?.creator} />
                     {label}
                     <span aria-hidden="true">×</span>
                   </Button>

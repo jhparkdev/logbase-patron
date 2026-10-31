@@ -7,6 +7,7 @@ import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
 import { MODEL_LIMITS } from "../lib/limits";
 import type { ModelChoice } from "../lib/presentation";
 import { FieldError } from "./InputFields";
+import { ModelCreatorBadge } from "./ModelCreatorBadge";
 import { ModelPickerDialog } from "./ModelPickerDialog";
 
 export function ModelSelection({
@@ -94,6 +95,9 @@ export function ModelSelection({
                 <p className="text-body-sm font-semibold">
                   {selected?.name ?? "목록에 없는 모델"}
                 </p>
+                <div className="mt-2">
+                  <ModelCreatorBadge creator={selected?.creator} />
+                </div>
                 {selected && (
                   <div className="mt-1 flex items-center gap-2 text-caption text-grey-600">
                     <span>{selected.provider}</span>
