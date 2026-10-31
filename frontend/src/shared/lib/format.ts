@@ -26,6 +26,9 @@ const GROUPING = new Intl.NumberFormat("ko-KR");
 /** 시안 기준 소수 자릿수: 합계·요약은 2자리, 호출 1건 비용은 4자리. */
 const USD_DIGITS = { summary: 2, perCall: 4 } as const;
 
+/** USD 금액의 소수 자릿수 종류. summary는 합계·요약, perCall은 호출 1건. */
+export type UsdPrecision = keyof typeof USD_DIGITS;
+
 const DECIMAL_STRING = /^\d+(\.\d+)?$/;
 
 /**
@@ -33,10 +36,7 @@ const DECIMAL_STRING = /^\d+(\.\d+)?$/;
  * float 오차를 피하려고 숫자로 바꾸지 않고 정수(BigInt)로 계산한다.
  * 미확인 비용(null)은 받지 않는다. 미확인 표시는 화면이 따로 한다.
  */
-export function formatUsd(
-  amount: string,
-  precision: keyof typeof USD_DIGITS,
-): string {
+export function formatUsd(amount: string, precision: UsdPrecision): string {
   if (!DECIMAL_STRING.test(amount)) {
     throw new Error("금액 형식이 아닌 값입니다.");
   }
