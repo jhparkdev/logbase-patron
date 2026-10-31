@@ -1,7 +1,6 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { TextLink } from "../../../shared/components/ui/TextLink";
-import { nextSort } from "../../../shared/lib/sort";
-import type { ListControls } from "../lib/list";
+import type { PagingControls } from "../lib/list";
 import type { BudgetListView } from "../lib/search";
 import { ProjectBudgetTable } from "./ProjectBudgetTable";
 import { RequestHistoryTable } from "./RequestHistoryTable";
@@ -15,27 +14,11 @@ type BudgetFullListProps = {
   month: string;
 };
 
-/** 전체보기 화면. 고른 목록 하나를 정렬·페이지와 함께 보여 준다. 정렬과 페이지는 주소에 남긴다. */
+/** 전체보기 화면. 고른 목록 하나를 페이지 이동과 함께 보여 준다. 정렬은 표가 맡는다. */
 export function BudgetFullList({ view, month }: BudgetFullListProps) {
   const search = route.useSearch();
   const navigate = route.useNavigate();
-  const sort =
-    search.sort && search.order
-      ? { key: search.sort, direction: search.order }
-      : undefined;
-  const list: ListControls = {
-    sort,
-    onSortChange: (key) => {
-      const next = nextSort(sort, key);
-      navigate({
-        search: (prev) => ({
-          ...prev,
-          sort: next.key,
-          order: next.direction,
-          page: undefined,
-        }),
-      });
-    },
+  const paging: PagingControls = {
     page: search.page ?? 1,
     onPageChange: (page) => navigate({ search: (prev) => ({ ...prev, page }) }),
   };
@@ -45,15 +28,17 @@ export function BudgetFullList({ view, month }: BudgetFullListProps) {
       <TextLink
         from="/internal-budget"
         to="/internal-budget"
-        // 조회 기간만 남기고 목록·정렬·페이지 값은 지운다.
-        search={(prev) => ({ from: prev.from, to: prev.to })}
+        // 목록·페이지 값만 지운다. 표의 정렬은 요약 화면에서도 이어진다.
+        search={(prev) => ({ ...prev, view: undefined, page: undefined })}
         className="self-start text-body-sm"
       >
         <span aria-hidden="true">‹ </span>요약으로 돌아가기
       </TextLink>
-      {view === "projects" && <ProjectBudgetTable month={month} list={list} />}
-      {view === "subscriptions" && <SubscriptionTable list={list} />}
-      {view === "requests" && <RequestHistoryTable list={list} />}
+      {view === "projects" && (
+        <ProjectBudgetTable month={month} paging={paging} />
+      )}
+      {view === "subscriptions" && <SubscriptionTable paging={paging} />}
+      {view === "requests" && <RequestHistoryTable paging={paging} />}
     </>
   );
 }

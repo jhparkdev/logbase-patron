@@ -1,5 +1,6 @@
 import { SectionCard } from "../../../shared/components/ui/SectionCard";
-import type { ListColumn, ListControls } from "../lib/list";
+import { useListSort } from "../hooks/useListSort";
+import type { ListColumn, PagingControls } from "../lib/list";
 import { NoUsageResult } from "./NoUsageResult";
 import { PendingTable } from "./PendingTable";
 import { ViewAllLink } from "./ViewAllLink";
@@ -17,21 +18,25 @@ const COLUMNS: ListColumn<"requests">[] = [
 ];
 
 /**
- * 조회 조건에 맞는 호출 이력. 요약 화면에서는 최근 20건, list가 있으면 전체 목록이다.
+ * 조회 조건에 맞는 호출 이력. 요약 화면에서는 최근 20건(그 20건 안에서 정렬), paging이 있으면 전체보기다.
  * 고객 사용은 넣지 않고, 구분 칸에 호출 출처를 보여 준다.
  */
-export function RequestHistoryTable({ list }: { list?: ListControls }) {
+export function RequestHistoryTable({ paging }: { paging?: PagingControls }) {
+  const sorting = useListSort("requests");
   return (
     <SectionCard
       title={TITLE}
-      description={list ? undefined : "최근 20건"}
-      action={list ? undefined : <ViewAllLink view="requests" title={TITLE} />}
+      description={paging ? undefined : "최근 20건"}
+      action={
+        paging ? undefined : <ViewAllLink view="requests" title={TITLE} />
+      }
     >
       <PendingTable
         caption={TITLE}
         columns={COLUMNS}
         empty={<NoUsageResult />}
-        list={list}
+        sorting={sorting}
+        paging={paging}
       />
     </SectionCard>
   );

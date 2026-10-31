@@ -3,7 +3,8 @@ import plusIcon from "../../../assets/plus.svg";
 import { Button } from "../../../shared/components/ui/Button";
 import { Result } from "../../../shared/components/ui/Result";
 import { SectionCard } from "../../../shared/components/ui/SectionCard";
-import type { ListColumn, ListControls } from "../lib/list";
+import { useListSort } from "../hooks/useListSort";
+import type { ListColumn, PagingControls } from "../lib/list";
 import { MemberUsageSection } from "./MemberUsageSection";
 import { PendingTable } from "./PendingTable";
 import { ViewAllLink } from "./ViewAllLink";
@@ -22,17 +23,18 @@ const COLUMNS: ListColumn<"subscriptions">[] = [
 
 /**
  * 월 구독료 목록. 요약 화면에서는 아래에 구성원별 Command Code 사용량을 함께 보여 주고,
- * list가 있으면 구독료 전체 목록만 보여 준다. 등록 버튼은 주소에 남겨 등록 패널을 연다.
+ * paging이 있으면 구독료 전체보기만 보여 준다. 등록 버튼은 주소에 남겨 등록 패널을 연다.
  */
-export function SubscriptionTable({ list }: { list?: ListControls }) {
+export function SubscriptionTable({ paging }: { paging?: PagingControls }) {
   const navigate = route.useNavigate();
+  const sorting = useListSort("subscriptions");
   return (
     <SectionCard
       title={TITLE}
       description="도구명을 누르면 내용을 고칠 수 있어요."
       action={
         <div className="flex items-center gap-4">
-          {!list && <ViewAllLink view="subscriptions" title={TITLE} />}
+          {!paging && <ViewAllLink view="subscriptions" title={TITLE} />}
           <Button
             variant="secondary"
             size="sm"
@@ -55,9 +57,10 @@ export function SubscriptionTable({ list }: { list?: ListControls }) {
             description="구독료를 등록하면 월 구독료와 총 관리 비용에 반영돼요."
           />
         }
-        list={list}
+        sorting={sorting}
+        paging={paging}
       />
-      {!list && <MemberUsageSection />}
+      {!paging && <MemberUsageSection />}
     </SectionCard>
   );
 }

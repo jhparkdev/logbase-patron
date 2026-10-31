@@ -1,6 +1,7 @@
 import { Result } from "../../../shared/components/ui/Result";
 import { SectionCard } from "../../../shared/components/ui/SectionCard";
-import type { ListColumn, ListControls } from "../lib/list";
+import { useListSort } from "../hooks/useListSort";
+import type { ListColumn, PagingControls } from "../lib/list";
 import { PendingTable } from "./PendingTable";
 import { ViewAllLink } from "./ViewAllLink";
 
@@ -17,17 +18,20 @@ const COLUMNS: ListColumn<"projects">[] = [
 type ProjectBudgetTableProps = {
   /** 예산을 비교하는 달 "YYYY-MM" */
   month: string;
-  /** 있으면 전체 목록, 없으면 요약 화면의 표 */
-  list?: ListControls;
+  /** 있으면 전체보기, 없으면 요약 화면의 표 */
+  paging?: PagingControls;
 };
 
 /** 프로젝트별 월 예산과 사용률. */
-export function ProjectBudgetTable({ month, list }: ProjectBudgetTableProps) {
+export function ProjectBudgetTable({ month, paging }: ProjectBudgetTableProps) {
+  const sorting = useListSort("projects");
   return (
     <SectionCard
       title={TITLE}
       description={`${month} 기준 · 프로젝트명을 누르면 상세 내역과 예산을 볼 수 있어요.`}
-      action={list ? undefined : <ViewAllLink view="projects" title={TITLE} />}
+      action={
+        paging ? undefined : <ViewAllLink view="projects" title={TITLE} />
+      }
     >
       <PendingTable
         caption={TITLE}
@@ -38,7 +42,8 @@ export function ProjectBudgetTable({ month, list }: ProjectBudgetTableProps) {
             description="프로젝트가 등록되면 여기에서 예산을 정할 수 있어요."
           />
         }
-        list={list}
+        sorting={sorting}
+        paging={paging}
       />
     </SectionCard>
   );

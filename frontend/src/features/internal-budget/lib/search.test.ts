@@ -27,46 +27,48 @@ describe("parseBudgetSearch", () => {
   });
 });
 
-describe("parseBudgetSearch 전체 목록", () => {
+describe("parseBudgetSearch 정렬·전체 목록", () => {
   const PERIOD = { from: "2026-10-01", to: "2026-10-20" };
 
-  test("전체 목록과 그 목록의 정렬·페이지를 받는다", () => {
-    expect(
-      parseBudgetSearch(
-        { ...PERIOD, view: "requests", sort: "cost", order: "desc", page: 2 },
-        NOW,
-      ),
-    ).toEqual({
+  test("표마다 정렬을 따로 받고, 요약 화면에서도 받는다", () => {
+    const sorts = {
+      projectsSort: "budget",
+      projectsOrder: "desc",
+      requestsSort: "cost",
+      requestsOrder: "asc",
+    };
+    expect(parseBudgetSearch({ ...PERIOD, ...sorts }, NOW)).toEqual({
       ...PERIOD,
-      view: "requests",
-      sort: "cost",
-      order: "desc",
-      page: 2,
+      ...sorts,
     });
   });
 
-  test("목록에 없는 정렬 칸, 방향 없는 정렬, 1 미만이거나 정수가 아닌 페이지는 버린다", () => {
+  test("그 표에 없는 정렬 칸이나 방향 없는 정렬은 버린다", () => {
     for (const raw of [
-      { view: "projects", sort: "tokens", order: "asc" },
-      { view: "projects", sort: "budget" },
-      { view: "projects", page: 0 },
-      { view: "projects", page: 1.5 },
+      { projectsSort: "tokens", projectsOrder: "asc" },
+      { requestsSort: "cost" },
+      { subscriptionsSort: "tool", subscriptionsOrder: "sideways" },
     ]) {
-      expect(parseBudgetSearch({ ...PERIOD, ...raw }, NOW)).toEqual({
-        ...PERIOD,
-        view: "projects",
-      });
+      expect(parseBudgetSearch({ ...PERIOD, ...raw }, NOW)).toEqual(PERIOD);
     }
   });
 
-  test("전체 목록이 아니면 정렬·페이지 값을 버린다", () => {
-    for (const view of [undefined, "members", "password"]) {
+  test("전체 목록과 페이지를 받고, 1 미만이거나 정수가 아닌 페이지는 버린다", () => {
+    expect(
+      parseBudgetSearch({ ...PERIOD, view: "requests", page: 2 }, NOW),
+    ).toEqual({ ...PERIOD, view: "requests", page: 2 });
+    for (const page of [0, 1.5]) {
       expect(
-        parseBudgetSearch(
-          { ...PERIOD, view, sort: "cost", order: "asc", page: 2 },
-          NOW,
-        ),
-      ).toEqual(PERIOD);
+        parseBudgetSearch({ ...PERIOD, view: "projects", page }, NOW),
+      ).toEqual({ ...PERIOD, view: "projects" });
+    }
+  });
+
+  test("페이지는 전체 목록에서만 쓰고, 없는 목록 이름은 버린다", () => {
+    for (const view of [undefined, "members", "password"]) {
+      expect(parseBudgetSearch({ ...PERIOD, view, page: 2 }, NOW)).toEqual(
+        PERIOD,
+      );
     }
   });
 });

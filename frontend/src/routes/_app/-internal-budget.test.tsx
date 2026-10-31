@@ -107,8 +107,8 @@ test("전체 목록에서 머리글을 누르면 정렬이 주소에 남고 1페
       from: "2026-10-01",
       to: "2026-10-15",
       view: "requests",
-      sort: "cost",
-      order: "asc",
+      requestsSort: "cost",
+      requestsOrder: "asc",
     }),
   );
 });
@@ -129,9 +129,9 @@ test("전체 목록에서 조회하면 목록은 유지하고 1페이지로 돌�
   );
 });
 
-test("요약으로 돌아가면 조회 기간만 남긴다", async () => {
+test("요약으로 돌아가면 목록·페이지 값은 지우고 정렬은 이어 간다", async () => {
   const router = renderAt(
-    `/internal-budget?${PERIOD}&view=requests&sort=cost&order=desc&page=2`,
+    `/internal-budget?${PERIOD}&view=requests&requestsSort=cost&requestsOrder=desc&page=2`,
   );
 
   fireEvent.click(
@@ -142,6 +142,34 @@ test("요약으로 돌아가면 조회 기간만 남긴다", async () => {
     expect(appliedSearch(router)).toEqual({
       from: "2026-10-01",
       to: "2026-10-15",
+      requestsSort: "cost",
+      requestsOrder: "desc",
+    }),
+  );
+});
+
+test("요약 화면에서 머리글을 누르면 그 표의 정렬만 주소에 남는다", async () => {
+  const router = renderAt(`/internal-budget?${PERIOD}`);
+
+  fireEvent.click(await screen.findByRole("button", { name: /비용 \(USD\)/ }));
+  await waitFor(() =>
+    expect(appliedSearch(router)).toEqual({
+      from: "2026-10-01",
+      to: "2026-10-15",
+      requestsSort: "cost",
+      requestsOrder: "asc",
+    }),
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: /월 예산 \(USD\)/ }));
+  await waitFor(() =>
+    expect(appliedSearch(router)).toEqual({
+      from: "2026-10-01",
+      to: "2026-10-15",
+      requestsSort: "cost",
+      requestsOrder: "asc",
+      projectsSort: "budget",
+      projectsOrder: "asc",
     }),
   );
 });
