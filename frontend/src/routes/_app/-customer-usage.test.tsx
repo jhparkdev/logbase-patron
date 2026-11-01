@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeAll, expect, test, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { stubCustomerUsageApi } from "../../test/customerUsageApi";
 import { changePeriod, periodInputs } from "../../test/periodInputs";
 import { renderAt, routeMatch } from "../../test/renderAt";
 
@@ -11,6 +12,19 @@ beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function () {
     this.open = true;
   };
+  // jsdom에는 크기 감시가 없어서 그래프 컨테이너가 쓸 빈 구현을 넣는다.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+});
+
+beforeEach(() => {
+  stubCustomerUsageApi();
 });
 
 afterEach(() => vi.useRealTimers());
@@ -18,10 +32,8 @@ afterEach(() => vi.useRealTimers());
 test("상세 패널은 조회 종료일이 속한 달의 사용 요약과 월 예산 입력을 보여 준다", async () => {
   renderAt("/customer-usage?from=2026-09-20&to=2026-10-15&detail=3");
 
-  const panel = await screen.findByRole("dialog", { name: "고객 상세" });
-  expect(
-    within(panel).getByRole("heading", { name: "2026-10 사용 요약" }),
-  ).toBeTruthy();
+  const panel = await screen.findByRole("dialog", { name: "A기업" });
+  expect(within(panel).getByText("2026-10 사용 요약")).toBeTruthy();
   expect(
     within(panel).getByLabelText<HTMLInputElement>("적용 시작 월").value,
   ).toBe("2026-10");
@@ -32,7 +44,7 @@ test("상세 패널을 닫으면 패널 값만 지우고 조회 조건과 전체
     "/customer-usage?from=2026-10-01&to=2026-10-15&view=customers&detail=3",
   );
 
-  const panel = await screen.findByRole("dialog", { name: "고객 상세" });
+  const panel = await screen.findByRole("dialog", { name: "A기업" });
   fireEvent.click(within(panel).getAllByRole("button", { name: "닫기" })[0]);
 
   await waitFor(() =>

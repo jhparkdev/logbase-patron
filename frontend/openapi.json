@@ -1,0 +1,3923 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BASE Patron API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Read Health",
+        "operationId": "read_health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthRead"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_api_auth_logout_post",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Read Me",
+        "operationId": "read_me_api_auth_me_get",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulations": {
+      "post": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Create Simulation Run",
+        "description": "비교 실행을 접수하고 바로 돌려준다. 모델 호출은 응답 뒤 백그라운드에서 진행한다.",
+        "operationId": "create_simulation_run_api_simulations_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationAccepted"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "List Simulation Runs",
+        "description": "이력 목록. 조건으로 거른 결과를 최신 순으로 상한까지 준다. 정렬·페이지는 화면이 한다.",
+        "operationId": "list_simulation_runs_api_simulations_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "scenario_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenario Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SimulationStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "simulation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Simulation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationHistoryList"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/simulations/{simulation_id}": {
+      "get": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Read Simulation Run",
+        "description": "진행·결과 조회. 화면이 끝날 때까지 5초마다 부른다. DB 만 읽으므로 비용이 들지 않는다.",
+        "operationId": "read_simulation_run_api_simulations__simulation_id__get",
+        "parameters": [
+          {
+            "name": "simulation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Simulation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulations/{simulation_id}/rerun-draft": {
+      "get": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Read Rerun Draft",
+        "description": "재실행 초안. 과거 입력으로 화면 입력칸을 채운다. 실행은 사용자가 새 실행 요청으로 보낼 때 시작한다.",
+        "operationId": "read_rerun_draft_api_simulations__simulation_id__rerun_draft_get",
+        "parameters": [
+          {
+            "name": "simulation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Simulation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationRerunDraft"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulations/{simulation_id}/cancel": {
+      "post": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Cancel Simulation Run",
+        "description": "실행 전체를 취소한다. 이미 끝난 모델은 그대로 두고, 이미 끝난 실행도 오류가 아니라 현재 상태를 알려 준다.",
+        "operationId": "cancel_simulation_run_api_simulations__simulation_id__cancel_post",
+        "parameters": [
+          {
+            "name": "simulation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Simulation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationCancelResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulations/{simulation_id}/slots/{slot_no}/cancel": {
+      "post": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Cancel Simulation Slot",
+        "description": "모델 하나만 취소한다. 나머지 모델은 계속 돈다.",
+        "operationId": "cancel_simulation_slot_api_simulations__simulation_id__slots__slot_no__cancel_post",
+        "parameters": [
+          {
+            "name": "simulation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Simulation Id"
+            }
+          },
+          {
+            "name": "slot_no",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Slot No"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationCancelResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "List Models",
+        "operationId": "list_models_api_models_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[^\\x00]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[^\\x00]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[^\\x00]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[^\\x00]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ModelStatus"
+              },
+              "title": "Status"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ModelSortField",
+              "default": "created_at"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "default": "desc"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/models/{model_id}": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Read Model",
+        "operationId": "read_model_api_models__model_id__get",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDetailRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/customers/options": {
+      "get": {
+        "tags": [
+          "customer-usage"
+        ],
+        "summary": "Read Options",
+        "operationId": "read_options_api_usage_customers_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageOptions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usage/customers/summary": {
+      "get": {
+        "tags": [
+          "customer-usage"
+        ],
+        "summary": "Read Summary",
+        "operationId": "read_summary_api_usage_customers_summary_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "customer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/customers/trend": {
+      "get": {
+        "tags": [
+          "customer-usage"
+        ],
+        "summary": "Read Trend",
+        "operationId": "read_trend_api_usage_customers_trend_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "customer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageTrend"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/customers/rows": {
+      "get": {
+        "tags": [
+          "customer-usage"
+        ],
+        "summary": "Read Customer Rows",
+        "operationId": "read_customer_rows_api_usage_customers_rows_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "customer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "default": "desc"
+            }
+          },
+          {
+            "name": "preview",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Preview"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CustomerRowSort",
+              "default": "confirmed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerUsagePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/customers/requests": {
+      "get": {
+        "tags": [
+          "customer-usage"
+        ],
+        "summary": "Read Requests",
+        "operationId": "read_requests_api_usage_customers_requests_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "customer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "default": "desc"
+            }
+          },
+          {
+            "name": "preview",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Preview"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RequestRowSort",
+              "default": "requestedAt"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerRequestPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/customers/{customer_id}": {
+      "get": {
+        "tags": [
+          "customer-usage"
+        ],
+        "summary": "Read Customer Detail",
+        "operationId": "read_customer_detail_api_usage_customers__customer_id__get",
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Customer Id"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerUsageDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/customers/{customer_id}/budget": {
+      "put": {
+        "tags": [
+          "customer-usage"
+        ],
+        "summary": "Save Customer Budget",
+        "operationId": "save_customer_budget_api_usage_customers__customer_id__budget_put",
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Customer Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerBudgetSave"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerBudgetRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BudgetStatus": {
+        "type": "string",
+        "enum": [
+          "NORMAL",
+          "WARNING",
+          "OVER",
+          "UNSET"
+        ],
+        "title": "BudgetStatus"
+      },
+      "BudgetUsage": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Month"
+          },
+          "monthly_amount_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Amount Usd"
+          },
+          "effective_from_month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From Month"
+          },
+          "used_usd": {
+            "type": "string",
+            "title": "Used Usd"
+          },
+          "usage_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Pct"
+          },
+          "confirmed_usage_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed Usage Pct"
+          },
+          "remaining_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BudgetStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "monthly_amount_usd",
+          "effective_from_month",
+          "used_usd",
+          "usage_pct",
+          "confirmed_usage_pct",
+          "remaining_usd",
+          "unknown_cost_count",
+          "status"
+        ],
+        "title": "BudgetUsage",
+        "description": "그 달의 고객 예산 현황. 서비스·모델 필터와 관계없이 고객 전체 사용액으로 계산한다."
+      },
+      "CancelDecision": {
+        "type": "string",
+        "enum": [
+          "CANCEL",
+          "ALREADY_CANCELLED",
+          "ALREADY_TERMINAL"
+        ],
+        "title": "CancelDecision"
+      },
+      "ConnectionTestStatus": {
+        "type": "string",
+        "enum": [
+          "SUCCESS",
+          "FAILED",
+          "TIMEOUT"
+        ],
+        "title": "ConnectionTestStatus"
+      },
+      "CostCheckStatus": {
+        "type": "string",
+        "enum": [
+          "확인 중",
+          "미확인 포함",
+          "추정 포함",
+          "확정"
+        ],
+        "title": "CostCheckStatus",
+        "description": "v_simulation_summary 의 cost_check_status 값. 뷰가 한국어 문구를 그대로 내보내므로 값도 같다."
+      },
+      "CostStatus": {
+        "type": "string",
+        "enum": [
+          "CONFIRMED",
+          "ESTIMATED",
+          "UNKNOWN"
+        ],
+        "title": "CostStatus",
+        "description": "비용 상태. UNKNOWN이면 cost_usd는 반드시 NULL이다(0으로 기록하지 않음)."
+      },
+      "CurrentUserRead": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "user_code": {
+            "type": "string",
+            "title": "User Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "user_code",
+          "name",
+          "email"
+        ],
+        "title": "CurrentUserRead",
+        "description": "로그인한 관리자. 비밀번호 해시와 세션 값은 내보내지 않는다."
+      },
+      "CustomerBudgetRead": {
+        "properties": {
+          "budget_id": {
+            "type": "integer",
+            "title": "Budget Id"
+          },
+          "customer_id": {
+            "type": "integer",
+            "title": "Customer Id"
+          },
+          "monthly_amount_usd": {
+            "type": "string",
+            "title": "Monthly Amount Usd"
+          },
+          "effective_from_month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Effective From Month"
+          },
+          "effective_to_month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To Month"
+          }
+        },
+        "type": "object",
+        "required": [
+          "budget_id",
+          "customer_id",
+          "monthly_amount_usd",
+          "effective_from_month",
+          "effective_to_month"
+        ],
+        "title": "CustomerBudgetRead"
+      },
+      "CustomerBudgetSave": {
+        "properties": {
+          "monthly_amount_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Monthly Amount Usd",
+            "decimal_places": 18,
+            "gt": 0,
+            "lt": "1000000000000"
+          },
+          "effective_from_month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Effective From Month"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "monthly_amount_usd",
+          "effective_from_month"
+        ],
+        "title": "CustomerBudgetSave"
+      },
+      "CustomerRequestPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerRequestRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "CustomerRequestPage"
+      },
+      "CustomerRequestRow": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "service_name": {
+            "type": "string",
+            "title": "Service Name"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "task_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Type"
+          },
+          "task_type_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Type Label"
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "cost_status": {
+            "$ref": "#/components/schemas/CostStatus"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus"
+          },
+          "error_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "requested_at",
+          "customer_id",
+          "customer_name",
+          "service_id",
+          "service_name",
+          "model",
+          "task_id",
+          "task_type",
+          "task_type_label",
+          "tokens",
+          "cost_usd",
+          "cost_status",
+          "status",
+          "error_type"
+        ],
+        "title": "CustomerRequestRow"
+      },
+      "CustomerRowSort": {
+        "type": "string",
+        "enum": [
+          "customer",
+          "service",
+          "tasks",
+          "calls",
+          "confirmed",
+          "estimated",
+          "budget",
+          "usage",
+          "status"
+        ],
+        "title": "CustomerRowSort",
+        "description": "고객 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다."
+      },
+      "CustomerServiceUsage": {
+        "properties": {
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "service_name": {
+            "type": "string",
+            "title": "Service Name"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "call_count": {
+            "type": "integer",
+            "title": "Call Count"
+          },
+          "confirmed_cost_usd": {
+            "type": "string",
+            "title": "Confirmed Cost Usd"
+          },
+          "estimated_cost_usd": {
+            "type": "string",
+            "title": "Estimated Cost Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          },
+          "budget_share_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Share Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service_id",
+          "service_name",
+          "task_count",
+          "call_count",
+          "confirmed_cost_usd",
+          "estimated_cost_usd",
+          "unknown_cost_count",
+          "budget_share_pct"
+        ],
+        "title": "CustomerServiceUsage",
+        "description": "고객 상세의 서비스별 사용량. 서비스별 예산이 아니라 고객 예산에서 차지하는 비중이다."
+      },
+      "CustomerUsageDetail": {
+        "properties": {
+          "customer_id": {
+            "type": "integer",
+            "title": "Customer Id"
+          },
+          "customer_name": {
+            "type": "string",
+            "title": "Customer Name"
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Month"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "call_count": {
+            "type": "integer",
+            "title": "Call Count"
+          },
+          "confirmed_cost_usd": {
+            "type": "string",
+            "title": "Confirmed Cost Usd"
+          },
+          "estimated_cost_usd": {
+            "type": "string",
+            "title": "Estimated Cost Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/BudgetUsage"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerServiceUsage"
+            },
+            "type": "array",
+            "title": "Services"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "customer_name",
+          "month",
+          "task_count",
+          "call_count",
+          "confirmed_cost_usd",
+          "estimated_cost_usd",
+          "unknown_cost_count",
+          "budget",
+          "services"
+        ],
+        "title": "CustomerUsageDetail",
+        "description": "고객 상세 패널. 그 달의 고객 전체 서비스 합계다."
+      },
+      "CustomerUsagePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerUsageRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "CustomerUsagePage"
+      },
+      "CustomerUsageRow": {
+        "properties": {
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "service_name": {
+            "type": "string",
+            "title": "Service Name"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "call_count": {
+            "type": "integer",
+            "title": "Call Count"
+          },
+          "confirmed_cost_usd": {
+            "type": "string",
+            "title": "Confirmed Cost Usd"
+          },
+          "estimated_cost_usd": {
+            "type": "string",
+            "title": "Estimated Cost Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/BudgetUsage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "customer_name",
+          "service_id",
+          "service_name",
+          "task_count",
+          "call_count",
+          "confirmed_cost_usd",
+          "estimated_cost_usd",
+          "unknown_cost_count",
+          "budget"
+        ],
+        "title": "CustomerUsageRow",
+        "description": "고객 × 서비스 한 행. 고객을 알 수 없는 호출은 customer_id가 null인 미분류 행으로 모은다."
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "BAD_REQUEST",
+          "VALIDATION_ERROR",
+          "NOT_FOUND",
+          "METHOD_NOT_ALLOWED",
+          "INTERNAL_ERROR",
+          "INVALID_CREDENTIALS",
+          "UNAUTHENTICATED",
+          "ORIGIN_NOT_ALLOWED",
+          "INVALID_PERIOD",
+          "BUDGET_PERIOD_CONFLICT"
+        ],
+        "title": "ErrorCode",
+        "description": "오류 응답 코드. 프론트엔드는 OpenAPI enum으로 받아 코드별로 화면 처리를 나눈다."
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorResponse",
+        "description": "모든 오류 응답의 형식. message는 사용자에게 그대로 보여 줄 수 있는 문구다."
+      },
+      "ErrorType": {
+        "type": "string",
+        "enum": [
+          "AUTH_ERROR",
+          "RATE_LIMIT",
+          "TIMEOUT_ERROR",
+          "PROVIDER_ERROR",
+          "NETWORK_ERROR",
+          "INVALID_RESPONSE",
+          "UNSUPPORTED_INPUT",
+          "UNKNOWN_ERROR"
+        ],
+        "title": "ErrorType"
+      },
+      "ExecutionConfig": {
+        "properties": {
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4096.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ExecutionConfig",
+        "description": "모델 실행 설정. 시나리오 기본 실행 설정(test_scenarios.default_execution_config)과 같은 항목이다.\n\n허용 항목만 받는다. provider·response_format 같은 키가 섞여 업체 고정이나 Schema 전달을\n덮어쓰는 일을 막기 위해서다. 보내지 않은 항목은 모델 기본값(또는 시나리오 기본값)을 쓴다."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthRead": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "HealthRead"
+      },
+      "JsonValue": {},
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 1,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "format": "password",
+            "title": "Password",
+            "writeOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "ModelDetailRead": {
+        "properties": {
+          "model_id": {
+            "type": "integer",
+            "title": "Model Id"
+          },
+          "openrouter_model_id": {
+            "type": "string",
+            "title": "Openrouter Model Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ModelStatus"
+          },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Modalities"
+          },
+          "output_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Modalities"
+          },
+          "supports_json_schema": {
+            "type": "boolean",
+            "title": "Supports Json Schema"
+          },
+          "context_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Length"
+          },
+          "current_price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_test_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConnectionTestStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_test_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Test At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "activated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated At"
+          },
+          "deactivated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deactivated At"
+          },
+          "last_success_test_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success Test At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_id",
+          "openrouter_model_id",
+          "display_name",
+          "provider",
+          "purpose",
+          "status",
+          "input_modalities",
+          "output_modalities",
+          "supports_json_schema",
+          "context_length",
+          "current_price",
+          "last_test_status",
+          "last_test_at",
+          "created_at",
+          "updated_at",
+          "activated_at",
+          "deactivated_at",
+          "last_success_test_at"
+        ],
+        "title": "ModelDetailRead",
+        "description": "상세 패널용. 목록의 한 줄에 활성화·비활성화·마지막 성공 테스트 시각이 더해진다."
+      },
+      "ModelListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "title": "ModelListResponse"
+      },
+      "ModelRead": {
+        "properties": {
+          "model_id": {
+            "type": "integer",
+            "title": "Model Id"
+          },
+          "openrouter_model_id": {
+            "type": "string",
+            "title": "Openrouter Model Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ModelStatus"
+          },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Modalities"
+          },
+          "output_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Modalities"
+          },
+          "supports_json_schema": {
+            "type": "boolean",
+            "title": "Supports Json Schema"
+          },
+          "context_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Length"
+          },
+          "current_price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_test_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConnectionTestStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_test_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Test At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_id",
+          "openrouter_model_id",
+          "display_name",
+          "provider",
+          "purpose",
+          "status",
+          "input_modalities",
+          "output_modalities",
+          "supports_json_schema",
+          "context_length",
+          "current_price",
+          "last_test_status",
+          "last_test_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ModelRead"
+      },
+      "ModelSelectionRequest": {
+        "properties": {
+          "model_id": {
+            "type": "integer",
+            "title": "Model Id"
+          },
+          "execution_provider": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Execution Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_id",
+          "execution_provider"
+        ],
+        "title": "ModelSelectionRequest",
+        "description": "비교 실행에서 고른 모델 한 칸. 필드 이름은 simulation_results 컬럼과 같다."
+      },
+      "ModelSortField": {
+        "type": "string",
+        "enum": [
+          "display_name",
+          "openrouter_model_id",
+          "provider",
+          "input_modalities",
+          "price_input",
+          "price_output",
+          "status",
+          "last_test_at",
+          "last_test_status",
+          "purpose",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ModelSortField",
+        "description": "목록을 정렬할 수 있는 값. 이 밖의 값은 거절한다."
+      },
+      "ModelStatus": {
+        "type": "string",
+        "enum": [
+          "TESTING",
+          "ACTIVE",
+          "INACTIVE"
+        ],
+        "title": "ModelStatus",
+        "description": "등록 모델 상태. 시뮬레이션 결과에는 실행 당시 상태로 복사해 둔다."
+      },
+      "PriceRead": {
+        "properties": {
+          "price_id": {
+            "type": "integer",
+            "title": "Price Id"
+          },
+          "execution_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Provider"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "price_status": {
+            "$ref": "#/components/schemas/PriceStatus"
+          },
+          "input_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Price Per Token"
+          },
+          "output_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Price Per Token"
+          },
+          "cache_read_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Price Per Token"
+          },
+          "cache_write_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Price Per Token"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PriceSource"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Effective From"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "price_id",
+          "execution_provider",
+          "currency",
+          "price_status",
+          "input_price_per_token",
+          "output_price_per_token",
+          "cache_read_price_per_token",
+          "cache_write_price_per_token",
+          "source",
+          "effective_from",
+          "effective_to",
+          "checked_at"
+        ],
+        "title": "PriceRead",
+        "description": "토큰 1개당 단가(USD). 금액은 문자열로 내려간다."
+      },
+      "PriceSource": {
+        "type": "string",
+        "enum": [
+          "OPENROUTER_MODELS",
+          "OPENROUTER_ENDPOINTS",
+          "MANUAL"
+        ],
+        "title": "PriceSource"
+      },
+      "PriceStatus": {
+        "type": "string",
+        "enum": [
+          "KNOWN",
+          "UNKNOWN"
+        ],
+        "title": "PriceStatus"
+      },
+      "RequestCancelOutcome": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "slot_no": {
+            "type": "integer",
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Slot No"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/CancelDecision"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "slot_no",
+          "decision",
+          "status"
+        ],
+        "title": "RequestCancelOutcome",
+        "description": "모델 한 칸의 취소 처리 결과. decision 은 decide_request_cancel 이 내린 판정이다.\n\n비용은 싣지 않는다. 취소된 호출의 비용은 대조(reconcile) 전까지 미확인이라 여기서 0 으로 보일 수 있다."
+      },
+      "RequestRowSort": {
+        "type": "string",
+        "enum": [
+          "requestedAt",
+          "customer",
+          "service",
+          "model",
+          "taskType",
+          "tokens",
+          "cost",
+          "costStatus",
+          "status"
+        ],
+        "title": "RequestRowSort",
+        "description": "호출 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다."
+      },
+      "RequestStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "RUNNING",
+          "SUCCESS",
+          "FAILED",
+          "TIMEOUT",
+          "CANCELLED"
+        ],
+        "title": "RequestStatus"
+      },
+      "RerunBlockReason": {
+        "type": "string",
+        "enum": [
+          "INPUT_MISSING"
+        ],
+        "title": "RerunBlockReason",
+        "description": "재실행을 시작할 수 없는 사유. 모델 상태는 사유가 아니다(교체·제외하면 되므로)."
+      },
+      "RerunModel": {
+        "properties": {
+          "model_id": {
+            "type": "integer",
+            "title": "Model Id"
+          },
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider"
+          },
+          "current_display_name": {
+            "type": "string",
+            "title": "Current Display Name"
+          },
+          "current_status": {
+            "$ref": "#/components/schemas/ModelStatus"
+          },
+          "selectable": {
+            "type": "boolean",
+            "title": "Selectable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_id",
+          "execution_provider",
+          "current_display_name",
+          "current_status",
+          "selectable"
+        ],
+        "title": "RerunModel",
+        "description": "재실행 초안의 모델 한 칸. 과거에 고른 값에 모델의 현재 상태를 더해 교체·제외 안내를 돕는다."
+      },
+      "RerunRoutingPolicy": {
+        "properties": {
+          "allow_fallbacks": {
+            "type": "boolean",
+            "title": "Allow Fallbacks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "allow_fallbacks"
+        ],
+        "title": "RerunRoutingPolicy",
+        "description": "재실행 초안에 돌려주는 Provider 정책. 사용자가 고칠 값만 담는다.\n\n과거 기록에는 서버가 적어 둔 값(require_parameters 등)이 더 들어 있으므로\n모르는 키는 거절하지 않고 버린다(pydantic 기본 동작)."
+      },
+      "RoutingPolicy": {
+        "properties": {
+          "allow_fallbacks": {
+            "type": "boolean",
+            "title": "Allow Fallbacks",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RoutingPolicy",
+        "description": "사용자가 정하는 Provider 정책. 키 이름은 simulation_runs.routing_policy 에 저장되는 값과 같다.\n\n업체 순서(order)는 모델 칸마다 execution_provider 로 정해지므로 여기에는 없다.\nrequire_parameters(요청한 설정을 모두 지원하는 업체만 사용)는 비교 실행의 고정 조건이라\n사용자가 정하지 않는다. 서버가 정해서 호출하고, 실제로 보낸 값을 저장할 때 함께 기록한다."
+      },
+      "SimulationAccepted": {
+        "properties": {
+          "simulation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Simulation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "simulation_id"
+        ],
+        "title": "SimulationAccepted",
+        "description": "실행 요청을 받았다는 응답(202). 진행과 결과는 이 ID 로 조회한다."
+      },
+      "SimulationCancelResponse": {
+        "properties": {
+          "simulation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Simulation Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SimulationStatus"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/RequestCancelOutcome"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "simulation_id",
+          "status",
+          "results"
+        ],
+        "title": "SimulationCancelResponse",
+        "description": "취소 요청 응답. 실행 전체 취소는 칸 전부를, 모델 하나 취소는 그 칸 하나를 담는다."
+      },
+      "SimulationCreateRequest": {
+        "properties": {
+          "test_type": {
+            "$ref": "#/components/schemas/TestType"
+          },
+          "rerun_of_simulation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rerun Of Simulation Id"
+          },
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Id"
+          },
+          "prompt_text": {
+            "type": "string",
+            "pattern": "\\S",
+            "title": "Prompt Text"
+          },
+          "input_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Text"
+          },
+          "json_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Schema"
+          },
+          "execution_config": {
+            "$ref": "#/components/schemas/ExecutionConfig"
+          },
+          "routing_policy": {
+            "$ref": "#/components/schemas/RoutingPolicy"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelSelectionRequest"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 2,
+            "title": "Models"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "test_type",
+          "prompt_text",
+          "models"
+        ],
+        "title": "SimulationCreateRequest",
+        "description": "비교 실행 요청. simulation_runs 한 행을 만들 재료 중 사용자가 정하는 값만 담는다.\n\nproject_id·key_id·executed_by 는 서버가 PoC Key 와 실행자 계정(app/api/deps.py)으로 정하고,\nmodel_count·input_hash·status·시각은 서버가 계산하므로 받지 않는다(extra 는 거절)."
+      },
+      "SimulationDetailResponse": {
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/SimulationSummary"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SimulationModelResult"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "results"
+        ],
+        "title": "SimulationDetailResponse",
+        "description": "진행·결과 조회(S-04) 응답. 완료될 때까지 화면이 같은 요청을 반복해 상태를 확인한다.\n\nresults 에는 칸마다 마지막 시도(is_final_attempt)만 싣는다. 재시도 전 시도는 싣지 않는다."
+      },
+      "SimulationErrorCode": {
+        "type": "string",
+        "enum": [
+          "INVALID_REQUEST",
+          "INPUT_REQUIRED",
+          "SIMULATION_NOT_FOUND",
+          "SLOT_NOT_FOUND",
+          "RERUN_SOURCE_NOT_FOUND",
+          "SCENARIO_NOT_FOUND",
+          "MODEL_NOT_FOUND",
+          "MODEL_NOT_ACTIVE",
+          "PROVIDER_NOT_AVAILABLE",
+          "PERIOD_INCOMPLETE",
+          "PERIOD_START_AFTER_END",
+          "PERIOD_TOO_LONG",
+          "INTERNAL_ERROR"
+        ],
+        "title": "SimulationErrorCode",
+        "description": "시뮬레이터 API 의 오류 코드. 프론트엔드는 이 값으로 상황별로 분기한다."
+      },
+      "SimulationErrorResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/SimulationErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "SimulationErrorResponse",
+        "description": "공통 오류 형식 {code, message} 에서 code 를 시뮬레이터 코드로 좁힌 응답.\n\n라우터가 responses= 에 이 모델을 지정하면 OpenAPI 에 코드 목록(enum)이 실린다."
+      },
+      "SimulationHistoryList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SimulationSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "truncated"
+        ],
+        "title": "SimulationHistoryList",
+        "description": "이력 목록 응답. 요청 시각 최신 순(같으면 실행 ID 내림차순)으로 준다.\n\n항목은 진행·결과 조회의 요약과 같은 모양이라 합계 계산을 한 곳(뷰)에서만 한다.\ntotal 은 조건에 맞는 전체 건수, truncated 는 상한 때문에 items 가 전체보다 적은지다."
+      },
+      "SimulationModelResult": {
+        "properties": {
+          "slot_no": {
+            "type": "integer",
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Slot No"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "model_id": {
+            "type": "integer",
+            "title": "Model Id"
+          },
+          "model_display_name_at_run": {
+            "type": "string",
+            "title": "Model Display Name At Run"
+          },
+          "model_status_at_run": {
+            "$ref": "#/components/schemas/ModelStatus"
+          },
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider"
+          },
+          "actual_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Provider"
+          },
+          "actual_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Model"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus"
+          },
+          "error_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "decimal_places": 18
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "cost_status": {
+            "$ref": "#/components/schemas/CostStatus"
+          },
+          "json_parse_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValidationStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_validation_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValidationStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missing_required_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Required Fields"
+          },
+          "comparability_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparability Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slot_no",
+          "request_id",
+          "model_id",
+          "model_display_name_at_run",
+          "model_status_at_run",
+          "execution_provider",
+          "actual_provider",
+          "actual_model",
+          "status",
+          "error_type",
+          "latency_ms",
+          "input_tokens",
+          "output_tokens",
+          "cost_usd",
+          "cost_status",
+          "json_parse_status",
+          "schema_validation_status",
+          "missing_required_fields",
+          "comparability_note"
+        ],
+        "title": "SimulationModelResult",
+        "description": "모델 한 칸의 결과. 응답 본문은 길어서 넣지 않고 원문 조회 API 로 따로 준다."
+      },
+      "SimulationRerunDraft": {
+        "properties": {
+          "rerun_of_simulation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Rerun Of Simulation Id"
+          },
+          "test_type": {
+            "$ref": "#/components/schemas/TestType"
+          },
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Id"
+          },
+          "prompt_text": {
+            "type": "string",
+            "title": "Prompt Text"
+          },
+          "input_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Text"
+          },
+          "json_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Schema"
+          },
+          "execution_config": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Execution Config"
+          },
+          "routing_policy": {
+            "$ref": "#/components/schemas/RerunRoutingPolicy"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/RerunModel"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 2,
+            "title": "Models"
+          },
+          "rerunnable": {
+            "type": "boolean",
+            "title": "Rerunnable"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RerunBlockReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "rerun_of_simulation_id",
+          "test_type",
+          "scenario_id",
+          "prompt_text",
+          "input_text",
+          "json_schema",
+          "execution_config",
+          "routing_policy",
+          "models",
+          "rerunnable",
+          "blocked_reason"
+        ],
+        "title": "SimulationRerunDraft",
+        "description": "재실행 초안(S-09) 응답. 과거 실행의 입력값을 그대로 돌려주어 화면 입력칸을 채운다.\n\n입력 필드는 비교 실행 요청(SimulationCreateRequest)과 같고, 화면이 안내에 쓰는\nrerunnable·blocked_reason 과 모델 칸의 현재 상태가 더해진다. 사용자가 고친 값은\n그 둘을 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).\n과거 이력은 지금 규칙으로 다시 거절하지 않는다. 새 실행 요청이 들어올 때 검증한다."
+      },
+      "SimulationStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "RUNNING",
+          "SUCCESS",
+          "PARTIAL_SUCCESS",
+          "FAILED",
+          "CANCELLED"
+        ],
+        "title": "SimulationStatus"
+      },
+      "SimulationSummary": {
+        "properties": {
+          "simulation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Simulation Id"
+          },
+          "rerun_of_simulation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rerun Of Simulation Id"
+          },
+          "test_type": {
+            "$ref": "#/components/schemas/TestType"
+          },
+          "scenario_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Code"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SimulationStatus"
+          },
+          "model_count": {
+            "type": "integer",
+            "maximum": 4.0,
+            "minimum": 2.0,
+            "title": "Model Count"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "executed_by": {
+            "type": "integer",
+            "title": "Executed By"
+          },
+          "final_result_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Final Result Count"
+          },
+          "success_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Success Count"
+          },
+          "failure_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Failure Count"
+          },
+          "confirmed_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "decimal_places": 18
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed Cost Usd"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "decimal_places": 18
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Unknown Cost Count"
+          },
+          "cost_check_status": {
+            "$ref": "#/components/schemas/CostCheckStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "simulation_id",
+          "rerun_of_simulation_id",
+          "test_type",
+          "scenario_code",
+          "status",
+          "model_count",
+          "requested_at",
+          "completed_at",
+          "executed_by",
+          "final_result_count",
+          "success_count",
+          "failure_count",
+          "confirmed_cost_usd",
+          "estimated_cost_usd",
+          "unknown_cost_count",
+          "cost_check_status"
+        ],
+        "title": "SimulationSummary",
+        "description": "비교 실행 한 건의 요약. v_simulation_summary 한 행과 같은 칸이며 여기서 다시 계산하지 않는다.\n\nconfirmed_cost_usd·estimated_cost_usd 가 null 이면 그 상태의 호출이 하나도 없다는 뜻이다(0 이 아님).\n비용 미확인 호출은 금액 합계에 넣지 않고 unknown_cost_count 로 센다."
+      },
+      "SortOrder": {
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "title": "SortOrder"
+      },
+      "TestType": {
+        "type": "string",
+        "enum": [
+          "SCENARIO",
+          "CUSTOM"
+        ],
+        "title": "TestType"
+      },
+      "UsageOption": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "UsageOption"
+      },
+      "UsageOptions": {
+        "properties": {
+          "customers": {
+            "items": {
+              "$ref": "#/components/schemas/UsageOption"
+            },
+            "type": "array",
+            "title": "Customers"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/UsageOption"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/UsageOption"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customers",
+          "services",
+          "models"
+        ],
+        "title": "UsageOptions",
+        "description": "선택 상자 목록. 서비스는 고객용만, 모델은 고객 호출에 쓰인 것만 준다."
+      },
+      "UsageSummary": {
+        "properties": {
+          "comparison_start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Comparison Start Date"
+          },
+          "comparison_end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Comparison End Date"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "call_count": {
+            "type": "integer",
+            "title": "Call Count"
+          },
+          "success_count": {
+            "type": "integer",
+            "title": "Success Count"
+          },
+          "failed_count": {
+            "type": "integer",
+            "title": "Failed Count"
+          },
+          "timeout_count": {
+            "type": "integer",
+            "title": "Timeout Count"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "confirmed_cost_usd": {
+            "type": "string",
+            "title": "Confirmed Cost Usd"
+          },
+          "estimated_cost_usd": {
+            "type": "string",
+            "title": "Estimated Cost Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          },
+          "task_change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Change Pct"
+          },
+          "call_change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Change Pct"
+          },
+          "confirmed_cost_change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed Cost Change Pct"
+          },
+          "estimated_cost_change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Change Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "comparison_start_date",
+          "comparison_end_date",
+          "task_count",
+          "call_count",
+          "success_count",
+          "failed_count",
+          "timeout_count",
+          "input_tokens",
+          "output_tokens",
+          "confirmed_cost_usd",
+          "estimated_cost_usd",
+          "unknown_cost_count",
+          "task_change_pct",
+          "call_change_pct",
+          "confirmed_cost_change_pct",
+          "estimated_cost_change_pct"
+        ],
+        "title": "UsageSummary",
+        "description": "요약 카드. *_change_pct는 직전 동일 길이 기간 대비 증감률이고 비교할 값이 0이면 null이다."
+      },
+      "UsageTrend": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UsageTrendPoint"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "UsageTrend",
+        "description": "조회 기간의 모든 KST 날짜. 호출이 없는 날도 0으로 채운다."
+      },
+      "UsageTrendPoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "call_count": {
+            "type": "integer",
+            "title": "Call Count"
+          },
+          "confirmed_cost_usd": {
+            "type": "string",
+            "title": "Confirmed Cost Usd"
+          },
+          "estimated_cost_usd": {
+            "type": "string",
+            "title": "Estimated Cost Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "task_count",
+          "call_count",
+          "confirmed_cost_usd",
+          "estimated_cost_usd",
+          "unknown_cost_count"
+        ],
+        "title": "UsageTrendPoint"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ValidationStatus": {
+        "type": "string",
+        "enum": [
+          "PASSED",
+          "FAILED",
+          "NOT_APPLICABLE",
+          "NOT_EXECUTED"
+        ],
+        "title": "ValidationStatus",
+        "description": "시뮬레이션 결과의 JSON 파싱·Schema 검증 결과."
+      }
+    }
+  }
+}
