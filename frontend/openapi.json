@@ -2038,6 +2038,744 @@
           }
         }
       }
+    },
+    "/api/usage/internal/summary": {
+      "get": {
+        "tags": [
+          "internal-budget"
+        ],
+        "summary": "Read Summary",
+        "operationId": "read_summary_api_usage_internal_summary_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/internal/trend": {
+      "get": {
+        "tags": [
+          "internal-budget"
+        ],
+        "summary": "Read Trend",
+        "operationId": "read_trend_api_usage_internal_trend_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalTrend"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/internal/requests": {
+      "get": {
+        "tags": [
+          "internal-budget"
+        ],
+        "summary": "Read Requests",
+        "operationId": "read_requests_api_usage_internal_requests_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/InternalRequestSort",
+              "default": "requestedAt"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "default": "desc"
+            }
+          },
+          {
+            "name": "preview",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Preview"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalRequestPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/internal/options": {
+      "get": {
+        "tags": [
+          "internal-budget"
+        ],
+        "summary": "Read Options",
+        "operationId": "read_options_api_usage_internal_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalOptions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usage/internal/projects": {
+      "get": {
+        "tags": [
+          "internal-budget"
+        ],
+        "summary": "Read Project Budgets",
+        "operationId": "read_project_budgets_api_usage_internal_projects_get",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Month"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectRowSort",
+              "default": "used"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "default": "desc"
+            }
+          },
+          {
+            "name": "preview",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Preview"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectBudgetPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/internal/projects/{project_id}": {
+      "get": {
+        "tags": [
+          "internal-budget"
+        ],
+        "summary": "Read Project Detail",
+        "operationId": "read_project_detail_api_usage_internal_projects__project_id__get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectUsageDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/usage/internal/projects/{project_id}/budget": {
+      "put": {
+        "tags": [
+          "internal-budget"
+        ],
+        "summary": "Save Budget",
+        "operationId": "save_budget_api_usage_internal_projects__project_id__budget_put",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectBudgetSave"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectBudgetRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/subscriptions": {
+      "get": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Read Subscriptions",
+        "operationId": "read_subscriptions_api_subscriptions_get",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionList"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Create Subscription",
+        "operationId": "create_subscription_api_subscriptions_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionRow"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/subscriptions/options": {
+      "get": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Read Options",
+        "operationId": "read_options_api_subscriptions_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOptions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subscriptions/{subscription_id}": {
+      "patch": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Update Subscription",
+        "operationId": "update_subscription_api_subscriptions__subscription_id__patch",
+        "parameters": [
+          {
+            "name": "subscription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Subscription Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionRow"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2926,6 +3664,319 @@
         ],
         "title": "HealthRead"
       },
+      "InternalOptions": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/UsageOption"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/UsageOption"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/UsageOption"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "projects",
+          "services",
+          "models"
+        ],
+        "title": "InternalOptions",
+        "description": "선택 상자 목록. 프로젝트는 사용 중인 것, 서비스와 모델은 내부 호출에 쓰인 것만 준다."
+      },
+      "InternalRequestPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InternalRequestRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "InternalRequestPage"
+      },
+      "InternalRequestRow": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "usage_origin": {
+            "$ref": "#/components/schemas/UsageOrigin"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Name"
+          },
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "service_name": {
+            "type": "string",
+            "title": "Service Name"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "task_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Type"
+          },
+          "task_type_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Type Label"
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "cost_status": {
+            "$ref": "#/components/schemas/CostStatus"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus"
+          },
+          "error_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "requested_at",
+          "usage_origin",
+          "project_id",
+          "project_name",
+          "service_id",
+          "service_name",
+          "model",
+          "task_id",
+          "task_type",
+          "task_type_label",
+          "tokens",
+          "cost_usd",
+          "cost_status",
+          "status",
+          "error_type"
+        ],
+        "title": "InternalRequestRow"
+      },
+      "InternalRequestSort": {
+        "type": "string",
+        "enum": [
+          "requestedAt",
+          "project",
+          "service",
+          "model",
+          "taskType",
+          "tokens",
+          "cost",
+          "costStatus",
+          "status"
+        ],
+        "title": "InternalRequestSort",
+        "description": "호출 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다."
+      },
+      "InternalSummary": {
+        "properties": {
+          "api_confirmed_usd": {
+            "type": "string",
+            "title": "Api Confirmed Usd"
+          },
+          "api_estimated_usd": {
+            "type": "string",
+            "title": "Api Estimated Usd"
+          },
+          "subscription_usd": {
+            "type": "string",
+            "title": "Subscription Usd"
+          },
+          "total_managed_usd": {
+            "type": "string",
+            "title": "Total Managed Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          },
+          "includes_estimate": {
+            "type": "boolean",
+            "title": "Includes Estimate"
+          },
+          "has_unknown": {
+            "type": "boolean",
+            "title": "Has Unknown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_confirmed_usd",
+          "api_estimated_usd",
+          "subscription_usd",
+          "total_managed_usd",
+          "unknown_cost_count",
+          "includes_estimate",
+          "has_unknown"
+        ],
+        "title": "InternalSummary",
+        "description": "비용 요약 카드. 미확인 비용은 금액에 넣지 않고 건수로만 센다."
+      },
+      "InternalTrend": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InternalTrendPoint"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "InternalTrend",
+        "description": "조회 기간의 모든 KST 날짜. 호출이 없는 날도 0으로 채운다. 구독료는 날짜별로 나누지 않아 넣지 않는다."
+      },
+      "InternalTrendPoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "api_confirmed_usd": {
+            "type": "string",
+            "title": "Api Confirmed Usd"
+          },
+          "api_estimated_usd": {
+            "type": "string",
+            "title": "Api Estimated Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "api_confirmed_usd",
+          "api_estimated_usd",
+          "unknown_cost_count"
+        ],
+        "title": "InternalTrendPoint"
+      },
       "JsonValue": {},
       "LoginRequest": {
         "properties": {
@@ -3703,6 +4754,424 @@
           "UNKNOWN"
         ],
         "title": "PriceStatus"
+      },
+      "ProjectBudgetPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectBudgetRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "ProjectBudgetPage"
+      },
+      "ProjectBudgetRead": {
+        "properties": {
+          "budget_id": {
+            "type": "integer",
+            "title": "Budget Id"
+          },
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id"
+          },
+          "monthly_amount_usd": {
+            "type": "string",
+            "title": "Monthly Amount Usd"
+          },
+          "effective_from_month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Effective From Month"
+          },
+          "effective_to_month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To Month"
+          }
+        },
+        "type": "object",
+        "required": [
+          "budget_id",
+          "project_id",
+          "monthly_amount_usd",
+          "effective_from_month",
+          "effective_to_month"
+        ],
+        "title": "ProjectBudgetRead"
+      },
+      "ProjectBudgetRow": {
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "monthly_amount_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Amount Usd"
+          },
+          "used_usd": {
+            "type": "string",
+            "title": "Used Usd"
+          },
+          "usage_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Pct"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BudgetStatus"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "monthly_amount_usd",
+          "used_usd",
+          "usage_pct",
+          "status",
+          "unknown_cost_count"
+        ],
+        "title": "ProjectBudgetRow"
+      },
+      "ProjectBudgetSave": {
+        "properties": {
+          "monthly_amount_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Monthly Amount Usd",
+            "decimal_places": 18,
+            "gt": 0,
+            "lt": "1000000000000"
+          },
+          "effective_from_month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Effective From Month"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "monthly_amount_usd",
+          "effective_from_month"
+        ],
+        "title": "ProjectBudgetSave"
+      },
+      "ProjectBudgetUsage": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Month"
+          },
+          "monthly_amount_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Amount Usd"
+          },
+          "effective_from_month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From Month"
+          },
+          "used_usd": {
+            "type": "string",
+            "title": "Used Usd"
+          },
+          "usage_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Pct"
+          },
+          "confirmed_usage_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed Usage Pct"
+          },
+          "remaining_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BudgetStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "monthly_amount_usd",
+          "effective_from_month",
+          "used_usd",
+          "usage_pct",
+          "confirmed_usage_pct",
+          "remaining_usd",
+          "unknown_cost_count",
+          "status"
+        ],
+        "title": "ProjectBudgetUsage",
+        "description": "그 달의 프로젝트 예산 현황. 사용액에는 이 프로젝트에 귀속된 구독료가 들어간다."
+      },
+      "ProjectRowSort": {
+        "type": "string",
+        "enum": [
+          "project",
+          "budget",
+          "used",
+          "usage",
+          "status"
+        ],
+        "title": "ProjectRowSort",
+        "description": "프로젝트 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다."
+      },
+      "ProjectServiceUsage": {
+        "properties": {
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "service_name": {
+            "type": "string",
+            "title": "Service Name"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "call_count": {
+            "type": "integer",
+            "title": "Call Count"
+          },
+          "confirmed_cost_usd": {
+            "type": "string",
+            "title": "Confirmed Cost Usd"
+          },
+          "estimated_cost_usd": {
+            "type": "string",
+            "title": "Estimated Cost Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          },
+          "budget_share_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Share Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service_id",
+          "service_name",
+          "task_count",
+          "call_count",
+          "confirmed_cost_usd",
+          "estimated_cost_usd",
+          "unknown_cost_count",
+          "budget_share_pct"
+        ],
+        "title": "ProjectServiceUsage",
+        "description": "서비스별 사용량. 서비스별 예산이 아니라 프로젝트 예산에서 차지하는 비중이다."
+      },
+      "ProjectSubscription": {
+        "properties": {
+          "subscription_id": {
+            "type": "integer",
+            "title": "Subscription Id"
+          },
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "amount_usd": {
+            "type": "string",
+            "title": "Amount Usd"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subscription_id",
+          "tool_name",
+          "amount_usd",
+          "status"
+        ],
+        "title": "ProjectSubscription"
+      },
+      "ProjectUsageDetail": {
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Month"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "call_count": {
+            "type": "integer",
+            "title": "Call Count"
+          },
+          "confirmed_cost_usd": {
+            "type": "string",
+            "title": "Confirmed Cost Usd"
+          },
+          "estimated_cost_usd": {
+            "type": "string",
+            "title": "Estimated Cost Usd"
+          },
+          "subscription_usd": {
+            "type": "string",
+            "title": "Subscription Usd"
+          },
+          "unknown_cost_count": {
+            "type": "integer",
+            "title": "Unknown Cost Count"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/ProjectBudgetUsage"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectServiceUsage"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "subscriptions": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectSubscription"
+            },
+            "type": "array",
+            "title": "Subscriptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "month",
+          "task_count",
+          "call_count",
+          "confirmed_cost_usd",
+          "estimated_cost_usd",
+          "subscription_usd",
+          "unknown_cost_count",
+          "budget",
+          "services",
+          "subscriptions"
+        ],
+        "title": "ProjectUsageDetail"
       },
       "ProviderListResponse": {
         "properties": {
@@ -4520,6 +5989,323 @@
         ],
         "title": "SortOrder"
       },
+      "SubscriptionCreate": {
+        "properties": {
+          "subscription_reference": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Subscription Reference"
+          },
+          "tool_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Tool Name"
+          },
+          "subscription_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subscription Type"
+          },
+          "applied_month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Applied Month"
+          },
+          "amount_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount Usd",
+            "decimal_places": 4,
+            "ge": 0,
+            "lt": "10000000000"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "subscription_reference",
+          "tool_name",
+          "applied_month",
+          "amount_usd"
+        ],
+        "title": "SubscriptionCreate",
+        "description": "구독료 등록. 같은 subscription_reference와 applied_month는 한 번만 등록할 수 있다."
+      },
+      "SubscriptionErrorCode": {
+        "type": "string",
+        "enum": [
+          "SUBSCRIPTION_DUPLICATE"
+        ],
+        "title": "SubscriptionErrorCode",
+        "description": "프론트엔드는 이 값으로 상황별로 화면을 나눈다."
+      },
+      "SubscriptionErrorResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/SubscriptionErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "SubscriptionErrorResponse",
+        "description": "공통 오류 형식 {code, message}에서 code를 구독료 코드로 좁힌 응답."
+      },
+      "SubscriptionList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionRow"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "SubscriptionList"
+      },
+      "SubscriptionOptions": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionProject"
+            },
+            "type": "array",
+            "title": "Projects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "projects"
+        ],
+        "title": "SubscriptionOptions"
+      },
+      "SubscriptionProject": {
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "name"
+        ],
+        "title": "SubscriptionProject"
+      },
+      "SubscriptionRow": {
+        "properties": {
+          "subscription_id": {
+            "type": "integer",
+            "title": "Subscription Id"
+          },
+          "subscription_reference": {
+            "type": "string",
+            "title": "Subscription Reference"
+          },
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "subscription_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subscription Type"
+          },
+          "applied_month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Applied Month"
+          },
+          "amount_usd": {
+            "type": "string",
+            "title": "Amount Usd"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subscription_id",
+          "subscription_reference",
+          "tool_name",
+          "subscription_type",
+          "applied_month",
+          "amount_usd",
+          "project_id",
+          "project_name",
+          "status",
+          "note"
+        ],
+        "title": "SubscriptionRow"
+      },
+      "SubscriptionStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "CANCELLED"
+        ],
+        "title": "SubscriptionStatus"
+      },
+      "SubscriptionUpdate": {
+        "properties": {
+          "amount_usd": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "decimal_places": 4,
+                "ge": 0,
+                "lt": "10000000000"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Usd"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubscriptionStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SubscriptionUpdate",
+        "description": "보낸 항목만 바꾼다. project_id와 note는 null을 보내면 값이 지워진다."
+      },
       "TestType": {
         "type": "string",
         "enum": [
@@ -4578,6 +6364,17 @@
         ],
         "title": "UsageOptions",
         "description": "선택 상자 목록. 서비스는 고객용만, 모델은 고객 호출에 쓰인 것만 준다."
+      },
+      "UsageOrigin": {
+        "type": "string",
+        "enum": [
+          "CUSTOMER_SERVICE",
+          "INTERNAL_DEVELOPMENT",
+          "SIMULATION",
+          "SYSTEM_TEST"
+        ],
+        "title": "UsageOrigin",
+        "description": "호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트)를 섞지 않는다."
       },
       "UsageSummary": {
         "properties": {
