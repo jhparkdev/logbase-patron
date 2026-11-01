@@ -8,7 +8,6 @@ import {
 } from "../../features/customer-usage/api/usage";
 import { CustomerPanel } from "../../features/customer-usage/components/CustomerPanel";
 import { CustomerUsageTable } from "../../features/customer-usage/components/CustomerUsageTable";
-import { DataBlock } from "../../features/customer-usage/components/DataBlock";
 import { RequestTable } from "../../features/customer-usage/components/RequestTable";
 import { SummaryCards } from "../../features/customer-usage/components/SummaryCards";
 import { SummarySkeleton } from "../../features/customer-usage/components/SummarySkeleton";
@@ -21,6 +20,7 @@ import {
   filterFormValues,
   filterSearchParams,
 } from "../../features/customer-usage/lib/search";
+import { DataBlock } from "../../shared/components/ui/DataBlock";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 import { RefreshingBar } from "../../shared/components/ui/RefreshingBar";
 
