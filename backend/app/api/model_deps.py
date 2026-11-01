@@ -6,8 +6,11 @@ from typing import Annotated
 
 import httpx
 from fastapi import Depends
+from pydantic import SecretStr
 
+from app.api.deps import SettingsDep
 from app.openrouter.client import OpenRouterClient
+from app.services.model_test import ConnectionCaller
 from app.services.openrouter_catalog import OpenRouterCatalog
 
 
@@ -22,3 +25,26 @@ def get_openrouter_catalog() -> OpenRouterCatalog:
 
 
 CatalogDep = Annotated[OpenRouterCatalog, Depends(get_openrouter_catalog)]
+
+
+@lru_cache
+def _shared_caller(api_key: SecretStr) -> ConnectionCaller:
+    """프로세스에 하나만 둔다. 클라이언트를 앱 수명 동안 재사용한다."""
+    client = OpenRouterClient(
+        http_client=httpx.AsyncClient(), api_key=api_key.get_secret_value()
+    )
+    return client.call_model
+
+
+def get_connection_caller(settings: SettingsDep) -> ConnectionCaller | None:
+    """연결 테스트에 쓸 모델 호출기. Key가 없거나 비어 있으면 None이다.
+
+    테스트는 app.dependency_overrides로 바꿔 끼운다.
+    """
+    key = settings.openrouter_api_key
+    if key is None or not key.get_secret_value().strip():
+        return None
+    return _shared_caller(key)
+
+
+ConnectionCallerDep = Annotated[ConnectionCaller | None, Depends(get_connection_caller)]

@@ -19,6 +19,8 @@ class ModelErrorCode(StrEnum):
     INVALID_STATUS_TRANSITION = "INVALID_STATUS_TRANSITION"
     # 사용 중으로 바꾸려는데 24시간 안에 성공한 연결 테스트가 없음. 값은 StatusChangeError와 같다.
     TEST_NOT_PASSED = "TEST_NOT_PASSED"
+    # 연결 테스트를 하려는데 서버에 OpenRouter Key가 설정되어 있지 않음
+    OPENROUTER_KEY_MISSING = "OPENROUTER_KEY_MISSING"
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,9 @@ ERROR_SPECS: dict[ModelErrorCode, ErrorSpec] = {
     ),
     ModelErrorCode.TEST_NOT_PASSED: ErrorSpec(
         409, "24시간 안에 성공한 연결 테스트가 없어 바꿀 수 없습니다."
+    ),
+    ModelErrorCode.OPENROUTER_KEY_MISSING: ErrorSpec(
+        503, "OpenRouter Key가 설정되지 않아 연결 테스트를 할 수 없습니다."
     ),
 }
 
