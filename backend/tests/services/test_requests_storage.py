@@ -47,6 +47,60 @@ async def pending_record(factory: Factory) -> PendingRecord:
     )
 
 
+async def test_create_pending_accepts_the_service_fixed_on_the_key(
+    db_session: AsyncSession, factory: Factory, pending_record: PendingRecord
+) -> None:
+    key = await factory.api_key(service_id=pending_record.service_id)
+
+    await requests.create_pending(
+        db_session, replace(pending_record, key_id=key["key_id"])
+    )
+
+    assert (
+        await db_session.scalar(
+            text("SELECT service_id FROM ai_requests WHERE request_id = :id"),
+            {"id": pending_record.request_id},
+        )
+        == pending_record.service_id
+    )
+
+
+async def test_create_pending_refuses_a_service_other_than_the_one_fixed_on_the_key(
+    db_session: AsyncSession, factory: Factory, pending_record: PendingRecord
+) -> None:
+    other_service = await factory.service()
+    key = await factory.api_key(service_id=other_service["service_id"])
+
+    with pytest.raises(requests.KeyServiceMismatchError):
+        await requests.create_pending(
+            db_session, replace(pending_record, key_id=key["key_id"])
+        )
+
+    assert (
+        await db_session.scalar(
+            text("SELECT count(*) FROM ai_requests WHERE request_id = :id"),
+            {"id": pending_record.request_id},
+        )
+        == 0
+    )
+
+
+async def test_create_pending_lets_a_shared_key_call_any_service(
+    db_session: AsyncSession, factory: Factory, pending_record: PendingRecord
+) -> None:
+    """PoC Key처럼 service_id가 NULL인 Key는 시뮬레이터와 연결 테스트가 함께 쓴다."""
+    for _ in range(2):
+        service = await factory.service()
+        await requests.create_pending(
+            db_session,
+            replace(
+                pending_record,
+                request_id=uuid.uuid4(),
+                service_id=service["service_id"],
+            ),
+        )
+
+
 async def test_create_pending_preserves_the_supplied_identifiers_and_configuration(
     db_session: AsyncSession, pending_record: PendingRecord
 ) -> None:
