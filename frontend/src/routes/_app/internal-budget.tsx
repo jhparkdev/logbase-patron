@@ -11,14 +11,13 @@ import { SubscriptionPanel } from "../../features/internal-budget/components/Sub
 import { SubscriptionTable } from "../../features/internal-budget/components/SubscriptionTable";
 import { SummaryCards } from "../../features/internal-budget/components/SummaryCards";
 import { SummarySkeleton } from "../../features/internal-budget/components/SummarySkeleton";
-import { parseBudgetSearch } from "../../features/internal-budget/lib/search";
+import { budgetSearchSchema } from "../../features/internal-budget/lib/search";
 import { DataBlock } from "../../shared/components/ui/DataBlock";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 import { RefreshingBar } from "../../shared/components/ui/RefreshingBar";
 
 export const Route = createFileRoute("/_app/internal-budget")({
-  // 주소를 읽을 때마다 현재 시각으로 기본 기간(이번 달)을 정한다.
-  validateSearch: (search) => parseBudgetSearch(search, new Date()),
+  validateSearch: budgetSearchSchema,
   loaderDeps: ({ search }) => search,
   // 화면 틀을 먼저 그리도록 기다리지 않는다. 실패는 블록마다 따로 보여 주므로 여기서 멈추지 않는다.
   loader: ({ context: { queryClient }, deps }) => {
