@@ -3498,6 +3498,17 @@
             "type": "boolean",
             "title": "Supports Tools"
           },
+          "temperature_supported": {
+            "type": "boolean",
+            "title": "Temperature Supported"
+          },
+          "reasoning_efforts": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningEffort"
+            },
+            "type": "array",
+            "title": "Reasoning Efforts"
+          },
           "context_length": {
             "anyOf": [
               {
@@ -3600,6 +3611,8 @@
           "output_modalities",
           "supports_json_schema",
           "supports_tools",
+          "temperature_supported",
+          "reasoning_efforts",
           "context_length",
           "current_price",
           "last_test_status",
@@ -3792,6 +3805,17 @@
             "type": "boolean",
             "title": "Supports Tools"
           },
+          "temperature_supported": {
+            "type": "boolean",
+            "title": "Temperature Supported"
+          },
+          "reasoning_efforts": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningEffort"
+            },
+            "type": "array",
+            "title": "Reasoning Efforts"
+          },
           "context_length": {
             "anyOf": [
               {
@@ -3858,6 +3882,8 @@
           "output_modalities",
           "supports_json_schema",
           "supports_tools",
+          "temperature_supported",
+          "reasoning_efforts",
           "context_length",
           "current_price",
           "last_test_status",
@@ -4602,6 +4628,7 @@
           "MODEL_NOT_FOUND",
           "MODEL_NOT_ACTIVE",
           "MODEL_IMAGE_NOT_SUPPORTED",
+          "MODEL_PARAMETER_NOT_SUPPORTED",
           "IMAGE_REQUIRED",
           "IMAGE_NOT_FOUND",
           "IMAGE_EMPTY",

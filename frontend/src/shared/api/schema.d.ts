@@ -868,6 +868,10 @@ export interface components {
             supports_json_schema: boolean;
             /** Supports Tools */
             supports_tools: boolean;
+            /** Temperature Supported */
+            temperature_supported: boolean;
+            /** Reasoning Efforts */
+            reasoning_efforts: components["schemas"]["ReasoningEffort"][];
             /** Context Length */
             context_length: number | null;
             current_price: components["schemas"]["PriceRead"] | null;
@@ -967,6 +971,10 @@ export interface components {
             supports_json_schema: boolean;
             /** Supports Tools */
             supports_tools: boolean;
+            /** Temperature Supported */
+            temperature_supported: boolean;
+            /** Reasoning Efforts */
+            reasoning_efforts: components["schemas"]["ReasoningEffort"][];
             /** Context Length */
             context_length: number | null;
             current_price: components["schemas"]["PriceRead"] | null;
@@ -1286,7 +1294,7 @@ export interface components {
          * @description 시뮬레이터 API 의 오류 코드. 프론트엔드는 이 값으로 상황별로 분기한다.
          * @enum {string}
          */
-        SimulationErrorCode: "INVALID_REQUEST" | "DUPLICATE_MODEL_SELECTION" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "MODEL_IMAGE_NOT_SUPPORTED" | "IMAGE_REQUIRED" | "IMAGE_NOT_FOUND" | "IMAGE_EMPTY" | "IMAGE_TOO_LARGE" | "IMAGE_TYPE_NOT_SUPPORTED" | "PROVIDER_NOT_AVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
+        SimulationErrorCode: "INVALID_REQUEST" | "DUPLICATE_MODEL_SELECTION" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "MODEL_IMAGE_NOT_SUPPORTED" | "MODEL_PARAMETER_NOT_SUPPORTED" | "IMAGE_REQUIRED" | "IMAGE_NOT_FOUND" | "IMAGE_EMPTY" | "IMAGE_TOO_LARGE" | "IMAGE_TYPE_NOT_SUPPORTED" | "PROVIDER_NOT_AVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
         /**
          * SimulationErrorResponse
          * @description 공통 오류 형식 {code, message} 에서 code 를 시뮬레이터 코드로 좁힌 응답.
