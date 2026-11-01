@@ -25,7 +25,7 @@ const MAX_QUERY_LENGTH = 100;
 const MAX_PAGE = 100_000;
 
 // 검색어와 제공사가 함께 쓰는 문자열 규칙
-const filterText = z
+export const searchTextSchema = z
   .string()
   .min(1)
   .max(MAX_QUERY_LENGTH)
@@ -34,8 +34,8 @@ const filterText = z
 
 /** 주소 조건은 외부 입력이라 검증. 허용 밖의 값은 버림 */
 export const modelsSearchSchema = z.object({
-  q: filterText.optional().catch(undefined),
-  provider: filterText.optional().catch(undefined),
+  q: searchTextSchema.optional().catch(undefined),
+  provider: searchTextSchema.optional().catch(undefined),
   status: z.enum(MODEL_STATUSES).optional().catch(undefined),
   sort: z.enum(SORT_KEYS).optional().catch(undefined),
   order: z.enum(ORDERS).optional().catch(undefined),

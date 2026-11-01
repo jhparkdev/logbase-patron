@@ -1,5 +1,9 @@
 import { expect, test } from "vitest";
-import { displayNameFormSchema, purposeFormSchema } from "./infoForm";
+import {
+  displayNameFormSchema,
+  purposeFormSchema,
+  registerFormSchema,
+} from "./infoForm";
 
 test("앞뒤 공백은 지우고 값을 돌려준다", () => {
   expect(displayNameFormSchema.safeParse({ value: "  GPT  " })).toMatchObject({
@@ -30,4 +34,17 @@ test("용도는 비워도 되고 200자까지 받는다", () => {
   expect(parse("")).toBe(true);
   expect(parse("a".repeat(200))).toBe(true);
   expect(parse("a".repeat(201))).toBe(false);
+});
+
+test("등록 폼은 표시 이름과 용도를 각 항목과 같은 규칙으로 검증한다", () => {
+  const parse = (displayName: string, purpose: string) =>
+    registerFormSchema.safeParse({ displayName, purpose });
+  expect(parse("  GPT  ", "  요약  ")).toMatchObject({
+    success: true,
+    data: { displayName: "GPT", purpose: "요약" },
+  });
+  expect(parse("", "").success).toBe(false);
+  expect(parse("a".repeat(101), "").success).toBe(false);
+  expect(parse("GPT", "").success).toBe(true);
+  expect(parse("GPT", "a".repeat(201)).success).toBe(false);
 });

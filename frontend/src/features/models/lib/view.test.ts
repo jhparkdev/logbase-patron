@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  modalitiesFlow,
   modalitiesLabel,
   modalityLabel,
   providerOptions,
@@ -94,4 +95,13 @@ test("상태 변경 버튼은 현재 상태를 뺀 사용 중·사용 중단이�
 test("시각이 없으면 빈칸 대신 없음, 있으면 KST로 보여 준다", () => {
   expect(timeOrNone(null)).toBe("없음");
   expect(timeOrNone("2026-10-31T05:32:21Z")).toBe("2026-10-31 14:32:21");
+});
+
+test("입력 형식 → 출력 형식으로 한 줄에 보여 준다", () => {
+  expect(modalitiesFlow(["text", "image"], ["text"])).toBe(
+    "텍스트·이미지 → 텍스트",
+  );
+  expect(modalitiesFlow(["text"], ["text", "image"])).toBe(
+    "텍스트 → 텍스트·이미지",
+  );
 });

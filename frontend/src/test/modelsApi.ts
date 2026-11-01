@@ -87,6 +87,47 @@ export const TEST_RESULT: Schemas["ConnectionTestResult"] = {
   error_message: null,
 };
 
+const OPENROUTER_BASE: Schemas["OpenRouterModelRead"] = {
+  openrouter_model_id: "openai/gpt-4o",
+  name: "GPT-4o",
+  provider: "openai",
+  input_modalities: ["text", "image"],
+  output_modalities: ["text"],
+  context_length: 128000,
+  input_price_per_token: "0.0000025",
+  output_price_per_token: "0.00001",
+  supports_json_schema: true,
+  supports_tools: true,
+  registered: false,
+};
+
+export const OPENROUTER: Schemas["OpenRouterModelListResponse"] = {
+  items: [
+    OPENROUTER_BASE,
+    {
+      ...OPENROUTER_BASE,
+      openrouter_model_id: "openai/gpt-4o-mini",
+      name: "GPT-4o mini",
+      registered: true,
+    },
+    {
+      ...OPENROUTER_BASE,
+      openrouter_model_id: "acme/free-model",
+      name: "Free Model",
+      provider: "acme",
+      input_modalities: ["text"],
+      context_length: 4096,
+      input_price_per_token: null,
+      output_price_per_token: null,
+      supports_json_schema: false,
+      supports_tools: false,
+    },
+  ],
+  page: 1,
+  page_size: 10,
+  total: 3,
+};
+
 export const PROVIDERS: Schemas["ProviderListResponse"] = {
   items: [
     { provider: "openai", model_count: 3 },
@@ -102,6 +143,8 @@ type Replies = {
   update?: Reply;
   test?: Reply;
   status?: Reply;
+  openrouter?: Reply;
+  register?: Reply;
 };
 
 const DETAIL_PATH = /\/api\/models\/\d+$/;
@@ -110,6 +153,13 @@ const STATUS_PATH = /\/api\/models\/\d+\/status$/;
 
 function replyFor(request: Request, replies: Replies): Reply {
   const url = request.url;
+  const { pathname } = new URL(url);
+  if (pathname === "/api/models" && request.method === "POST") {
+    return replies.register ?? { status: 201, body: DETAIL };
+  }
+  if (pathname === "/api/models/openrouter") {
+    return replies.openrouter ?? { status: 200, body: OPENROUTER };
+  }
   if (url.endsWith("/api/models/providers")) {
     return replies.providers ?? { status: 200, body: PROVIDERS };
   }
