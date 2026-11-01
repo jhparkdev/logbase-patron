@@ -5,6 +5,7 @@ import {
   providerOptions,
   STATUS_OPTIONS,
   statusBadge,
+  testCostView,
   testResultView,
 } from "./view";
 
@@ -60,4 +61,24 @@ test("고른 제공사가 받은 목록에 없으면 모델 수 없이 이름만
 test("입력 형식 여러 개는 한국어 이름을 쉼표로 이어 보여 준다", () => {
   expect(modalitiesLabel(["text", "image"])).toBe("텍스트, 이미지");
   expect(modalitiesLabel(["text"])).toBe("텍스트");
+});
+
+test("테스트 비용은 확정과 추정을 구분하고 모르면 금액 없이 미확인이다", () => {
+  expect(
+    testCostView({ cost_usd: "0.0004", cost_status: "CONFIRMED" }),
+  ).toEqual({ kind: "confirmed", amount: "0.0004" });
+  expect(
+    testCostView({ cost_usd: "0.0004", cost_status: "ESTIMATED" }),
+  ).toEqual({ kind: "estimated", amount: "0.0004" });
+  expect(testCostView({ cost_usd: null, cost_status: "UNKNOWN" })).toEqual({
+    kind: "unknown",
+    amount: null,
+  });
+});
+
+test("비용 금액이 없으면 상태가 확정이어도 미확인으로 본다", () => {
+  expect(testCostView({ cost_usd: null, cost_status: "CONFIRMED" })).toEqual({
+    kind: "unknown",
+    amount: null,
+  });
 });

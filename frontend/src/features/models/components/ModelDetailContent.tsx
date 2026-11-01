@@ -1,9 +1,12 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Badge } from "../../../shared/components/ui/Badge";
+import { Button } from "../../../shared/components/ui/Button";
 import { formatCount, formatKstDateTime } from "../../../shared/lib/format";
 import type { ModelDetail } from "../api/models";
 import { displayNameFormSchema, purposeFormSchema } from "../lib/infoForm";
 import { modalitiesLabel, statusBadge } from "../lib/view";
+import { ConnectionTestDialog } from "./ConnectionTestDialog";
+import { Row, Rows } from "./DetailRows";
 import { EditableInfoRow } from "./EditableInfoRow";
 import { LastTestCell, PriceCell } from "./ModelCells";
 
@@ -31,26 +34,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** 항목 이름과 값을 두 줄 격자로 나열 */
-function Rows({ children }: { children: ReactNode }) {
-  return (
-    <dl className="grid grid-cols-[8.5rem_1fr] items-center gap-x-4 gap-y-2.5 text-body-sm">
-      {children}
-    </dl>
-  );
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <>
-      <dt className="text-grey-600">{label}</dt>
-      <dd className="tabular-nums">{children}</dd>
-    </>
-  );
-}
-
-/** 모델 상세 내용. 표시 이름·용도는 연필로 수정하고 테스트·상태 변경은 이후 단계에서 붙임 */
+/** 모델 상세 내용. 표시 이름·용도는 연필로 수정하고, 연결 테스트는 창에서 실행. 상태 변경은 이후 단계에서 붙임 */
 export function ModelDetailContent({ model }: { model: ModelDetail }) {
+  const [testing, setTesting] = useState(false);
   const price = model.current_price;
   const status = statusBadge(model.status);
   return (
@@ -110,6 +96,17 @@ export function ModelDetailContent({ model }: { model: ModelDetail }) {
             {timeOrNone(model.last_success_test_at)}
           </Row>
         </Rows>
+        <div className="flex justify-end">
+          <Button variant="secondary" onClick={() => setTesting(true)}>
+            연결 테스트
+          </Button>
+        </div>
+        {testing && (
+          <ConnectionTestDialog
+            model={model}
+            onClose={() => setTesting(false)}
+          />
+        )}
       </Section>
       <Section title={SECTION_TITLES.status}>
         <Rows>

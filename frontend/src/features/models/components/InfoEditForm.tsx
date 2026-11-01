@@ -10,6 +10,8 @@ import { useUpdateModelInfo } from "../hooks/useUpdateModelInfo";
 import type { InfoFormValues } from "../lib/infoForm";
 import { FormError } from "./FormError";
 
+const SAVE_FAILED_MESSAGE = "저장하지 못했어요. 다시 시도해 주세요.";
+
 export type InfoField = "display_name" | "purpose";
 
 export type InfoFormProps = {
@@ -50,7 +52,9 @@ export function InfoEditForm({
       )}
       className="col-span-2 flex flex-col gap-3"
     >
-      {save.isError && <FormError error={save.error} />}
+      {save.isError && (
+        <FormError error={save.error} fallback={SAVE_FAILED_MESSAGE} />
+      )}
       <FormField label={label} error={errors.value?.message}>
         {(control) => (
           <input

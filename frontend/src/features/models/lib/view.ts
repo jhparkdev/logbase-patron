@@ -1,8 +1,10 @@
 import type { components } from "../../../shared/api/schema";
+import type { CostAmountView } from "../../../shared/components/ui/CostAmount";
 
 type ModelStatus = components["schemas"]["ModelStatus"];
 type ConnectionTestStatus = components["schemas"]["ConnectionTestStatus"];
 type ProviderRead = components["schemas"]["ProviderRead"];
+type ConnectionTestResult = components["schemas"]["ConnectionTestResult"];
 
 const STATUS_BADGES = {
   TESTING: { tone: "blue", label: "검증 중" },
@@ -77,4 +79,18 @@ export function providerOptions(
     options.push({ value: selected, label: selected });
   }
   return [{ value: "", label: "Provider 전체" }, ...options];
+}
+
+/** 테스트 비용 표시. 금액이 없으면 상태와 관계없이 미확인(0으로 바꾸지 않음) */
+export function testCostView({
+  cost_usd,
+  cost_status,
+}: Pick<ConnectionTestResult, "cost_usd" | "cost_status">): CostAmountView {
+  if (cost_usd === null || cost_status === "UNKNOWN") {
+    return { kind: "unknown", amount: null };
+  }
+  return {
+    kind: cost_status === "ESTIMATED" ? "estimated" : "confirmed",
+    amount: cost_usd,
+  };
 }

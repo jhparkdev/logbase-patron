@@ -74,6 +74,19 @@ export const UNPRICED_DETAIL: Schemas["ModelDetailRead"] = {
   last_success_test_at: null,
 };
 
+export const TEST_RESULT: Schemas["ConnectionTestResult"] = {
+  status: "SUCCESS",
+  tested_at: "2026-11-01T03:00:00Z",
+  latency_ms: 1234,
+  input_tokens: 12,
+  output_tokens: 30,
+  cost_usd: "0.0004",
+  cost_status: "CONFIRMED",
+  actual_provider: "OpenAI",
+  error_type: null,
+  error_message: null,
+};
+
 export const PROVIDERS: Schemas["ProviderListResponse"] = {
   items: [
     { provider: "openai", model_count: 3 },
@@ -87,14 +100,19 @@ type Replies = {
   providers?: Reply;
   detail?: Reply;
   update?: Reply;
+  test?: Reply;
 };
 
 const DETAIL_PATH = /\/api\/models\/\d+$/;
+const TEST_PATH = /\/api\/models\/\d+\/test$/;
 
 function replyFor(request: Request, replies: Replies): Reply {
   const url = request.url;
   if (url.endsWith("/api/models/providers")) {
     return replies.providers ?? { status: 200, body: PROVIDERS };
+  }
+  if (TEST_PATH.test(new URL(url).pathname)) {
+    return replies.test ?? { status: 200, body: TEST_RESULT };
   }
   if (DETAIL_PATH.test(new URL(url).pathname)) {
     return request.method === "PATCH"

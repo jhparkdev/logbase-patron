@@ -65,3 +65,17 @@ export async function updateModelInfo(modelId: number, body: ModelInfoChange) {
     }),
   );
 }
+
+/** 연결 테스트 결과. 실패한 테스트도 오류가 아니라 이 모양으로 돌아옴 */
+export type ConnectionTestResult =
+  components["schemas"]["ConnectionTestResult"];
+
+/** 연결 테스트 실행. 실제 AI 호출이라 비용이 듦 */
+export async function runConnectionTest(modelId: number, prompt: string) {
+  return unwrap(
+    await api.POST("/api/models/{model_id}/test", {
+      params: { path: { model_id: modelId } },
+      body: { prompt },
+    }),
+  );
+}

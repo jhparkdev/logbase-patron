@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { DataBlock } from "../../../shared/components/ui/DataBlock";
 import { DataTable } from "../../../shared/components/ui/DataTable";
 import { Pagination } from "../../../shared/components/ui/Pagination";
@@ -7,10 +7,11 @@ import { RefreshingBar } from "../../../shared/components/ui/RefreshingBar";
 import { Result } from "../../../shared/components/ui/Result";
 import { SectionCard } from "../../../shared/components/ui/SectionCard";
 import { TableSkeleton } from "../../../shared/components/ui/TableSkeleton";
-import { modelListOptions } from "../api/models";
+import { type ModelRow, modelListOptions } from "../api/models";
 import { useModelPageChange, useModelSort } from "../hooks/useModelTable";
 import { hasModelFilter, type ModelsSearch } from "../lib/search";
-import { COLUMNS } from "./ModelColumns";
+import { ConnectionTestDialog } from "./ConnectionTestDialog";
+import { modelColumns } from "./ModelColumns";
 
 const TITLE = "등록된 AI 모델";
 const LOADING_ROWS = 5;
@@ -56,13 +57,15 @@ function ModelRows({ search, refreshing }: ModelTableProps) {
   const { data } = useSuspenseQuery(modelListOptions(search));
   const { sort, onSortChange } = useModelSort();
   const onPageChange = useModelPageChange();
+  // 테스트 창을 연 모델. 없으면 창이 닫힌 상태
+  const [testing, setTesting] = useState<ModelRow>();
   return (
     // 전체 개수·페이지 정보는 서버 응답 값
     <ModelCard count={data.total}>
       {refreshing && <RefreshingBar />}
       <DataTable
         caption={TITLE}
-        columns={COLUMNS}
+        columns={modelColumns(setTesting)}
         rows={data.items}
         rowKey={(row) => String(row.model_id)}
         sort={sort}
@@ -82,6 +85,12 @@ function ModelRows({ search, refreshing }: ModelTableProps) {
         page={data.page}
         onPageChange={onPageChange}
       />
+      {testing && (
+        <ConnectionTestDialog
+          model={testing}
+          onClose={() => setTesting(undefined)}
+        />
+      )}
     </ModelCard>
   );
 }
