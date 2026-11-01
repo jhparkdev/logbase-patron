@@ -44,7 +44,7 @@ export const RUN_DETAIL: Schemas["SimulationDetailResponse"] = {
       model_display_name_at_run: "Mistral Nemo",
       model_status_at_run: "ACTIVE",
       execution_provider: "DeepInfra",
-      execution_config: {},
+      execution_config: { temperature: 0.9, max_tokens: 512 },
       actual_provider: "DeepInfra",
       actual_model: "mistralai/mistral-nemo",
       status: "SUCCESS",

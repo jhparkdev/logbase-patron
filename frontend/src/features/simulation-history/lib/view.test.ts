@@ -90,8 +90,9 @@ test("상세는 당시 입력과 설정, 모델의 현재 상태를 함께 보�
   expect(view.settings).toEqual(
     expect.arrayContaining([
       { label: "테스트 유형", value: "기본 시나리오" },
-      { label: "Temperature", value: "0.3" },
-      { label: "최대 출력 토큰", value: "512" },
+      { label: "공통 Temperature", value: "0.3" },
+      { label: "공통 최대 출력 토큰", value: "512" },
+      { label: "공통 추론 강도", value: "미지정" },
     ]),
   );
   expect(view.models.map((model) => model.key)).toHaveLength(
@@ -99,7 +100,7 @@ test("상세는 당시 입력과 설정, 모델의 현재 상태를 함께 보�
   );
 });
 
-test("값이 없는 입력은 빈 값으로, 없는 설정은 미기록으로 둔다", () => {
+test("값이 없는 입력은 빈 값으로, 없는 공통 설정은 미지정으로 둔다", () => {
   const view = toHistoryDetail(RUN_DETAIL, {
     ...RERUN_DRAFT,
     input_text: null,
@@ -108,7 +109,7 @@ test("값이 없는 입력은 빈 값으로, 없는 설정은 미기록으로 �
   });
   expect(view.input).toMatchObject({ text: "", schema: "" });
   expect(view.settings).toEqual(
-    expect.arrayContaining([{ label: "Temperature", value: "미기록" }]),
+    expect.arrayContaining([{ label: "공통 Temperature", value: "미지정" }]),
   );
 });
 

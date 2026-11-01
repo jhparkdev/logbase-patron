@@ -36,6 +36,28 @@ export function ResponseCards({
             <span className="text-grey-600">비용</span>
             <CostValue cost={slot.cost} />
           </div>
+          {slot.settings && (
+            <div>
+              <p className="mb-1 text-label font-semibold">적용 설정</p>
+              {slot.settings.length ? (
+                <dl className="space-y-1 text-caption text-grey-600">
+                  {slot.settings.map((setting) => (
+                    <div
+                      key={setting.label}
+                      className="flex justify-between gap-3"
+                    >
+                      <dt>{setting.label}</dt>
+                      <dd className="min-w-0 break-words text-right tabular-nums">
+                        {setting.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="text-caption text-grey-600">모델 기본값</p>
+              )}
+            </div>
+          )}
           {(slot.actualModel || slot.actualProvider) && (
             <p className="break-words text-caption text-grey-600">
               실제 처리: {slot.actualModel ?? slot.name} ·{" "}

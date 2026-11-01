@@ -101,6 +101,13 @@ test("상세를 열면 당시 입력과 모델별 결과를 조회해 표시한�
     dialog.getByRole("heading", { name: "시뮬레이션 결과 요약" }),
   ).toBeDefined();
   expect(dialog.getByText("모델 응답 원문")).toBeDefined();
+  // 공통 값(0.3)과 다른 모델별 값을 구분해 보여 준다
+  expect(dialog.getByText("공통 Temperature").nextSibling?.textContent).toBe(
+    "0.3",
+  );
+  const [first, second] = dialog.getAllByRole("article");
+  expect(within(first).getByText("0.9")).toBeDefined();
+  expect(within(second).getByText("모델 기본값")).toBeDefined();
   expect(
     requests.some((url) => url.pathname === `/api/simulations/${RUN_ID}`),
   ).toBe(true);

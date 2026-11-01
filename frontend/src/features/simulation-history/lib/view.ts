@@ -23,6 +23,7 @@ const STATUS_TONES: Record<RunStatus, HistoryRow["status"]["tone"]> = {
 };
 const CUSTOM_LABEL = "Custom Prompt";
 const NOT_RECORDED = "미기록";
+const NOT_SPECIFIED = "미지정";
 const JSON_INDENT = 2;
 
 export function isRunOngoing(status: RunStatus): boolean {
@@ -63,9 +64,10 @@ export function toModelOptions(
   }));
 }
 
+// 실행 공통 설정이다. 모델별로 실제 적용한 값은 결과 카드의 "적용 설정"에서 따로 보여 준다.
 function configValue(config: RerunDraft["execution_config"], name: string) {
   const value = config[name];
-  return value === undefined || value === null ? NOT_RECORDED : String(value);
+  return value === undefined || value === null ? NOT_SPECIFIED : String(value);
 }
 
 function toInput(draft: RerunDraft): HistoryDetailView["input"] {
@@ -100,12 +102,16 @@ export function toHistoryDetail(
         value: draft.test_type === "SCENARIO" ? "기본 시나리오" : CUSTOM_LABEL,
       },
       {
-        label: "Temperature",
+        label: "공통 Temperature",
         value: configValue(draft.execution_config, "temperature"),
       },
       {
-        label: "최대 출력 토큰",
+        label: "공통 최대 출력 토큰",
         value: configValue(draft.execution_config, "max_tokens"),
+      },
+      {
+        label: "공통 추론 강도",
+        value: configValue(draft.execution_config, "reasoning_effort"),
       },
       {
         label: "Provider·Fallback 정책",

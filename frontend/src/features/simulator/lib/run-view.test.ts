@@ -67,6 +67,48 @@ test("모델 칸의 성공 결과를 그대로 옮긴다", () => {
   });
 });
 
+test("모델 칸마다 실제로 적용한 설정을 화면 이름으로 옮긴다", () => {
+  const [first, second] = RUN_DETAIL.results;
+  const { slots } = toRunView({
+    ...RUN_DETAIL,
+    results: [
+      {
+        ...first,
+        execution_config: {
+          reasoning_effort: "low",
+          max_tokens: 512,
+          temperature: 0,
+        },
+      },
+      { ...second, execution_config: {} },
+    ],
+  });
+  expect(slots[0].settings).toEqual([
+    { label: "Temperature", value: "0" },
+    { label: "최대 출력 토큰", value: "512" },
+    { label: "추론 강도", value: "low" },
+  ]);
+  expect(slots[1].settings).toEqual([]);
+});
+
+test("과거 이력에 남은 다른 설정도 숨기지 않고 값이 없는 항목은 뺀다", () => {
+  const [first, second] = RUN_DETAIL.results;
+  const { slots } = toRunView({
+    ...RUN_DETAIL,
+    results: [
+      {
+        ...first,
+        execution_config: { temperature: null, top_p: 0.5, stop: ["끝"] },
+      },
+      second,
+    ],
+  });
+  expect(slots[0].settings).toEqual([
+    { label: "top_p", value: "0.5" },
+    { label: "stop", value: '["끝"]' },
+  ]);
+});
+
 test("비용 미확인 칸은 0이 아니라 미확인으로 두고 실패 문구를 전달한다", () => {
   expect(toRunView(RUN_DETAIL).slots[1]).toMatchObject({
     status: { label: "시간 초과", tone: "yellow", ongoing: false },

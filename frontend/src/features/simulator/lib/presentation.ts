@@ -53,6 +53,8 @@ export type SlotView = {
   response: string | null;
   errorMessage?: string;
   comparisonNote?: string | null;
+  // 이 칸에 실제로 적용한 설정. 빈 배열은 모델 기본값으로 호출했다는 뜻이다.
+  settings?: readonly { label: string; value: string }[];
 };
 export type RunView = {
   key: string;

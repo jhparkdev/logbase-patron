@@ -1,4 +1,5 @@
 import type { components } from "../../../shared/api/schema";
+import { PARAMETER_LABELS } from "./parameters";
 import type { CostView, RunView, SlotView, StatusView } from "./presentation";
 
 type Schemas = components["schemas"];
@@ -27,6 +28,28 @@ const VALIDATION: Record<Schemas["ValidationStatus"], string> = {
   NOT_EXECUTED: "미실행",
 };
 const VALIDATION_NOT_RUN = VALIDATION.NOT_EXECUTED;
+const SETTING_LABELS: Readonly<Record<string, string>> = {
+  temperature: PARAMETER_LABELS.temperature,
+  max_tokens: PARAMETER_LABELS.maxTokens,
+  reasoning_effort: PARAMETER_LABELS.reasoningEffort,
+};
+
+/** 아는 설정을 먼저 정해진 순서로 두고, 과거 이력에만 남은 설정은 키 이름 그대로 뒤에 붙인다. */
+function toSettings(config: Result["execution_config"]): SlotView["settings"] {
+  const known = Object.keys(SETTING_LABELS);
+  const others = Object.keys(config).filter((key) => !known.includes(key));
+  return [...known, ...others].flatMap((key) => {
+    const value = config[key];
+    if (value === undefined || value === null) return [];
+    return [
+      {
+        label: SETTING_LABELS[key] ?? key,
+        value:
+          typeof value === "object" ? JSON.stringify(value) : String(value),
+      },
+    ];
+  });
+}
 
 function toCost(result: Result): CostView {
   if (result.cost_status === "UNKNOWN" || result.cost_usd === null)
@@ -59,6 +82,7 @@ function toSlot(result: Result): SlotView {
     response: result.response_text,
     errorMessage: result.error_message ?? undefined,
     comparisonNote: result.comparability_note,
+    settings: toSettings(result.execution_config),
   };
 }
 

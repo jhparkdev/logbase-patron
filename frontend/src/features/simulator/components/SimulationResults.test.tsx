@@ -48,6 +48,29 @@ const run = (slots: SlotView[]): RunView => ({
   slots,
 });
 
+test("모델 칸마다 적용 설정을 따로 보여 주고 값이 없으면 모델 기본값으로 안내한다", () => {
+  render(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: run([
+          slot({
+            settings: [{ label: "Temperature", value: "0" }],
+          }),
+          slot({ key: "slot-2", name: "둘째 모델", settings: [] }),
+          slot({ key: "slot-3", name: "셋째 모델" }),
+        ]),
+      }}
+    />,
+  );
+  const [first, second, third] = screen.getAllByRole("article");
+  expect(within(first).getByText("적용 설정")).toBeDefined();
+  expect(within(first).getByText("Temperature")).toBeDefined();
+  expect(within(first).getByText("0")).toBeDefined();
+  expect(within(second).getByText("모델 기본값")).toBeDefined();
+  expect(within(third).queryByText("적용 설정")).toBeNull();
+});
+
 test("서버가 합계를 주지 않으면 금액이 있어도 합계를 미확인으로 표시하지 않는다", () => {
   const page = render(
     <SimulationResults
