@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from app.openrouter.lookup_parsing import (
+    parse_endpoints,
     parse_generation,
     parse_key_usage,
     parse_keys,
@@ -326,3 +327,101 @@ def test_Key_목록에서_모양이_다른_항목은_건너뛴다() -> None:
 @pytest.mark.parametrize("body", [{}, {"data": "문자열"}, {"data": {"hash": "h"}}])
 def test_Key_목록의_data가_목록이_아니면_None이다(body: dict[str, Any]) -> None:
     assert parse_keys(body) is None
+
+
+# ---------------------------------------------------------------
+# 모델 하나의 서버 업체 목록
+# ---------------------------------------------------------------
+def endpoint(name: str | None, **fields: Any) -> dict[str, Any]:
+    return {"provider_name": name, "status": 0, "uptime_last_1d": 99.5, **fields}
+
+
+def test_업체_목록에서_이름_상태_가동률을_꺼낸다() -> None:
+    body = {
+        "data": {
+            "id": "a/b",
+            "endpoints": [
+                endpoint("Io Net", uptime_last_1d=99.51388888888889),
+                endpoint("DekaLLM", status=-1, uptime_last_1d=None),
+            ],
+        }
+    }
+
+    endpoints = parse_endpoints(body)
+
+    assert endpoints is not None
+    assert [item.provider_name for item in endpoints] == ["Io Net", "DekaLLM"]
+    assert [item.status for item in endpoints] == [0, -1]
+    assert endpoints[0].uptime_last_1d == Decimal("99.51388888888889")
+    assert endpoints[1].uptime_last_1d is None
+
+
+def test_같은_이름의_업체는_처음_것_하나만_남긴다() -> None:
+    body = {
+        "data": {
+            "endpoints": [
+                endpoint("DeepInfra", status=0),
+                endpoint("DeepInfra", status=-1),
+                endpoint("Parasail"),
+            ]
+        }
+    }
+
+    endpoints = parse_endpoints(body)
+
+    assert endpoints is not None
+    assert [(item.provider_name, item.status) for item in endpoints] == [
+        ("DeepInfra", 0),
+        ("Parasail", 0),
+    ]
+
+
+def test_업체_목록에서_이름이_없거나_모양이_다른_항목은_건너뛴다() -> None:
+    body = {
+        "data": {
+            "endpoints": [
+                "문자열",
+                endpoint(None),
+                endpoint(""),
+                endpoint(5),
+                {"status": 0},
+                endpoint("DekaLLM"),
+            ]
+        }
+    }
+
+    endpoints = parse_endpoints(body)
+
+    assert endpoints is not None
+    assert [item.provider_name for item in endpoints] == ["DekaLLM"]
+
+
+def test_상태와_가동률의_모양이_다르면_None으로_둔다() -> None:
+    item = endpoint("DekaLLM", status="정상", uptime_last_1d="높음")
+
+    endpoints = parse_endpoints({"data": {"endpoints": [item]}})
+
+    assert endpoints is not None
+    assert endpoints[0].status is None
+    assert endpoints[0].uptime_last_1d is None
+
+
+def test_업체가_하나도_없어도_정상_응답이면_빈_목록이다() -> None:
+    endpoints = parse_endpoints({"data": {"endpoints": []}})
+
+    assert endpoints == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"data": "문자열"},
+        {"data": []},
+        {"data": {}},
+        {"data": {"endpoints": "문자열"}},
+        {"data": {"endpoints": {"provider_name": "DekaLLM"}}},
+    ],
+)
+def test_업체_목록의_모양이_틀리면_None이다(body: dict[str, Any]) -> None:
+    assert parse_endpoints(body) is None
