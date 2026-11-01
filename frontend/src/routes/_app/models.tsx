@@ -1,97 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
+import { useDeferredValue } from "react";
 import plusIcon from "../../assets/plus.svg";
+import { modelListOptions } from "../../features/models/api/models";
 import { ModelDetailPanel } from "../../features/models/components/ModelDetailPanel";
+import { ModelTable } from "../../features/models/components/ModelTable";
+import { modelsSearchSchema } from "../../features/models/lib/search";
 import { Button } from "../../shared/components/ui/Button";
-import { type Column, DataTable } from "../../shared/components/ui/DataTable";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
-import { Pagination } from "../../shared/components/ui/Pagination";
-import { Result } from "../../shared/components/ui/Result";
 import { SearchField } from "../../shared/components/ui/SearchField";
-import { SectionCard } from "../../shared/components/ui/SectionCard";
 import { Select } from "../../shared/components/ui/Select";
-import { PAGE_SIZE } from "../../shared/lib/pagination";
-import { nextSort } from "../../shared/lib/sort";
-
-const SORT_KEYS = [
-  "name",
-  "modelId",
-  "provider",
-  "capabilities",
-  "inputPrice",
-  "outputPrice",
-  "status",
-  "lastTest",
-] as const;
-
-// 주소의 조회 조건은 외부 입력이라 검증한다. 허용 목록 밖의 값은 버린다.
-const searchSchema = z.object({
-  q: z.string().optional().catch(undefined),
-  sort: z.enum(SORT_KEYS).optional().catch(undefined),
-  order: z.enum(["asc", "desc"]).optional().catch(undefined),
-  page: z.number().int().min(1).optional().catch(undefined),
-  // 상세 패널을 연 모델의 번호(models.model_id)
-  model: z.number().int().min(1).optional().catch(undefined),
-});
 
 export const Route = createFileRoute("/_app/models")({
-  validateSearch: searchSchema,
+  validateSearch: modelsSearchSchema,
+  // 조건이 바뀔 때마다 loader 재실행
+  loaderDeps: ({ search }) => search,
+  // 화면 틀을 먼저 그리도록 대기하지 않음. 실패는 표 블록이 처리하므로 여기서 중단하지 않음
+  loader: ({ context: { queryClient }, deps }) => {
+    void queryClient.prefetchQuery(modelListOptions(deps));
+  },
   component: ModelsPage,
 });
-
-// 행 타입과 칸 내용은 모델 목록 API의 생성 타입이 생기면 채운다. 그 전까지 행은 비어 있다.
-type ModelRow = never;
-const EMPTY_CELL = () => null;
-// 전체 건수는 목록 API 응답의 total로 바꾼다. 그 전까지의 자리값이다.
-const TOTAL_COUNT = 0;
-
-const PRICE_UNIT = <span className="font-normal text-grey-500">(USD/1K)</span>;
-
-const COLUMNS: Column<ModelRow>[] = [
-  { key: "name", header: "표시 이름", sortable: true, render: EMPTY_CELL },
-  { key: "modelId", header: "Model ID", sortable: true, render: EMPTY_CELL },
-  { key: "provider", header: "Provider", sortable: true, render: EMPTY_CELL },
-  {
-    key: "capabilities",
-    header: "지원 기능",
-    sortable: true,
-    render: EMPTY_CELL,
-  },
-  {
-    key: "inputPrice",
-    header: <>Input 가격 {PRICE_UNIT}</>,
-    align: "right",
-    sortable: true,
-    render: EMPTY_CELL,
-  },
-  {
-    key: "outputPrice",
-    header: <>Output 가격 {PRICE_UNIT}</>,
-    align: "right",
-    sortable: true,
-    render: EMPTY_CELL,
-  },
-  { key: "status", header: "상태", sortable: true, render: EMPTY_CELL },
-  {
-    key: "lastTest",
-    header: "마지막 테스트",
-    sortable: true,
-    render: EMPTY_CELL,
-  },
-  {
-    key: "test",
-    header: <span className="sr-only">연결 테스트</span>,
-    render: EMPTY_CELL,
-  },
-];
 
 function ModelsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const sort =
-    search.sort && search.order
-      ? { key: search.sort, direction: search.order }
-      : undefined;
+  // 재조회 중에는 이전 결과를 유지하고, 새 결과가 오면 교체
+  const shown = useDeferredValue(search);
 
   return (
     <>
@@ -136,40 +70,7 @@ function ModelsPage() {
           className="w-56"
         />
       </div>
-      <SectionCard
-        title="등록된 AI 모델"
-        count={TOTAL_COUNT}
-        description="모델명을 누르면 상세 정보를 볼 수 있어요."
-      >
-        <DataTable
-          caption="등록된 AI 모델"
-          columns={COLUMNS}
-          rows={[]}
-          rowKey={() => ""}
-          sort={sort}
-          onSortChange={(key) => {
-            const next = nextSort(sort, key);
-            const sortKey = SORT_KEYS.find((allowed) => allowed === next.key);
-            navigate({
-              search: (prev) => ({
-                ...prev,
-                sort: sortKey,
-                order: next.direction,
-                page: undefined,
-              }),
-            });
-          }}
-          empty={<Result title="등록된 모델이 없어요" />}
-        />
-        <Pagination
-          total={TOTAL_COUNT}
-          pageSize={PAGE_SIZE}
-          page={search.page ?? 1}
-          onPageChange={(page) =>
-            navigate({ search: (prev) => ({ ...prev, page }) })
-          }
-        />
-      </SectionCard>
+      <ModelTable search={shown} refreshing={shown !== search} />
       {search.model !== undefined && (
         <ModelDetailPanel
           onClose={() =>
