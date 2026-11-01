@@ -5,15 +5,9 @@ from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
+from app.schemas.decimal_string import require_decimal_string
 from app.schemas.plain_decimal import PlainDecimal
 from app.schemas.usage import AMOUNT_LIMIT, AMOUNT_MAX_DECIMAL_PLACES, Month
-
-
-def _require_decimal_string(value: object) -> object:
-    """금액은 문자열로만 받는다. JSON 숫자는 float을 거치며 값이 달라질 수 있다."""
-    if isinstance(value, str | Decimal):
-        return value
-    raise ValueError("금액은 문자열이어야 한다")
 
 
 class ProjectBudgetSave(BaseModel):
@@ -21,7 +15,7 @@ class ProjectBudgetSave(BaseModel):
 
     monthly_amount_usd: Annotated[
         Decimal,
-        BeforeValidator(_require_decimal_string),
+        BeforeValidator(require_decimal_string),
         Field(gt=0, lt=AMOUNT_LIMIT, decimal_places=AMOUNT_MAX_DECIMAL_PLACES),
     ]
     effective_from_month: Month
