@@ -1,10 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  amountForInput,
-  summaryTrend,
-  trendDayLabel,
-  trendPoint,
-} from "./view";
+import { summaryTrend, trendDayLabel, trendPoint } from "./view";
 
 describe("summaryTrend", () => {
   test("증가와 감소의 방향과 정수 비율을 만든다", () => {
@@ -45,16 +40,4 @@ describe("trendPoint", () => {
 
 test("trendDayLabel은 월-일만 보여 준다", () => {
   expect(trendDayLabel("2026-10-02")).toBe("10-02");
-});
-
-describe("amountForInput", () => {
-  test("입력 칸에 넣을 때 뒤쪽 0만 지운다", () => {
-    expect(amountForInput("1.970000000000000000")).toBe("1.97");
-    expect(amountForInput("90.000000000000000000")).toBe("90");
-    expect(amountForInput("100")).toBe("100");
-  });
-
-  test("예산이 없으면 빈 칸이다", () => {
-    expect(amountForInput(null)).toBe("");
-  });
 });

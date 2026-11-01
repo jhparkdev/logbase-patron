@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { schemaErrors } from "../../test/schemaErrors";
 import {
+  amountForInput,
   budgetFormSchema,
   budgetMonthOf,
   budgetStatusBadge,
@@ -92,5 +93,17 @@ describe("budgetStatusBadge", () => {
     ["UNSET", "미설정", "grey"],
   ] as const)("%s는 %s로 보여 준다", (status, label, tone) => {
     expect(budgetStatusBadge(status)).toEqual({ label, tone });
+  });
+});
+
+describe("amountForInput", () => {
+  test("입력 칸에 넣을 때 뒤쪽 0만 지운다", () => {
+    expect(amountForInput("1.970000000000000000")).toBe("1.97");
+    expect(amountForInput("90.000000000000000000")).toBe("90");
+    expect(amountForInput("100")).toBe("100");
+  });
+
+  test("예산이 없으면 빈 칸이다", () => {
+    expect(amountForInput(null)).toBe("");
   });
 });

@@ -37,11 +37,3 @@ export function trendPoint(point: Schemas["UsageTrendPoint"]) {
 }
 
 export type TrendPointView = ReturnType<typeof trendPoint>;
-
-/** 서버의 긴 소수("1.970000000000000000")를 입력 칸에 넣기 좋게 뒤쪽 0만 지운다. */
-export function amountForInput(amount: string | null): string {
-  if (amount === null) {
-    return "";
-  }
-  return amount.includes(".") ? amount.replace(/\.?0+$/, "") : amount;
-}
