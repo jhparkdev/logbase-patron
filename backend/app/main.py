@@ -5,7 +5,16 @@
 
 from fastapi import Depends, FastAPI
 
-from app.api import auth, health, model_favorites, models, simulations, usage
+from app.api import (
+    auth,
+    health,
+    internal_budget,
+    model_favorites,
+    models,
+    simulations,
+    subscriptions,
+    usage,
+)
 from app.api.deps import require_allowed_origin
 from app.api.errors import install_error_handlers
 
@@ -21,6 +30,8 @@ PROTECTED_ROUTERS = (
     models.router,
     usage.router,
     model_favorites.router,
+    internal_budget.router,
+    subscriptions.router,
 )
 
 
