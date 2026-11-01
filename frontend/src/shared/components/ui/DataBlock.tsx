@@ -1,7 +1,7 @@
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import { Component, type ReactNode, Suspense } from "react";
-import { Button } from "../../../shared/components/ui/Button";
-import { Result } from "../../../shared/components/ui/Result";
+import { Button } from "./Button";
+import { Result } from "./Result";
 
 type DataBlockProps = {
   /** 처음 불러오는 동안 보여 줄 모양 */

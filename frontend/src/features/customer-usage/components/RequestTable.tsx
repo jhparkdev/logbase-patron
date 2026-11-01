@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { CostAmount } from "../../../shared/components/ui/CostAmount";
+import { DataBlock } from "../../../shared/components/ui/DataBlock";
 import {
   type Column,
   DataTable,
@@ -15,7 +16,6 @@ import { type CustomerRequestRow, requestRowsOptions } from "../api/usage";
 import { usePageChange, useRequestSort } from "../hooks/useUsageList";
 import type { CustomerUsageSearch } from "../lib/search";
 import { costView, executionStatus } from "../lib/view";
-import { DataBlock } from "./DataBlock";
 import { ViewAllLink } from "./ViewAllLink";
 
 const TITLE = "상세 API 호출 내역";

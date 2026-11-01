@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Badge } from "../../../shared/components/ui/Badge";
+import { DataBlock } from "../../../shared/components/ui/DataBlock";
 import {
   type Column,
   DataTable,
@@ -21,7 +22,6 @@ import {
   unreflectedText,
   usageView,
 } from "../lib/view";
-import { DataBlock } from "./DataBlock";
 import { ViewAllLink } from "./ViewAllLink";
 
 const TITLE = "고객별 사용 현황";
