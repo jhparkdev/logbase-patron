@@ -21,6 +21,10 @@ class ModelErrorCode(StrEnum):
     TEST_NOT_PASSED = "TEST_NOT_PASSED"
     # 연결 테스트를 하려는데 서버에 OpenRouter Key가 설정되어 있지 않음
     OPENROUTER_KEY_MISSING = "OPENROUTER_KEY_MISSING"
+    # 서버 업체 목록을 받지 못했고 보관한 목록도 없음
+    EXECUTION_PROVIDERS_UNAVAILABLE = "EXECUTION_PROVIDERS_UNAVAILABLE"
+    # 등록된 모델인데 OpenRouter가 이 모델을 모른다고 답함(제공이 중단되었을 수 있음)
+    OPENROUTER_MODEL_NOT_FOUND = "OPENROUTER_MODEL_NOT_FOUND"
 
 
 @dataclass(frozen=True)
@@ -48,6 +52,12 @@ ERROR_SPECS: dict[ModelErrorCode, ErrorSpec] = {
     ),
     ModelErrorCode.OPENROUTER_KEY_MISSING: ErrorSpec(
         503, "OpenRouter Key가 설정되지 않아 연결 테스트를 할 수 없습니다."
+    ),
+    ModelErrorCode.EXECUTION_PROVIDERS_UNAVAILABLE: ErrorSpec(
+        502, "서버 업체 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+    ),
+    ModelErrorCode.OPENROUTER_MODEL_NOT_FOUND: ErrorSpec(
+        404, "OpenRouter에서 이 모델을 찾을 수 없습니다. 제공이 중단됐을 수 있습니다."
     ),
 }
 

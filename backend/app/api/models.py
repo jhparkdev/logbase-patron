@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, status
 from fastapi.responses import JSONResponse
 
-from app.api import model_manage, model_openrouter
+from app.api import model_execution_providers, model_manage, model_openrouter
 from app.api.deps import DevUserDep, NowDep
 from app.api.model_common import (
     ModelIdPath,
@@ -124,6 +124,7 @@ async def list_model_providers(session: SessionDep) -> ProviderListResponse:
 
 
 router.include_router(model_openrouter.router)
+router.include_router(model_execution_providers.router)
 router.include_router(model_manage.router)
 
 
