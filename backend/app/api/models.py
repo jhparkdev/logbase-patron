@@ -7,6 +7,7 @@ from fastapi import APIRouter, Path, Query, status
 from app.api.errors import ApiError
 from app.db import SessionDep
 from app.schemas.common import ErrorCode, ErrorResponse
+from app.schemas.model_provider import ProviderListResponse, ProviderRead
 from app.schemas.models import (
     MAX_MODEL_ID,
     ModelDetailRead,
@@ -16,7 +17,7 @@ from app.schemas.models import (
     PriceRead,
     SortOrder,
 )
-from app.services import model_detail, model_list
+from app.services import model_detail, model_list, model_providers
 from app.services.model_list import ModelListItem
 from app.services.model_registry import supports_json_schema
 
@@ -87,6 +88,15 @@ async def list_models(
         page=query.page,
         page_size=query.page_size,
         total=page.total,
+    )
+
+
+# "/{model_id}"보다 먼저 선언해야 "providers"가 모델 번호로 해석되지 않는다.
+@router.get("/providers")
+async def list_model_providers(session: SessionDep) -> ProviderListResponse:
+    providers = await model_providers.list_providers(session)
+    return ProviderListResponse(
+        items=[ProviderRead.model_validate(item) for item in providers]
     )
 
 
