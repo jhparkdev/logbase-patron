@@ -1,12 +1,15 @@
 import { expect, test } from "vitest";
+import { PAGE_SIZE } from "../../../shared/lib/pagination";
 import {
   changeHistorySort,
   createHistorySearchSchema,
   historyFiltersSchema,
+  historyListQuery,
   recentHistoryFilters,
 } from "./search";
 
 const now = new Date("2026-10-29T15:10:00Z");
+const RUN_ID = "01a1611f-3e80-73c5-a130-3efa5a1f75de";
 
 test.each([
   [undefined, 1],
@@ -29,15 +32,80 @@ test("정렬을 변경하면 필터와 선택은 유지하고 첫 페이지로 �
   const search = createHistorySearchSchema(now).parse({
     page: 3,
     status: "FAILED",
+    selected: RUN_ID,
+    detail: true,
+  });
+  expect(changeHistorySort(search, "modelCount")).toMatchObject({
+    ...search,
+    page: 1,
+    sort: "modelCount",
+    direction: "asc",
+  });
+});
+test("서버가 지원하지 않는 총 비용 정렬은 URL에서 기본 정렬로 복구한다", () => {
+  expect(createHistorySearchSchema(now).parse({ sort: "totalCost" }).sort).toBe(
+    "requestedAt",
+  );
+});
+test("UUID가 아닌 실행 ID는 URL에서 지우고 조회 폼에서는 거절한다", () => {
+  const search = createHistorySearchSchema(now).parse({
+    simulationId: "run-1",
     selected: "run-1",
     detail: true,
   });
-  expect(changeHistorySort(search, "totalCost")).toMatchObject({
-    ...search,
-    page: 1,
-    sort: "totalCost",
+  expect(search).toMatchObject({
+    simulationId: "",
+    selected: undefined,
+    detail: false,
+  });
+  const base = recentHistoryFilters(now);
+  expect(
+    historyFiltersSchema.safeParse({ ...base, simulationId: "run-1" }).success,
+  ).toBe(false);
+  expect(
+    historyFiltersSchema.safeParse({ ...base, simulationId: RUN_ID }).success,
+  ).toBe(true);
+  expect(historyFiltersSchema.safeParse(base).success).toBe(true);
+});
+test("조회 조건을 API 이름으로 바꾸고 고르지 않은 조건은 보내지 않는다", () => {
+  const search = createHistorySearchSchema(now).parse({
+    from: "2026-10-01",
+    to: "2026-10-30",
+    page: 2,
+    sort: "status",
     direction: "asc",
   });
+  expect(historyListQuery(search)).toEqual({
+    start_date: "2026-10-01",
+    end_date: "2026-10-30",
+    page: 2,
+    page_size: PAGE_SIZE,
+    sort: "status",
+    direction: "asc",
+  });
+  expect(
+    historyListQuery({
+      ...search,
+      scenario: "3",
+      model: "7",
+      status: "FAILED",
+      simulationId: RUN_ID,
+    }),
+  ).toMatchObject({
+    scenario_id: 3,
+    model_id: 7,
+    status: "FAILED",
+    simulation_id: RUN_ID,
+  });
+});
+test("숫자 ID가 아닌 시나리오·모델 값은 조회 조건으로 보내지 않는다", () => {
+  const search = createHistorySearchSchema(now).parse({
+    scenario: "abc",
+    model: "a:p",
+  });
+  const query = historyListQuery(search);
+  expect(query).not.toHaveProperty("scenario_id");
+  expect(query).not.toHaveProperty("model_id");
 });
 test("최근 30일의 기본 기간을 KST 자정 기준으로 계산한다", () => {
   expect(recentHistoryFilters(now)).toMatchObject({
@@ -89,17 +157,17 @@ test("상세 선택과 검색 조건을 URL에서 함께 복원한다", () => {
   expect(
     createHistorySearchSchema(now).parse({
       ...recentHistoryFilters(now),
-      selected: "run-1",
+      selected: RUN_ID,
       detail: true,
-      sort: "totalCost",
+      sort: "costStatus",
       direction: "asc",
-      simulationId: " run-1 ",
+      simulationId: ` ${RUN_ID} `,
     }),
   ).toMatchObject({
-    selected: "run-1",
+    selected: RUN_ID,
     detail: true,
-    simulationId: "run-1",
-    sort: "totalCost",
+    simulationId: RUN_ID,
+    sort: "costStatus",
     direction: "asc",
   });
 });

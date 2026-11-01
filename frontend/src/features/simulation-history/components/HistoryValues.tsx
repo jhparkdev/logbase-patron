@@ -36,11 +36,11 @@ export function HistoryCostStatus({ cost }: { cost: HistoryRow["cost"] }) {
   return (
     <span className="inline-flex flex-wrap gap-1">
       {cost.checking && <Badge tone="grey">확인 중</Badge>}
-      {cost.estimated && <Badge tone="blue">추정 포함</Badge>}
+      {cost.estimated !== null && <Badge tone="blue">추정 포함</Badge>}
       {cost.unknownCount > 0 && <Badge tone="yellow">미확인 포함</Badge>}
-      {!cost.checking && !cost.estimated && !cost.unknownCount && (
-        <Badge tone={cost.total === null ? "yellow" : "green"}>
-          {cost.total === null ? "미확인" : "확정"}
+      {!cost.checking && cost.estimated === null && !cost.unknownCount && (
+        <Badge tone={cost.confirmed === null ? "yellow" : "green"}>
+          {cost.confirmed === null ? "미확인" : "확정"}
         </Badge>
       )}
     </span>
@@ -49,13 +49,19 @@ export function HistoryCostStatus({ cost }: { cost: HistoryRow["cost"] }) {
 export function HistoryCost({ cost }: { cost: HistoryRow["cost"] }) {
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <span
-        className={`whitespace-nowrap tabular-nums ${cost.estimated ? "text-blue-600" : ""}`}
-      >
-        {cost.total === null
-          ? "미확인"
-          : `${cost.estimated ? "≈ " : ""}$${formatUsd(cost.total, "summary")}`}
-      </span>
+      {cost.confirmed !== null && (
+        <span className="whitespace-nowrap tabular-nums">
+          ${formatUsd(cost.confirmed, "summary")}
+        </span>
+      )}
+      {cost.estimated !== null && (
+        <span className="whitespace-nowrap tabular-nums text-blue-600">
+          ≈ ${formatUsd(cost.estimated, "summary")}
+        </span>
+      )}
+      {cost.confirmed === null && cost.estimated === null && (
+        <span className="whitespace-nowrap tabular-nums">미확인</span>
+      )}
       {cost.unknownCount > 0 && (
         <span className="whitespace-nowrap text-caption text-yellow-900">
           미확인 {formatCount(cost.unknownCount)}건 미반영

@@ -127,7 +127,7 @@ test("두 번째 페이지에서 정렬·검색하면 첫 페이지로 돌아가
 test.each([
   ["page=999", 2, 3],
   ["page=999&status=FAILED", 1, 2],
-  ["page=999&simulationId=missing", 1, 0],
+  ["page=999&simulationId=00000000-0000-7000-8000-000000000000", 1, 0],
 ])("결과 범위를 벗어난 페이지를 보정한다: %s", async (query, page, rows) => {
   const router = show(`/simulation-history-preview.html?${query}`);
   await screen.findByRole("heading", {
@@ -145,7 +145,6 @@ test.each([
   ["모델 수", "modelCount"],
   ["실행 상태", "status"],
   ["비용 상태", "costStatus"],
-  ["총 비용 (USD)", "totalCost"],
 ])(
   "%s 정렬 방향을 바꿔도 화면 상단으로 이동하지 않고 버튼 포커스를 유지한다",
   async (label, sort) => {

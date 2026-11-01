@@ -48,6 +48,30 @@ const run = (slots: SlotView[]): RunView => ({
   slots,
 });
 
+test("서버가 합계를 주지 않으면 금액이 있어도 합계를 미확인으로 표시하지 않는다", () => {
+  const page = render(
+    <SimulationResults
+      view={{ kind: "ready", run: { ...run([]), totalCost: null } }}
+    />,
+  );
+  expect(screen.queryByText(/비교 비용 합계/)).toBeNull();
+  expect(screen.getByText("추정 포함")).toBeDefined();
+  page.rerender(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: {
+          ...run([]),
+          confirmedCost: null,
+          estimatedCost: null,
+          totalCost: null,
+        },
+      }}
+    />,
+  );
+  expect(screen.getByText(/비교 비용 합계/).textContent).toContain("미확인");
+});
+
 test("실행·비용·검증 상태를 독립적으로 표시하고 원문을 보존한다", () => {
   render(
     <SimulationResults
