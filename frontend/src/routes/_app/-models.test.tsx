@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { beforeAll, expect, test } from "vitest";
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { stubModelsApi } from "../../test/modelsApi";
 import { renderAt, routeMatch } from "../../test/renderAt";
 
 // jsdom에는 모달 dialog 열기가 없어서, 브라우저처럼 open 속성만 켠다.
@@ -9,6 +10,12 @@ beforeAll(() => {
     this.open = true;
   };
 });
+
+beforeEach(() => {
+  stubModelsApi();
+});
+
+afterEach(() => vi.restoreAllMocks());
 
 const ROUTE_ID = "/_app/models";
 
@@ -71,7 +78,7 @@ test("정렬을 바꾸면 1페이지로 돌아간다", async () => {
 
   await waitFor(() =>
     expect(routeMatch(router, ROUTE_ID)?.search).toEqual({
-      sort: "modelId",
+      sort: "openrouter_model_id",
       order: "asc",
     }),
   );

@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { api, toApiError } from "../../../shared/api/client";
+import { api, unwrap } from "../../../shared/api/client";
 import type { components } from "../../../shared/api/schema";
 import {
   type CustomerUsageSearch,
@@ -17,18 +17,6 @@ const ROOT_KEY = "customer-usage";
 const USAGE_STALE_TIME_MS = 30_000;
 /** 고객·서비스 목록은 거의 바뀌지 않는다. */
 const OPTIONS_STALE_TIME_MS = 5 * 60_000;
-
-/** 호출 결과를 데이터로 돌려주고 실패는 ApiError로 던진다. */
-function unwrap<T>(result: {
-  data?: T;
-  error?: unknown;
-  response: Response;
-}): T {
-  if (result.data === undefined) {
-    throw toApiError(result.response.status, result.error);
-  }
-  return result.data;
-}
 
 export const usageOptionsQuery = queryOptions({
   queryKey: [ROOT_KEY, "options"],
