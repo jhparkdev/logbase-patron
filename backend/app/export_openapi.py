@@ -1,25 +1,29 @@
-"""OpenAPI 문서를 파일로 쓴다. 서버를 띄우지 않고 프론트엔드 타입을 생성하기 위해서다.
+"""OpenAPI 문서를 파일로 내보낸다. 서버를 띄우지 않고도 프론트엔드 타입을 만들 수 있게 한다.
 
-uv --directory backend run python -m app.export_openapi ../frontend/openapi.json
-그다음 pnpm --dir frontend gen:api 로 프론트엔드 타입을 갱신한다.
+사용: uv --directory backend run python -m app.export_openapi ../frontend/openapi.json
 """
 
-import argparse
 import json
+import sys
 from pathlib import Path
 
-from app.main import create_app
+from app.main import app
 
 
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="python -m app.export_openapi")
-    parser.add_argument("output", type=Path, help="OpenAPI 문서를 쓸 파일 경로")
-    args = parser.parse_args(argv)
-    document = create_app().openapi()
-    # 한국어 설명을 그대로 두고 키 순서를 유지해, 계약이 바뀐 줄만 diff 에 드러나게 한다
-    text = json.dumps(document, ensure_ascii=False, indent=2) + "\n"
-    args.output.write_text(text, encoding="utf-8")
+def export_openapi(output: Path) -> None:
+    output.write_text(
+        json.dumps(app.openapi(), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 1:
+        print("사용법: python -m app.export_openapi <출력 파일 경로>", file=sys.stderr)
+        return 2
+    export_openapi(Path(argv[0]))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(sys.argv[1:]))

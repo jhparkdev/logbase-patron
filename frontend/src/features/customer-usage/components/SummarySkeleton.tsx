@@ -1,11 +1,11 @@
 import { Skeleton } from "../../../shared/components/ui/Skeleton";
 
-/** 요약 카드 순서와 이름. 미확인 건수 카드에는 전월 대비 증감이 없다. */
+/** 요약 카드 순서와 이름. 미확인 건수 카드에는 이전 기간 대비 증감이 없다. */
 const SUMMARY_CARDS = [
   { label: "작업 건수", trend: true },
   { label: "API 호출 수", trend: true },
-  { label: "확정 API 비용 (USD)", trend: true },
-  { label: "추정 API 비용 (USD)", trend: true },
+  { label: "확정 API 비용", trend: true },
+  { label: "추정 API 비용", trend: true },
   { label: "비용 미확인 건수", trend: false },
 ] as const;
 
@@ -20,7 +20,9 @@ export function SummarySkeleton() {
             <Skeleton className="size-full" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <p className="text-label font-medium text-grey-600">{card.label}</p>
+            <p className="text-label font-medium break-keep text-grey-600">
+              {card.label}
+            </p>
             <Skeleton className="h-9 w-2/3" />
             {card.trend && <Skeleton className="h-5 w-1/2" />}
           </div>

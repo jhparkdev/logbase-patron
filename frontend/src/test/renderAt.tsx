@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
   createRouter,
@@ -12,11 +13,20 @@ afterEach(cleanup);
 
 /** 실제 앱 라우트 전체를 주어진 주소에서 띄운다. 주소를 확인할 수 있게 라우터를 돌려준다. */
 export function renderAt(path: string) {
+  // 테스트마다 캐시를 따로 두고, 실패 동작을 기다림 없이 확인하려고 재시도를 끈다.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [path] }),
+    context: { queryClient },
   });
-  render(<RouterProvider router={router} />);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   return router;
 }
 

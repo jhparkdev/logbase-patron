@@ -15,6 +15,7 @@ CACHE_READ_KEY = "input_cache_read"
 CACHE_WRITE_KEY = "input_cache_write"
 
 RESPONSE_FORMAT_PARAMETER = "response_format"
+TOOLS_PARAMETER = "tools"
 
 # ACTIVE로 바꾸는 시점에 이 시간 안에 성공한 연결 테스트가 있어야 한다.
 ACTIVATION_TEST_WINDOW = timedelta(hours=24)
@@ -89,6 +90,11 @@ def supports_json_schema(supported_parameters: Collection[str]) -> bool:
     return RESPONSE_FORMAT_PARAMETER in supported_parameters
 
 
+def supports_tools(supported_parameters: Collection[str]) -> bool:
+    """함수 호출(tools)을 지원하는지. tool_choice만 있는 경우는 지원으로 보지 않는다."""
+    return TOOLS_PARAMETER in supported_parameters
+
+
 def provider_from_model_id(openrouter_model_id: str) -> str | None:
     """모델 ID의 '/' 앞부분을 모델 제공사로 쓴다 (안). '/'가 없으면 None."""
     provider, separator, _ = openrouter_model_id.partition("/")
@@ -100,11 +106,11 @@ def provider_from_model_id(openrouter_model_id: str) -> str | None:
 def snapshot_from_pricing(pricing: Mapping[str, Decimal]) -> PriceSnapshot | None:
     """OpenRouter 가격 항목에서 우리가 저장하는 단가를 꺼낸다.
 
-    입력 또는 출력 단가가 없으면 가격 미확인이라 None이다.
+    입력 또는 출력 단가가 없거나 음수이면 가격 미확인이라 None이다. 0은 무료로 본다.
     """
     prompt = pricing.get(PROMPT_KEY)
     completion = pricing.get(COMPLETION_KEY)
-    if prompt is None or completion is None:
+    if prompt is None or completion is None or prompt < 0 or completion < 0:
         return None
     return PriceSnapshot(
         input_price_per_token=prompt,

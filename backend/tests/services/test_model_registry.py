@@ -14,6 +14,7 @@ from app.services.model_registry import (
     provider_from_model_id,
     snapshot_from_pricing,
     supports_json_schema,
+    supports_tools,
 )
 
 TESTING = ModelStatus.TESTING
@@ -146,6 +147,20 @@ def test_response_format이_있으면_JSON_Schema를_지원한다(
 
 
 @pytest.mark.parametrize(
+    ("parameters", "expected"),
+    [
+        (["temperature", "tools"], True),
+        ([], False),
+        (["temperature", "tool_choice"], False),
+    ],
+)
+def test_tools가_있으면_함수_호출을_지원한다(
+    parameters: list[str], expected: bool
+) -> None:
+    assert supports_tools(parameters) is expected
+
+
+@pytest.mark.parametrize(
     ("model_id", "expected"),
     [
         ("mistralai/mistral-nemo", "mistralai"),
@@ -204,6 +219,24 @@ def test_입력_또는_출력_단가가_없으면_가격_미확인이다(
     pricing: dict[str, Decimal],
 ) -> None:
     assert snapshot_from_pricing(pricing) is None
+
+
+@pytest.mark.parametrize(
+    "pricing",
+    [
+        {"prompt": Decimal(-1), "completion": Decimal("0.2")},
+        {"prompt": Decimal("0.1"), "completion": Decimal(-1)},
+    ],
+)
+def test_단가가_음수이면_가격_미확인이다(pricing: dict[str, Decimal]) -> None:
+    assert snapshot_from_pricing(pricing) is None
+
+
+def test_단가가_0이면_무료로_보고_가격은_확인된_것이다() -> None:
+    snapshot = snapshot_from_pricing({"prompt": Decimal(0), "completion": Decimal(0)})
+
+    assert snapshot is not None
+    assert snapshot.input_price_per_token == 0
 
 
 def snapshot(input_price: str, output_price: str) -> PriceSnapshot:

@@ -12,6 +12,10 @@ import {
 type BudgetFormProps = {
   /** 적용 시작 월의 처음 값 "YYYY-MM" */
   defaultMonth: string;
+  /** 월 예산의 처음 값. 없으면 빈 칸이다. */
+  defaultAmount?: string;
+  /** 저장하는 동안 저장 버튼을 막아 같은 요청이 두 번 가지 않게 한다. */
+  submitting?: boolean;
   /** 검증을 통과한 값을 받는다. 없으면 저장할 수 없어 저장 버튼을 막는다(예산 저장 API 전). */
   onSubmit?: (values: BudgetFormValues) => void;
   onClose: () => void;
@@ -20,6 +24,8 @@ type BudgetFormProps = {
 /** 월 예산 입력(고객·프로젝트 공용). 저장을 누를 때만 검증한다. */
 export function BudgetForm({
   defaultMonth,
+  defaultAmount = "",
+  submitting = false,
   onSubmit,
   onClose,
 }: BudgetFormProps) {
@@ -28,7 +34,7 @@ export function BudgetForm({
     handleSubmit,
     formState: { errors },
   } = useForm<z.input<typeof budgetFormSchema>, unknown, BudgetFormValues>({
-    defaultValues: { amount: "", effectiveFrom: defaultMonth },
+    defaultValues: { amount: defaultAmount, effectiveFrom: defaultMonth },
     resolver: zodResolver(budgetFormSchema),
     reValidateMode: "onSubmit",
   });
@@ -65,7 +71,7 @@ export function BudgetForm({
       </FormHint>
       <FormActions
         submitLabel="예산 저장"
-        canSubmit={onSubmit !== undefined}
+        canSubmit={onSubmit !== undefined && !submitting}
         onClose={onClose}
       />
     </form>

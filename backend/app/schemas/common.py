@@ -19,6 +19,10 @@ class ErrorCode(StrEnum):
     UNAUTHENTICATED = "UNAUTHENTICATED"
     # 허용한 화면 주소(ALLOWED_ORIGIN)가 아닌 곳에서 온 상태 변경 요청
     ORIGIN_NOT_ALLOWED = "ORIGIN_NOT_ALLOWED"
+    # 조회 기간이 규칙(시작≤종료, 366일 이내)에 맞지 않음
+    INVALID_PERIOD = "INVALID_PERIOD"
+    # 적용 시작 월이 같은 대상의 다른 예산 기간과 겹침
+    BUDGET_PERIOD_CONFLICT = "BUDGET_PERIOD_CONFLICT"
 
 
 class ErrorResponse(BaseModel):

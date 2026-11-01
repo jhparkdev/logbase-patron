@@ -79,8 +79,9 @@ async def list_models(
         conditions.append(
             ModelRegistry.openrouter_model_id.icontains(model_id, autoescape=True)
         )
+    # 제공사는 화면의 선택 상자에서 고른 이름이라, 글자 일부가 아니라 이름 전체가 같을 때만 찾는다.
     if provider:
-        conditions.append(ModelRegistry.provider.icontains(provider, autoescape=True))
+        conditions.append(func.lower(ModelRegistry.provider) == provider.lower())
     if statuses:
         conditions.append(ModelRegistry.status.in_(statuses))
 
