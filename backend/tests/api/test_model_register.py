@@ -91,14 +91,17 @@ async def test_등록한_모델은_목록과_상세에서_조회된다(
     assert detail == created
 
 
-async def test_단가를_모르면_current_price가_null이다(
+async def test_단가를_모르면_가격_미확인으로_등록된다(
     client: AsyncClient, catalog: FakeCatalog
 ) -> None:
     catalog.models = [info(NEW_MODEL, pricing={})]
 
     created = (await client.post(MODELS, json=body())).json()
 
-    assert created["current_price"] is None
+    price = created["current_price"]
+    assert price["price_status"] == "UNKNOWN"
+    assert price["input_price_per_token"] is None
+    assert price["output_price_per_token"] is None
 
 
 async def test_앞뒤_공백은_지우고_비운_용도는_null로_저장한다(

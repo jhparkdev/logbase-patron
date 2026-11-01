@@ -118,13 +118,22 @@ async def test_단가를_알면_첫_가격_이력도_함께_저장한다(
     }
 
 
-async def test_단가를_모르면_가격_행을_만들지_않는다(
+async def test_단가를_모르면_가격_미확인_행을_만든다(
     db_session: AsyncSession, user_id: int
 ) -> None:
-    await register(db_session, user_id, models=[info(pricing={})])
+    model_id = await register(db_session, user_id, models=[info(pricing={})])
 
-    assert await count(db_session, ModelPrice) == 0
-    assert await count(db_session, ModelRegistry) == 1
+    price = await db_session.scalar(
+        select(ModelPrice).where(ModelPrice.model_id == model_id)
+    )
+    assert price is not None
+    assert price.price_status == "UNKNOWN"
+    assert price.input_price_per_token is None
+    assert price.output_price_per_token is None
+    assert price.source == "OPENROUTER_MODELS"
+    assert price.effective_from == NOW
+    assert price.checked_at == NOW
+    assert price.raw_pricing == {}
 
 
 async def test_글자_수_한도가_0_이하이면_null로_저장한다(

@@ -100,18 +100,24 @@ def _positive_or_none(value: int | None) -> int | None:
 def _add_first_price(
     session: AsyncSession, model_id: int, info: ModelInfo, now: datetime
 ) -> None:
-    """단가를 알면 첫 가격 이력을 넣는다. 모르면 넣지 않아, 모델의 현재 가격이 없는(미확인) 상태가 된다."""
+    """첫 가격 이력을 넣는다. 단가를 모르면 단가 없이 가격 미확인(UNKNOWN) 행으로 남긴다."""
     snapshot = snapshot_from_pricing(info.pricing)
-    if snapshot is None:
-        return
+    prices = (
+        {}
+        if snapshot is None
+        else {
+            "input_price_per_token": snapshot.input_price_per_token,
+            "output_price_per_token": snapshot.output_price_per_token,
+            "cache_read_price_per_token": snapshot.cache_read_price_per_token,
+            "cache_write_price_per_token": snapshot.cache_write_price_per_token,
+        }
+    )
+    status = PriceStatus.UNKNOWN if snapshot is None else PriceStatus.KNOWN
     session.add(
         ModelPrice(
             model_id=model_id,
-            price_status=PriceStatus.KNOWN.value,
-            input_price_per_token=snapshot.input_price_per_token,
-            output_price_per_token=snapshot.output_price_per_token,
-            cache_read_price_per_token=snapshot.cache_read_price_per_token,
-            cache_write_price_per_token=snapshot.cache_write_price_per_token,
+            price_status=status.value,
+            **prices,
             # str()은 작은 값을 1E-7처럼 쓰므로, OpenRouter가 준 표기와 같게 일반 숫자 표기로 남긴다.
             raw_pricing={
                 key: format(value, "f") for key, value in info.pricing.items()
