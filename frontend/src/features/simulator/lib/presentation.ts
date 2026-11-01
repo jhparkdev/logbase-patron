@@ -53,6 +53,8 @@ export type SlotView = {
   response: string | null;
   errorMessage?: string;
   comparisonNote?: string | null;
+  // 실행 당시의 모델 상태. 현재 상태와 다를 수 있다.
+  statusAtRun?: string;
   // 이 칸에 실제로 적용한 설정. 빈 배열은 모델 기본값으로 호출했다는 뜻이다.
   settings?: readonly { label: string; value: string }[];
 };

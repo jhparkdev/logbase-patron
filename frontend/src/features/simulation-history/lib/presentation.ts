@@ -1,3 +1,5 @@
+import type { components } from "../../../shared/api/schema";
+
 // 화면 전용 표시 props다. API 응답에서 바꾸는 일은 view.ts가 한다.
 export type HistoryOption = { key: string; name: string };
 export type HistoryRow = {
@@ -11,7 +13,8 @@ export type HistoryRow = {
     confirmed: string | null;
     estimated: string | null;
     unknownCount: number;
-    checking: boolean;
+    // 서버가 정한 비용 상태. 화면에서 다시 판단하지 않는다.
+    checkStatus: components["schemas"]["CostCheckStatus"];
   };
   inactiveModelCount: number | null;
 };

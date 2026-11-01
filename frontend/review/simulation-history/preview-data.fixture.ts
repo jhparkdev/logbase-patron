@@ -42,7 +42,13 @@ export const historyRows: HistoryRow[] = dbMock.runs.map((run) => ({
     confirmed: run.confirmedCost,
     estimated: run.estimatedCost,
     unknownCount: run.unknownCostCount,
-    checking: !!run.status.ongoing,
+    checkStatus: run.status.ongoing
+      ? "확인 중"
+      : run.unknownCostCount > 0
+        ? "미확인 포함"
+        : run.estimatedCost !== null
+          ? "추정 포함"
+          : "확정",
   },
   inactiveModelCount: run.slots.filter((slot) => !choiceFor(slot)?.selectable)
     .length,
@@ -144,13 +150,7 @@ export function selectPreviewRows(search: HistorySearch): HistoryRow[] {
         result = a.status.label.localeCompare(b.status.label);
         break;
       case "costStatus":
-        result = String([
-          a.cost.checking,
-          a.cost.estimated,
-          a.cost.unknownCount > 0,
-        ]).localeCompare(
-          String([b.cost.checking, b.cost.estimated, b.cost.unknownCount > 0]),
-        );
+        result = a.cost.checkStatus.localeCompare(b.cost.checkStatus);
         break;
     }
     return (

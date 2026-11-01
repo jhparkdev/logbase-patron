@@ -50,12 +50,12 @@ const row: HistoryRow = {
   requestedAt: "2026-10-22T01:00:00Z",
   scenario: "기존 시나리오",
   modelCount: 3,
-  status: { label: "일부 성공", tone: "yellow" },
+  status: { label: "부분 성공", tone: "yellow" },
   cost: {
     confirmed: null,
     estimated: "0.125",
     unknownCount: 1,
-    checking: false,
+    checkStatus: "미확인 포함",
   },
   inactiveModelCount: 1,
 };

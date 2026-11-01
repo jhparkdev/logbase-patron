@@ -67,6 +67,20 @@ test("모델 칸의 성공 결과를 그대로 옮긴다", () => {
   });
 });
 
+test.each([
+  ["ACTIVE", "활성"],
+  ["INACTIVE", "비활성"],
+  ["TESTING", "검증 중"],
+] as const)("실행 당시 모델 상태 %s를 %s로 옮긴다", (status, label) => {
+  const [first, second] = RUN_DETAIL.results;
+  expect(
+    toRunView({
+      ...RUN_DETAIL,
+      results: [{ ...first, model_status_at_run: status }, second],
+    }).slots[0].statusAtRun,
+  ).toBe(label);
+});
+
 test("모델 칸마다 실제로 적용한 설정을 화면 이름으로 옮긴다", () => {
   const [first, second] = RUN_DETAIL.results;
   const { slots } = toRunView({

@@ -48,6 +48,23 @@ const run = (slots: SlotView[]): RunView => ({
   slots,
 });
 
+test("실행 당시 모델 상태가 있는 칸만 표시한다", () => {
+  render(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: run([
+          slot({ statusAtRun: "비활성" }),
+          slot({ key: "slot-2", name: "둘째 모델" }),
+        ]),
+      }}
+    />,
+  );
+  const [first, second] = screen.getAllByRole("article");
+  expect(within(first).getByText("실행 당시 모델 상태: 비활성")).toBeDefined();
+  expect(within(second).queryByText(/실행 당시 모델 상태/)).toBeNull();
+});
+
 test("모델 칸마다 적용 설정을 따로 보여 주고 값이 없으면 모델 기본값으로 안내한다", () => {
   render(
     <SimulationResults

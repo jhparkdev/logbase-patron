@@ -30,7 +30,7 @@ export const STATUS_LABELS: Record<(typeof HISTORY_STATUSES)[number], string> =
     PENDING: "대기",
     RUNNING: "진행 중",
     SUCCESS: "성공",
-    PARTIAL_SUCCESS: "일부 성공",
+    PARTIAL_SUCCESS: "부분 성공",
     FAILED: "실패",
     CANCELLED: "취소",
   };

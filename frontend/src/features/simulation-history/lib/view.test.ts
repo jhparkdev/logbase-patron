@@ -26,7 +26,7 @@ test("이력 한 행의 비용은 확정·추정을 더하지 않고 나눠 전�
     confirmed: "0.1",
     estimated: "0.2",
     unknownCount: 0,
-    checking: false,
+    checkStatus: "추정 포함",
   });
 });
 
@@ -43,7 +43,7 @@ test("비용이 집계되지 않으면 금액을 0으로 만들지 않고 비워
     confirmed: null,
     estimated: null,
     unknownCount: 2,
-    checking: true,
+    checkStatus: "확인 중",
   });
 });
 
@@ -53,7 +53,7 @@ test("실행 상태는 내부 코드 대신 화면 문구와 색으로 바꾼다
     requestedAt: HISTORY_ITEM.requested_at,
     scenario: "PRODUCT_DESCRIPTION",
     modelCount: 2,
-    status: { label: "일부 성공", tone: "yellow" },
+    status: { label: "부분 성공", tone: "yellow" },
     inactiveModelCount: 1,
   });
   expect(toHistoryRow({ ...HISTORY_ITEM, status: "FAILED" }).status.tone).toBe(

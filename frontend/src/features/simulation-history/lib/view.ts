@@ -49,7 +49,7 @@ export function toHistoryRow(
       confirmed: item.confirmed_cost_usd,
       estimated: item.estimated_cost_usd,
       unknownCount: item.unknown_cost_count,
-      checking: item.cost_check_status === "확인 중",
+      checkStatus: item.cost_check_status,
     },
     inactiveModelCount: item.inactive_model_count,
   };

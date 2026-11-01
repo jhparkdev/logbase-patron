@@ -28,6 +28,11 @@ const VALIDATION: Record<Schemas["ValidationStatus"], string> = {
   NOT_EXECUTED: "미실행",
 };
 const VALIDATION_NOT_RUN = VALIDATION.NOT_EXECUTED;
+const MODEL_STATUS: Record<Schemas["ModelStatus"], string> = {
+  ACTIVE: "활성",
+  INACTIVE: "비활성",
+  TESTING: "검증 중",
+};
 const SETTING_LABELS: Readonly<Record<string, string>> = {
   temperature: PARAMETER_LABELS.temperature,
   max_tokens: PARAMETER_LABELS.maxTokens,
@@ -82,6 +87,7 @@ function toSlot(result: Result): SlotView {
     response: result.response_text,
     errorMessage: result.error_message ?? undefined,
     comparisonNote: result.comparability_note,
+    statusAtRun: MODEL_STATUS[result.model_status_at_run],
     settings: toSettings(result.execution_config),
   };
 }

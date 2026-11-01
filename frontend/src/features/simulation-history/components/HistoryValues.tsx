@@ -32,17 +32,18 @@ export function HistoryStatus({ status }: { status: HistoryRow["status"] }) {
     </span>
   );
 }
+const COST_STATUS_TONES = {
+  "확인 중": "grey",
+  "미확인 포함": "yellow",
+  "추정 포함": "blue",
+  확정: "green",
+} as const satisfies Record<HistoryRow["cost"]["checkStatus"], string>;
 export function HistoryCostStatus({ cost }: { cost: HistoryRow["cost"] }) {
   return (
     <span className="inline-flex flex-wrap gap-1">
-      {cost.checking && <Badge tone="grey">확인 중</Badge>}
-      {cost.estimated !== null && <Badge tone="blue">추정 포함</Badge>}
-      {cost.unknownCount > 0 && <Badge tone="yellow">미확인 포함</Badge>}
-      {!cost.checking && cost.estimated === null && !cost.unknownCount && (
-        <Badge tone={cost.confirmed === null ? "yellow" : "green"}>
-          {cost.confirmed === null ? "미확인" : "확정"}
-        </Badge>
-      )}
+      <Badge tone={COST_STATUS_TONES[cost.checkStatus]}>
+        {cost.checkStatus}
+      </Badge>
     </span>
   );
 }
@@ -61,6 +62,12 @@ export function HistoryCost({ cost }: { cost: HistoryRow["cost"] }) {
       )}
       {cost.confirmed === null && cost.estimated === null && (
         <span className="whitespace-nowrap tabular-nums">미확인</span>
+      )}
+      {/* 비용 상태가 미확인 포함이면 배지에 드러나지 않으므로 금액 쪽에 남긴다 */}
+      {cost.estimated !== null && cost.checkStatus !== "추정 포함" && (
+        <span className="whitespace-nowrap text-caption text-blue-600">
+          추정 포함
+        </span>
       )}
       {cost.unknownCount > 0 && (
         <span className="whitespace-nowrap text-caption text-yellow-900">

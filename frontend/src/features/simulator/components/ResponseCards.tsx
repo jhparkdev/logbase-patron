@@ -36,6 +36,11 @@ export function ResponseCards({
             <span className="text-grey-600">비용</span>
             <CostValue cost={slot.cost} />
           </div>
+          {slot.statusAtRun && (
+            <p className="text-caption text-grey-600">
+              실행 당시 모델 상태: {slot.statusAtRun}
+            </p>
+          )}
           {slot.settings && (
             <div>
               <p className="mb-1 text-label font-semibold">적용 설정</p>

@@ -28,7 +28,7 @@ test("URL 조건으로 이력을 조회해 서버가 준 행을 표시한다", a
   expect(await screen.findByRole("button", { name: RUN_ID })).toBeDefined();
   expect(screen.getByText("PRODUCT_DESCRIPTION")).toBeDefined();
   expect(
-    within(screen.getAllByRole("row")[1]).getByText("일부 성공"),
+    within(screen.getAllByRole("row")[1]).getByText("부분 성공"),
   ).toBeDefined();
   expect(screen.getByText("미확인 1건 미반영")).toBeDefined();
   const query = listRequests(requests)[0].searchParams;
@@ -108,6 +108,9 @@ test("상세를 열면 당시 입력과 모델별 결과를 조회해 표시한�
   const [first, second] = dialog.getAllByRole("article");
   expect(within(first).getByText("0.9")).toBeDefined();
   expect(within(second).getByText("모델 기본값")).toBeDefined();
+  // 지금은 비활성인 모델도 실행 당시 상태를 따로 보여 준다
+  expect(within(second).getByText("실행 당시 모델 상태: 활성")).toBeDefined();
+  expect(dialog.getByText("비활성")).toBeDefined();
   expect(
     requests.some((url) => url.pathname === `/api/simulations/${RUN_ID}`),
   ).toBe(true);
