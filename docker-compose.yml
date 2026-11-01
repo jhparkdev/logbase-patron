@@ -40,7 +40,10 @@ services:
       ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-http://localhost:5173}
       SESSION_COOKIE_SECURE: "false"
 
-      # 로컬 이미지 업로드 기능 
+      # 개발용 Key만 .env에 넣는다. 비어 있으면 시뮬레이션 접수만 거절되고 앱은 뜬다.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+
+      # 로컬 이미지 업로드 기능
       UPLOAD_DIR: /app/uploads
     
     volumes:
