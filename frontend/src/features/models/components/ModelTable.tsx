@@ -9,7 +9,7 @@ import { SectionCard } from "../../../shared/components/ui/SectionCard";
 import { TableSkeleton } from "../../../shared/components/ui/TableSkeleton";
 import { modelListOptions } from "../api/models";
 import { useModelPageChange, useModelSort } from "../hooks/useModelTable";
-import type { ModelsSearch } from "../lib/search";
+import { hasModelFilter, type ModelsSearch } from "../lib/search";
 import { COLUMNS } from "./ModelColumns";
 
 const TITLE = "등록된 AI 모델";
@@ -67,12 +67,12 @@ function ModelRows({ search, refreshing }: ModelTableProps) {
         rowKey={(row) => String(row.model_id)}
         sort={sort}
         onSortChange={onSortChange}
-        // 검색어 있음: 조건 불일치 / 없음: 등록된 모델 없음
+        // 조건 있음: 조건 불일치 / 없음: 등록된 모델 없음
         empty={
-          search.q === undefined ? (
-            <Result title="등록된 모델이 없어요" />
-          ) : (
+          hasModelFilter(search) ? (
             <Result title="조건에 맞는 모델이 없어요" />
+          ) : (
+            <Result title="등록된 모델이 없어요" />
           )
         }
       />

@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { PAGE_SIZE } from "../../../shared/lib/pagination";
 import {
+  hasModelFilter,
   modelListQuery,
   modelSortOf,
   modelSortParams,
@@ -72,4 +73,35 @@ test("정렬을 바꾸면 1페이지로 돌아간다", () => {
     order: "asc",
     page: undefined,
   });
+});
+
+test("제공사는 검색어와 같은 규칙으로 검증한다", () => {
+  expect(parse({ provider: "openai" }).provider).toBe("openai");
+  expect(parse({ provider: "" }).provider).toBeUndefined();
+  expect(parse({ provider: "a".repeat(101) }).provider).toBeUndefined();
+  expect(parse({ provider: "a\u0000b" }).provider).toBeUndefined();
+});
+
+test("상태는 백엔드가 정한 값만 받는다", () => {
+  expect(parse({ status: "ACTIVE" }).status).toBe("ACTIVE");
+  expect(parse({ status: "TESTING" }).status).toBe("TESTING");
+  expect(parse({ status: "INACTIVE" }).status).toBe("INACTIVE");
+  expect(parse({ status: "active" }).status).toBeUndefined();
+  expect(parse({ status: "DELETED" }).status).toBeUndefined();
+});
+
+test("제공사와 상태 조건을 목록 요청에 담는다", () => {
+  expect(
+    modelListQuery({ provider: "openai", status: "ACTIVE" }),
+  ).toMatchObject({ provider: "openai", status: ["ACTIVE"] });
+  expect(modelListQuery({}).status).toBeUndefined();
+  expect(modelListQuery({}).provider).toBeUndefined();
+});
+
+test("검색어, 제공사, 상태 중 하나라도 있으면 조건이 걸린 것이다", () => {
+  expect(hasModelFilter({})).toBe(false);
+  expect(hasModelFilter({ sort: "status", order: "asc", page: 2 })).toBe(false);
+  expect(hasModelFilter({ q: "gpt" })).toBe(true);
+  expect(hasModelFilter({ provider: "openai" })).toBe(true);
+  expect(hasModelFilter({ status: "ACTIVE" })).toBe(true);
 });

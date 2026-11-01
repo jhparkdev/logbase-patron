@@ -2,6 +2,7 @@ import type { components } from "../../../shared/api/schema";
 
 type ModelStatus = components["schemas"]["ModelStatus"];
 type ConnectionTestStatus = components["schemas"]["ConnectionTestStatus"];
+type ProviderRead = components["schemas"]["ProviderRead"];
 
 const STATUS_BADGES = {
   TESTING: { tone: "blue", label: "검증 중" },
@@ -37,4 +38,39 @@ const MODALITY_LABELS: Record<string, string> = {
 /** 새 입력 형식이 추가돼도 화면이 비지 않게 모르는 형식은 원문 표시 */
 export function modalityLabel(modality: string): string {
   return MODALITY_LABELS[modality] ?? modality;
+}
+
+// 선택지 순서. 상태가 늘면 STATUS_BADGES에서 타입 오류가 나므로 여기도 함께 고친다.
+export const MODEL_STATUSES = [
+  "TESTING",
+  "ACTIVE",
+  "INACTIVE",
+] as const satisfies readonly ModelStatus[];
+
+export const STATUS_OPTIONS = [
+  { value: "", label: "상태 전체" },
+  ...MODEL_STATUSES.map((status) => ({
+    value: status,
+    label: STATUS_BADGES[status].label,
+  })),
+];
+
+/** 선택 상자의 값(전체는 빈 문자열)을 상태로 변환. 전체는 undefined */
+export function statusOfOption(value: string): ModelStatus | undefined {
+  return MODEL_STATUSES.find((status) => status === value);
+}
+
+/** 제공사 선택지(모델 수 포함). 고른 제공사가 목록에 없어도(로딩·조회 실패) 이름만 남겨 선택이 풀리지 않게 함 */
+export function providerOptions(
+  providers: ProviderRead[],
+  selected: string | undefined,
+) {
+  const options = providers.map((item) => ({
+    value: item.provider,
+    label: `${item.provider} (${item.model_count})`,
+  }));
+  if (selected !== undefined && !options.some((o) => o.value === selected)) {
+    options.push({ value: selected, label: selected });
+  }
+  return [{ value: "", label: "Provider 전체" }, ...options];
 }

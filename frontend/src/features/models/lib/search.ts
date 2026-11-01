@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { components } from "../../../shared/api/schema";
 import { PAGE_SIZE } from "../../../shared/lib/pagination";
 import type { SortDirection, SortState } from "../../../shared/lib/sort";
+import { MODEL_STATUSES } from "./view";
 
 type ModelSortField = components["schemas"]["ModelSortField"];
 
@@ -23,16 +24,19 @@ const ORDERS = ["asc", "desc"] as const;
 const MAX_QUERY_LENGTH = 100;
 const MAX_PAGE = 100_000;
 
+// 검색어와 제공사가 함께 쓰는 문자열 규칙
+const filterText = z
+  .string()
+  .min(1)
+  .max(MAX_QUERY_LENGTH)
+  // NUL 문자는 PostgreSQL이 거절하므로 백엔드와 같이 차단
+  .refine((text) => !text.includes("\0"));
+
 /** 주소 조건은 외부 입력이라 검증. 허용 밖의 값은 버림 */
 export const modelsSearchSchema = z.object({
-  q: z
-    .string()
-    .min(1)
-    .max(MAX_QUERY_LENGTH)
-    // NUL 문자는 PostgreSQL이 거절하므로 백엔드와 같이 차단
-    .refine((text) => !text.includes("\0"))
-    .optional()
-    .catch(undefined),
+  q: filterText.optional().catch(undefined),
+  provider: filterText.optional().catch(undefined),
+  status: z.enum(MODEL_STATUSES).optional().catch(undefined),
   sort: z.enum(SORT_KEYS).optional().catch(undefined),
   order: z.enum(ORDERS).optional().catch(undefined),
   page: z.number().int().min(1).max(MAX_PAGE).optional().catch(undefined),
@@ -56,6 +60,8 @@ export function modelListQuery(search: ModelsSearch) {
   const sort = modelSortOf(search);
   return {
     q: search.q,
+    provider: search.provider,
+    status: search.status ? [search.status] : undefined,
     sort: sort?.key,
     order: sort?.direction,
     page: search.page ?? 1,
@@ -70,4 +76,13 @@ export function modelSortParams(sort: SortState) {
     order: sort.direction,
     page: undefined,
   };
+}
+
+/** 검색어·제공사·상태 중 하나라도 있으면 조건이 걸린 상태 */
+export function hasModelFilter(search: ModelsSearch): boolean {
+  return (
+    search.q !== undefined ||
+    search.provider !== undefined ||
+    search.status !== undefined
+  );
 }

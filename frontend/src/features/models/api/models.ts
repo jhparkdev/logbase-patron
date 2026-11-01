@@ -9,6 +9,8 @@ export type ModelRow = components["schemas"]["ModelRead"];
 const ROOT_KEY = "models";
 /** 테스트·상태 변경으로 목록이 바뀌므로 짧게 캐시 */
 const LIST_STALE_TIME_MS = 30_000;
+/** 제공사는 모델을 등록할 때만 바뀐다. */
+const PROVIDERS_STALE_TIME_MS = 5 * 60_000;
 
 /** 목록 조회. 조회 조건별로 캐시 */
 export function modelListOptions(search: ModelsSearch) {
@@ -23,3 +25,11 @@ export function modelListOptions(search: ModelsSearch) {
     retry: false,
   });
 }
+
+/** 제공사 선택지. 모델 목록의 provider 조건에 그대로 쓰는 값 */
+export const modelProvidersQuery = queryOptions({
+  queryKey: [ROOT_KEY, "providers"],
+  queryFn: async () => unwrap(await api.GET("/api/models/providers")),
+  staleTime: PROVIDERS_STALE_TIME_MS,
+  retry: false,
+});

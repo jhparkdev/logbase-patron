@@ -3,12 +3,11 @@ import { useDeferredValue } from "react";
 import plusIcon from "../../assets/plus.svg";
 import { modelListOptions } from "../../features/models/api/models";
 import { ModelDetailPanel } from "../../features/models/components/ModelDetailPanel";
+import { ModelFilters } from "../../features/models/components/ModelFilters";
 import { ModelTable } from "../../features/models/components/ModelTable";
 import { modelsSearchSchema } from "../../features/models/lib/search";
 import { Button } from "../../shared/components/ui/Button";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
-import { SearchField } from "../../shared/components/ui/SearchField";
-import { Select } from "../../shared/components/ui/Select";
 
 export const Route = createFileRoute("/_app/models")({
   validateSearch: modelsSearchSchema,
@@ -38,38 +37,15 @@ function ModelsPage() {
           신규 모델 등록
         </Button>
       </div>
-      <div className="flex flex-wrap gap-3 rounded-2xl bg-white p-4">
-        <SearchField
-          label="모델 검색"
-          placeholder="모델명 또는 Model ID로 검색하세요"
-          value={search.q}
-          onSearch={(text) =>
-            navigate({
-              search: (prev) => ({
-                ...prev,
-                q: text || undefined,
-                page: undefined,
-              }),
-            })
-          }
-        />
-        <Select
-          label="Provider"
-          value=""
-          options={[{ value: "", label: "Provider 전체" }]}
-          onChange={() => {}}
-          disabled
-          className="w-56"
-        />
-        <Select
-          label="상태"
-          value=""
-          options={[{ value: "", label: "상태 전체" }]}
-          onChange={() => {}}
-          disabled
-          className="w-56"
-        />
-      </div>
+      <ModelFilters
+        search={search}
+        // 조건이 바뀌면 1페이지로 복귀
+        onChange={(filters) =>
+          navigate({
+            search: (prev) => ({ ...prev, ...filters, page: undefined }),
+          })
+        }
+      />
       <ModelTable search={shown} refreshing={shown !== search} />
       {search.model !== undefined && (
         <ModelDetailPanel

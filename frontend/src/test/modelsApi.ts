@@ -59,8 +59,15 @@ export const LIST: Schemas["ModelListResponse"] = {
   total: 12,
 };
 
+export const PROVIDERS: Schemas["ProviderListResponse"] = {
+  items: [
+    { provider: "openai", model_count: 3 },
+    { provider: "mistralai", model_count: 1 },
+  ],
+};
+
 type Reply = { status: number; body: unknown };
-type Replies = { list?: Reply };
+type Replies = { list?: Reply; providers?: Reply };
 
 /** 브라우저 fetch를 P-03 API 응답으로 대체. 보낸 요청은 반환된 목록에 기록 */
 export function stubModelsApi(initial: Replies = {}) {
@@ -68,7 +75,9 @@ export function stubModelsApi(initial: Replies = {}) {
   const requests: { url: URL }[] = [];
   vi.stubGlobal("fetch", async (request: Request) => {
     requests.push({ url: new URL(request.url) });
-    const reply = replies.list ?? { status: 200, body: LIST };
+    const reply = request.url.endsWith("/api/models/providers")
+      ? (replies.providers ?? { status: 200, body: PROVIDERS })
+      : (replies.list ?? { status: 200, body: LIST });
     return new Response(JSON.stringify(reply.body), {
       status: reply.status,
       headers: JSON_HEADERS,

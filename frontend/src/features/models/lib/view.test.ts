@@ -1,5 +1,11 @@
 import { expect, test } from "vitest";
-import { modalityLabel, statusBadge, testResultView } from "./view";
+import {
+  modalityLabel,
+  providerOptions,
+  STATUS_OPTIONS,
+  statusBadge,
+  testResultView,
+} from "./view";
 
 test("모델 상태를 한국어 글자와 색으로 바꾼다", () => {
   expect(statusBadge("TESTING")).toEqual({ tone: "blue", label: "검증 중" });
@@ -17,4 +23,35 @@ test("입력 형식을 한국어로 바꾸고, 모르는 형식은 그대로 보
   expect(modalityLabel("text")).toBe("텍스트");
   expect(modalityLabel("image")).toBe("이미지");
   expect(modalityLabel("hologram")).toBe("hologram");
+});
+
+test("상태 선택지는 전체와 세 상태를 한국어 글자로 보여 준다", () => {
+  expect(STATUS_OPTIONS).toEqual([
+    { value: "", label: "상태 전체" },
+    { value: "TESTING", label: "검증 중" },
+    { value: "ACTIVE", label: "사용 중" },
+    { value: "INACTIVE", label: "사용 중단" },
+  ]);
+});
+
+test("제공사 선택지는 전체 뒤에 받은 제공사를 모델 수와 함께 순서대로 둔다", () => {
+  const providers = [
+    { provider: "openai", model_count: 3 },
+    { provider: "mistralai", model_count: 1 },
+  ];
+  expect(providerOptions(providers, undefined)).toEqual([
+    { value: "", label: "Provider 전체" },
+    { value: "openai", label: "openai (3)" },
+    { value: "mistralai", label: "mistralai (1)" },
+  ]);
+});
+
+test("고른 제공사가 받은 목록에 없으면 모델 수 없이 이름만 선택지에 남긴다", () => {
+  expect(providerOptions([], "openai")).toEqual([
+    { value: "", label: "Provider 전체" },
+    { value: "openai", label: "openai" },
+  ]);
+  expect(
+    providerOptions([{ provider: "openai", model_count: 3 }], "openai"),
+  ).toHaveLength(2);
 });
