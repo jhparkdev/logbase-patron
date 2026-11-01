@@ -99,10 +99,40 @@ export const REQUESTS: Schemas["InternalRequestPage"] = {
   page_size: 10,
 };
 
-type Reply = { status: number; body: unknown };
-/** 경로 끝부분별 응답을 바꾼다. 예: { summary: { status: 500, body: {} } } */
-type Replies = Partial<Record<"summary" | "projects" | "requests", Reply>>;
+export const PROJECT_DETAIL: Schemas["ProjectUsageDetail"] = {
+  project_id: 1,
+  project_name: "사내 챗봇 구축",
+  month: "2026-10",
+  task_count: 12,
+  call_count: 40,
+  confirmed_cost_usd: "3100.200000000000",
+  estimated_cost_usd: "320.300000000000",
+  subscription_usd: "0.0000",
+  unknown_cost_count: 2,
+  budget: {
+    month: "2026-10",
+    monthly_amount_usd: "5000.0000",
+    effective_from_month: "2026-09",
+    used_usd: "3420.500000000000",
+    usage_pct: "68.41",
+    confirmed_usage_pct: "62.00",
+    remaining_usd: "1579.500000000000",
+    unknown_cost_count: 2,
+    status: "NORMAL",
+  },
+  services: [],
+  subscriptions: [],
+};
 
+const SAVED_BUDGET: Schemas["ProjectBudgetRead"] = {
+  budget_id: 9,
+  project_id: 1,
+  monthly_amount_usd: "6000.0000",
+  effective_from_month: "2026-10",
+  effective_to_month: null,
+};
+
+type Reply = { status: number; body: unknown };
 function ok(body: unknown): Reply {
   return { status: 200, body };
 }
@@ -111,10 +141,24 @@ const DEFAULT_REPLIES = {
   summary: ok(SUMMARY),
   projects: ok(PROJECTS),
   requests: ok(REQUESTS),
+  detail: ok(PROJECT_DETAIL),
+  budget: ok(SAVED_BUDGET),
 };
+
+/** 경로 끝부분별 응답을 바꾼다. 예: { summary: { status: 500, body: {} } } */
+type Replies = Partial<Record<keyof typeof DEFAULT_REPLIES, Reply>>;
+
+const PROJECT_DETAIL_PATH = /^projects\/\d+$/;
+const PROJECT_BUDGET_PATH = /^projects\/\d+\/budget$/;
 
 function blockOf(pathname: string): keyof typeof DEFAULT_REPLIES {
   const last = pathname.slice(BASE.length + 1);
+  if (PROJECT_DETAIL_PATH.test(last)) {
+    return "detail";
+  }
+  if (PROJECT_BUDGET_PATH.test(last)) {
+    return "budget";
+  }
   if (last in DEFAULT_REPLIES) {
     return last as keyof typeof DEFAULT_REPLIES;
   }
@@ -125,10 +169,15 @@ function blockOf(pathname: string): keyof typeof DEFAULT_REPLIES {
 /** 브라우저 fetch를 P-02 API 응답으로 바꾼다. 보낸 요청은 돌려준 목록에 쌓인다. */
 export function stubInternalBudgetApi(initial: Replies = {}) {
   const replies: Replies = { ...initial };
-  const requests: { url: URL }[] = [];
+  const requests: { url: URL; method: string; body: unknown }[] = [];
   vi.stubGlobal("fetch", async (request: Request) => {
     const url = new URL(request.url);
-    requests.push({ url });
+    const text = await request.clone().text();
+    requests.push({
+      url,
+      method: request.method,
+      body: text === "" ? undefined : JSON.parse(text),
+    });
     const block = blockOf(url.pathname);
     const reply = replies[block] ?? DEFAULT_REPLIES[block];
     return new Response(JSON.stringify(reply.body), {

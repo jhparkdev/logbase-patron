@@ -11,6 +11,7 @@ import {
 
 export type ProjectBudgetRow = components["schemas"]["ProjectBudgetRow"];
 export type InternalRequestRow = components["schemas"]["InternalRequestRow"];
+type BudgetSave = components["schemas"]["ProjectBudgetSave"];
 
 const ROOT_KEY = "internal-budget";
 /** 호출 기록은 계속 쌓이지만 조회 버튼으로 다시 보는 화면이라 잠깐은 캐시를 쓴다. */
@@ -53,4 +54,33 @@ export function requestRowsOptions(search: BudgetSearch) {
     staleTime: USAGE_STALE_TIME_MS,
     retry: false,
   });
+}
+
+export function projectDetailQuery(projectId: number, month: string) {
+  return queryOptions({
+    queryKey: [ROOT_KEY, "project", projectId, month],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/usage/internal/projects/{project_id}", {
+          params: { path: { project_id: projectId }, query: { month } },
+        }),
+      ),
+    staleTime: USAGE_STALE_TIME_MS,
+    retry: false,
+  });
+}
+
+/** 예산 저장 뒤 다시 불러올 키. 요약 카드, 추이, 이력은 예산과 관계없다. */
+export const PROJECT_BUDGET_AFFECTED_KEYS = [
+  [ROOT_KEY, "projects"],
+  [ROOT_KEY, "project"],
+];
+
+export async function saveProjectBudget(projectId: number, body: BudgetSave) {
+  return unwrap(
+    await api.PUT("/api/usage/internal/projects/{project_id}/budget", {
+      params: { path: { project_id: projectId } },
+      body,
+    }),
+  );
 }

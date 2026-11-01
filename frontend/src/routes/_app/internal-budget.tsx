@@ -97,7 +97,11 @@ function InternalBudgetPage() {
         />
       )}
       {search.project !== undefined && (
-        <ProjectPanel month={month} onClose={closePanel} />
+        <ProjectPanel
+          projectId={search.project}
+          month={month}
+          onClose={closePanel}
+        />
       )}
       {search.subscription === "new" && (
         <SubscriptionPanel month={month} onClose={closePanel} />

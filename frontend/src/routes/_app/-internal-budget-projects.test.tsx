@@ -100,7 +100,7 @@ test("프로젝트명을 누르면 그 프로젝트의 상세 패널을 연다",
   const table = await screen.findByRole("table", { name: TITLE });
   fireEvent.click(within(table).getByRole("link", { name: "사내 챗봇 구축" }));
 
-  await screen.findByRole("dialog", { name: "프로젝트 상세" });
+  await screen.findByRole("dialog", { name: "사내 챗봇 구축" });
   expect(routeMatch(router, ROUTE_ID)?.search.project).toBe(1);
 });
 
