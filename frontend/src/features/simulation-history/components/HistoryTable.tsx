@@ -49,32 +49,38 @@ export function HistoryTable({
                 scope="col"
                 key={key}
                 aria-sort={
-                  search.sort === key
-                    ? search.direction === "asc"
-                      ? "ascending"
-                      : "descending"
-                    : "none"
+                  key === "totalCost"
+                    ? undefined
+                    : search.sort === key
+                      ? search.direction === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : "none"
                 }
                 className={`whitespace-nowrap px-3 py-3 text-label font-medium text-grey-600 ${key === "modelCount" || key === "totalCost" ? "text-right" : "text-left"}`}
               >
-                <button
-                  type="button"
-                  aria-label={`${label} 정렬`}
-                  onClick={() => onSearch(changeHistorySort(search, key))}
-                  className="inline-flex items-center gap-1 focus-visible:outline-2 focus-visible:outline-brand"
-                >
-                  {label}
-                  <span
-                    aria-hidden="true"
-                    className="inline-flex size-4 shrink-0 items-center justify-center"
+                {key === "totalCost" ? (
+                  label
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={`${label} 정렬`}
+                    onClick={() => onSearch(changeHistorySort(search, key))}
+                    className="inline-flex items-center gap-1 focus-visible:outline-2 focus-visible:outline-brand"
                   >
-                    {search.sort === key
-                      ? search.direction === "asc"
-                        ? "↑"
-                        : "↓"
-                      : "↕"}
-                  </span>
-                </button>
+                    {label}
+                    <span
+                      aria-hidden="true"
+                      className="inline-flex size-4 shrink-0 items-center justify-center"
+                    >
+                      {search.sort === key
+                        ? search.direction === "asc"
+                          ? "↑"
+                          : "↓"
+                        : "↕"}
+                    </span>
+                  </button>
+                )}
               </th>
             ))}
             <th scope="col">
