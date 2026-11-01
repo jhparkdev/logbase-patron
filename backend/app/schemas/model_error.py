@@ -15,6 +15,10 @@ class ModelErrorCode(StrEnum):
     MODEL_NOT_IN_OPENROUTER = "MODEL_NOT_IN_OPENROUTER"
     # 이미 등록된 모델
     MODEL_ALREADY_REGISTERED = "MODEL_ALREADY_REGISTERED"
+    # 지금 상태에서 선택한 상태로 바꿀 수 없음. 값은 StatusChangeError와 같다.
+    INVALID_STATUS_TRANSITION = "INVALID_STATUS_TRANSITION"
+    # 사용 중으로 바꾸려는데 24시간 안에 성공한 연결 테스트가 없음. 값은 StatusChangeError와 같다.
+    TEST_NOT_PASSED = "TEST_NOT_PASSED"
 
 
 @dataclass(frozen=True)
@@ -34,6 +38,12 @@ ERROR_SPECS: dict[ModelErrorCode, ErrorSpec] = {
         422, "OpenRouter에서 찾을 수 없는 모델입니다. 모델 ID를 확인해 주세요."
     ),
     ModelErrorCode.MODEL_ALREADY_REGISTERED: ErrorSpec(409, "이미 등록된 모델입니다."),
+    ModelErrorCode.INVALID_STATUS_TRANSITION: ErrorSpec(
+        409, "현재 상태에서는 선택한 상태로 바꿀 수 없습니다."
+    ),
+    ModelErrorCode.TEST_NOT_PASSED: ErrorSpec(
+        409, "24시간 안에 성공한 연결 테스트가 없어 바꿀 수 없습니다."
+    ),
 }
 
 
