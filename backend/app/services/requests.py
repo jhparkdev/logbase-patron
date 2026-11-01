@@ -10,12 +10,13 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 
 from pydantic import JsonValue
-from sqlalchemy import insert, update
+from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     AIRequest,
     AIRequestPayload,
+    APIKey,
     CostSource,
     CostStatus,
     RequestStatus,
@@ -30,13 +31,23 @@ _FINISHED_STATUSES = (
 _CANCELLABLE_STATUSES = (RequestStatus.PENDING, RequestStatus.RUNNING)
 
 
+class KeyServiceMismatchError(Exception):
+    """Key에 정해진 서비스와 다른 서비스의 호출을 기록하려 할 때 발생한다."""
+
+
 async def create_pending(session: AsyncSession, request: PendingRequest) -> None:
     """시뮬레이터가 만든 ID와 실행 조건으로 PENDING 이력을 생성한다.
 
     금액은 미확인(NULL)으로 시작한다. 중복 ID나 잘못된 참조는 DB 오류로 전달하며,
     기존 이력을 초기화하거나 덮어쓰지 않는다. 시뮬레이션 전체의 commit은 호출자가 한다.
     외부 모델 호출은 이 이력과 시뮬레이션 접수 정보가 commit된 뒤에 시작해야 한다.
+    Key에 서비스가 정해져 있으면 그 서비스의 호출만 받는다. NULL은 여러 서비스가 함께 쓰는 Key다.
     """
+    key_service_id = await session.scalar(
+        select(APIKey.service_id).where(APIKey.key_id == request.key_id)
+    )
+    if key_service_id is not None and key_service_id != request.service_id:
+        raise KeyServiceMismatchError("Key에 정해진 서비스와 호출의 서비스가 다릅니다.")
     await session.execute(
         insert(AIRequest).values(
             request_id=request.request_id,
