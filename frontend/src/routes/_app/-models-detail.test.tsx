@@ -33,30 +33,26 @@ test("주소의 모델 번호로 상세를 요청하고 표시 이름을 제목�
   expect(detailRequest).toBeTruthy();
 });
 
-test("기본 정보에 이름, Model ID, 제공사, 용도, 지원 기능, Context Length를 보여 준다", async () => {
-  stubModelsApi({
-    detail: { status: 200, body: { ...DETAIL, purpose: "상품 설명 생성" } },
-  });
+test("기본 정보에 Model ID, 제공사, 입출력 형식, 지원 여부, Context Length를 보여 준다", async () => {
+  stubModelsApi();
   const panel = await openPanel("/models?model=3", "GPT-4o mini");
 
   expect(panel.getByText("openai/gpt-4o-mini")).toBeTruthy();
   expect(panel.getByText("openai")).toBeTruthy();
-  expect(panel.getByText("상품 설명 생성")).toBeTruthy();
   expect(panel.getByText("텍스트, 이미지")).toBeTruthy();
   expect(panel.getAllByText("지원")).toHaveLength(2);
   expect(panel.getByText("128,000")).toBeTruthy();
 });
 
-test("용도와 Context Length를 모르면 빈칸이 아니라 미입력, 미확인으로 보여 준다", async () => {
+test("Context Length를 모르면 빈칸이나 0이 아니라 미확인으로 보여 준다", async () => {
   stubModelsApi({
     detail: {
       status: 200,
-      body: { ...DETAIL, purpose: null, context_length: null },
+      body: { ...DETAIL, context_length: null },
     },
   });
   const panel = await openPanel("/models?model=3", "GPT-4o mini");
 
-  expect(panel.getByText("미입력")).toBeTruthy();
   expect(panel.getByText("미확인")).toBeTruthy();
 });
 

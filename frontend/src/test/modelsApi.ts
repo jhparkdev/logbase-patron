@@ -82,16 +82,24 @@ export const PROVIDERS: Schemas["ProviderListResponse"] = {
 };
 
 type Reply = { status: number; body: unknown };
-type Replies = { list?: Reply; providers?: Reply; detail?: Reply };
+type Replies = {
+  list?: Reply;
+  providers?: Reply;
+  detail?: Reply;
+  update?: Reply;
+};
 
 const DETAIL_PATH = /\/api\/models\/\d+$/;
 
-function replyFor(url: string, replies: Replies): Reply {
+function replyFor(request: Request, replies: Replies): Reply {
+  const url = request.url;
   if (url.endsWith("/api/models/providers")) {
     return replies.providers ?? { status: 200, body: PROVIDERS };
   }
   if (DETAIL_PATH.test(new URL(url).pathname)) {
-    return replies.detail ?? { status: 200, body: DETAIL };
+    return request.method === "PATCH"
+      ? (replies.update ?? { status: 200, body: DETAIL })
+      : (replies.detail ?? { status: 200, body: DETAIL });
   }
   return replies.list ?? { status: 200, body: LIST };
 }
@@ -99,10 +107,15 @@ function replyFor(url: string, replies: Replies): Reply {
 /** 브라우저 fetch를 P-03 API 응답으로 대체. 보낸 요청은 반환된 목록에 기록 */
 export function stubModelsApi(initial: Replies = {}) {
   const replies: Replies = { ...initial };
-  const requests: { url: URL }[] = [];
+  const requests: { url: URL; method: string; body: unknown }[] = [];
   vi.stubGlobal("fetch", async (request: Request) => {
-    requests.push({ url: new URL(request.url) });
-    const reply = replyFor(request.url, replies);
+    const text = await request.clone().text();
+    requests.push({
+      url: new URL(request.url),
+      method: request.method,
+      body: text === "" ? undefined : JSON.parse(text),
+    });
+    const reply = replyFor(request, replies);
     return new Response(JSON.stringify(reply.body), {
       status: reply.status,
       headers: JSON_HEADERS,

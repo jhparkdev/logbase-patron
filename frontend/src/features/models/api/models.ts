@@ -9,6 +9,8 @@ export type ModelRow = components["schemas"]["ModelRead"];
 export type ModelDetail = components["schemas"]["ModelDetailRead"];
 
 const ROOT_KEY = "models";
+/** 목록 조회 캐시 전체의 키. 모델이 바뀌면 이 키로 다시 불러옴 */
+export const MODEL_LIST_KEY = [ROOT_KEY, "list"];
 /** 테스트·상태 변경으로 목록·상세가 바뀌므로 짧게 캐시 */
 const MODEL_STALE_TIME_MS = 30_000;
 /** 제공사는 모델을 등록할 때만 바뀐다. */
@@ -18,7 +20,7 @@ const PROVIDERS_STALE_TIME_MS = 5 * 60_000;
 export function modelListOptions(search: ModelsSearch) {
   const query = modelListQuery(search);
   return queryOptions({
-    queryKey: [ROOT_KEY, "list", query],
+    queryKey: [...MODEL_LIST_KEY, query],
     // 실패 시 ApiError를 던져 DataBlock이 오류 표시
     queryFn: async () =>
       unwrap(await api.GET("/api/models", { params: { query } })),
@@ -49,4 +51,17 @@ export function modelDetailQuery(modelId: number) {
     staleTime: MODEL_STALE_TIME_MS,
     retry: false,
   });
+}
+
+/** 수정할 항목. 보낸 항목만 바뀌고 보내지 않은 항목은 그대로 */
+export type ModelInfoChange = components["schemas"]["ModelUpdate"];
+
+/** 표시 이름·용도 수정. 응답은 수정된 상세 */
+export async function updateModelInfo(modelId: number, body: ModelInfoChange) {
+  return unwrap(
+    await api.PATCH("/api/models/{model_id}", {
+      params: { path: { model_id: modelId } },
+      body,
+    }),
+  );
 }
