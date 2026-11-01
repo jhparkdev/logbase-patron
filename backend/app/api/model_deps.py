@@ -10,6 +10,7 @@ from pydantic import SecretStr
 
 from app.api.deps import SettingsDep
 from app.openrouter.client import OpenRouterClient
+from app.services.execution_provider_catalog import EndpointCatalog
 from app.services.model_test import ConnectionCaller
 from app.services.openrouter_catalog import OpenRouterCatalog
 
@@ -25,6 +26,18 @@ def get_openrouter_catalog() -> OpenRouterCatalog:
 
 
 CatalogDep = Annotated[OpenRouterCatalog, Depends(get_openrouter_catalog)]
+
+
+@lru_cache
+def get_endpoint_catalog() -> EndpointCatalog:
+    """프로세스에 하나만 둔다. 모델별 업체 목록 조회도 공개 API라 Key 없이 부른다."""
+    client = OpenRouterClient(http_client=httpx.AsyncClient(), api_key="")
+    return EndpointCatalog(
+        fetch=client.get_model_endpoints, now=lambda: datetime.now(UTC)
+    )
+
+
+EndpointCatalogDep = Annotated[EndpointCatalog, Depends(get_endpoint_catalog)]
 
 
 @lru_cache

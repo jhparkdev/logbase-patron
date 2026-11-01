@@ -39,6 +39,18 @@ class ModelInfo(BaseModel):
     expiration_date: date | None = None
 
 
+class EndpointInfo(BaseModel):
+    """모델 하나를 실제로 처리하는 서버 업체 한 곳. provider_name은 provider.order에 그대로 쓴다."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider_name: str
+    # OpenRouter가 주는 상태 값 그대로다. 정상일 때 0인 것은 보았지만 다른 값의 뜻은 확인하지 못했다.
+    status: int | None = None
+    # 최근 1일 가동률(%)
+    uptime_last_1d: Decimal | None = None
+
+
 class GenerationInfo(BaseModel):
     model_config = ConfigDict(frozen=True)
 
