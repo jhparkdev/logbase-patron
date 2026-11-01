@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  modalitiesLabel,
   modalityLabel,
   providerOptions,
   STATUS_OPTIONS,
@@ -54,4 +55,9 @@ test("고른 제공사가 받은 목록에 없으면 모델 수 없이 이름만
   expect(
     providerOptions([{ provider: "openai", model_count: 3 }], "openai"),
   ).toHaveLength(2);
+});
+
+test("입력 형식 여러 개는 한국어 이름을 쉼표로 이어 보여 준다", () => {
+  expect(modalitiesLabel(["text", "image"])).toBe("텍스트, 이미지");
+  expect(modalitiesLabel(["text"])).toBe("텍스트");
 });

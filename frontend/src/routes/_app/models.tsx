@@ -49,6 +49,7 @@ function ModelsPage() {
       <ModelTable search={shown} refreshing={shown !== search} />
       {search.model !== undefined && (
         <ModelDetailPanel
+          modelId={search.model}
           onClose={() =>
             navigate({ search: (prev) => ({ ...prev, model: undefined }) })
           }

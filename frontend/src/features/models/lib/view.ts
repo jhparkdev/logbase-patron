@@ -40,6 +40,10 @@ export function modalityLabel(modality: string): string {
   return MODALITY_LABELS[modality] ?? modality;
 }
 
+export function modalitiesLabel(modalities: string[]): string {
+  return modalities.map(modalityLabel).join(", ");
+}
+
 // 선택지 순서. 상태가 늘면 STATUS_BADGES에서 타입 오류가 나므로 여기도 함께 고친다.
 export const MODEL_STATUSES = [
   "TESTING",

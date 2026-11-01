@@ -59,6 +59,21 @@ export const LIST: Schemas["ModelListResponse"] = {
   total: 12,
 };
 
+export const DETAIL: Schemas["ModelDetailRead"] = {
+  ...MODEL_ROW,
+  activated_at: "2026-10-20T01:00:00Z",
+  deactivated_at: null,
+  last_success_test_at: "2026-10-30T02:00:00Z",
+};
+
+/** 가격도 테스트도 활성화도 없는 막 등록한 모델 */
+export const UNPRICED_DETAIL: Schemas["ModelDetailRead"] = {
+  ...UNPRICED_ROW,
+  activated_at: null,
+  deactivated_at: null,
+  last_success_test_at: null,
+};
+
 export const PROVIDERS: Schemas["ProviderListResponse"] = {
   items: [
     { provider: "openai", model_count: 3 },
@@ -67,7 +82,19 @@ export const PROVIDERS: Schemas["ProviderListResponse"] = {
 };
 
 type Reply = { status: number; body: unknown };
-type Replies = { list?: Reply; providers?: Reply };
+type Replies = { list?: Reply; providers?: Reply; detail?: Reply };
+
+const DETAIL_PATH = /\/api\/models\/\d+$/;
+
+function replyFor(url: string, replies: Replies): Reply {
+  if (url.endsWith("/api/models/providers")) {
+    return replies.providers ?? { status: 200, body: PROVIDERS };
+  }
+  if (DETAIL_PATH.test(new URL(url).pathname)) {
+    return replies.detail ?? { status: 200, body: DETAIL };
+  }
+  return replies.list ?? { status: 200, body: LIST };
+}
 
 /** 브라우저 fetch를 P-03 API 응답으로 대체. 보낸 요청은 반환된 목록에 기록 */
 export function stubModelsApi(initial: Replies = {}) {
@@ -75,9 +102,7 @@ export function stubModelsApi(initial: Replies = {}) {
   const requests: { url: URL }[] = [];
   vi.stubGlobal("fetch", async (request: Request) => {
     requests.push({ url: new URL(request.url) });
-    const reply = request.url.endsWith("/api/models/providers")
-      ? (replies.providers ?? { status: 200, body: PROVIDERS })
-      : (replies.list ?? { status: 200, body: LIST });
+    const reply = replyFor(request.url, replies);
     return new Response(JSON.stringify(reply.body), {
       status: reply.status,
       headers: JSON_HEADERS,

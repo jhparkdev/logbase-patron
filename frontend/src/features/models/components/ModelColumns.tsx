@@ -1,42 +1,11 @@
 import { Badge } from "../../../shared/components/ui/Badge";
 import type { Column } from "../../../shared/components/ui/DataTable";
 import { TextLink } from "../../../shared/components/ui/TextLink";
-import { formatKstDateTime } from "../../../shared/lib/format";
 import type { ModelRow } from "../api/models";
-import { formatPricePerMillion } from "../lib/price";
-import { modalityLabel, statusBadge, testResultView } from "../lib/view";
+import { modalitiesLabel, statusBadge } from "../lib/view";
+import { LastTestCell, PriceCell } from "./ModelCells";
 
-const NO_TEST_LABEL = "미실행";
 const PRICE_UNIT = <span className="font-normal text-grey-500">(USD/1M)</span>;
-
-const DOT_CLASS = { green: "bg-green-500", red: "bg-red-500" } as const;
-
-/** 단가 없음은 0이 아닌 미확인. 있으면 100만 토큰당 단가로 변환 */
-function PriceCell({ perToken }: { perToken: string | null | undefined }) {
-  return perToken === null || perToken === undefined ? (
-    <Badge tone="yellow">미확인</Badge>
-  ) : (
-    formatPricePerMillion(perToken)
-  );
-}
-
-/** 색 점은 성공·실패 표시, 결과 글자는 화면 낭독기용 */
-function LastTestCell({ row }: { row: ModelRow }) {
-  if (row.last_test_at === null || row.last_test_status === null) {
-    return <span className="text-grey-600">{NO_TEST_LABEL}</span>;
-  }
-  const result = testResultView(row.last_test_status);
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span
-        aria-hidden="true"
-        className={`size-2 rounded-full ${DOT_CLASS[result.dot]}`}
-      />
-      {formatKstDateTime(row.last_test_at)}
-      <span className="sr-only">{result.label}</span>
-    </span>
-  );
-}
 
 // key는 API 정렬 값과 동일. 머리글 클릭 시 주소의 sort로 저장
 export const COLUMNS: Column<ModelRow>[] = [
@@ -70,7 +39,7 @@ export const COLUMNS: Column<ModelRow>[] = [
     key: "input_modalities",
     header: "지원 기능",
     sortable: true,
-    render: (row) => row.input_modalities.map(modalityLabel).join(", "),
+    render: (row) => modalitiesLabel(row.input_modalities),
   },
   {
     key: "price_input",

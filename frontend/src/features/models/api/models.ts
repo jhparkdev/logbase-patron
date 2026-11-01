@@ -5,10 +5,12 @@ import { type ModelsSearch, modelListQuery } from "../lib/search";
 
 /** 목록 한 줄. 백엔드 ModelRead 계약 그대로 */
 export type ModelRow = components["schemas"]["ModelRead"];
+/** 상세. 목록 한 줄에 활성화·비활성화·마지막 성공 테스트 시각이 더해짐 */
+export type ModelDetail = components["schemas"]["ModelDetailRead"];
 
 const ROOT_KEY = "models";
-/** 테스트·상태 변경으로 목록이 바뀌므로 짧게 캐시 */
-const LIST_STALE_TIME_MS = 30_000;
+/** 테스트·상태 변경으로 목록·상세가 바뀌므로 짧게 캐시 */
+const MODEL_STALE_TIME_MS = 30_000;
 /** 제공사는 모델을 등록할 때만 바뀐다. */
 const PROVIDERS_STALE_TIME_MS = 5 * 60_000;
 
@@ -20,7 +22,7 @@ export function modelListOptions(search: ModelsSearch) {
     // 실패 시 ApiError를 던져 DataBlock이 오류 표시
     queryFn: async () =>
       unwrap(await api.GET("/api/models", { params: { query } })),
-    staleTime: LIST_STALE_TIME_MS,
+    staleTime: MODEL_STALE_TIME_MS,
     // 자동 재시도 없음. 사용자가 [다시 시도]로 재조회
     retry: false,
   });
@@ -33,3 +35,18 @@ export const modelProvidersQuery = queryOptions({
   staleTime: PROVIDERS_STALE_TIME_MS,
   retry: false,
 });
+
+/** 상세 조회. 목록과 같은 시간만 캐시 */
+export function modelDetailQuery(modelId: number) {
+  return queryOptions({
+    queryKey: [ROOT_KEY, "detail", modelId],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/models/{model_id}", {
+          params: { path: { model_id: modelId } },
+        }),
+      ),
+    staleTime: MODEL_STALE_TIME_MS,
+    retry: false,
+  });
+}
