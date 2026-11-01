@@ -9,7 +9,7 @@ import uuid
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AIRequest, SimulationResult
+from app.models import AIRequest, AIRequestPayload, RequestStatus, SimulationResult
 from app.schemas.simulation_result import (
     SimulationDetailResponse,
     SimulationModelResult,
@@ -42,19 +42,27 @@ async def _final_results(
     session: AsyncSession, simulation_id: uuid.UUID
 ) -> list[SimulationModelResult]:
     rows = await session.execute(
-        select(SimulationResult, AIRequest)
+        select(SimulationResult, AIRequest, AIRequestPayload.response_text)
         .join(AIRequest, AIRequest.request_id == SimulationResult.request_id)
+        # 원문은 호출이 끝나야 저장되므로 진행 중인 칸에는 행이 없다
+        .outerjoin(
+            AIRequestPayload,
+            AIRequestPayload.request_id == SimulationResult.request_id,
+        )
         .where(
             SimulationResult.simulation_id == simulation_id,
             SimulationResult.is_final_attempt,
         )
         .order_by(SimulationResult.slot_no)
     )
-    return [_to_model_result(result, request) for result, request in rows]
+    return [
+        _to_model_result(result, request, response_text)
+        for result, request, response_text in rows
+    ]
 
 
 def _to_model_result(
-    result: SimulationResult, request: AIRequest
+    result: SimulationResult, request: AIRequest, response_text: str | None
 ) -> SimulationModelResult:
     return SimulationModelResult(
         slot_no=result.slot_no,
@@ -63,10 +71,12 @@ def _to_model_result(
         model_display_name_at_run=result.model_display_name_at_run,
         model_status_at_run=result.model_status_at_run,
         execution_provider=result.execution_provider,
+        execution_config=request.execution_config,
         actual_provider=request.actual_provider,
         actual_model=request.actual_model,
         status=request.status,
         error_type=request.error_type,
+        error_message=request.error_message,
         latency_ms=request.latency_ms,
         input_tokens=request.input_tokens,
         output_tokens=request.output_tokens,
@@ -76,4 +86,8 @@ def _to_model_result(
         schema_validation_status=result.schema_validation_status,
         missing_required_fields=result.missing_required_fields,
         comparability_note=result.comparability_note,
+        # 취소된 칸의 원문은 취소 뒤 늦게 도착해 대조용으로만 남긴 것이라 결과로 보여 주지 않는다
+        response_text=(
+            None if request.status == RequestStatus.CANCELLED else response_text
+        ),
     )

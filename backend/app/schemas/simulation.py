@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Annotated, Self
 from uuid import UUID
 
@@ -14,44 +15,23 @@ from pydantic import (
 )
 
 from app.models import TestType
+from app.schemas.simulation_image import MAX_IMAGE_COUNT
 
 # 모델 선택 규칙은 services 의 순수 검증 모듈에 한 번만 정의하고 여기서는 가져다 쓴다.
 # 그 모듈이 schemas 를 가져오게 만들면 순환 import 가 되므로 그러지 않는다.
-from app.services.simulation_validation import (
-    MAX_MODEL_COUNT,
-    MIN_MODEL_COUNT,
-    ModelSelection,
-    validate_model_selection,
-)
+from app.services.simulation_validation import MAX_MODEL_COUNT, MIN_MODEL_COUNT
 
 
-class ModelSelectionRequest(BaseModel):
-    """비교 실행에서 고른 모델 한 칸. 필드 이름은 simulation_results 컬럼과 같다."""
+class ReasoningEffort(StrEnum):
+    """추론 강도. OpenRouter 의 reasoning.effort 값이다. 모델마다 지원하는 값이 달라 지원하지 않는 값은 OpenRouter 가 처리한다."""
 
-    model_id: int  # models 표의 model_id
-    # 실행 Provider. 자동 라우팅이 없으므로 서버 업체가 하나뿐인 모델도 반드시 적는다
-    execution_provider: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1)
-    ]
-
-
-def _reject_invalid_selection(
-    selections: list[ModelSelectionRequest],
-) -> list[ModelSelectionRequest]:
-    # 같은 모델 + 같은 Provider 중복을 막는다. 오류는 ValueError 라서 pydantic 이 422 로 바꾼다
-    validate_model_selection(
-        [ModelSelection(s.model_id, s.execution_provider) for s in selections]
-    )
-    return selections
-
-
-ModelSelections = Annotated[
-    list[ModelSelectionRequest],
-    # min_length/max_length 는 OpenAPI 의 minItems/maxItems 로 프론트엔드에 전달된다
-    Field(min_length=MIN_MODEL_COUNT, max_length=MAX_MODEL_COUNT),
-    AfterValidator(_reject_invalid_selection),
-]
-"""비교 실행에서 고른 모델 2~4개. 같은 모델은 Provider 가 다를 때만 두 번 넣을 수 있다."""
+    NONE = "none"
+    MINIMAL = "minimal"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    XHIGH = "xhigh"
+    MAX = "max"
 
 
 def _reject_invalid_json_schema(schema: dict[str, JsonValue]) -> dict[str, JsonValue]:
@@ -84,6 +64,8 @@ class RoutingPolicy(BaseModel):
 
 # 시나리오 기본값(seed)이 512~1024 라서 여유를 두고 정한 상한이다. 한 번의 실수로 큰 비용이 나가지 않게 한다
 MAX_TOKENS_LIMIT = 4096
+# Prompt·입력 텍스트 한 칸의 최대 글자 수. 화면과 같은 값이며 OpenAPI maxLength 로 화면에 전달된다
+MAX_TEXT_LENGTH = 2_000
 MIN_TEMPERATURE = 0.0
 MAX_TEMPERATURE = 2.0
 
@@ -105,6 +87,27 @@ class ExecutionConfig(BaseModel):
 
     temperature: Temperature | None = None
     max_tokens: MaxTokens | None = None
+    reasoning_effort: ReasoningEffort | None = None
+
+
+class ModelSelectionRequest(BaseModel):
+    """비교 실행에서 고른 모델 한 칸. 필드 이름은 simulation_results 컬럼과 같다."""
+
+    model_id: int  # models 표의 model_id
+    # 실행 Provider. 자동 라우팅이 없으므로 서버 업체가 하나뿐인 모델도 반드시 적는다
+    execution_provider: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1)
+    ]
+    # 이 칸에만 적용할 설정. 정하지 않은 항목은 실행 공통 설정을 따른다
+    execution_config: ExecutionConfig = Field(default_factory=ExecutionConfig)
+
+
+ModelSelections = Annotated[
+    list[ModelSelectionRequest],
+    # min_length/max_length 는 OpenAPI 의 minItems/maxItems 로 프론트엔드에 전달된다
+    Field(min_length=MIN_MODEL_COUNT, max_length=MAX_MODEL_COUNT),
+]
+"""비교 실행에서 고른 모델 2~4개. 같은 모델·Provider 중복은 적용 설정까지 합친 뒤 접수 서비스가 판단한다."""
 
 
 class SimulationCreateRequest(BaseModel):
@@ -121,12 +124,24 @@ class SimulationCreateRequest(BaseModel):
     rerun_of_simulation_id: UUID | None = None
     scenario_id: int | None = None  # test_scenarios 표의 scenario_id
     # 실행 당시 원문이라 다듬지 않는다. 공백뿐인 값만 거절한다(\S = 공백이 아닌 글자 하나 이상)
-    prompt_text: Annotated[str, Field(pattern=r"\S")]
-    input_text: str | None = None
+    prompt_text: Annotated[str, Field(pattern=r"\S", max_length=MAX_TEXT_LENGTH)]
+    input_text: Annotated[str, Field(max_length=MAX_TEXT_LENGTH)] | None = None
     json_schema: JsonSchemaDocument | None = None  # 없으면 Schema 검증은 "미적용"
     execution_config: ExecutionConfig = Field(default_factory=ExecutionConfig)
     routing_policy: RoutingPolicy = Field(default_factory=RoutingPolicy)
     models: ModelSelections
+    # 먼저 올려 둔 이미지(POST /simulations/images 의 asset_id). 순서가 곧 모델에 보내는 순서다.
+    # 올린 적 없는 ID 인지는 DB 가 필요해 서비스가 확인한다
+    asset_ids: Annotated[list[UUID], Field(max_length=MAX_IMAGE_COUNT)] = Field(
+        default_factory=list
+    )
+
+    @model_validator(mode="after")
+    def _no_image_twice(self) -> Self:
+        # 같은 이미지를 두 번 보내면 모델이 두 장으로 읽고 비용도 두 번 나간다
+        if len(set(self.asset_ids)) != len(self.asset_ids):
+            raise ValueError("같은 이미지를 두 번 보낼 수 없다")
+        return self
 
     @model_validator(mode="after")
     def _scenario_matches_test_type(self) -> Self:

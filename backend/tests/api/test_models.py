@@ -146,6 +146,40 @@ async def test_tools가_있으면_함수_호출을_지원한다(
     assert item["supports_tools"] is expected
 
 
+@pytest.mark.parametrize(
+    ("parameters", "temperature", "efforts"),
+    [
+        (
+            ["temperature", "reasoning"],
+            True,
+            ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
+        ),
+        (["temperature"], True, []),
+        (
+            ["reasoning"],
+            False,
+            ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
+        ),
+        ([], False, []),
+    ],
+)
+async def test_모델이_받을_수_있는_온도와_추론_강도를_돌려준다(
+    client: AsyncClient,
+    factory: Factory,
+    parameters: list[str],
+    temperature: bool,
+    efforts: list[str],
+) -> None:
+    created = await factory.model(supported_parameters=parameters)
+
+    listed = (await client.get(MODELS)).json()["items"][0]
+    detail = (await client.get(f"{MODELS}/{created['model_id']}")).json()
+
+    for item in (listed, detail):
+        assert item["temperature_supported"] is temperature
+        assert item["reasoning_efforts"] == efforts
+
+
 async def test_가격이_없는_모델은_current_price가_null이다(
     client: AsyncClient, factory: Factory
 ) -> None:

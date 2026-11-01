@@ -2,7 +2,7 @@ from enum import StrEnum
 from typing import Annotated, Self
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, JsonValue, model_validator
 
 from app.models import (
     CostStatus,
@@ -54,7 +54,7 @@ class SimulationSummary(BaseModel):
 
 
 class SimulationModelResult(BaseModel):
-    """모델 한 칸의 결과. 응답 본문은 길어서 넣지 않고 원문 조회 API 로 따로 준다."""
+    """모델 한 칸의 결과. 화면이 모델 칸에 그대로 그릴 수 있게 응답 원문도 함께 준다."""
 
     slot_no: Annotated[int, Field(ge=1, le=MAX_MODEL_COUNT)]
     request_id: UUID
@@ -63,6 +63,8 @@ class SimulationModelResult(BaseModel):
     model_display_name_at_run: str
     model_status_at_run: ModelStatus
     execution_provider: str  # 이 칸에서 고정한 업체
+    # 이 칸에 실제로 적용한 설정(실행 공통 설정과 합친 값). 과거 이력은 지금 규칙으로 다시 거절하지 않는다
+    execution_config: dict[str, JsonValue]
     actual_provider: str | None  # 실제로 처리한 업체. 모르면 null
     actual_model: str | None
     status: RequestStatus
@@ -76,6 +78,10 @@ class SimulationModelResult(BaseModel):
     schema_validation_status: ValidationStatus | None
     missing_required_fields: list[str] | None
     comparability_note: str | None
+    # 모델이 돌려준 답변. 끝나지 않았거나 실패·취소되어 답변이 없으면 null
+    response_text: str | None
+    # 실패한 칸에 화면이 보여 줄 문구. 내부 예외 원문이 아니라 정해진 사용자 문구다. 실패가 아니면 null
+    error_message: str | None
 
     @model_validator(mode="after")
     def _cost_unknown_means_null(self) -> Self:

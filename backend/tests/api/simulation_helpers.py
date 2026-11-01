@@ -15,6 +15,7 @@ from app.services.simulation_recorders import ScopedRequestRecorder
 from app.services.simulation_registry import CancelRegistry
 from app.services.simulation_scoped_store import ScopedSimulationStore
 from tests.db_helpers import T0
+from tests.services.simulation_fakes import FakeImageSource
 
 CREATE = "/api/simulations"
 
@@ -93,6 +94,7 @@ def build_manager(
             recorder=ScopedRequestRecorder(sessions),  # type: ignore[arg-type]
             store=ScopedSimulationStore(sessions),  # type: ignore[arg-type]
             now=lambda: now,
+            images=FakeImageSource(),
         ),
         registry=registry,
     )

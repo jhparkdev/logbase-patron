@@ -8,6 +8,7 @@ from app.api.errors import ApiError
 from app.schemas.common import ErrorCode
 from app.schemas.models import MAX_MODEL_ID, ModelDetailRead, ModelRead, PriceRead
 from app.services.model_list import ModelListItem
+from app.services.model_parameters import parameter_support
 from app.services.model_registry import supports_json_schema, supports_tools
 
 MODEL_NOT_FOUND_MESSAGE = "모델을 찾을 수 없습니다."
@@ -23,6 +24,7 @@ def model_not_found() -> ApiError:
 
 def to_model_read(item: ModelListItem) -> ModelRead:
     model = item.model
+    support = parameter_support(model.supported_parameters)
     return ModelRead(
         model_id=model.model_id,
         openrouter_model_id=model.openrouter_model_id,
@@ -34,6 +36,8 @@ def to_model_read(item: ModelListItem) -> ModelRead:
         output_modalities=model.output_modalities,
         supports_json_schema=supports_json_schema(model.supported_parameters),
         supports_tools=supports_tools(model.supported_parameters),
+        temperature_supported=support.temperature,
+        reasoning_efforts=list(support.reasoning_efforts),
         context_length=model.context_length,
         current_price=(
             PriceRead.model_validate(item.price) if item.price is not None else None

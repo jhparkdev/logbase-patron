@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import ConnectionTestStatus, ModelStatus, PriceSource, PriceStatus
 from app.schemas.plain_decimal import PlainDecimal
+from app.schemas.simulation import ReasoningEffort
 
 # 한 페이지 개수의 기본값과 최댓값, 검색어 최대 길이
 DEFAULT_PAGE_SIZE = 20
@@ -93,6 +94,10 @@ class ModelRead(BaseModel):
     output_modalities: list[str]
     supports_json_schema: bool
     supports_tools: bool
+    # 온도를 받는지. false 면 화면에서 온도 입력을 막는다
+    temperature_supported: bool
+    # 받을 수 있는 추론 강도. 비어 있으면 추론 강도를 받지 않는다
+    reasoning_efforts: list[ReasoningEffort]
     context_length: int | None
     # 가격이 없으면 null("가격 미확인")
     current_price: PriceRead | None

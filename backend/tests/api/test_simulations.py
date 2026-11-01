@@ -1,5 +1,6 @@
 """POST /api/simulations (S-03) 테스트. 접수·저장·작업 시작의 순서와 오류 응답을 확인한다."""
 
+import asyncio
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -10,7 +11,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.api import simulation_deps
 from app.api.simulation_deps import get_simulation_manager
+from app.main import create_app
 from app.models import (
     AIRequest,
     AIRequestPayload,
@@ -35,7 +38,7 @@ from tests.api.simulation_helpers import (
 from tests.api.test_auth import log_in, make_user
 from tests.conftest import TEST_BASE_URL, TEST_ORIGIN
 from tests.db_helpers import T0, Factory
-from tests.services.simulation_fakes import FakeCaller
+from tests.services.simulation_fakes import FakeCaller, FakeImageSource
 
 TEMPLATE = "다음 상품 정보로 작성하세요.\n{{product_info}}"
 
@@ -85,7 +88,9 @@ async def test_the_run_and_every_call_are_saved_as_pending_before_answering(
     assert [r.status for r in requests] == [RequestStatus.PENDING] * 2
     assert {r.cost_status for r in requests} == {CostStatus.UNKNOWN}
     assert await count(db_session, SimulationResult) == 2
-    assert manager.jobs[0].max_tokens == 4096
+    assert [slot.execution_config for slot in manager.jobs[0].slots] == [
+        {"max_tokens": 4096}
+    ] * 2
 
 
 @pytest.mark.usefixtures("poc_setup", "signed_in")
@@ -273,6 +278,7 @@ async def test_after_the_answer_the_run_finishes_in_the_database(
             recorder=ScopedRequestRecorder(sessions),  # type: ignore[arg-type]
             store=ScopedSimulationStore(sessions),  # type: ignore[arg-type]
             now=lambda: T0 + timedelta(seconds=5),
+            images=FakeImageSource(),
         )
     )
     app.dependency_overrides[get_simulation_manager] = lambda: manager
@@ -296,3 +302,158 @@ async def test_after_the_answer_the_run_finishes_in_the_database(
     assert [r.status for r in requests] == [RequestStatus.SUCCESS] * 2
     assert {r.cost_status for r in requests} == {CostStatus.CONFIRMED}
     assert await count(db_session, AIRequestPayload) == 2
+
+
+# --- 서버가 떠 있는 동안의 정리 작업 ---
+
+
+async def test_recovery_runs_while_the_server_is_up(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """시뮬레이터 라우터를 등록한 앱이 뜨면 미완료 실행 정리(J-01·J-03)가 돌고, 내려가면 멈춘다."""
+    started = asyncio.Event()
+    stopped = asyncio.Event()
+
+    async def fake_loop(*args: object, **kwargs: object) -> None:
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    monkeypatch.setattr(simulation_deps, "run_recovery_loop", fake_loop)
+    app = create_app()
+
+    async with app.router.lifespan_context(app):
+        await asyncio.wait_for(started.wait(), timeout=1)
+        assert not stopped.is_set()
+
+    assert stopped.is_set()
+
+
+# --- OpenAPI 의 오류 응답 형식 ---
+
+
+def simulator_operations() -> list[tuple[str, str, dict[str, Any]]]:
+    paths = create_app().openapi()["paths"]
+    return [
+        (method, path, operation)
+        for path, operations in paths.items()
+        if path.startswith("/api/simulations")
+        for method, operation in operations.items()
+    ]
+
+
+def error_schema(response: dict[str, Any]) -> dict[str, Any]:
+    ref = response["content"]["application/json"]["schema"]["$ref"]
+    schemas = create_app().openapi()["components"]["schemas"]
+    return schemas[ref.rsplit("/", 1)[-1]]
+
+
+def code_values(schema: dict[str, Any]) -> set[str]:
+    schemas = create_app().openapi()["components"]["schemas"]
+    code = schema["properties"]["code"]
+    options = code.get("anyOf", [code])
+    values: set[str] = set()
+    for option in options:
+        if "$ref" in option:
+            option = schemas[option["$ref"].rsplit("/", 1)[-1]]
+        values.update(option.get("enum", [option.get("const")]))
+    return values
+
+
+def test_every_simulator_error_is_documented_as_code_and_message() -> None:
+    # 실제 오류 응답은 모두 {code, message} 다. 프론트엔드 타입이 이 문서에서 생성되므로 문서도 같아야 한다
+    for method, path, operation in simulator_operations():
+        for status_code, response in operation["responses"].items():
+            if int(status_code) >= 400:
+                schema = error_schema(response)
+                assert set(schema["properties"]) == {"code", "message"}, (
+                    method,
+                    path,
+                    status_code,
+                )
+
+
+def test_validation_failures_carry_the_code_the_server_actually_sends() -> None:
+    # 형식 검증 실패는 공통 코드 VALIDATION_ERROR 로 나간다(모델 수, 글자 수, 잘못된 정렬 키 등)
+    for method, path, operation in simulator_operations():
+        # 받는 값이 없는 조회(이미지 한도)는 형식 검증으로 실패할 수 없다
+        if not operation.get("parameters") and not operation.get("requestBody"):
+            continue
+        assert "422" in operation["responses"], (method, path)
+        codes = code_values(error_schema(operation["responses"]["422"]))
+        assert "VALIDATION_ERROR" in codes, (method, path)
+
+
+def test_state_changing_requests_document_the_origin_refusal() -> None:
+    for method, path, operation in simulator_operations():
+        if method == "post":
+            codes = code_values(error_schema(operation["responses"]["403"]))
+            assert codes == {"ORIGIN_NOT_ALLOWED"}, path
+
+
+def tuned_body(model_ids: list[int], *configs: dict[str, Any]) -> dict[str, Any]:
+    """첫 모델을 같은 Provider 로 설정만 달리해 칸마다 넣은 요청."""
+    return create_body(
+        model_ids,
+        models=[
+            {
+                "model_id": model_ids[0],
+                "execution_provider": "DeepInfra",
+                "execution_config": config,
+            }
+            for config in configs
+        ],
+    )
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in")
+async def test_same_model_and_provider_with_different_settings_are_saved_per_slot(
+    client: AsyncClient,
+    manager: FakeManager,
+    models: list[int],
+    db_session: AsyncSession,
+) -> None:
+    body = tuned_body(models, {"reasoning_effort": "low"}, {"reasoning_effort": "high"})
+
+    response = await client.post(CREATE, json=body)
+
+    # DB 의 설정별 고유 제약에 걸리지 않고 두 칸이 모두 저장된다
+    assert response.status_code == 202, response.text
+    assert await count(db_session, SimulationResult) == 2
+    efforts = (
+        await db_session.scalars(
+            select(AIRequest.execution_config["reasoning_effort"].as_string())
+        )
+    ).all()
+    assert sorted(efforts) == ["high", "low"]
+    assert [s.execution_config["reasoning_effort"] for s in manager.jobs[0].slots] == [
+        "low",
+        "high",
+    ]
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in")
+@pytest.mark.parametrize(
+    "configs",
+    [
+        ({"max_tokens": 300}, {"max_tokens": 300}),
+        ({"temperature": 1}, {"temperature": 1.0}),
+        ({}, {}),
+    ],
+)
+async def test_same_model_provider_and_settings_are_rejected_with_a_code(
+    client: AsyncClient,
+    manager: FakeManager,
+    models: list[int],
+    db_session: AsyncSession,
+    configs: tuple[dict[str, Any], dict[str, Any]],
+) -> None:
+    response = await client.post(CREATE, json=tuned_body(models, *configs))
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "DUPLICATE_MODEL_SELECTION"
+    assert manager.jobs == []
+    assert await count(db_session, SimulationRun) == 0
+    assert await count(db_session, AIRequest) == 0

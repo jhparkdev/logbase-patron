@@ -81,7 +81,7 @@ export interface paths {
         };
         /**
          * List Simulation Runs
-         * @description 이력 목록. 조건으로 거른 결과를 최신 순으로 상한까지 준다. 정렬·페이지는 화면이 한다.
+         * @description 이력 목록. 조건으로 거른 결과를 요청한 열·방향으로 정렬해 한 페이지씩 준다.
          */
         get: operations["list_simulation_runs_api_simulations_get"];
         put?: never;
@@ -170,6 +170,46 @@ export interface paths {
          * @description 모델 하나만 취소한다. 나머지 모델은 계속 돈다.
          */
         post: operations["cancel_simulation_slot_api_simulations__simulation_id__slots__slot_no__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulations/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Simulation Image
+         * @description 이미지 한 장을 올린다. 파일은 저장소에 두고 DB 에는 경로·해시만 남긴다.
+         */
+        post: operations["upload_simulation_image_api_simulations_images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulations/images/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Image Limits
+         * @description 이미지 입력 한도. 화면이 숫자를 따로 정하지 않고 이 값을 쓴다.
+         */
+        get: operations["read_image_limits_api_simulations_images_limits_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -402,6 +442,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/model-favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Model Favorites */
+        get: operations["list_model_favorites_api_model_favorites_get"];
+        put?: never;
+        /**
+         * Add Model Favorite
+         * @description 등록한다. 이미 있으면 200 으로 같은 항목을 돌려줘 화면이 두 번 눌러도 안전하다.
+         */
+        post: operations["add_model_favorite_api_model_favorites_post"];
+        /**
+         * Remove Model Favorite
+         * @description 해제한다. 없는 항목도 204 다. 삭제와 목록은 로그인 사용자 본인 행에만 닿는다.
+         */
+        delete: operations["remove_model_favorite_api_model_favorites_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/usage/internal/summary": {
         parameters: {
             query?: never;
@@ -577,6 +642,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_upload_simulation_image_api_simulations_images_post */
+        Body_upload_simulation_image_api_simulations_images_post: {
+            /** File */
+            file: string;
+        };
         /**
          * BudgetStatus
          * @enum {string}
@@ -863,6 +933,7 @@ export interface components {
             temperature?: number | null;
             /** Max Tokens */
             max_tokens?: number | null;
+            reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -877,6 +948,50 @@ export interface components {
              */
             status: "ok";
         };
+        /**
+         * HistorySortColumn
+         * @description 이력 목록의 정렬 열(허용 목록). 값은 이력 화면의 URL 정렬 키와 같다.
+         *
+         *     요약 뷰의 어느 열로 정렬할지는 서비스(simulation_history.py)가 정한다. 총 비용(totalCost)은
+         *     요약 뷰에 합계 열이 생기면 여기와 서비스의 열 대응표에 한 줄씩 추가한다.
+         * @enum {string}
+         */
+        HistorySortColumn: "requestedAt" | "id" | "scenario" | "modelCount" | "status" | "costStatus";
+        /**
+         * ImageAssetRead
+         * @description 올린 이미지 한 장. 비교 실행 요청에는 asset_id 만 보낸다.
+         */
+        ImageAssetRead: {
+            /**
+             * Asset Id
+             * Format: uuid
+             */
+            asset_id: string;
+            /** Mime Type */
+            mime_type: string;
+            /** File Size Bytes */
+            file_size_bytes: number;
+            /** Original Filename */
+            original_filename: string | null;
+        };
+        /**
+         * ImageLimits
+         * @description 이미지 입력 한도. 화면은 하드코딩하지 않고 이 응답을 쓴다.
+         */
+        ImageLimits: {
+            /** Max Count */
+            max_count: number;
+            /** Max Bytes */
+            max_bytes: number;
+            /** Mime Types */
+            mime_types: components["schemas"]["ImageMimeType"][];
+        };
+        /**
+         * ImageMimeType
+         * @description 받는 이미지 형식. 파일 내용의 머리 바이트로 판단한다.
+         * @enum {string}
+         */
+        ImageMimeType: "image/jpeg" | "image/png" | "image/webp";
         /**
          * InternalOptions
          * @description 선택 상자 목록. 프로젝트는 사용 중인 것, 서비스와 모델은 내부 호출에 쓰인 것만 준다.
@@ -1032,6 +1147,10 @@ export interface components {
             supports_json_schema: boolean;
             /** Supports Tools */
             supports_tools: boolean;
+            /** Temperature Supported */
+            temperature_supported: boolean;
+            /** Reasoning Efforts */
+            reasoning_efforts: components["schemas"]["ReasoningEffort"][];
             /** Context Length */
             context_length: number | null;
             current_price: components["schemas"]["PriceRead"] | null;
@@ -1072,6 +1191,33 @@ export interface components {
             /** Message */
             message: string;
         };
+        /**
+         * ModelFavoriteKey
+         * @description 즐겨찾기 한 건을 가리키는 값. 설정(effort 등)은 저장하지 않으므로 모델과 Provider 뿐이다.
+         */
+        ModelFavoriteKey: {
+            /** Model Id */
+            model_id: number;
+            /** Execution Provider */
+            execution_provider: string;
+        };
+        /** ModelFavoriteList */
+        ModelFavoriteList: {
+            /** Items */
+            items: components["schemas"]["ModelFavoriteRead"][];
+        };
+        /** ModelFavoriteRead */
+        ModelFavoriteRead: {
+            /** Model Id */
+            model_id: number;
+            /** Execution Provider */
+            execution_provider: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** ModelListResponse */
         ModelListResponse: {
             /** Items */
@@ -1104,6 +1250,10 @@ export interface components {
             supports_json_schema: boolean;
             /** Supports Tools */
             supports_tools: boolean;
+            /** Temperature Supported */
+            temperature_supported: boolean;
+            /** Reasoning Efforts */
+            reasoning_efforts: components["schemas"]["ReasoningEffort"][];
             /** Context Length */
             context_length: number | null;
             current_price: components["schemas"]["PriceRead"] | null;
@@ -1130,6 +1280,7 @@ export interface components {
             model_id: number;
             /** Execution Provider */
             execution_provider: string;
+            execution_config?: components["schemas"]["ExecutionConfig"];
         };
         /**
          * ModelSortField
@@ -1195,6 +1346,19 @@ export interface components {
             supports_tools: boolean;
             /** Registered */
             registered: boolean;
+        };
+        /**
+         * OriginNotAllowedResponse
+         * @description 403 응답의 문서용 형식. 상태를 바꾸는 요청의 Origin 이 허용한 화면 주소가 아닐 때다.
+         */
+        OriginNotAllowedResponse: {
+            /**
+             * Code
+             * @constant
+             */
+            code: "ORIGIN_NOT_ALLOWED";
+            /** Message */
+            message: string;
         };
         /**
          * PriceRead
@@ -1390,6 +1554,12 @@ export interface components {
             model_count: number;
         };
         /**
+         * ReasoningEffort
+         * @description 추론 강도. OpenRouter 의 reasoning.effort 값이다. 모델마다 지원하는 값이 달라 지원하지 않는 값은 OpenRouter 가 처리한다.
+         * @enum {string}
+         */
+        ReasoningEffort: "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+        /**
          * RequestCancelOutcome
          * @description 모델 한 칸의 취소 처리 결과. decision 은 decide_request_cancel 이 내린 판정이다.
          *
@@ -1432,6 +1602,10 @@ export interface components {
             model_id: number;
             /** Execution Provider */
             execution_provider: string;
+            /** Execution Config */
+            execution_config: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
             /** Current Display Name */
             current_display_name: string;
             current_status: components["schemas"]["ModelStatus"];
@@ -1514,6 +1688,8 @@ export interface components {
             routing_policy?: components["schemas"]["RoutingPolicy"];
             /** Models */
             models: components["schemas"]["ModelSelectionRequest"][];
+            /** Asset Ids */
+            asset_ids?: string[];
         };
         /**
          * SimulationDetailResponse
@@ -1531,7 +1707,7 @@ export interface components {
          * @description 시뮬레이터 API 의 오류 코드. 프론트엔드는 이 값으로 상황별로 분기한다.
          * @enum {string}
          */
-        SimulationErrorCode: "INVALID_REQUEST" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "PROVIDER_NOT_AVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
+        SimulationErrorCode: "INVALID_REQUEST" | "DUPLICATE_MODEL_SELECTION" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "MODEL_IMAGE_NOT_SUPPORTED" | "MODEL_PARAMETER_NOT_SUPPORTED" | "IMAGE_REQUIRED" | "IMAGE_NOT_FOUND" | "IMAGE_EMPTY" | "IMAGE_TOO_LARGE" | "IMAGE_TYPE_NOT_SUPPORTED" | "PROVIDER_NOT_AVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
         /**
          * SimulationErrorResponse
          * @description 공통 오류 형식 {code, message} 에서 code 를 시뮬레이터 코드로 좁힌 응답.
@@ -1544,23 +1720,64 @@ export interface components {
             message: string;
         };
         /**
+         * SimulationHistoryItem
+         * @description 이력 목록 한 행. 진행·결과 조회의 요약에 재실행 판단용 값 하나를 더한다.
+         */
+        SimulationHistoryItem: {
+            /**
+             * Simulation Id
+             * Format: uuid
+             */
+            simulation_id: string;
+            /** Rerun Of Simulation Id */
+            rerun_of_simulation_id: string | null;
+            test_type: components["schemas"]["TestType"];
+            /** Scenario Code */
+            scenario_code: string | null;
+            status: components["schemas"]["SimulationStatus"];
+            /** Model Count */
+            model_count: number;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Completed At */
+            completed_at: string | null;
+            /** Executed By */
+            executed_by: number;
+            /** Final Result Count */
+            final_result_count: number;
+            /** Success Count */
+            success_count: number;
+            /** Failure Count */
+            failure_count: number;
+            /** Confirmed Cost Usd */
+            confirmed_cost_usd: string | null;
+            /** Estimated Cost Usd */
+            estimated_cost_usd: string | null;
+            /** Unknown Cost Count */
+            unknown_cost_count: number;
+            cost_check_status: components["schemas"]["CostCheckStatus"];
+            /** Inactive Model Count */
+            inactive_model_count: number;
+        };
+        /**
          * SimulationHistoryList
-         * @description 이력 목록 응답. 요청 시각 최신 순(같으면 실행 ID 내림차순)으로 준다.
+         * @description 이력 목록 한 페이지. 정렬한 값이 같으면 실행 ID 내림차순으로 순서를 고정한다.
          *
          *     항목은 진행·결과 조회의 요약과 같은 모양이라 합계 계산을 한 곳(뷰)에서만 한다.
-         *     total 은 조건에 맞는 전체 건수, truncated 는 상한 때문에 items 가 전체보다 적은지다.
+         *     total 은 조건에 맞는 전체 건수라 items 길이보다 클 수 있다.
          */
         SimulationHistoryList: {
             /** Items */
-            items: components["schemas"]["SimulationSummary"][];
+            items: components["schemas"]["SimulationHistoryItem"][];
             /** Total */
             total: number;
-            /** Truncated */
-            truncated: boolean;
         };
         /**
          * SimulationModelResult
-         * @description 모델 한 칸의 결과. 응답 본문은 길어서 넣지 않고 원문 조회 API 로 따로 준다.
+         * @description 모델 한 칸의 결과. 화면이 모델 칸에 그대로 그릴 수 있게 응답 원문도 함께 준다.
          */
         SimulationModelResult: {
             /** Slot No */
@@ -1577,6 +1794,10 @@ export interface components {
             model_status_at_run: components["schemas"]["ModelStatus"];
             /** Execution Provider */
             execution_provider: string;
+            /** Execution Config */
+            execution_config: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
             /** Actual Provider */
             actual_provider: string | null;
             /** Actual Model */
@@ -1598,6 +1819,22 @@ export interface components {
             missing_required_fields: string[] | null;
             /** Comparability Note */
             comparability_note: string | null;
+            /** Response Text */
+            response_text: string | null;
+            /** Error Message */
+            error_message: string | null;
+        };
+        /**
+         * SimulationRequestErrorResponse
+         * @description 422 응답의 문서용 형식. 형식 검증 실패는 공통 코드로, 업무 규칙 위반은 시뮬레이터 코드로 나간다.
+         *
+         *     형식 검증(모델 수, 글자 수, 정렬 키 등)은 공통 오류 처리기가 VALIDATION_ERROR 로 돌려준다.
+         */
+        SimulationRequestErrorResponse: {
+            /** Code */
+            code: "VALIDATION_ERROR" | components["schemas"]["SimulationErrorCode"];
+            /** Message */
+            message: string;
         };
         /**
          * SimulationRerunDraft
@@ -1632,6 +1869,8 @@ export interface components {
             routing_policy: components["schemas"]["RerunRoutingPolicy"];
             /** Models */
             models: components["schemas"]["RerunModel"][];
+            /** Asset Ids */
+            asset_ids: string[];
             /** Rerunnable */
             rerunnable: boolean;
             blocked_reason: components["schemas"]["RerunBlockReason"] | null;
@@ -1685,6 +1924,11 @@ export interface components {
             unknown_cost_count: number;
             cost_check_status: components["schemas"]["CostCheckStatus"];
         };
+        /**
+         * SortDirection
+         * @enum {string}
+         */
+        SortDirection: "asc" | "desc";
         /**
          * SortOrder
          * @enum {string}
@@ -2053,6 +2297,10 @@ export interface operations {
     list_simulation_runs_api_simulations_get: {
         parameters: {
             query?: {
+                sort?: components["schemas"]["HistorySortColumn"];
+                direction?: components["schemas"]["SortDirection"];
+                page?: number;
+                page_size?: number;
                 start_date?: string | null;
                 end_date?: string | null;
                 scenario_id?: number | null;
@@ -2081,7 +2329,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
         };
@@ -2108,13 +2356,22 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationAccepted"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OriginNotAllowedResponse"];
+                };
+            };
             /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
             /** @description Internal Server Error */
@@ -2157,13 +2414,13 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
         };
@@ -2197,13 +2454,13 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
         };
@@ -2228,6 +2485,15 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationCancelResponse"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OriginNotAllowedResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2237,13 +2503,13 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
         };
@@ -2269,6 +2535,15 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationCancelResponse"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OriginNotAllowedResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2278,13 +2553,93 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
+                };
+            };
+        };
+    };
+    upload_simulation_image_api_simulations_images_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_simulation_image_api_simulations_images_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageAssetRead"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OriginNotAllowedResponse"];
+                };
+            };
+            /** @description Content Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
+                };
+            };
+        };
+    };
+    read_image_limits_api_simulations_images_limits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageLimits"];
                 };
             };
         };
@@ -2973,6 +3328,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_model_favorites_api_model_favorites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelFavoriteList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_model_favorite_api_model_favorites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelFavoriteKey"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelFavoriteRead"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelFavoriteRead"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    remove_model_favorite_api_model_favorites_delete: {
+        parameters: {
+            query: {
+                model_id: number;
+                execution_provider: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

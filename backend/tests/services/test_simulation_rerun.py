@@ -27,10 +27,15 @@ def past_run(**values: Any) -> SimulationRun:
     return SimulationRun(**fields)
 
 
-def slot(model_id: int, status: ModelStatus = ModelStatus.ACTIVE) -> PastSlot:
+def slot(
+    model_id: int,
+    status: ModelStatus = ModelStatus.ACTIVE,
+    execution_config: dict[str, Any] | None = None,
+) -> PastSlot:
     return PastSlot(
         model_id=model_id,
         execution_provider=f"provider-{model_id}",
+        execution_config=execution_config or {"max_tokens": 4096},
         current_display_name=f"모델 {model_id}",
         current_status=status,
     )
@@ -40,7 +45,7 @@ SLOTS = [slot(1), slot(2)]
 
 
 def test_the_draft_restores_the_past_inputs_unchanged() -> None:
-    draft = build_rerun_draft(past_run(), SLOTS, has_input_assets=False)
+    draft = build_rerun_draft(past_run(), SLOTS)
 
     assert draft.rerun_of_simulation_id == PAST_ID
     assert draft.test_type == "CUSTOM"
@@ -55,14 +60,14 @@ def test_the_draft_restores_the_past_inputs_unchanged() -> None:
 def test_a_scenario_run_keeps_its_scenario() -> None:
     run = past_run(test_type="SCENARIO", scenario_id=7)
 
-    draft = build_rerun_draft(run, SLOTS, has_input_assets=False)
+    draft = build_rerun_draft(run, SLOTS)
 
     assert (draft.test_type, draft.scenario_id) == ("SCENARIO", 7)
 
 
 def test_only_the_policy_the_user_chooses_comes_back() -> None:
     # require_parameters 는 서버가 정해 기록한 값이라 사용자가 고칠 칸이 아니다
-    draft = build_rerun_draft(past_run(), SLOTS, has_input_assets=False)
+    draft = build_rerun_draft(past_run(), SLOTS)
 
     assert draft.routing_policy.model_dump() == {"allow_fallbacks": True}
 
@@ -71,13 +76,13 @@ def test_a_policy_recorded_without_fallbacks_reads_as_no_fallbacks() -> None:
     # 값이 없던 과거 기록은 새 실행의 기본값(업체를 바꾸지 않음)으로 읽는다
     run = past_run(routing_policy={})
 
-    draft = build_rerun_draft(run, SLOTS, has_input_assets=False)
+    draft = build_rerun_draft(run, SLOTS)
 
     assert draft.routing_policy.allow_fallbacks is False
 
 
 def test_models_keep_their_slot_order_and_pinned_provider() -> None:
-    draft = build_rerun_draft(past_run(), [slot(2), slot(1)], has_input_assets=False)
+    draft = build_rerun_draft(past_run(), [slot(2), slot(1)])
 
     assert [(m.model_id, m.execution_provider) for m in draft.models] == [
         (2, "provider-2"),
@@ -96,9 +101,7 @@ def test_models_keep_their_slot_order_and_pinned_provider() -> None:
 def test_each_model_says_whether_it_can_be_chosen_today(
     status: ModelStatus, selectable: bool
 ) -> None:
-    draft = build_rerun_draft(
-        past_run(), [slot(1), slot(2, status)], has_input_assets=False
-    )
+    draft = build_rerun_draft(past_run(), [slot(1), slot(2, status)])
 
     assert draft.models[1].current_status == status
     assert draft.models[1].selectable is selectable
@@ -108,14 +111,49 @@ def test_a_model_that_can_no_longer_be_chosen_does_not_block_the_rerun() -> None
     # 교체하거나 빼면 되므로 막지 않고 안내만 한다
     slots = [slot(1), slot(2, ModelStatus.INACTIVE)]
 
-    draft = build_rerun_draft(past_run(), slots, has_input_assets=False)
+    draft = build_rerun_draft(past_run(), slots)
 
     assert (draft.rerunnable, draft.blocked_reason) == (True, None)
 
 
-def test_a_run_with_attached_images_cannot_be_restored() -> None:
-    # 새 실행 요청에는 이미지 칸이 없어서 같은 입력으로 다시 돌릴 수 없다
-    draft = build_rerun_draft(past_run(), SLOTS, has_input_assets=True)
+IMAGE_IDS = [uuid.UUID(int=21), uuid.UUID(int=22)]
+
+
+def test_a_run_with_images_whose_files_remain_can_be_rerun_with_them() -> None:
+    draft = build_rerun_draft(past_run(), SLOTS, asset_ids=IMAGE_IDS)
+
+    assert (draft.rerunnable, draft.blocked_reason) == (True, None)
+    # 올린 순서가 곧 모델에 보낸 순서다
+    assert draft.asset_ids == IMAGE_IDS
+
+
+def test_a_run_whose_image_files_are_gone_cannot_be_restored() -> None:
+    # 다른 이미지로 돌리면 같은 입력의 비교가 아니다
+    draft = build_rerun_draft(
+        past_run(), SLOTS, asset_ids=IMAGE_IDS, assets_available=False
+    )
 
     assert draft.rerunnable is False
     assert draft.blocked_reason == RerunBlockReason.INPUT_MISSING
+    assert draft.asset_ids == IMAGE_IDS
+
+
+def test_a_text_only_run_has_no_images_to_restore() -> None:
+    draft = build_rerun_draft(past_run(), SLOTS, assets_available=False)
+
+    assert (draft.rerunnable, draft.asset_ids) == (True, [])
+
+
+def test_each_model_comes_back_with_the_settings_that_were_applied() -> None:
+    # 칸마다 다르게 돌린 설정을 돌려줘야 같은 조건으로 다시 돌릴 수 있다
+    slots = [
+        slot(1, execution_config={"max_tokens": 100, "reasoning_effort": "low"}),
+        slot(1, execution_config={"max_tokens": 100, "reasoning_effort": "high"}),
+    ]
+
+    draft = build_rerun_draft(past_run(), slots)
+
+    assert [m.execution_config for m in draft.models] == [
+        {"max_tokens": 100, "reasoning_effort": "low"},
+        {"max_tokens": 100, "reasoning_effort": "high"},
+    ]

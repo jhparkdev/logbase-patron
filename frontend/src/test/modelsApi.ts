@@ -31,6 +31,8 @@ export const MODEL_ROW: Schemas["ModelRead"] = {
   output_modalities: ["text"],
   supports_json_schema: true,
   supports_tools: true,
+  temperature_supported: true,
+  reasoning_efforts: [],
   context_length: 128000,
   current_price: PRICE,
   last_test_status: "SUCCESS",

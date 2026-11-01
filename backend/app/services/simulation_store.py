@@ -6,6 +6,7 @@
 """
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import select, update
@@ -16,6 +17,7 @@ from app.models import (
     RequestStatus,
     SimulationResult,
     SimulationRun,
+    SimulationRunAsset,
     SimulationStatus,
 )
 from app.services.simulation_ports import NewResult, NewRun, SlotRecord, SlotState
@@ -63,7 +65,19 @@ class DbSimulationStore:
                 execution_provider=result.execution_provider,
                 model_status_at_run=result.model_status_at_run,
                 model_display_name_at_run=result.model_display_name_at_run,
+                comparability_note=result.comparability_note,
             )
+        )
+        await self._session.flush()
+
+    async def insert_run_assets(
+        self, simulation_id: uuid.UUID, asset_ids: Sequence[uuid.UUID]
+    ) -> None:
+        self._session.add_all(
+            SimulationRunAsset(
+                simulation_id=simulation_id, asset_id=asset_id, sort_order=order
+            )
+            for order, asset_id in enumerate(asset_ids, start=1)
         )
         await self._session.flush()
 

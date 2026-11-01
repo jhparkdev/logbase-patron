@@ -9,6 +9,7 @@ from app.api import (
     auth,
     health,
     internal_budget,
+    model_favorites,
     models,
     simulations,
     subscriptions,
@@ -28,6 +29,7 @@ PROTECTED_ROUTERS = (
     simulations.router,
     models.router,
     usage.router,
+    model_favorites.router,
     internal_budget.router,
     subscriptions.router,
 )

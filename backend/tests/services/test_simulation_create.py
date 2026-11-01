@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 
@@ -13,11 +14,16 @@ from app.models import (
 )
 from app.models import TestType as RunType
 from app.schemas.simulation import SimulationCreateRequest
+from app.services.model_parameters import (
+    ModelParameterUnsupportedError,
+    ParameterSupport,
+)
 from app.services.simulation_create import (
     ModelNotActiveError,
     ModelNotFoundError,
     RerunSourceNotFoundError,
     ScenarioNotFoundError,
+    comparability_notes,
     create_simulation,
 )
 from app.services.simulation_input import (
@@ -27,7 +33,13 @@ from app.services.simulation_input import (
     compute_input_hash,
 )
 from app.services.simulation_ports import IntakeDeps, ScenarioInfo
-from tests.services.simulation_fakes import FakeLookup, FakeRecorder, FakeStore
+from app.services.simulation_validation import DuplicateModelSelectionError
+from tests.services.simulation_fakes import (
+    FULL_PARAMETER_SUPPORT,
+    FakeLookup,
+    FakeRecorder,
+    FakeStore,
+)
 
 NOW = datetime(2026, 10, 29, 1, 0, tzinfo=UTC)
 USER_ID = 1
@@ -101,8 +113,7 @@ async def test_scenario_run_is_saved_with_the_confirmed_inputs() -> None:
     assert run.model_count == 2
     # 보내지 않은 Schema·설정은 시나리오 기본값을 쓴다
     assert run.json_schema == {"type": "object", "required": ["name"]}
-    # temperature 는 call_model 이 아직 받지 않아 기록하지 않는다(보낸 값만 기록)
-    assert run.execution_config == {"max_tokens": 1024}
+    assert run.execution_config == {"temperature": 0.7, "max_tokens": 1024}
     assert run.routing_policy == {"allow_fallbacks": False, "require_parameters": True}
     # 비용 귀속과 실행자는 서버가 정한다
     assert (run.project_id, run.key_id, run.executed_by) == (3, 1, USER_ID)
@@ -121,7 +132,7 @@ async def test_request_values_win_over_the_scenario_defaults() -> None:
 
     [run] = intake.store.runs
     assert run.json_schema == own_schema
-    assert run.execution_config == {"max_tokens": 256}
+    assert run.execution_config == {"temperature": 0.7, "max_tokens": 256}
 
 
 async def test_one_pending_request_is_created_per_model_in_order() -> None:
@@ -146,7 +157,7 @@ async def test_one_pending_request_is_created_per_model_in_order() -> None:
         assert request.executed_by == USER_ID
         assert request.requested_at == NOW
         assert request.input_hash == compute_input_hash(TEMPLATE, PRODUCT)
-        assert request.execution_config == {"max_tokens": 1024}
+        assert request.execution_config == {"temperature": 0.7, "max_tokens": 1024}
     # 칸마다 고정한 업체가 호출별 정책의 order 에 들어간다
     assert first.routing_policy == {
         "allow_fallbacks": False,
@@ -164,6 +175,7 @@ async def test_one_result_row_is_saved_per_slot_with_the_model_snapshot() -> Non
         openrouter_model_id="vendor/model-2",
         display_name="Mistral Nemo",
         status=ModelStatus.ACTIVE,
+        parameter_support=FULL_PARAMETER_SUPPORT,
     )
 
     await create_simulation(scenario_request(), executed_by=USER_ID, deps=intake.deps)
@@ -194,7 +206,9 @@ async def test_the_returned_job_is_ready_to_run() -> None:
     ]
     assert job.messages == build_messages("다음 상품 정보로 작성하세요.\n" + PRODUCT)
     assert job.allow_fallbacks is True
-    assert job.max_tokens == 1024
+    assert [slot.execution_config for slot in job.slots] == [
+        {"temperature": 0.7, "max_tokens": 1024}
+    ] * 2
     assert job.json_schema == {"type": "object", "required": ["name"]}
 
 
@@ -222,6 +236,35 @@ async def test_same_model_with_different_providers_gets_two_slots() -> None:
 
     assert [s.execution_provider for s in job.slots] == ["DeepInfra", "DekaLLM"]
     assert {s.model_id for s in job.slots} == {1}
+
+
+def test_slots_sharing_a_model_are_told_apart_by_provider() -> None:
+    # 같은 모델을 Provider 만 바꿔 비교하는 칸에 그 사실을 적어, 화면이 결과 칸에 보여 준다
+    notes = comparability_notes([(1, "DeepInfra"), (2, "DeepInfra"), (1, "DekaLLM")])
+
+    assert notes == [
+        "같은 모델, 실행 Provider DeepInfra",
+        None,
+        "같은 모델, 실행 Provider DekaLLM",
+    ]
+
+
+def test_slots_with_different_models_have_no_note() -> None:
+    assert comparability_notes([(1, "DeepInfra"), (2, "DeepInfra")]) == [None, None]
+
+
+async def test_the_note_is_saved_with_each_result_row() -> None:
+    intake = Intake()
+    request = custom_request(
+        models=[selection(1, "DeepInfra"), selection(1, "DekaLLM")]
+    )
+
+    await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert [r.comparability_note for r in intake.store.results] == [
+        "같은 모델, 실행 Provider DeepInfra",
+        "같은 모델, 실행 Provider DekaLLM",
+    ]
 
 
 async def test_rerun_keeps_the_link_to_the_original_run() -> None:
@@ -352,6 +395,7 @@ async def test_a_model_that_is_not_active_is_rejected(status: ModelStatus) -> No
         openrouter_model_id="vendor/model-2",
         display_name="Model 2",
         status=status,
+        parameter_support=FULL_PARAMETER_SUPPORT,
     )
 
     with pytest.raises(ModelNotActiveError) as error:
@@ -372,3 +416,197 @@ async def test_custom_prompt_with_a_placeholder_and_no_input_is_rejected() -> No
         )
 
     assert intake.nothing_was_saved()
+
+
+# --- 모델별 실행 설정 ---
+def tuned(
+    model_id: int, provider: str = "DeepInfra", **config: Any
+) -> dict[str, object]:
+    return {**selection(model_id, provider), "execution_config": config}
+
+
+async def test_each_slot_applies_its_own_settings_over_the_run_settings() -> None:
+    intake = Intake()
+    request = custom_request(
+        execution_config={"max_tokens": 1000, "temperature": 0.5},
+        models=[
+            tuned(1, reasoning_effort="high", temperature=0.1),
+            tuned(2, max_tokens=300),
+        ],
+    )
+
+    job = await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    first, second = [slot.execution_config for slot in job.slots]
+    assert first == {"max_tokens": 1000, "temperature": 0.1, "reasoning_effort": "high"}
+    assert second == {"max_tokens": 300, "temperature": 0.5}
+    # 호출 기록에도 칸마다 실제 적용값이 남는다. 실행 행에는 공통 설정이 남는다
+    assert [r.execution_config for r in intake.recorder.created] == [first, second]
+    [run] = intake.store.runs
+    assert run.execution_config == {"max_tokens": 1000, "temperature": 0.5}
+
+
+async def test_a_slot_without_settings_follows_the_scenario_defaults() -> None:
+    intake = Intake()
+
+    job = await create_simulation(
+        scenario_request(models=[tuned(1, max_tokens=64), selection(2)]),
+        executed_by=USER_ID,
+        deps=intake.deps,
+    )
+
+    assert [s.execution_config for s in job.slots] == [
+        {"temperature": 0.7, "max_tokens": 64},
+        {"temperature": 0.7, "max_tokens": 1024},
+    ]
+
+
+async def test_same_model_and_provider_with_different_settings_runs_as_two_slots() -> (
+    None
+):
+    intake = Intake()
+    request = custom_request(
+        models=[tuned(1, reasoning_effort="low"), tuned(1, reasoning_effort="high")]
+    )
+
+    job = await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert [(s.model_id, s.execution_provider) for s in job.slots] == [
+        (1, "DeepInfra"),
+        (1, "DeepInfra"),
+    ]
+    assert [r.slot_no for r in intake.store.results] == [1, 2]
+
+
+async def test_same_model_provider_and_settings_are_rejected_before_saving() -> None:
+    intake = Intake()
+    request = custom_request(
+        models=[tuned(1, max_tokens=300), tuned(1, max_tokens=300)]
+    )
+
+    with pytest.raises(DuplicateModelSelectionError):
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert intake.nothing_was_saved()
+
+
+async def test_duplicates_are_judged_on_the_applied_settings_not_the_typed_ones() -> (
+    None
+):
+    # 한 칸은 비워 두고 다른 칸은 공통값과 같은 값을 적으면 실제 적용 설정이 같다.
+    # DB 제약은 적용 설정(해시)으로 막으므로 서버도 합친 값으로 판단해야 500 이 나지 않는다
+    intake = Intake()
+    request = custom_request(
+        execution_config={"max_tokens": 300},
+        models=[selection(1), tuned(1, max_tokens=300)],
+    )
+
+    with pytest.raises(DuplicateModelSelectionError):
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert intake.nothing_was_saved()
+
+
+async def test_a_scenario_default_makes_an_empty_slot_equal_to_an_explicit_one() -> (
+    None
+):
+    intake = Intake()
+    request = scenario_request(
+        models=[selection(1), tuned(1, temperature=0.7, max_tokens=1024)]
+    )
+
+    with pytest.raises(DuplicateModelSelectionError):
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert intake.nothing_was_saved()
+
+
+# --- 모델이 지원하지 않는 설정 ---
+def limit_support(intake: Intake, model_id: int, support: ParameterSupport) -> None:
+    model = intake.lookup.models[model_id]
+    intake.lookup.models[model_id] = replace(model, parameter_support=support)
+
+
+NO_TEMPERATURE = ParameterSupport(
+    temperature=False, reasoning_efforts=FULL_PARAMETER_SUPPORT.reasoning_efforts
+)
+NO_REASONING = ParameterSupport(temperature=True, reasoning_efforts=())
+
+
+async def test_a_run_setting_is_left_out_only_of_the_slot_that_cannot_take_it() -> None:
+    intake = Intake()
+    limit_support(intake, 2, NO_TEMPERATURE)
+    request = custom_request(
+        execution_config={"max_tokens": 300, "temperature": 0.5},
+        models=[selection(1), selection(2, "DekaLLM")],
+    )
+
+    job = await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    first, second = [slot.execution_config for slot in job.slots]
+    assert first == {"max_tokens": 300, "temperature": 0.5}
+    assert second == {"max_tokens": 300}
+    # 기록에는 실제로 보낸 값만 남아야 기록과 호출이 어긋나지 않는다
+    assert [r.execution_config for r in intake.recorder.created] == [first, second]
+    [run] = intake.store.runs
+    assert run.execution_config == {"max_tokens": 300, "temperature": 0.5}
+
+
+async def test_a_scenario_default_is_left_out_of_a_slot_that_cannot_take_it() -> None:
+    intake = Intake()
+    limit_support(intake, 1, NO_TEMPERATURE)
+
+    job = await create_simulation(
+        scenario_request(), executed_by=USER_ID, deps=intake.deps
+    )
+
+    assert [slot.execution_config for slot in job.slots] == [
+        {"max_tokens": 1024},
+        {"temperature": 0.7, "max_tokens": 1024},
+    ]
+
+
+async def test_a_value_typed_into_a_slot_that_cannot_take_it_is_rejected() -> None:
+    intake = Intake()
+    limit_support(intake, 2, NO_REASONING)
+    request = custom_request(
+        models=[selection(1), tuned(2, "DekaLLM", reasoning_effort="high")]
+    )
+
+    with pytest.raises(ModelParameterUnsupportedError) as error:
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert error.value.model_ids == [2]
+    assert error.value.parameters == ["reasoning_effort"]
+    assert intake.nothing_was_saved()
+
+
+async def test_an_effort_value_the_model_does_not_allow_is_rejected() -> None:
+    intake = Intake()
+    only_low = ParameterSupport(
+        temperature=True, reasoning_efforts=FULL_PARAMETER_SUPPORT.reasoning_efforts[:3]
+    )
+    limit_support(intake, 1, only_low)
+    request = custom_request(models=[tuned(1, reasoning_effort="max"), selection(2)])
+
+    with pytest.raises(ModelParameterUnsupportedError):
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert intake.nothing_was_saved()
+
+
+async def test_every_slot_with_a_bad_value_is_reported_at_once() -> None:
+    intake = Intake()
+    limit_support(intake, 1, NO_TEMPERATURE)
+    limit_support(intake, 2, NO_REASONING)
+    request = custom_request(
+        models=[
+            tuned(1, temperature=0.2),
+            tuned(2, "DekaLLM", reasoning_effort="low"),
+        ]
+    )
+
+    with pytest.raises(ModelParameterUnsupportedError) as error:
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert error.value.model_ids == [1, 2]

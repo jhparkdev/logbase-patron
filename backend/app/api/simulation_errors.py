@@ -18,19 +18,29 @@ from app.schemas.simulation_error import (
     error_body,
     period_error_code,
 )
+from app.services.model_parameters import ModelParameterUnsupportedError
 from app.services.simulation_cancel_service import (
     SimulationNotFoundError,
     SlotNotFoundError,
 )
 from app.services.simulation_create import (
+    ImageNotFoundError,
+    ImageRequiredError,
+    ModelImageUnsupportedError,
     ModelNotActiveError,
     ModelNotFoundError,
     RerunSourceNotFoundError,
     ScenarioNotFoundError,
 )
+from app.services.simulation_image_check import (
+    EmptyImageError,
+    ImageTooLargeError,
+    UnsupportedImageTypeError,
+)
 from app.services.simulation_input import InputRequiredError
 from app.services.simulation_lookup import SimulatorContextMissingError
 from app.services.simulation_period import InvalidPeriodError
+from app.services.simulation_validation import DuplicateModelSelectionError
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +48,18 @@ C = SimulationErrorCode
 # 예외 종류 하나가 코드 하나가 되는 것들. 상속 관계를 따지지 않고 정확한 종류로 찾는다
 _CODE_OF_ERROR: dict[type[Exception], SimulationErrorCode] = {
     InputRequiredError: C.INPUT_REQUIRED,
+    DuplicateModelSelectionError: C.DUPLICATE_MODEL_SELECTION,
     ScenarioNotFoundError: C.SCENARIO_NOT_FOUND,
     RerunSourceNotFoundError: C.RERUN_SOURCE_NOT_FOUND,
     ModelNotFoundError: C.MODEL_NOT_FOUND,
     ModelNotActiveError: C.MODEL_NOT_ACTIVE,
+    ModelImageUnsupportedError: C.MODEL_IMAGE_NOT_SUPPORTED,
+    ModelParameterUnsupportedError: C.MODEL_PARAMETER_NOT_SUPPORTED,
+    ImageRequiredError: C.IMAGE_REQUIRED,
+    ImageNotFoundError: C.IMAGE_NOT_FOUND,
+    EmptyImageError: C.IMAGE_EMPTY,
+    ImageTooLargeError: C.IMAGE_TOO_LARGE,
+    UnsupportedImageTypeError: C.IMAGE_TYPE_NOT_SUPPORTED,
     SimulationNotFoundError: C.SIMULATION_NOT_FOUND,
     SlotNotFoundError: C.SLOT_NOT_FOUND,
 }

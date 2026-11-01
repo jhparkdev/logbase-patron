@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from contextlib import suppress
 from datetime import datetime
+from typing import Any
 
 from app.models import SimulationStatus
 from app.openrouter.errors import ErrorType as CallErrorType
@@ -12,6 +13,7 @@ from app.openrouter.result import CallResult, CallStatus
 from app.services.simulation_input import (
     HEARTBEAT_INTERVAL_SECONDS,
     SIMULATION_TIMEOUT_SECONDS,
+    inline_images,
 )
 from app.services.simulation_outcome import to_slot_record
 from app.services.simulation_ports import (
@@ -46,8 +48,12 @@ async def run_simulation(
     heartbeat = asyncio.create_task(
         _beat(deps.store, job.simulation_id, deps.now, heartbeat_interval_seconds)
     )
+    # 이미지는 실행당 한 번만 읽어 모든 칸이 나눠 쓴다. 칸마다 읽으면 같은 파일을 모델 수만큼 읽는다
+    to_send = await _messages_to_send(job, deps)
     slot_runs = [
-        _run_slot(slot, job, deps, _cancel_signal(events, slot), timeout_seconds)
+        _run_slot(
+            slot, job, deps, _cancel_signal(events, slot), timeout_seconds, to_send
+        )
         for slot in job.slots
     ]
     try:
@@ -112,27 +118,57 @@ def _log_unrecorded_slots(
             )
 
 
+class _ImagesUnavailableError(RuntimeError):
+    """이미지 내용을 읽지 못했다. 모델은 질문의 일부만 보게 되므로 호출하지 않는다."""
+
+
+async def _messages_to_send(
+    job: SimulationJob, deps: SimulationDeps
+) -> list[dict[str, Any]] | None:
+    """모델에 보낼 메시지. 저장용 메시지의 이미지 참조를 내용으로 바꾼다. 읽지 못하면 None."""
+    if not job.images:
+        return job.messages
+    try:
+        data_urls = {
+            str(image.asset_id): await deps.images.data_url(image)
+            for image in job.images
+        }
+        return inline_images(job.messages, data_urls)
+    except Exception as error:  # noqa: BLE001 - 이미지를 못 읽으면 모든 칸이 같은 이유로 실패한다
+        logger.error(
+            "images unreadable: simulation_id=%s error=%s",
+            job.simulation_id,
+            type(error).__name__,
+        )
+        return None
+
+
 async def _run_slot(
     slot: SlotPlan,
     job: SimulationJob,
     deps: SimulationDeps,
     cancel: asyncio.Event,
     timeout_seconds: float,
+    to_send: list[dict[str, Any]] | None,
 ) -> None:
     started_at = deps.now()
     if not await deps.recorder.mark_running(slot.request_id, started_at):
         return  # 시작 전에 이미 취소되었다
     try:
+        if to_send is None:
+            raise _ImagesUnavailableError
         result = await deps.caller(
             request_id=slot.request_id,
             model_id=slot.openrouter_model_id,
-            messages=job.messages,
-            max_tokens=job.max_tokens,
+            messages=to_send,
             timeout_seconds=timeout_seconds,
             json_schema=job.json_schema,
             provider_order=[slot.execution_provider],
             allow_fallbacks=job.allow_fallbacks,
             cancel=cancel,
+            # 칸 설정에는 call_model 이 받는 항목(SENT_EXECUTION_SETTINGS)만 있고 max_tokens 는 항상 있다.
+            # 아무도 정하지 않은 항목은 빠져 있어 인자로도 보내지 않는다
+            **slot.execution_config,
         )
     except Exception as error:  # noqa: BLE001 - 예상 밖 오류는 이 칸의 실패로 바꿔 기록한다
         logger.error(
@@ -143,7 +179,8 @@ async def _run_slot(
         result = _unexpected_failure(slot, started_at, deps.now())
     record = to_slot_record(result, job.json_schema)
     if not await deps.recorder.record_finished(slot.request_id, record, deps.now()):
-        # 이미 취소로 끝난 칸이다. 종료된 호출의 상태는 바꾸지 않으므로 늦게 온 결과는 저장하지 않는다
+        # 이미 취소로 끝난 칸이다. 종료된 호출의 상태는 바꾸지 않고, 늦게 온 결과는 대조용으로만 남긴다
+        await deps.recorder.keep_late_result(slot.request_id, job.messages, record)
         return
     await deps.recorder.save_payload(
         slot.request_id, job.messages, record.response_text
