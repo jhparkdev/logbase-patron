@@ -9,6 +9,7 @@ import { SidePanel } from "../../../shared/components/ui/SidePanel";
 import { Skeleton } from "../../../shared/components/ui/Skeleton";
 import { TextLink } from "../../../shared/components/ui/TextLink";
 import { UsageBar } from "../../../shared/components/ui/UsageBar";
+import { budgetStatusBadge, usageView } from "../../../shared/lib/budget";
 import {
   formatCount,
   formatUsd,
@@ -17,7 +18,7 @@ import {
 } from "../../../shared/lib/format";
 import { customerDetailQuery } from "../api/usage";
 import { useSaveCustomerBudget } from "../hooks/useSaveCustomerBudget";
-import { amountForInput, budgetStatusBadge, usageView } from "../lib/view";
+import { amountForInput } from "../lib/view";
 
 const SAVE_FAILED_MESSAGE = "예산을 저장하지 못했어요. 다시 시도해 주세요.";
 

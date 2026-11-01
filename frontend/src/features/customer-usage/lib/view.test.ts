@@ -1,13 +1,11 @@
 import { describe, expect, test } from "vitest";
 import {
   amountForInput,
-  budgetStatusBadge,
   costView,
   executionStatus,
   summaryTrend,
   trendDayLabel,
   trendPoint,
-  usageView,
 } from "./view";
 
 describe("costView", () => {
@@ -27,40 +25,6 @@ describe("costView", () => {
       kind: "unknown",
       amount: null,
     });
-  });
-});
-
-describe("usageView", () => {
-  test("서버의 상태를 그대로 쓰고 사용률은 정수로 보여 준다", () => {
-    expect(usageView({ status: "WARNING", usage_pct: "82.60" })).toEqual({
-      status: "warning",
-      percent: 83,
-    });
-    expect(usageView({ status: "OVER", usage_pct: "121.00" })).toEqual({
-      status: "over",
-      percent: 121,
-    });
-    expect(usageView({ status: "NORMAL", usage_pct: "0.00" })).toEqual({
-      status: "normal",
-      percent: 0,
-    });
-  });
-
-  test("예산이 없으면 0%가 아니라 미설정이다", () => {
-    expect(usageView({ status: "UNSET", usage_pct: null })).toEqual({
-      status: "unset",
-    });
-  });
-});
-
-describe("budgetStatusBadge", () => {
-  test.each([
-    ["NORMAL", "정상", "green"],
-    ["WARNING", "주의", "yellow"],
-    ["OVER", "초과", "red"],
-    ["UNSET", "미설정", "grey"],
-  ] as const)("%s는 %s로 보여 준다", (status, label, tone) => {
-    expect(budgetStatusBadge(status)).toEqual({ label, tone });
   });
 });
 

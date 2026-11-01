@@ -1,10 +1,8 @@
 import type { components } from "../../../shared/api/schema";
 import type { CostAmountView } from "../../../shared/components/ui/CostAmount";
-import type { UsageView } from "../../../shared/components/ui/UsageBar";
 
 type Schemas = components["schemas"];
 type RequestRow = Schemas["CustomerRequestRow"];
-type BudgetStatus = Schemas["BudgetStatus"];
 type RequestStatus = Schemas["RequestStatus"];
 
 /** 호출 1건의 비용을 표시용으로 바꾼다. 미확인은 금액이 없다. */
@@ -18,36 +16,6 @@ export function costView(
     kind: row.cost_status === "CONFIRMED" ? "confirmed" : "estimated",
     amount: row.cost_usd,
   };
-}
-
-const USAGE_STATUS = {
-  NORMAL: "normal",
-  WARNING: "warning",
-  OVER: "over",
-} as const;
-
-/** 상태는 서버 판정을 그대로 쓴다. 사용률은 막대와 글자에만 쓰므로 정수로 바꾼다. */
-export function usageView(
-  budget: Pick<Schemas["BudgetUsage"], "status" | "usage_pct">,
-): UsageView {
-  if (budget.status === "UNSET" || budget.usage_pct === null) {
-    return { status: "unset" };
-  }
-  return {
-    status: USAGE_STATUS[budget.status],
-    percent: Math.round(Number(budget.usage_pct)),
-  };
-}
-
-const BUDGET_STATUS_BADGE = {
-  NORMAL: { label: "정상", tone: "green" },
-  WARNING: { label: "주의", tone: "yellow" },
-  OVER: { label: "초과", tone: "red" },
-  UNSET: { label: "미설정", tone: "grey" },
-} as const;
-
-export function budgetStatusBadge(status: BudgetStatus) {
-  return BUDGET_STATUS_BADGE[status];
 }
 
 const EXECUTION_STATUS = {

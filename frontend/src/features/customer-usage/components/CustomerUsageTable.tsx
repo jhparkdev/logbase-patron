@@ -12,6 +12,7 @@ import { SectionCard } from "../../../shared/components/ui/SectionCard";
 import { TableSkeleton } from "../../../shared/components/ui/TableSkeleton";
 import { TextLink } from "../../../shared/components/ui/TextLink";
 import { UsageBar } from "../../../shared/components/ui/UsageBar";
+import { budgetStatusBadge, usageView } from "../../../shared/lib/budget";
 import {
   formatCount,
   formatUsd,
@@ -21,7 +22,6 @@ import {
 import { type CustomerUsageRow, customerRowsOptions } from "../api/usage";
 import { useCustomerSort, usePageChange } from "../hooks/useUsageList";
 import type { CustomerUsageSearch } from "../lib/search";
-import { budgetStatusBadge, usageView } from "../lib/view";
 import { ViewAllLink } from "./ViewAllLink";
 
 const TITLE = "고객별 사용 현황";
