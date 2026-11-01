@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AIRequest, Budget, BudgetScopeType, Project, SubscriptionCost
@@ -46,6 +46,18 @@ def month_period(month: date) -> DateRange:
     first = month.replace(day=1)
     next_month = (first + timedelta(days=32)).replace(day=1)
     return DateRange(first, next_month - timedelta(days=1))
+
+
+def budget_conditions(month: date) -> list[ColumnElement[bool]]:
+    """그 달에 적용되는 프로젝트 예산을 고르는 조건. 표와 상세가 같이 쓴다."""
+    return [
+        Budget.scope_type == BudgetScopeType.PROJECT.value,
+        Budget.effective_from_month <= month,
+        or_(
+            Budget.effective_to_month.is_(None),
+            Budget.effective_to_month >= month,
+        ),
+    ]
 
 
 def build_row(
@@ -99,16 +111,7 @@ async def project_budget_rows(
         .group_by(SubscriptionCost.project_id)
     )
     subscriptions = {project_id: total for project_id, total in subscription_rows}
-    budget_rows = await session.scalars(
-        select(Budget).where(
-            Budget.scope_type == BudgetScopeType.PROJECT.value,
-            Budget.effective_from_month <= month,
-            or_(
-                Budget.effective_to_month.is_(None),
-                Budget.effective_to_month >= month,
-            ),
-        )
-    )
+    budget_rows = await session.scalars(select(Budget).where(*budget_conditions(month)))
     budgets = {budget.project_id: budget.monthly_amount_usd for budget in budget_rows}
 
     rows = []
