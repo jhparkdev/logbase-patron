@@ -1,35 +1,6 @@
 import type { components } from "../../../shared/api/schema";
-import type { CostAmountView } from "../../../shared/components/ui/CostAmount";
 
 type Schemas = components["schemas"];
-type RequestRow = Schemas["CustomerRequestRow"];
-type RequestStatus = Schemas["RequestStatus"];
-
-/** 호출 1건의 비용을 표시용으로 바꾼다. 미확인은 금액이 없다. */
-export function costView(
-  row: Pick<RequestRow, "cost_status" | "cost_usd">,
-): CostAmountView {
-  if (row.cost_status === "UNKNOWN" || row.cost_usd === null) {
-    return { kind: "unknown", amount: null };
-  }
-  return {
-    kind: row.cost_status === "CONFIRMED" ? "confirmed" : "estimated",
-    amount: row.cost_usd,
-  };
-}
-
-const EXECUTION_STATUS = {
-  PENDING: { label: "대기", dotClass: "bg-grey-400" },
-  RUNNING: { label: "실행 중", dotClass: "bg-grey-400" },
-  SUCCESS: { label: "성공", dotClass: "bg-green-500" },
-  FAILED: { label: "실패", dotClass: "bg-red-500" },
-  TIMEOUT: { label: "Timeout", dotClass: "bg-yellow-800" },
-  CANCELLED: { label: "취소", dotClass: "bg-grey-400" },
-} as const;
-
-export function executionStatus(status: RequestStatus) {
-  return EXECUTION_STATUS[status];
-}
 
 /** 요약 카드의 증감. 비교할 값이 없거나 반올림해 0%면 보여 주지 않는다. */
 export function summaryTrend(changePct: string | null) {

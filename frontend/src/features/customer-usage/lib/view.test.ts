@@ -1,45 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
   amountForInput,
-  costView,
-  executionStatus,
   summaryTrend,
   trendDayLabel,
   trendPoint,
 } from "./view";
-
-describe("costView", () => {
-  test("확정·추정은 금액을 그대로 넘긴다", () => {
-    expect(costView({ cost_status: "CONFIRMED", cost_usd: "0.0200" })).toEqual({
-      kind: "confirmed",
-      amount: "0.0200",
-    });
-    expect(costView({ cost_status: "ESTIMATED", cost_usd: "0.0800" })).toEqual({
-      kind: "estimated",
-      amount: "0.0800",
-    });
-  });
-
-  test("미확인은 금액이 없다", () => {
-    expect(costView({ cost_status: "UNKNOWN", cost_usd: null })).toEqual({
-      kind: "unknown",
-      amount: null,
-    });
-  });
-});
-
-describe("executionStatus", () => {
-  test.each([
-    ["PENDING", "대기"],
-    ["RUNNING", "실행 중"],
-    ["SUCCESS", "성공"],
-    ["FAILED", "실패"],
-    ["TIMEOUT", "Timeout"],
-    ["CANCELLED", "취소"],
-  ] as const)("%s는 %s로 보여 준다", (status, label) => {
-    expect(executionStatus(status).label).toBe(label);
-  });
-});
 
 describe("summaryTrend", () => {
   test("증가와 감소의 방향과 정수 비율을 만든다", () => {
