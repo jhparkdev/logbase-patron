@@ -6,6 +6,7 @@ import { renderAt } from "../../test/renderAt";
 
 const OCTOBER = "/internal-budget?from=2026-10-01&to=2026-10-31";
 const SUMMARY_ERROR = "요약을 불러오지 못했어요";
+const EMPTY_PAGE = { items: [], total: 0, page: 1, page_size: 10 };
 
 beforeEach(() => {
   stubInternalBudgetApi();
@@ -35,10 +36,8 @@ test("추정 비용이 0이면 ≈ 없이 보여 주고, 미확인이 없으면 
       },
     },
     // 요약 카드만 보도록 금액이 나오는 다른 표는 비운다.
-    projects: {
-      status: 200,
-      body: { items: [], total: 0, page: 1, page_size: 10 },
-    },
+    projects: { status: 200, body: EMPTY_PAGE },
+    requests: { status: 200, body: EMPTY_PAGE },
   });
   renderAt(OCTOBER);
 

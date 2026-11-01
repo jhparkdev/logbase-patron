@@ -6,9 +6,11 @@ import {
   type BudgetSearch,
   internalFilterQuery,
   projectRowsQuery,
+  requestRowsQuery,
 } from "../lib/search";
 
 export type ProjectBudgetRow = components["schemas"]["ProjectBudgetRow"];
+export type InternalRequestRow = components["schemas"]["InternalRequestRow"];
 
 const ROOT_KEY = "internal-budget";
 /** 호출 기록은 계속 쌓이지만 조회 버튼으로 다시 보는 화면이라 잠깐은 캐시를 쓴다. */
@@ -34,6 +36,19 @@ export function projectRowsOptions(search: BudgetSearch) {
     queryFn: async () =>
       unwrap(
         await api.GET("/api/usage/internal/projects", { params: { query } }),
+      ),
+    staleTime: USAGE_STALE_TIME_MS,
+    retry: false,
+  });
+}
+
+export function requestRowsOptions(search: BudgetSearch) {
+  const query = requestRowsQuery(search);
+  return queryOptions({
+    queryKey: [ROOT_KEY, "requests", query],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/usage/internal/requests", { params: { query } }),
       ),
     staleTime: USAGE_STALE_TIME_MS,
     retry: false,

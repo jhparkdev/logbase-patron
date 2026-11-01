@@ -42,9 +42,66 @@ export const PROJECTS: Schemas["ProjectBudgetPage"] = {
   page_size: 10,
 };
 
+const REQUEST_BASE = {
+  service_id: 10,
+  service_name: "사내 챗봇",
+  task_id: null,
+  task_type: null,
+  task_type_label: null,
+  error_type: null,
+} as const;
+
+export const REQUESTS: Schemas["InternalRequestPage"] = {
+  items: [
+    {
+      ...REQUEST_BASE,
+      request_id: "00000000-0000-0000-0000-000000000001",
+      requested_at: "2026-10-31T05:32:21Z",
+      usage_origin: "INTERNAL_DEVELOPMENT",
+      project_id: 1,
+      project_name: "사내 챗봇 구축",
+      model: "openai/gpt-4o",
+      tokens: 125320,
+      cost_usd: "0.020000000000",
+      cost_status: "CONFIRMED",
+      status: "SUCCESS",
+    },
+    {
+      ...REQUEST_BASE,
+      request_id: "00000000-0000-0000-0000-000000000002",
+      requested_at: "2026-10-30T15:00:00Z",
+      usage_origin: "SIMULATION",
+      project_id: null,
+      project_name: null,
+      model: "anthropic/claude-sonnet",
+      tokens: null,
+      cost_usd: "0.080000000000",
+      cost_status: "ESTIMATED",
+      status: "SUCCESS",
+    },
+    {
+      ...REQUEST_BASE,
+      request_id: "00000000-0000-0000-0000-000000000003",
+      requested_at: "2026-10-29T01:00:00Z",
+      usage_origin: "SYSTEM_TEST",
+      project_id: null,
+      project_name: null,
+      model: "google/gemini-pro",
+      tokens: 10,
+      cost_usd: null,
+      cost_status: "UNKNOWN",
+      status: "TIMEOUT",
+      error_type: "TIMEOUT_ERROR",
+    },
+  ],
+  total: 23,
+  page: 1,
+  page_size: 10,
+};
+
 type Reply = { status: number; body: unknown };
 /** 경로 끝부분별 응답을 바꾼다. 예: { summary: { status: 500, body: {} } } */
-type Replies = Partial<Record<"summary" | "projects", Reply>>;
+type Replies = Partial<Record<"summary" | "projects" | "requests", Reply>>;
 
 function ok(body: unknown): Reply {
   return { status: 200, body };
@@ -53,6 +110,7 @@ function ok(body: unknown): Reply {
 const DEFAULT_REPLIES = {
   summary: ok(SUMMARY),
   projects: ok(PROJECTS),
+  requests: ok(REQUESTS),
 };
 
 function blockOf(pathname: string): keyof typeof DEFAULT_REPLIES {

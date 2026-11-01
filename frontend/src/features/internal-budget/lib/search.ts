@@ -9,7 +9,7 @@ import {
 } from "../../../shared/lib/period";
 import type { SortState } from "../../../shared/lib/sort";
 
-type ProjectRowSort = components["schemas"]["ProjectRowSort"];
+type Schemas = components["schemas"];
 
 /** 전체보기로 펼칠 수 있는 목록 표 */
 const LIST_VIEWS = ["projects", "subscriptions", "requests"] as const;
@@ -18,24 +18,24 @@ export type BudgetListView = (typeof LIST_VIEWS)[number];
 
 /** 표마다 정렬할 수 있는 칸(표의 칸 key와 같다). 목록 표가 빠지거나 남으면 타입 검사에서 잡힌다. */
 export const BUDGET_LIST_SORTS = {
-  // 백엔드 정렬 허용 목록(ProjectRowSort)에 없는 값을 쓰면 타입 검사에서 잡힌다.
+  // 프로젝트·이력 표는 백엔드 정렬 허용 목록에 없는 값을 쓰면 타입 검사에서 잡힌다.
   projects: [
     "project",
     "budget",
     "used",
     "usage",
     "status",
-  ] as const satisfies readonly ProjectRowSort[],
+  ] as const satisfies readonly Schemas["ProjectRowSort"][],
   subscriptions: ["tool", "month", "amount", "project", "status"],
+  // 구분(호출 출처) 칸은 백엔드가 정렬하지 못해 넣지 않는다.
   requests: [
     "requestedAt",
     "project",
     "model",
     "tokens",
     "cost",
-    "origin",
     "status",
-  ],
+  ] as const satisfies readonly Schemas["InternalRequestSort"][],
 } as const satisfies Record<BudgetListView, readonly string[]>;
 
 const order = z.enum(["asc", "desc"]).optional().catch(undefined);
@@ -116,17 +116,34 @@ export function internalFilterQuery({ from, to }: Period) {
   return { start_date: from, end_date: to };
 }
 
+/** 요약 화면은 미리보기(서버가 정한 N건 안에서 정렬), 그 목록의 전체보기는 페이지를 나눠 요청한다. */
+function listPageQuery(search: BudgetSearch, view: BudgetListView) {
+  const fullView = search.view === view;
+  return {
+    preview: !fullView,
+    ...(fullView ? { page: search.page ?? 1, page_size: PAGE_SIZE } : {}),
+  };
+}
+
 /**
  * 프로젝트 표 요청 조건. 예산은 월 단위라 조회 기간 종료일의 달과 비교한다.
  * 정렬을 고르지 않았으면 보내지 않고 서버 기본 정렬을 따른다.
  */
 export function projectRowsQuery(search: BudgetSearch) {
-  const fullView = search.view === "projects";
   const { projectsSort: sort, projectsOrder: order } = search;
   return {
     month: budgetMonthOf(search),
-    preview: !fullView,
+    ...listPageQuery(search, "projects"),
     ...(sort && order ? { sort, order } : {}),
-    ...(fullView ? { page: search.page ?? 1, page_size: PAGE_SIZE } : {}),
+  };
+}
+
+/** 이력 표 요청 조건. 정렬을 고르지 않았으면 보내지 않고 서버 기본 정렬(최신순)을 따른다. */
+export function requestRowsQuery(search: BudgetSearch) {
+  const { requestsSort: sort, requestsOrder: order } = search;
+  return {
+    ...internalFilterQuery(search),
+    ...listPageQuery(search, "requests"),
+    ...(sort && order ? { sort, order } : {}),
   };
 }

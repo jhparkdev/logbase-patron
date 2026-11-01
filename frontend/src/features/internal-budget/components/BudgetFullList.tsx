@@ -46,7 +46,13 @@ export function BudgetFullList({
         />
       )}
       {view === "subscriptions" && <SubscriptionTable paging={paging} />}
-      {view === "requests" && <RequestHistoryTable paging={paging} />}
+      {view === "requests" && (
+        <RequestHistoryTable
+          search={search}
+          refreshing={refreshing}
+          onPageChange={paging.onPageChange}
+        />
+      )}
     </>
   );
 }

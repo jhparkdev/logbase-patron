@@ -3,6 +3,7 @@ import { useDeferredValue } from "react";
 import {
   internalSummaryQuery,
   projectRowsOptions,
+  requestRowsOptions,
 } from "../../features/internal-budget/api/budget";
 import { BudgetFilters } from "../../features/internal-budget/components/BudgetFilters";
 import { BudgetFullList } from "../../features/internal-budget/components/BudgetFullList";
@@ -27,6 +28,9 @@ export const Route = createFileRoute("/_app/internal-budget")({
   loader: ({ context: { queryClient }, deps }) => {
     if (deps.view === undefined || deps.view === "projects") {
       void queryClient.prefetchQuery(projectRowsOptions(deps));
+    }
+    if (deps.view === undefined || deps.view === "requests") {
+      void queryClient.prefetchQuery(requestRowsOptions(deps));
     }
     if (deps.view === undefined) {
       void queryClient.prefetchQuery(internalSummaryQuery(deps));
@@ -83,7 +87,7 @@ function InternalBudgetPage() {
           <CostTrendCard />
           <ProjectBudgetTable search={shown} refreshing={refreshing} />
           <SubscriptionTable />
-          <RequestHistoryTable />
+          <RequestHistoryTable search={shown} refreshing={refreshing} />
         </>
       ) : (
         <BudgetFullList
