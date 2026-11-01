@@ -402,6 +402,177 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/usage/internal/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Summary */
+        get: operations["read_summary_api_usage_internal_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage/internal/trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Trend */
+        get: operations["read_trend_api_usage_internal_trend_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage/internal/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Requests */
+        get: operations["read_requests_api_usage_internal_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage/internal/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Options */
+        get: operations["read_options_api_usage_internal_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage/internal/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Project Budgets */
+        get: operations["read_project_budgets_api_usage_internal_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage/internal/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Project Detail */
+        get: operations["read_project_detail_api_usage_internal_projects__project_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage/internal/projects/{project_id}/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Budget */
+        put: operations["save_budget_api_usage_internal_projects__project_id__budget_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Subscriptions */
+        get: operations["read_subscriptions_api_subscriptions_get"];
+        put?: never;
+        /** Create Subscription */
+        post: operations["create_subscription_api_subscriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscriptions/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Options */
+        get: operations["read_options_api_subscriptions_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscriptions/{subscription_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Subscription */
+        patch: operations["update_subscription_api_subscriptions__subscription_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -706,6 +877,114 @@ export interface components {
              */
             status: "ok";
         };
+        /**
+         * InternalOptions
+         * @description 선택 상자 목록. 프로젝트는 사용 중인 것, 서비스와 모델은 내부 호출에 쓰인 것만 준다.
+         */
+        InternalOptions: {
+            /** Projects */
+            projects: components["schemas"]["UsageOption"][];
+            /** Services */
+            services: components["schemas"]["UsageOption"][];
+            /** Models */
+            models: components["schemas"]["UsageOption"][];
+        };
+        /** InternalRequestPage */
+        InternalRequestPage: {
+            /** Items */
+            items: components["schemas"]["InternalRequestRow"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** InternalRequestRow */
+        InternalRequestRow: {
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            usage_origin: components["schemas"]["UsageOrigin"];
+            /** Project Id */
+            project_id: number | null;
+            /** Project Name */
+            project_name: string | null;
+            /** Service Id */
+            service_id: number;
+            /** Service Name */
+            service_name: string;
+            /** Model */
+            model: string;
+            /** Task Id */
+            task_id: string | null;
+            /** Task Type */
+            task_type: string | null;
+            /** Task Type Label */
+            task_type_label: string | null;
+            /** Tokens */
+            tokens: number | null;
+            /** Cost Usd */
+            cost_usd: string | null;
+            cost_status: components["schemas"]["CostStatus"];
+            status: components["schemas"]["RequestStatus"];
+            error_type: components["schemas"]["ErrorType"] | null;
+        };
+        /**
+         * InternalRequestSort
+         * @description 호출 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다.
+         * @enum {string}
+         */
+        InternalRequestSort: "requestedAt" | "project" | "service" | "model" | "taskType" | "tokens" | "cost" | "costStatus" | "status";
+        /**
+         * InternalSummary
+         * @description 비용 요약 카드. 미확인 비용은 금액에 넣지 않고 건수로만 센다.
+         */
+        InternalSummary: {
+            /** Api Confirmed Usd */
+            api_confirmed_usd: string;
+            /** Api Estimated Usd */
+            api_estimated_usd: string;
+            /** Subscription Usd */
+            subscription_usd: string;
+            /** Total Managed Usd */
+            total_managed_usd: string;
+            /** Unknown Cost Count */
+            unknown_cost_count: number;
+            /** Includes Estimate */
+            includes_estimate: boolean;
+            /** Has Unknown */
+            has_unknown: boolean;
+        };
+        /**
+         * InternalTrend
+         * @description 조회 기간의 모든 KST 날짜. 호출이 없는 날도 0으로 채운다. 구독료는 날짜별로 나누지 않아 넣지 않는다.
+         */
+        InternalTrend: {
+            /** Items */
+            items: components["schemas"]["InternalTrendPoint"][];
+        };
+        /** InternalTrendPoint */
+        InternalTrendPoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Api Confirmed Usd */
+            api_confirmed_usd: string;
+            /** Api Estimated Usd */
+            api_estimated_usd: string;
+            /** Unknown Cost Count */
+            unknown_cost_count: number;
+        };
         JsonValue: unknown;
         /** LoginRequest */
         LoginRequest: {
@@ -961,6 +1240,140 @@ export interface components {
          * @enum {string}
          */
         PriceStatus: "KNOWN" | "UNKNOWN";
+        /** ProjectBudgetPage */
+        ProjectBudgetPage: {
+            /** Items */
+            items: components["schemas"]["ProjectBudgetRow"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** ProjectBudgetRead */
+        ProjectBudgetRead: {
+            /** Budget Id */
+            budget_id: number;
+            /** Project Id */
+            project_id: number;
+            /** Monthly Amount Usd */
+            monthly_amount_usd: string;
+            /** Effective From Month */
+            effective_from_month: string;
+            /** Effective To Month */
+            effective_to_month: string | null;
+        };
+        /** ProjectBudgetRow */
+        ProjectBudgetRow: {
+            /** Project Id */
+            project_id: number;
+            /** Project Name */
+            project_name: string;
+            /** Monthly Amount Usd */
+            monthly_amount_usd: string | null;
+            /** Used Usd */
+            used_usd: string;
+            /** Usage Pct */
+            usage_pct: string | null;
+            status: components["schemas"]["BudgetStatus"];
+            /** Unknown Cost Count */
+            unknown_cost_count: number;
+        };
+        /** ProjectBudgetSave */
+        ProjectBudgetSave: {
+            /** Monthly Amount Usd */
+            monthly_amount_usd: number | string;
+            /** Effective From Month */
+            effective_from_month: string;
+        };
+        /**
+         * ProjectBudgetUsage
+         * @description 그 달의 프로젝트 예산 현황. 사용액에는 이 프로젝트에 귀속된 구독료가 들어간다.
+         */
+        ProjectBudgetUsage: {
+            /** Month */
+            month: string;
+            /** Monthly Amount Usd */
+            monthly_amount_usd: string | null;
+            /** Effective From Month */
+            effective_from_month: string | null;
+            /** Used Usd */
+            used_usd: string;
+            /** Usage Pct */
+            usage_pct: string | null;
+            /** Confirmed Usage Pct */
+            confirmed_usage_pct: string | null;
+            /** Remaining Usd */
+            remaining_usd: string | null;
+            /** Unknown Cost Count */
+            unknown_cost_count: number;
+            status: components["schemas"]["BudgetStatus"];
+        };
+        /**
+         * ProjectRowSort
+         * @description 프로젝트 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다.
+         * @enum {string}
+         */
+        ProjectRowSort: "project" | "budget" | "used" | "usage" | "status";
+        /**
+         * ProjectServiceUsage
+         * @description 서비스별 사용량. 서비스별 예산이 아니라 프로젝트 예산에서 차지하는 비중이다.
+         */
+        ProjectServiceUsage: {
+            /** Service Id */
+            service_id: number;
+            /** Service Name */
+            service_name: string;
+            /** Task Count */
+            task_count: number;
+            /** Call Count */
+            call_count: number;
+            /** Confirmed Cost Usd */
+            confirmed_cost_usd: string;
+            /** Estimated Cost Usd */
+            estimated_cost_usd: string;
+            /** Unknown Cost Count */
+            unknown_cost_count: number;
+            /** Budget Share Pct */
+            budget_share_pct: string | null;
+        };
+        /** ProjectSubscription */
+        ProjectSubscription: {
+            /** Subscription Id */
+            subscription_id: number;
+            /** Tool Name */
+            tool_name: string;
+            /** Amount Usd */
+            amount_usd: string;
+            status: components["schemas"]["SubscriptionStatus"];
+        };
+        /** ProjectUsageDetail */
+        ProjectUsageDetail: {
+            /** Project Id */
+            project_id: number;
+            /** Project Name */
+            project_name: string;
+            /** Month */
+            month: string;
+            /** Task Count */
+            task_count: number;
+            /** Call Count */
+            call_count: number;
+            /** Confirmed Cost Usd */
+            confirmed_cost_usd: string;
+            /** Estimated Cost Usd */
+            estimated_cost_usd: string;
+            /** Subscription Usd */
+            subscription_usd: string;
+            /** Unknown Cost Count */
+            unknown_cost_count: number;
+            budget: components["schemas"]["ProjectBudgetUsage"];
+            /** Services */
+            services: components["schemas"]["ProjectServiceUsage"][];
+            /** Subscriptions */
+            subscriptions: components["schemas"]["ProjectSubscription"][];
+        };
         /** ProviderListResponse */
         ProviderListResponse: {
             /** Items */
@@ -1278,6 +1691,98 @@ export interface components {
          */
         SortOrder: "asc" | "desc";
         /**
+         * SubscriptionCreate
+         * @description 구독료 등록. 같은 subscription_reference와 applied_month는 한 번만 등록할 수 있다.
+         */
+        SubscriptionCreate: {
+            /** Subscription Reference */
+            subscription_reference: string;
+            /** Tool Name */
+            tool_name: string;
+            /** Subscription Type */
+            subscription_type?: string | null;
+            /** Applied Month */
+            applied_month: string;
+            /** Amount Usd */
+            amount_usd: number | string;
+            /** Project Id */
+            project_id?: number | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * SubscriptionErrorCode
+         * @description 프론트엔드는 이 값으로 상황별로 화면을 나눈다.
+         * @enum {string}
+         */
+        SubscriptionErrorCode: "SUBSCRIPTION_DUPLICATE";
+        /**
+         * SubscriptionErrorResponse
+         * @description 공통 오류 형식 {code, message}에서 code를 구독료 코드로 좁힌 응답.
+         */
+        SubscriptionErrorResponse: {
+            code: components["schemas"]["SubscriptionErrorCode"];
+            /** Message */
+            message: string;
+        };
+        /** SubscriptionList */
+        SubscriptionList: {
+            /** Items */
+            items: components["schemas"]["SubscriptionRow"][];
+        };
+        /** SubscriptionOptions */
+        SubscriptionOptions: {
+            /** Projects */
+            projects: components["schemas"]["SubscriptionProject"][];
+        };
+        /** SubscriptionProject */
+        SubscriptionProject: {
+            /** Project Id */
+            project_id: number;
+            /** Name */
+            name: string;
+        };
+        /** SubscriptionRow */
+        SubscriptionRow: {
+            /** Subscription Id */
+            subscription_id: number;
+            /** Subscription Reference */
+            subscription_reference: string;
+            /** Tool Name */
+            tool_name: string;
+            /** Subscription Type */
+            subscription_type: string | null;
+            /** Applied Month */
+            applied_month: string;
+            /** Amount Usd */
+            amount_usd: string;
+            /** Project Id */
+            project_id: number | null;
+            /** Project Name */
+            project_name: string | null;
+            status: components["schemas"]["SubscriptionStatus"];
+            /** Note */
+            note: string | null;
+        };
+        /**
+         * SubscriptionStatus
+         * @enum {string}
+         */
+        SubscriptionStatus: "ACTIVE" | "CANCELLED";
+        /**
+         * SubscriptionUpdate
+         * @description 보낸 항목만 바꾼다. project_id와 note는 null을 보내면 값이 지워진다.
+         */
+        SubscriptionUpdate: {
+            /** Amount Usd */
+            amount_usd?: (number | string) | null;
+            /** Project Id */
+            project_id?: number | null;
+            status?: components["schemas"]["SubscriptionStatus"] | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
          * TestType
          * @enum {string}
          */
@@ -1301,6 +1806,12 @@ export interface components {
             /** Models */
             models: components["schemas"]["UsageOption"][];
         };
+        /**
+         * UsageOrigin
+         * @description 호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트)를 섞지 않는다.
+         * @enum {string}
+         */
+        UsageOrigin: "CUSTOMER_SERVICE" | "INTERNAL_DEVELOPMENT" | "SIMULATION" | "SYSTEM_TEST";
         /**
          * UsageSummary
          * @description 요약 카드. *_change_pct는 직전 동일 길이 기간 대비 증감률이고 비교할 값이 0이면 null이다.
@@ -2448,6 +2959,398 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_summary_api_usage_internal_summary_get: {
+        parameters: {
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalSummary"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_trend_api_usage_internal_trend_get: {
+        parameters: {
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalTrend"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_requests_api_usage_internal_requests_get: {
+        parameters: {
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+                project_id?: number | null;
+                service_id?: number | null;
+                model_id?: number | null;
+                sort?: components["schemas"]["InternalRequestSort"];
+                order?: components["schemas"]["SortOrder"];
+                preview?: boolean;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalRequestPage"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_options_api_usage_internal_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InternalOptions"];
+                };
+            };
+        };
+    };
+    read_project_budgets_api_usage_internal_projects_get: {
+        parameters: {
+            query: {
+                month: string;
+                sort?: components["schemas"]["ProjectRowSort"];
+                order?: components["schemas"]["SortOrder"];
+                preview?: boolean;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectBudgetPage"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_project_detail_api_usage_internal_projects__project_id__get: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectUsageDetail"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    save_budget_api_usage_internal_projects__project_id__budget_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectBudgetSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectBudgetRead"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_subscriptions_api_subscriptions_get: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionList"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_subscription_api_subscriptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionRow"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_options_api_subscriptions_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOptions"];
+                };
+            };
+        };
+    };
+    update_subscription_api_subscriptions__subscription_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                subscription_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionRow"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

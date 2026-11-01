@@ -435,6 +435,11 @@ class APIKey(Base):
     project_id: Mapped[int | None] = mapped_column(
         BigInteger, fk("projects.project_id")
     )
+    service_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        fk("services.service_id"),
+        comment="이 Key를 쓰는 서비스. 여러 서비스가 함께 쓰는 Key는 NULL",
+    )
     environment: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, server_default=KeyStatus.ACTIVE.value)
     limit_usd: Mapped[Decimal | None] = mapped_column(MONEY)
