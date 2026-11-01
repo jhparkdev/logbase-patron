@@ -1516,6 +1516,14 @@ async def test_every_foreign_key_restricts_delete(db_session: AsyncSession) -> N
             "api_keys_customer_id_fkey",
         ),
         (
+            "service",
+            "services",
+            "service_id",
+            "api_key",
+            "service_id",
+            "api_keys_service_id_fkey",
+        ),
+        (
             "user",
             "users",
             "user_id",
