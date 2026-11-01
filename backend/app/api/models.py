@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, status
 
+from app.api import model_openrouter
 from app.api.errors import ApiError
 from app.db import SessionDep
 from app.schemas.common import ErrorCode, ErrorResponse
@@ -99,6 +100,9 @@ async def list_model_providers(session: SessionDep) -> ProviderListResponse:
     return ProviderListResponse(
         items=[ProviderRead.model_validate(item) for item in providers]
     )
+
+
+router.include_router(model_openrouter.router)
 
 
 @router.get("/{model_id}", responses=DETAIL_ERROR_RESPONSES)
