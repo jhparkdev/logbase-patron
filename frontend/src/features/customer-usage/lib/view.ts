@@ -99,20 +99,10 @@ export function trendPoint(point: Schemas["UsageTrendPoint"]) {
 
 export type TrendPointView = ReturnType<typeof trendPoint>;
 
-export function unreflectedText(unknownCount: number): string | undefined {
-  return unknownCount > 0 ? `미확인 ${unknownCount}건 미반영` : undefined;
-}
-
 /** 서버의 긴 소수("1.970000000000000000")를 입력 칸에 넣기 좋게 뒤쪽 0만 지운다. */
 export function amountForInput(amount: string | null): string {
   if (amount === null) {
     return "";
   }
   return amount.includes(".") ? amount.replace(/\.?0+$/, "") : amount;
-}
-
-const ZERO_AMOUNT = /^0+(\.0+)?$/;
-
-export function isZeroAmount(amount: string): boolean {
-  return ZERO_AMOUNT.test(amount);
 }

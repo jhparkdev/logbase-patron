@@ -9,8 +9,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatCount, formatUsd } from "../../../shared/lib/format";
-import { type TrendPointView, unreflectedText } from "../lib/view";
+import {
+  formatCount,
+  formatUsd,
+  unreflectedText,
+} from "../../../shared/lib/format";
+import type { TrendPointView } from "../lib/view";
 
 const SYNC_ID = "customer-usage-trend";
 const TASK_CHART_HEIGHT = 150;

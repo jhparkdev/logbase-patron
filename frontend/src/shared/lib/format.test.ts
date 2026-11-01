@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { formatCount, formatKstDateTime, formatUsd } from "./format";
+import {
+  formatCount,
+  formatKstDateTime,
+  formatUsd,
+  isZeroAmount,
+  unreflectedText,
+} from "./format";
 
 describe("formatKstDateTime", () => {
   test.each([
@@ -58,5 +64,25 @@ describe("formatCount", () => {
     [24591, "24,591"],
   ])("%i → %s", (count, expected) => {
     expect(formatCount(count)).toBe(expected);
+  });
+});
+
+describe("isZeroAmount", () => {
+  test.each([
+    ["0", true],
+    ["0.00", true],
+    ["0.000000000000", true],
+    ["0.000000000001", false],
+    ["1", false],
+    ["10.00", false],
+  ])("%s → %s", (amount, expected) => {
+    expect(isZeroAmount(amount)).toBe(expected);
+  });
+});
+
+describe("unreflectedText", () => {
+  test("미확인이 있을 때만 문구를 만든다", () => {
+    expect(unreflectedText(3)).toBe("미확인 3건 미반영");
+    expect(unreflectedText(0)).toBeUndefined();
   });
 });

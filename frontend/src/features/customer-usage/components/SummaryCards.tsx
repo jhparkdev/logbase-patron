@@ -5,10 +5,14 @@ import estimatedCostIcon from "../../../assets/estimatedCost.svg";
 import taskCountIcon from "../../../assets/taskCount.svg";
 import warningIcon from "../../../assets/warning.svg";
 import { StatCard } from "../../../shared/components/ui/StatCard";
-import { formatCount, formatUsd } from "../../../shared/lib/format";
+import {
+  formatCount,
+  formatUsd,
+  isZeroAmount,
+} from "../../../shared/lib/format";
 import { usageSummaryQuery } from "../api/usage";
 import type { CustomerUsageSearch } from "../lib/search";
-import { isZeroAmount, summaryTrend } from "../lib/view";
+import { summaryTrend } from "../lib/view";
 
 const TREND_LABEL = "이전 기간 대비";
 

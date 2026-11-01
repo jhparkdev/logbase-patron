@@ -7,7 +7,6 @@ import {
   summaryTrend,
   trendDayLabel,
   trendPoint,
-  unreflectedText,
   usageView,
 } from "./view";
 
@@ -117,13 +116,6 @@ describe("trendPoint", () => {
 
 test("trendDayLabel은 월-일만 보여 준다", () => {
   expect(trendDayLabel("2026-10-02")).toBe("10-02");
-});
-
-describe("unreflectedText", () => {
-  test("미확인이 있을 때만 문구를 만든다", () => {
-    expect(unreflectedText(3)).toBe("미확인 3건 미반영");
-    expect(unreflectedText(0)).toBeUndefined();
-  });
 });
 
 describe("amountForInput", () => {
