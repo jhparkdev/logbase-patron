@@ -16,9 +16,35 @@ export const SUMMARY: Schemas["InternalSummary"] = {
   has_unknown: true,
 };
 
+export const PROJECTS: Schemas["ProjectBudgetPage"] = {
+  items: [
+    {
+      project_id: 1,
+      project_name: "사내 챗봇 구축",
+      monthly_amount_usd: "10.0000",
+      used_usd: "12.100000000000",
+      usage_pct: "121.00",
+      status: "OVER",
+      unknown_cost_count: 2,
+    },
+    {
+      project_id: 2,
+      project_name: "문서 요약",
+      monthly_amount_usd: null,
+      used_usd: "0",
+      usage_pct: null,
+      status: "UNSET",
+      unknown_cost_count: 0,
+    },
+  ],
+  total: 12,
+  page: 1,
+  page_size: 10,
+};
+
 type Reply = { status: number; body: unknown };
 /** 경로 끝부분별 응답을 바꾼다. 예: { summary: { status: 500, body: {} } } */
-type Replies = Partial<Record<"summary", Reply>>;
+type Replies = Partial<Record<"summary" | "projects", Reply>>;
 
 function ok(body: unknown): Reply {
   return { status: 200, body };
@@ -26,6 +52,7 @@ function ok(body: unknown): Reply {
 
 const DEFAULT_REPLIES = {
   summary: ok(SUMMARY),
+  projects: ok(PROJECTS),
 };
 
 function blockOf(pathname: string): keyof typeof DEFAULT_REPLIES {

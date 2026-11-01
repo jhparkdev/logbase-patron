@@ -1,5 +1,7 @@
 import { z } from "zod";
 import type { components } from "../../../shared/api/schema";
+import { budgetMonthOf } from "../../../shared/lib/budget";
+import { PAGE_SIZE } from "../../../shared/lib/pagination";
 import {
   currentMonthPeriod,
   type Period,
@@ -112,4 +114,19 @@ export function listSortParams(
 /** 주소의 조회 기간을 내부 비용 API의 조회 조건으로 바꾼다. */
 export function internalFilterQuery({ from, to }: Period) {
   return { start_date: from, end_date: to };
+}
+
+/**
+ * 프로젝트 표 요청 조건. 예산은 월 단위라 조회 기간 종료일의 달과 비교한다.
+ * 정렬을 고르지 않았으면 보내지 않고 서버 기본 정렬을 따른다.
+ */
+export function projectRowsQuery(search: BudgetSearch) {
+  const fullView = search.view === "projects";
+  const { projectsSort: sort, projectsOrder: order } = search;
+  return {
+    month: budgetMonthOf(search),
+    preview: !fullView,
+    ...(sort && order ? { sort, order } : {}),
+    ...(fullView ? { page: search.page ?? 1, page_size: PAGE_SIZE } : {}),
+  };
 }

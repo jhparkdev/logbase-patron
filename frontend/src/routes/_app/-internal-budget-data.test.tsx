@@ -34,6 +34,11 @@ test("추정 비용이 0이면 ≈ 없이 보여 주고, 미확인이 없으면 
         has_unknown: false,
       },
     },
+    // 요약 카드만 보도록 금액이 나오는 다른 표는 비운다.
+    projects: {
+      status: 200,
+      body: { items: [], total: 0, page: 1, page_size: 10 },
+    },
   });
   renderAt(OCTOBER);
 
@@ -60,7 +65,7 @@ test("요약을 불러오지 못하면 그 블록에만 알리고 다시 시도�
 
   expect(await screen.findByText(SUMMARY_ERROR)).toBeTruthy();
   expect(
-    screen.getByRole("table", { name: "프로젝트별 예산 현황" }),
+    await screen.findByRole("table", { name: "프로젝트별 예산 현황" }),
   ).toBeTruthy();
 
   delete replies.summary;

@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useDeferredValue } from "react";
-import { internalSummaryQuery } from "../../features/internal-budget/api/budget";
+import {
+  internalSummaryQuery,
+  projectRowsOptions,
+} from "../../features/internal-budget/api/budget";
 import { BudgetFilters } from "../../features/internal-budget/components/BudgetFilters";
 import { BudgetFullList } from "../../features/internal-budget/components/BudgetFullList";
 import { CostTrendCard } from "../../features/internal-budget/components/CostTrendCard";
@@ -15,12 +18,16 @@ import { budgetSearchSchema } from "../../features/internal-budget/lib/search";
 import { DataBlock } from "../../shared/components/ui/DataBlock";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 import { RefreshingBar } from "../../shared/components/ui/RefreshingBar";
+import { budgetMonthOf } from "../../shared/lib/budget";
 
 export const Route = createFileRoute("/_app/internal-budget")({
   validateSearch: budgetSearchSchema,
   loaderDeps: ({ search }) => search,
   // 화면 틀을 먼저 그리도록 기다리지 않는다. 실패는 블록마다 따로 보여 주므로 여기서 멈추지 않는다.
   loader: ({ context: { queryClient }, deps }) => {
+    if (deps.view === undefined || deps.view === "projects") {
+      void queryClient.prefetchQuery(projectRowsOptions(deps));
+    }
     if (deps.view === undefined) {
       void queryClient.prefetchQuery(internalSummaryQuery(deps));
     }
@@ -34,8 +41,7 @@ function InternalBudgetPage() {
   // 조건을 바꿔 다시 불러오는 동안 이전 결과를 보여 주고, 새 결과가 오면 바꾼다.
   const shown = useDeferredValue(search);
   const refreshing = shown !== search;
-  // 예산은 월 단위라 조회 기간 종료일이 속한 달과 비교한다.
-  const month = search.to.slice(0, 7);
+  const month = budgetMonthOf(search);
   // 패널을 닫으면 패널 값만 지우고 조회 조건·목록은 그대로 둔다.
   const closePanel = () =>
     navigate({
@@ -75,12 +81,16 @@ function InternalBudgetPage() {
             </DataBlock>
           </div>
           <CostTrendCard />
-          <ProjectBudgetTable month={month} />
+          <ProjectBudgetTable search={shown} refreshing={refreshing} />
           <SubscriptionTable />
           <RequestHistoryTable />
         </>
       ) : (
-        <BudgetFullList view={search.view} month={month} />
+        <BudgetFullList
+          view={search.view}
+          search={shown}
+          refreshing={refreshing}
+        />
       )}
       {search.project !== undefined && (
         <ProjectPanel month={month} onClose={closePanel} />

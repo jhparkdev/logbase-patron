@@ -151,7 +151,9 @@ test("요약 화면에서 머리글을 누르면 그 표의 정렬만 주소에 
     }),
   );
 
-  fireEvent.click(screen.getByRole("button", { name: /월 예산 \(USD\)/ }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: /월 예산 \(USD\)/ }),
+  );
   await waitFor(() =>
     expect(routeMatch(router, ROUTE_ID)?.search).toEqual({
       from: "2026-10-01",

@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { budgetSearchSchema, internalFilterQuery, listSortOf } from "./search";
+import {
+  budgetSearchSchema,
+  internalFilterQuery,
+  listSortOf,
+  projectRowsQuery,
+} from "./search";
 
 const THIS_MONTH = { from: "2026-10-01", to: "2026-10-20" };
 const PERIOD = { from: "2026-10-01", to: "2026-10-20" };
@@ -121,5 +126,39 @@ describe("internalFilterQuery", () => {
     expect(
       internalFilterQuery({ from: "2026-10-01", to: "2026-10-31" }),
     ).toEqual({ start_date: "2026-10-01", end_date: "2026-10-31" });
+  });
+});
+
+describe("projectRowsQuery", () => {
+  test("요약 화면은 조회 기간 종료일의 달로 미리보기를 요청하고 정렬이 없으면 보내지 않는다", () => {
+    expect(
+      projectRowsQuery(parse({ from: "2026-09-01", to: "2026-10-15" })),
+    ).toEqual({ month: "2026-10", preview: true });
+  });
+
+  test("정렬은 칸과 방향이 함께 있을 때만 보낸다", () => {
+    expect(
+      projectRowsQuery(
+        parse({ ...PERIOD, projectsSort: "usage", projectsOrder: "asc" }),
+      ),
+    ).toEqual({ month: "2026-10", preview: true, sort: "usage", order: "asc" });
+    expect(
+      projectRowsQuery(parse({ ...PERIOD, projectsSort: "usage" })),
+    ).toEqual({ month: "2026-10", preview: true });
+  });
+
+  test("전체보기는 페이지를 나눠 요청하고, 다른 목록의 전체보기에서는 미리보기다", () => {
+    expect(
+      projectRowsQuery(parse({ ...PERIOD, view: "projects", page: 3 })),
+    ).toEqual({ month: "2026-10", preview: false, page: 3, page_size: 10 });
+    expect(projectRowsQuery(parse({ ...PERIOD, view: "projects" }))).toEqual({
+      month: "2026-10",
+      preview: false,
+      page: 1,
+      page_size: 10,
+    });
+    expect(
+      projectRowsQuery(parse({ ...PERIOD, view: "requests", page: 3 })),
+    ).toEqual({ month: "2026-10", preview: true });
   });
 });
