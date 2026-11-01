@@ -173,10 +173,47 @@ async def test_모델_ID와_제공사로도_찾는다(
     )
 
     by_id = (await client.get(MODELS, params={"model_id": "nemo"})).json()
-    by_provider = (await client.get(MODELS, params={"provider": "open"})).json()
+    by_provider = (await client.get(MODELS, params={"provider": "openai"})).json()
 
     assert names(by_id) == ["B"]
     assert names(by_provider) == ["A"]
+
+
+async def test_제공사는_이름이_정확히_같을_때만_찾는다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(
+        display_name="A", openrouter_model_id="openai/a", provider="openai"
+    )
+    await factory.model(
+        display_name="B", openrouter_model_id="openai-labs/b", provider="openai-labs"
+    )
+
+    exact = (await client.get(MODELS, params={"provider": "openai"})).json()
+    partial = (await client.get(MODELS, params={"provider": "open"})).json()
+
+    assert names(exact) == ["A"]
+    assert partial["items"] == []
+
+
+async def test_제공사는_대소문자를_구분하지_않는다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(display_name="A", provider="openai")
+
+    body = (await client.get(MODELS, params={"provider": "OpenAI"})).json()
+
+    assert names(body) == ["A"]
+
+
+async def test_제공사의_퍼센트는_글자_그대로이다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(display_name="A", provider="openai")
+
+    body = (await client.get(MODELS, params={"provider": "%"})).json()
+
+    assert body["items"] == []
 
 
 async def test_q는_표시_이름이나_모델_ID_중_하나에만_맞아도_찾는다(

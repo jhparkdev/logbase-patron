@@ -53,6 +53,7 @@ class ModelListQuery(BaseModel):
     q: SearchText | None = None
     name: SearchText | None = None
     model_id: SearchText | None = None
+    # 제공사 이름 전체가 같은 모델만 찾는다(대소문자 무시). 선택지는 GET /api/models/providers가 준다.
     provider: SearchText | None = None
     status: list[ModelStatus] = Field(default_factory=list)
     sort: ModelSortField = ModelSortField.CREATED_AT
