@@ -25,7 +25,11 @@ def test_모델_목록에서_ID_가격_입력_형식을_꺼낸다() -> None:
                     "completion": "0.00001",
                     "input_cache_read": "0.0000002",
                 },
-                "architecture": {"input_modalities": ["text", "image"]},
+                "name": "Example: Model A",
+                "architecture": {
+                    "input_modalities": ["text", "image"],
+                    "output_modalities": ["text"],
+                },
                 "supported_parameters": ["response_format", "reasoning"],
                 "context_length": 1000,
                 "expiration_date": "2026-12-31",
@@ -44,7 +48,9 @@ def test_모델_목록에서_ID_가격_입력_형식을_꺼낸다() -> None:
         "completion": Decimal("0.00001"),
         "input_cache_read": Decimal("0.0000002"),
     }
+    assert model.name == "Example: Model A"
     assert model.input_modalities == ["text", "image"]
+    assert model.output_modalities == ["text"]
     assert model.supported_parameters == ["response_format", "reasoning"]
     assert model.context_length == 1000
     assert model.expiration_date == date(2026, 12, 31)
@@ -55,6 +61,21 @@ def test_예고일_필드가_없는_모델은_expiration_date가_None이다() ->
 
     assert models is not None
     assert models[0].expiration_date is None
+
+
+def test_이름과_출력_형식이_없으면_None과_빈_목록이다() -> None:
+    models = parse_models({"data": [{"id": "a/b"}]})
+
+    assert models is not None
+    assert models[0].name is None
+    assert models[0].output_modalities == []
+
+
+def test_이름이_문자열이_아니면_None이다() -> None:
+    models = parse_models({"data": [{"id": "a/b", "name": 5}]})
+
+    assert models is not None
+    assert models[0].name is None
 
 
 def test_가격_단위는_문자열도_정확한_Decimal로_읽는다() -> None:

@@ -19,3 +19,16 @@ export function renderAt(path: string) {
   render(<RouterProvider router={router} />);
   return router;
 }
+
+type Match = ReturnType<typeof renderAt>["state"]["matches"][number];
+
+/** 지금 띄운 그 화면의 매치. `.search`가 검증을 거쳐 화면이 실제로 쓰는 조회 조건이다. */
+export function routeMatch<TRouteId extends Match["routeId"]>(
+  router: ReturnType<typeof renderAt>,
+  routeId: TRouteId,
+) {
+  return router.state.matches.find(
+    (match): match is Extract<Match, { routeId: TRouteId }> =>
+      match.routeId === routeId,
+  );
+}

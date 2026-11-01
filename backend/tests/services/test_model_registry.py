@@ -1,8 +1,9 @@
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 
-from app.models import ConnectionTestStatus, ModelStatus
+from app.models import ModelStatus
 from app.services.model_registry import (
     AvailabilityStatus,
     PriceSnapshot,
@@ -18,7 +19,9 @@ from app.services.model_registry import (
 TESTING = ModelStatus.TESTING
 ACTIVE = ModelStatus.ACTIVE
 INACTIVE = ModelStatus.INACTIVE
-SUCCESS = ConnectionTestStatus.SUCCESS
+NOW = datetime(2026, 10, 31, 12, 0, tzinfo=UTC)
+DAY = timedelta(hours=24)
+RECENT = NOW - timedelta(hours=1)
 
 
 # ---------------------------------------------------------------
@@ -28,26 +31,40 @@ SUCCESS = ConnectionTestStatus.SUCCESS
     ("current", "target"),
     [(TESTING, INACTIVE), (ACTIVE, INACTIVE)],
 )
-@pytest.mark.parametrize("last_test_status", [None, "FAILED", "SUCCESS"])
-def test_비활성으로_바꾸는_것은_테스트_결과와_상관없이_허용한다(
-    current: ModelStatus, target: ModelStatus, last_test_status: str | None
+@pytest.mark.parametrize("last_success_test_at", [None, RECENT, NOW - 30 * DAY])
+def test_비활성으로_바꾸는_것은_테스트_기록과_상관없이_허용한다(
+    current: ModelStatus, target: ModelStatus, last_success_test_at: datetime | None
 ) -> None:
-    assert check_status_change(current, target, last_test_status) is None
+    assert check_status_change(current, target, last_success_test_at, NOW) is None
 
 
 @pytest.mark.parametrize("current", [TESTING, INACTIVE])
-def test_마지막_연결_테스트가_성공이면_ACTIVE로_바꿀_수_있다(
-    current: ModelStatus,
+@pytest.mark.parametrize(
+    "elapsed",
+    [timedelta(0), timedelta(hours=23, minutes=59), DAY],
+    ids=["방금", "23시간 59분", "정확히 24시간"],
+)
+def test_24시간_안에_성공한_테스트가_있으면_ACTIVE로_바꿀_수_있다(
+    current: ModelStatus, elapsed: timedelta
 ) -> None:
-    assert check_status_change(current, ACTIVE, SUCCESS) is None
+    assert check_status_change(current, ACTIVE, NOW - elapsed, NOW) is None
 
 
 @pytest.mark.parametrize("current", [TESTING, INACTIVE])
-@pytest.mark.parametrize("last_test_status", [None, "FAILED", "TIMEOUT"])
-def test_마지막_테스트가_성공이_아니면_ACTIVE로_바꿀_수_없다(
-    current: ModelStatus, last_test_status: str | None
+@pytest.mark.parametrize(
+    "last_success_test_at",
+    [
+        None,
+        NOW - DAY - timedelta(seconds=1),
+        NOW - DAY - timedelta(minutes=1),
+        NOW - 3 * DAY,
+    ],
+    ids=["성공 기록 없음", "24시간 1초", "24시간 1분", "3일"],
+)
+def test_24시간_안에_성공한_테스트가_없으면_ACTIVE로_바꿀_수_없다(
+    current: ModelStatus, last_success_test_at: datetime | None
 ) -> None:
-    error = check_status_change(current, ACTIVE, last_test_status)
+    error = check_status_change(current, ACTIVE, last_success_test_at, NOW)
 
     assert error == StatusChangeError.TEST_NOT_PASSED
 
@@ -65,19 +82,19 @@ def test_마지막_테스트가_성공이_아니면_ACTIVE로_바꿀_수_없다(
 def test_허용하지_않는_전이는_INVALID_STATUS_TRANSITION이다(
     current: ModelStatus, target: ModelStatus
 ) -> None:
-    error = check_status_change(current, target, SUCCESS)
+    error = check_status_change(current, target, RECENT, NOW)
 
     assert error == StatusChangeError.INVALID_STATUS_TRANSITION
 
 
 def test_허용하지_않는_전이가_테스트_미통과보다_먼저_판단된다() -> None:
-    error = check_status_change(ACTIVE, ACTIVE, None)
+    error = check_status_change(ACTIVE, ACTIVE, None, NOW)
 
     assert error == StatusChangeError.INVALID_STATUS_TRANSITION
 
 
 def test_알_수_없는_상태_값은_거절한다() -> None:
-    error = check_status_change("DELETED", ACTIVE, SUCCESS)
+    error = check_status_change("DELETED", ACTIVE, RECENT, NOW)
 
     assert error == StatusChangeError.INVALID_STATUS_TRANSITION
 

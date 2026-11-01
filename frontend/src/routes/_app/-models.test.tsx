@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeAll, expect, test } from "vitest";
-import { renderAt } from "../../test/renderAt";
+import { renderAt, routeMatch } from "../../test/renderAt";
 
 // jsdom에는 모달 dialog 열기가 없어서, 브라우저처럼 open 속성만 켠다.
 beforeAll(() => {
@@ -10,13 +10,7 @@ beforeAll(() => {
   };
 });
 
-type Router = ReturnType<typeof renderAt>;
-
-/** 화면이 검증을 거쳐 실제로 쓰는 조회 조건 */
-function appliedSearch(router: Router) {
-  return router.state.matches.find((match) => match.routeId === "/_app/models")
-    ?.search;
-}
+const ROUTE_ID = "/_app/models";
 
 function sortStateOf(header: string) {
   return screen
@@ -64,7 +58,7 @@ test("주소의 페이지 번호는 1 이상의 정수만 받는다", async () =
   ] as const) {
     const router = renderAt(`/models?page=${page}`);
     await screen.findByRole("table", { name: "등록된 AI 모델" });
-    expect(appliedSearch(router)?.page).toBe(expected);
+    expect(routeMatch(router, ROUTE_ID)?.search?.page).toBe(expected);
     cleanup();
   }
 });
@@ -76,7 +70,10 @@ test("정렬을 바꾸면 1페이지로 돌아간다", async () => {
   fireEvent.click(screen.getByRole("button", { name: /Model ID/ }));
 
   await waitFor(() =>
-    expect(appliedSearch(router)).toEqual({ sort: "modelId", order: "asc" }),
+    expect(routeMatch(router, ROUTE_ID)?.search).toEqual({
+      sort: "modelId",
+      order: "asc",
+    }),
   );
 });
 
@@ -88,7 +85,9 @@ test("검색어를 바꾸면 1페이지로 돌아간다", async () => {
     target: { value: "gpt" },
   });
 
-  await waitFor(() => expect(appliedSearch(router)).toEqual({ q: "gpt" }));
+  await waitFor(() =>
+    expect(routeMatch(router, ROUTE_ID)?.search).toEqual({ q: "gpt" }),
+  );
 });
 
 test("주소에 모델 번호가 있으면 상세 패널을 연다", async () => {
@@ -113,7 +112,7 @@ test("닫기를 누르면 패널이 닫히고 다른 조회 조건은 남는다"
   fireEvent.click(screen.getByRole("button", { name: "닫기" }));
 
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  expect(appliedSearch(router)).toEqual({ q: "gpt" });
+  expect(routeMatch(router, ROUTE_ID)?.search).toEqual({ q: "gpt" });
 });
 
 test("Esc를 누르면 패널이 닫힌다", async () => {

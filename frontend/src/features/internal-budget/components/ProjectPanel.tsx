@@ -1,6 +1,6 @@
+import { BudgetForm } from "../../../shared/components/budget/BudgetForm";
 import { SidePanel } from "../../../shared/components/ui/SidePanel";
 import { Skeleton } from "../../../shared/components/ui/Skeleton";
-import { BudgetForm } from "./BudgetForm";
 
 type ProjectPanelProps = {
   /** 예산을 비교하는 달 "YYYY-MM" */
