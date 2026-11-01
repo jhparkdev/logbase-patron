@@ -125,3 +125,8 @@ export function parseBudgetSearch(
     page: positiveIntSchema.safeParse(raw.page).data,
   };
 }
+
+/** 주소의 조회 기간을 내부 비용 API의 조회 조건으로 바꾼다. */
+export function internalFilterQuery({ from, to }: Period) {
+  return { start_date: from, end_date: to };
+}

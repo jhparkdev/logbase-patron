@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useDeferredValue } from "react";
+import { internalSummaryQuery } from "../../features/internal-budget/api/budget";
 import { BudgetFilters } from "../../features/internal-budget/components/BudgetFilters";
 import { BudgetFullList } from "../../features/internal-budget/components/BudgetFullList";
 import { CostTrendCard } from "../../features/internal-budget/components/CostTrendCard";
@@ -7,19 +9,32 @@ import { ProjectPanel } from "../../features/internal-budget/components/ProjectP
 import { RequestHistoryTable } from "../../features/internal-budget/components/RequestHistoryTable";
 import { SubscriptionPanel } from "../../features/internal-budget/components/SubscriptionPanel";
 import { SubscriptionTable } from "../../features/internal-budget/components/SubscriptionTable";
+import { SummaryCards } from "../../features/internal-budget/components/SummaryCards";
 import { SummarySkeleton } from "../../features/internal-budget/components/SummarySkeleton";
 import { parseBudgetSearch } from "../../features/internal-budget/lib/search";
+import { DataBlock } from "../../shared/components/ui/DataBlock";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
+import { RefreshingBar } from "../../shared/components/ui/RefreshingBar";
 
 export const Route = createFileRoute("/_app/internal-budget")({
   // 주소를 읽을 때마다 현재 시각으로 기본 기간(이번 달)을 정한다.
   validateSearch: (search) => parseBudgetSearch(search, new Date()),
+  loaderDeps: ({ search }) => search,
+  // 화면 틀을 먼저 그리도록 기다리지 않는다. 실패는 블록마다 따로 보여 주므로 여기서 멈추지 않는다.
+  loader: ({ context: { queryClient }, deps }) => {
+    if (deps.view === undefined) {
+      void queryClient.prefetchQuery(internalSummaryQuery(deps));
+    }
+  },
   component: InternalBudgetPage,
 });
 
 function InternalBudgetPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  // 조건을 바꿔 다시 불러오는 동안 이전 결과를 보여 주고, 새 결과가 오면 바꾼다.
+  const shown = useDeferredValue(search);
+  const refreshing = shown !== search;
   // 예산은 월 단위라 조회 기간 종료일이 속한 달과 비교한다.
   const month = search.to.slice(0, 7);
   // 패널을 닫으면 패널 값만 지우고 조회 조건·목록은 그대로 둔다.
@@ -50,8 +65,16 @@ function InternalBudgetPage() {
       />
       {search.view === undefined ? (
         <>
-          {/* 요약 값은 비용 요약 API가 생기면 채운다. 그 전까지는 불러오는 중 모양이다. */}
-          <SummarySkeleton />
+          <div className="relative">
+            {refreshing && <RefreshingBar />}
+            <DataBlock
+              fallback={<SummarySkeleton />}
+              errorTitle="요약을 불러오지 못했어요"
+              resetKey={JSON.stringify(internalSummaryQuery(shown).queryKey)}
+            >
+              <SummaryCards period={shown} />
+            </DataBlock>
+          </div>
           <CostTrendCard />
           <ProjectBudgetTable month={month} />
           <SubscriptionTable />

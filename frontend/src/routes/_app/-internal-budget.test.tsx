@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { beforeAll, expect, test } from "vitest";
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { stubInternalBudgetApi } from "../../test/internalBudgetApi";
 import { changePeriod, periodInputs } from "../../test/periodInputs";
 import { renderAt, routeMatch } from "../../test/renderAt";
 
@@ -10,6 +11,12 @@ beforeAll(() => {
     this.open = true;
   };
 });
+
+beforeEach(() => {
+  stubInternalBudgetApi();
+});
+
+afterEach(() => vi.restoreAllMocks());
 
 const ROUTE_ID = "/_app/internal-budget";
 

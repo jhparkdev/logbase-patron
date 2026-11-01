@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseBudgetSearch } from "./search";
+import { internalFilterQuery, parseBudgetSearch } from "./search";
 
 const NOW = new Date("2026-10-20T03:00:00Z");
 const THIS_MONTH = { from: "2026-10-01", to: "2026-10-20" };
@@ -92,5 +92,13 @@ describe("parseBudgetSearch 상세 패널", () => {
     expect(
       parseBudgetSearch({ ...PERIOD, view: "projects", project: 3 }, NOW),
     ).toEqual({ ...PERIOD, view: "projects", project: 3 });
+  });
+});
+
+describe("internalFilterQuery", () => {
+  test("주소의 기간을 API 조회 조건 이름으로 바꾼다", () => {
+    expect(
+      internalFilterQuery({ from: "2026-10-01", to: "2026-10-31" }),
+    ).toEqual({ start_date: "2026-10-01", end_date: "2026-10-31" });
   });
 });
