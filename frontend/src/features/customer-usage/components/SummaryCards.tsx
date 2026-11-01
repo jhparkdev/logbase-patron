@@ -1,4 +1,8 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
+import boltIcon from "../../../assets/bolt.svg";
+import costIcon from "../../../assets/cost.svg";
+import estimatedCostIcon from "../../../assets/estimatedCost.svg";
+import taskCountIcon from "../../../assets/taskCount.svg";
 import warningIcon from "../../../assets/warning.svg";
 import { StatCard } from "../../../shared/components/ui/StatCard";
 import { formatCount, formatUsd } from "../../../shared/lib/format";
@@ -8,7 +12,7 @@ import { isZeroAmount, summaryTrend } from "../lib/view";
 
 const TREND_LABEL = "이전 기간 대비";
 
-/** 요약 카드 5개. 앞의 4개 아이콘은 파일을 받으면 icon으로 넘긴다. */
+/** 요약 카드 5개. */
 export function SummaryCards({ search }: { search: CustomerUsageSearch }) {
   const { data } = useSuspenseQuery(usageSummaryQuery(search));
   const estimated = formatUsd(data.estimated_cost_usd, "summary");
@@ -17,12 +21,16 @@ export function SummaryCards({ search }: { search: CustomerUsageSearch }) {
       <StatCard
         label="작업 건수"
         value={formatCount(data.task_count)}
+        icon={taskCountIcon}
+        iconTone="blue"
         trend={summaryTrend(data.task_change_pct)}
         trendLabel={TREND_LABEL}
       />
       <StatCard
         label="API 호출 수"
         value={formatCount(data.call_count)}
+        icon={boltIcon}
+        iconTone="blue"
         trend={summaryTrend(data.call_change_pct)}
         trendLabel={TREND_LABEL}
       />
@@ -30,6 +38,8 @@ export function SummaryCards({ search }: { search: CustomerUsageSearch }) {
         label="확정 API 비용"
         value={formatUsd(data.confirmed_cost_usd, "summary")}
         unit="USD"
+        icon={costIcon}
+        iconTone="green"
         trend={summaryTrend(data.confirmed_cost_change_pct)}
         trendLabel={TREND_LABEL}
       />
@@ -40,6 +50,8 @@ export function SummaryCards({ search }: { search: CustomerUsageSearch }) {
           isZeroAmount(data.estimated_cost_usd) ? estimated : `≈ ${estimated}`
         }
         unit="USD"
+        icon={estimatedCostIcon}
+        iconTone="blue"
         trend={summaryTrend(data.estimated_cost_change_pct)}
         trendLabel={TREND_LABEL}
       />
