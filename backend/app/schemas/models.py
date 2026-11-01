@@ -1,13 +1,13 @@
 """모델 관리(P-03) 요청·응답 모델."""
 
 from datetime import datetime
-from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import ConnectionTestStatus, ModelStatus, PriceSource, PriceStatus
+from app.schemas.plain_decimal import PlainDecimal
 
 # 한 페이지 개수의 기본값과 최댓값, 검색어 최대 길이
 DEFAULT_PAGE_SIZE = 20
@@ -53,6 +53,7 @@ class ModelListQuery(BaseModel):
     q: SearchText | None = None
     name: SearchText | None = None
     model_id: SearchText | None = None
+    # 제공사 이름 전체가 같은 모델만 찾는다(대소문자 무시). 선택지는 GET /api/models/providers가 준다.
     provider: SearchText | None = None
     status: list[ModelStatus] = Field(default_factory=list)
     sort: ModelSortField = ModelSortField.CREATED_AT
@@ -70,10 +71,10 @@ class PriceRead(BaseModel):
     execution_provider: str | None
     currency: str
     price_status: PriceStatus
-    input_price_per_token: Decimal | None
-    output_price_per_token: Decimal | None
-    cache_read_price_per_token: Decimal | None
-    cache_write_price_per_token: Decimal | None
+    input_price_per_token: PlainDecimal | None
+    output_price_per_token: PlainDecimal | None
+    cache_read_price_per_token: PlainDecimal | None
+    cache_write_price_per_token: PlainDecimal | None
     source: PriceSource
     effective_from: datetime
     effective_to: datetime | None
@@ -91,6 +92,7 @@ class ModelRead(BaseModel):
     input_modalities: list[str]
     output_modalities: list[str]
     supports_json_schema: bool
+    supports_tools: bool
     context_length: int | None
     # 가격이 없으면 null("가격 미확인")
     current_price: PriceRead | None
