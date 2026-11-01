@@ -79,3 +79,16 @@ export async function runConnectionTest(modelId: number, prompt: string) {
     }),
   );
 }
+
+/** 상태 변경. 가능 여부는 서버가 판단하고, 거절되면 이유가 담긴 오류로 돌아옴 */
+export async function changeModelStatus(
+  modelId: number,
+  status: components["schemas"]["ModelStatus"],
+) {
+  return unwrap(
+    await api.PATCH("/api/models/{model_id}/status", {
+      params: { path: { model_id: modelId } },
+      body: { status },
+    }),
+  );
+}

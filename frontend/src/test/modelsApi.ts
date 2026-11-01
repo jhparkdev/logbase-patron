@@ -101,15 +101,20 @@ type Replies = {
   detail?: Reply;
   update?: Reply;
   test?: Reply;
+  status?: Reply;
 };
 
 const DETAIL_PATH = /\/api\/models\/\d+$/;
 const TEST_PATH = /\/api\/models\/\d+\/test$/;
+const STATUS_PATH = /\/api\/models\/\d+\/status$/;
 
 function replyFor(request: Request, replies: Replies): Reply {
   const url = request.url;
   if (url.endsWith("/api/models/providers")) {
     return replies.providers ?? { status: 200, body: PROVIDERS };
+  }
+  if (STATUS_PATH.test(new URL(url).pathname)) {
+    return replies.status ?? { status: 200, body: DETAIL };
   }
   if (TEST_PATH.test(new URL(url).pathname)) {
     return replies.test ?? { status: 200, body: TEST_RESULT };

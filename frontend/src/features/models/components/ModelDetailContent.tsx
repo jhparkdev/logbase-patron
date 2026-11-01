@@ -1,14 +1,14 @@
 import { type ReactNode, useState } from "react";
-import { Badge } from "../../../shared/components/ui/Badge";
 import { Button } from "../../../shared/components/ui/Button";
-import { formatCount, formatKstDateTime } from "../../../shared/lib/format";
+import { formatCount } from "../../../shared/lib/format";
 import type { ModelDetail } from "../api/models";
 import { displayNameFormSchema, purposeFormSchema } from "../lib/infoForm";
-import { modalitiesLabel, statusBadge } from "../lib/view";
+import { modalitiesLabel, timeOrNone } from "../lib/view";
 import { ConnectionTestDialog } from "./ConnectionTestDialog";
 import { Row, Rows } from "./DetailRows";
 import { EditableInfoRow } from "./EditableInfoRow";
 import { LastTestCell, PriceCell } from "./ModelCells";
+import { ModelStatusControls } from "./ModelStatusControls";
 
 export const SECTION_TITLES = {
   basic: "기본 정보",
@@ -17,13 +17,10 @@ export const SECTION_TITLES = {
   status: "운영 상태 관리",
 } as const;
 
-// 값이 없을 때 빈칸 대신 보여 주는 글자
-const NONE_LABEL = "없음";
+// 값을 모를 때 빈칸 대신 보여 주는 글자
 const UNKNOWN_LABEL = "미확인";
 
 const supportLabel = (supported: boolean) => (supported ? "지원" : "미지원");
-const timeOrNone = (utc: string | null) =>
-  utc === null ? NONE_LABEL : formatKstDateTime(utc);
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -34,11 +31,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** 모델 상세 내용. 표시 이름·용도는 연필로 수정하고, 연결 테스트는 창에서 실행. 상태 변경은 이후 단계에서 붙임 */
+/** 모델 상세 내용. 표시 이름·용도는 연필로 수정하고, 연결 테스트는 창에서 실행. 상태 변경은 확인창을 거쳐 실행 */
 export function ModelDetailContent({ model }: { model: ModelDetail }) {
   const [testing, setTesting] = useState(false);
   const price = model.current_price;
-  const status = statusBadge(model.status);
   return (
     <div className="flex flex-col gap-8">
       <Section title={SECTION_TITLES.basic}>
@@ -109,13 +105,7 @@ export function ModelDetailContent({ model }: { model: ModelDetail }) {
         )}
       </Section>
       <Section title={SECTION_TITLES.status}>
-        <Rows>
-          <Row label="현재 상태">
-            <Badge tone={status.tone}>{status.label}</Badge>
-          </Row>
-          <Row label="활성화 시각">{timeOrNone(model.activated_at)}</Row>
-          <Row label="비활성화 시각">{timeOrNone(model.deactivated_at)}</Row>
-        </Rows>
+        <ModelStatusControls model={model} />
       </Section>
     </div>
   );

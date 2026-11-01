@@ -5,8 +5,10 @@ import {
   providerOptions,
   STATUS_OPTIONS,
   statusBadge,
+  statusChangeTargets,
   testCostView,
   testResultView,
+  timeOrNone,
 } from "./view";
 
 test("모델 상태를 한국어 글자와 색으로 바꾼다", () => {
@@ -81,4 +83,15 @@ test("비용 금액이 없으면 상태가 확정이어도 미확인으로 본�
     kind: "unknown",
     amount: null,
   });
+});
+
+test("상태 변경 버튼은 현재 상태를 뺀 사용 중·사용 중단이다", () => {
+  expect(statusChangeTargets("TESTING")).toEqual(["ACTIVE", "INACTIVE"]);
+  expect(statusChangeTargets("ACTIVE")).toEqual(["INACTIVE"]);
+  expect(statusChangeTargets("INACTIVE")).toEqual(["ACTIVE"]);
+});
+
+test("시각이 없으면 빈칸 대신 없음, 있으면 KST로 보여 준다", () => {
+  expect(timeOrNone(null)).toBe("없음");
+  expect(timeOrNone("2026-10-31T05:32:21Z")).toBe("2026-10-31 14:32:21");
 });

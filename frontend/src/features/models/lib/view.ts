@@ -1,5 +1,6 @@
 import type { components } from "../../../shared/api/schema";
 import type { CostAmountView } from "../../../shared/components/ui/CostAmount";
+import { formatKstDateTime } from "../../../shared/lib/format";
 
 type ModelStatus = components["schemas"]["ModelStatus"];
 type ConnectionTestStatus = components["schemas"]["ConnectionTestStatus"];
@@ -93,4 +94,40 @@ export function testCostView({
     kind: cost_status === "ESTIMATED" ? "estimated" : "confirmed",
     amount: cost_usd,
   };
+}
+
+// TESTING으로 돌아가는 상태 변경은 없음. 가능 여부(24시간 안의 성공 테스트 등)는 서버가 판단
+export type ChangeableStatus = Exclude<ModelStatus, "TESTING">;
+
+const CHANGEABLE_STATUSES = [
+  "ACTIVE",
+  "INACTIVE",
+] as const satisfies readonly ChangeableStatus[];
+
+/** 상태 변경 버튼으로 보여 줄 상태. 현재 상태는 뺌 */
+export function statusChangeTargets(current: ModelStatus): ChangeableStatus[] {
+  return CHANGEABLE_STATUSES.filter((status) => status !== current);
+}
+
+const STATUS_CHANGES = {
+  ACTIVE: {
+    action: "사용 시작",
+    hint: "시뮬레이터에서 이 모델을 선택할 수 있게 돼요.",
+  },
+  INACTIVE: {
+    action: "사용 중단",
+    hint: "새 시뮬레이션에서 이 모델이 빠져요. 지난 사용 기록과 결과는 그대로 남아요.",
+  },
+} as const satisfies Record<ChangeableStatus, { action: string; hint: string }>;
+
+/** 버튼 글자(동사)와 확인창 안내 */
+export function statusChangeText(target: ChangeableStatus) {
+  return STATUS_CHANGES[target];
+}
+
+const NONE_LABEL = "없음";
+
+/** 시각이 없으면 빈칸 대신 없음, 있으면 KST */
+export function timeOrNone(utc: string | null): string {
+  return utc === null ? NONE_LABEL : formatKstDateTime(utc);
 }
