@@ -1,7 +1,7 @@
 # 평소 개발은 db만 띄운다: docker compose up -d db
 # 배포와 같은 컨테이너로 확인할 때: docker compose up -d backend (db도 함께 뜬다)
 #   마이그레이션은 자동 실행하지 않는다: docker compose run --rm backend alembic upgrade head
-# frontend 서비스는 frontend Dockerfile을 만드는 브랜치에서 추가한다.
+# 화면까지 배포와 같은 컨테이너로 확인할 때: docker compose up -d frontend (backend, db도 함께 뜬다)
 services:
   db:
     image: postgres:18
@@ -52,6 +52,25 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  frontend:
+    profiles:
+      - full
+
+    build: ./frontend
+
+    # .env 전체를 넘기지 않는다. nginx가 /api/*를 compose 네트워크의 backend로 넘기도록 주소만 준다.
+    environment:
+      BACKEND_URL: http://backend:8080
+      BACKEND_HOST: backend
+
+    ports:
+      # Vite 개발 서버와 동일한 호스트 포트(5173)을 사용하므로 동시 실행 불가
+      # 브라우저의 /api 요청을 nginx를 통해 backend로 전달
+      - "127.0.0.1:5173:8080"
+
+    depends_on:
+      - backend
 
 volumes:
   pgdata:
