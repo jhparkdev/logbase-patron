@@ -81,7 +81,7 @@ export interface paths {
         };
         /**
          * List Simulation Runs
-         * @description 이력 목록. 조건으로 거른 결과를 최신 순으로 상한까지 준다. 정렬·페이지는 화면이 한다.
+         * @description 이력 목록. 조건으로 거른 결과를 요청한 열·방향으로 정렬해 한 페이지씩 준다.
          */
         get: operations["list_simulation_runs_api_simulations_get"];
         put?: never;
@@ -176,6 +176,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/simulations/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Simulation Image
+         * @description 이미지 한 장을 올린다. 파일은 저장소에 두고 DB 에는 경로·해시만 남긴다.
+         */
+        post: operations["upload_simulation_image_api_simulations_images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulations/images/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Image Limits
+         * @description 이미지 입력 한도. 화면이 숫자를 따로 정하지 않고 이 값을 쓴다.
+         */
+        get: operations["read_image_limits_api_simulations_images_limits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models": {
         parameters: {
             query?: never;
@@ -185,6 +225,41 @@ export interface paths {
         };
         /** List Models */
         get: operations["list_models_api_models_get"];
+        put?: never;
+        /** Register Model */
+        post: operations["register_model_api_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Model Providers */
+        get: operations["list_model_providers_api_models_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/openrouter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Openrouter Models */
+        get: operations["search_openrouter_models_api_models_openrouter_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -204,6 +279,44 @@ export interface paths {
         get: operations["read_model_api_models__model_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Model Info */
+        patch: operations["update_model_info_api_models__model_id__patch"];
+        trace?: never;
+    };
+    "/api/models/{model_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change Model Status */
+        patch: operations["change_model_status_api_models__model_id__status_patch"];
+        trace?: never;
+    };
+    "/api/models/{model_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Model Connection Test
+         * @description 실제 비용이 드는 호출을 한 번 보낸다. 성공하든 실패하든 결과를 200으로 돌려준다.
+         */
+        post: operations["run_model_connection_test_api_models__model_id__test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -329,10 +442,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/model-favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Model Favorites */
+        get: operations["list_model_favorites_api_model_favorites_get"];
+        put?: never;
+        /**
+         * Add Model Favorite
+         * @description 등록한다. 이미 있으면 200 으로 같은 항목을 돌려줘 화면이 두 번 눌러도 안전하다.
+         */
+        post: operations["add_model_favorite_api_model_favorites_post"];
+        /**
+         * Remove Model Favorite
+         * @description 해제한다. 없는 항목도 204 다. 삭제와 목록은 로그인 사용자 본인 행에만 닿는다.
+         */
+        delete: operations["remove_model_favorite_api_model_favorites_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_upload_simulation_image_api_simulations_images_post */
+        Body_upload_simulation_image_api_simulations_images_post: {
+            /** File */
+            file: string;
+        };
         /**
          * BudgetStatus
          * @enum {string}
@@ -366,6 +509,40 @@ export interface components {
          * @enum {string}
          */
         CancelDecision: "CANCEL" | "ALREADY_CANCELLED" | "ALREADY_TERMINAL";
+        /**
+         * ConnectionTestRequest
+         * @description POST /api/models/{model_id}/test의 본문. 문장을 비우면 서버의 기본 문장을 쓴다.
+         */
+        ConnectionTestRequest: {
+            /** Prompt */
+            prompt?: string | null;
+        };
+        /**
+         * ConnectionTestResult
+         * @description 테스트 결과. 실패한 테스트도 오류가 아니라 이 모양으로 돌려준다.
+         */
+        ConnectionTestResult: {
+            status: components["schemas"]["ConnectionTestStatus"];
+            /**
+             * Tested At
+             * Format: date-time
+             */
+            tested_at: string;
+            /** Latency Ms */
+            latency_ms: number | null;
+            /** Input Tokens */
+            input_tokens: number | null;
+            /** Output Tokens */
+            output_tokens: number | null;
+            /** Cost Usd */
+            cost_usd: string | null;
+            cost_status: components["schemas"]["CostStatus"];
+            /** Actual Provider */
+            actual_provider: string | null;
+            error_type: components["schemas"]["ErrorType"] | null;
+            /** Error Message */
+            error_message: string | null;
+        };
         /**
          * ConnectionTestStatus
          * @enum {string}
@@ -585,6 +762,7 @@ export interface components {
             temperature?: number | null;
             /** Max Tokens */
             max_tokens?: number | null;
+            reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -599,6 +777,50 @@ export interface components {
              */
             status: "ok";
         };
+        /**
+         * HistorySortColumn
+         * @description 이력 목록의 정렬 열(허용 목록). 값은 이력 화면의 URL 정렬 키와 같다.
+         *
+         *     요약 뷰의 어느 열로 정렬할지는 서비스(simulation_history.py)가 정한다. 총 비용(totalCost)은
+         *     요약 뷰에 합계 열이 생기면 여기와 서비스의 열 대응표에 한 줄씩 추가한다.
+         * @enum {string}
+         */
+        HistorySortColumn: "requestedAt" | "id" | "scenario" | "modelCount" | "status" | "costStatus";
+        /**
+         * ImageAssetRead
+         * @description 올린 이미지 한 장. 비교 실행 요청에는 asset_id 만 보낸다.
+         */
+        ImageAssetRead: {
+            /**
+             * Asset Id
+             * Format: uuid
+             */
+            asset_id: string;
+            /** Mime Type */
+            mime_type: string;
+            /** File Size Bytes */
+            file_size_bytes: number;
+            /** Original Filename */
+            original_filename: string | null;
+        };
+        /**
+         * ImageLimits
+         * @description 이미지 입력 한도. 화면은 하드코딩하지 않고 이 응답을 쓴다.
+         */
+        ImageLimits: {
+            /** Max Count */
+            max_count: number;
+            /** Max Bytes */
+            max_bytes: number;
+            /** Mime Types */
+            mime_types: components["schemas"]["ImageMimeType"][];
+        };
+        /**
+         * ImageMimeType
+         * @description 받는 이미지 형식. 파일 내용의 머리 바이트로 판단한다.
+         * @enum {string}
+         */
+        ImageMimeType: "image/jpeg" | "image/png" | "image/webp";
         JsonValue: unknown;
         /** LoginRequest */
         LoginRequest: {
@@ -609,6 +831,18 @@ export interface components {
              * Format: password
              */
             password: string;
+        };
+        /**
+         * ModelCreate
+         * @description POST /api/models의 본문. 상태와 OpenRouter 정보는 받지 않고 서버가 정한다.
+         */
+        ModelCreate: {
+            /** Openrouter Model Id */
+            openrouter_model_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Purpose */
+            purpose?: string | null;
         };
         /**
          * ModelDetailRead
@@ -632,6 +866,8 @@ export interface components {
             output_modalities: string[];
             /** Supports Json Schema */
             supports_json_schema: boolean;
+            /** Supports Tools */
+            supports_tools: boolean;
             /** Context Length */
             context_length: number | null;
             current_price: components["schemas"]["PriceRead"] | null;
@@ -654,6 +890,50 @@ export interface components {
             deactivated_at: string | null;
             /** Last Success Test At */
             last_success_test_at: string | null;
+        };
+        /**
+         * ModelErrorCode
+         * @description 프론트엔드는 이 값으로 상황별로 화면을 나눈다.
+         * @enum {string}
+         */
+        ModelErrorCode: "OPENROUTER_UNAVAILABLE" | "MODEL_NOT_IN_OPENROUTER" | "MODEL_ALREADY_REGISTERED" | "INVALID_STATUS_TRANSITION" | "TEST_NOT_PASSED" | "OPENROUTER_KEY_MISSING";
+        /**
+         * ModelErrorResponse
+         * @description 공통 오류 형식 {code, message}에서 code를 모델 관리 코드로 좁힌 응답.
+         *
+         *     라우터가 responses=에 이 모델을 지정하면 OpenAPI에 코드 목록(enum)이 실린다.
+         */
+        ModelErrorResponse: {
+            code: components["schemas"]["ModelErrorCode"];
+            /** Message */
+            message: string;
+        };
+        /**
+         * ModelFavoriteKey
+         * @description 즐겨찾기 한 건을 가리키는 값. 설정(effort 등)은 저장하지 않으므로 모델과 Provider 뿐이다.
+         */
+        ModelFavoriteKey: {
+            /** Model Id */
+            model_id: number;
+            /** Execution Provider */
+            execution_provider: string;
+        };
+        /** ModelFavoriteList */
+        ModelFavoriteList: {
+            /** Items */
+            items: components["schemas"]["ModelFavoriteRead"][];
+        };
+        /** ModelFavoriteRead */
+        ModelFavoriteRead: {
+            /** Model Id */
+            model_id: number;
+            /** Execution Provider */
+            execution_provider: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ModelListResponse */
         ModelListResponse: {
@@ -685,6 +965,8 @@ export interface components {
             output_modalities: string[];
             /** Supports Json Schema */
             supports_json_schema: boolean;
+            /** Supports Tools */
+            supports_tools: boolean;
             /** Context Length */
             context_length: number | null;
             current_price: components["schemas"]["PriceRead"] | null;
@@ -711,6 +993,7 @@ export interface components {
             model_id: number;
             /** Execution Provider */
             execution_provider: string;
+            execution_config?: components["schemas"]["ExecutionConfig"];
         };
         /**
          * ModelSortField
@@ -724,6 +1007,72 @@ export interface components {
          * @enum {string}
          */
         ModelStatus: "TESTING" | "ACTIVE" | "INACTIVE";
+        /**
+         * ModelStatusChange
+         * @description PATCH /api/models/{model_id}/status의 본문.
+         */
+        ModelStatusChange: {
+            status: components["schemas"]["ModelStatus"];
+        };
+        /**
+         * ModelUpdate
+         * @description PATCH /api/models/{model_id}의 본문. 보낸 항목만 바꾸고, 모델 ID와 상태 등은 받지 않는다.
+         */
+        ModelUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Purpose */
+            purpose?: string | null;
+        };
+        /** OpenRouterModelListResponse */
+        OpenRouterModelListResponse: {
+            /** Items */
+            items: components["schemas"]["OpenRouterModelRead"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** OpenRouterModelRead */
+        OpenRouterModelRead: {
+            /** Openrouter Model Id */
+            openrouter_model_id: string;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string | null;
+            /** Input Modalities */
+            input_modalities: string[];
+            /** Output Modalities */
+            output_modalities: string[];
+            /** Context Length */
+            context_length: number | null;
+            /** Input Price Per Token */
+            input_price_per_token: string | null;
+            /** Output Price Per Token */
+            output_price_per_token: string | null;
+            /** Supports Json Schema */
+            supports_json_schema: boolean;
+            /** Supports Tools */
+            supports_tools: boolean;
+            /** Registered */
+            registered: boolean;
+        };
+        /**
+         * OriginNotAllowedResponse
+         * @description 403 응답의 문서용 형식. 상태를 바꾸는 요청의 Origin 이 허용한 화면 주소가 아닐 때다.
+         */
+        OriginNotAllowedResponse: {
+            /**
+             * Code
+             * @constant
+             */
+            code: "ORIGIN_NOT_ALLOWED";
+            /** Message */
+            message: string;
+        };
         /**
          * PriceRead
          * @description 토큰 1개당 단가(USD). 금액은 문자열로 내려간다.
@@ -768,6 +1117,27 @@ export interface components {
          * @enum {string}
          */
         PriceStatus: "KNOWN" | "UNKNOWN";
+        /** ProviderListResponse */
+        ProviderListResponse: {
+            /** Items */
+            items: components["schemas"]["ProviderRead"][];
+        };
+        /**
+         * ProviderRead
+         * @description 화면의 제공사 선택 상자 한 줄. provider는 모델 목록의 provider 조건에 그대로 쓴다.
+         */
+        ProviderRead: {
+            /** Provider */
+            provider: string;
+            /** Model Count */
+            model_count: number;
+        };
+        /**
+         * ReasoningEffort
+         * @description 추론 강도. OpenRouter 의 reasoning.effort 값이다. 모델마다 지원하는 값이 달라 지원하지 않는 값은 OpenRouter 가 처리한다.
+         * @enum {string}
+         */
+        ReasoningEffort: "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
         /**
          * RequestCancelOutcome
          * @description 모델 한 칸의 취소 처리 결과. decision 은 decide_request_cancel 이 내린 판정이다.
@@ -811,6 +1181,10 @@ export interface components {
             model_id: number;
             /** Execution Provider */
             execution_provider: string;
+            /** Execution Config */
+            execution_config: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
             /** Current Display Name */
             current_display_name: string;
             current_status: components["schemas"]["ModelStatus"];
@@ -893,6 +1267,8 @@ export interface components {
             routing_policy?: components["schemas"]["RoutingPolicy"];
             /** Models */
             models: components["schemas"]["ModelSelectionRequest"][];
+            /** Asset Ids */
+            asset_ids?: string[];
         };
         /**
          * SimulationDetailResponse
@@ -910,7 +1286,7 @@ export interface components {
          * @description 시뮬레이터 API 의 오류 코드. 프론트엔드는 이 값으로 상황별로 분기한다.
          * @enum {string}
          */
-        SimulationErrorCode: "INVALID_REQUEST" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "PROVIDER_NOT_AVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
+        SimulationErrorCode: "INVALID_REQUEST" | "DUPLICATE_MODEL_SELECTION" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "MODEL_IMAGE_NOT_SUPPORTED" | "IMAGE_REQUIRED" | "IMAGE_NOT_FOUND" | "IMAGE_EMPTY" | "IMAGE_TOO_LARGE" | "IMAGE_TYPE_NOT_SUPPORTED" | "PROVIDER_NOT_AVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
         /**
          * SimulationErrorResponse
          * @description 공통 오류 형식 {code, message} 에서 code 를 시뮬레이터 코드로 좁힌 응답.
@@ -923,23 +1299,64 @@ export interface components {
             message: string;
         };
         /**
+         * SimulationHistoryItem
+         * @description 이력 목록 한 행. 진행·결과 조회의 요약에 재실행 판단용 값 하나를 더한다.
+         */
+        SimulationHistoryItem: {
+            /**
+             * Simulation Id
+             * Format: uuid
+             */
+            simulation_id: string;
+            /** Rerun Of Simulation Id */
+            rerun_of_simulation_id: string | null;
+            test_type: components["schemas"]["TestType"];
+            /** Scenario Code */
+            scenario_code: string | null;
+            status: components["schemas"]["SimulationStatus"];
+            /** Model Count */
+            model_count: number;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Completed At */
+            completed_at: string | null;
+            /** Executed By */
+            executed_by: number;
+            /** Final Result Count */
+            final_result_count: number;
+            /** Success Count */
+            success_count: number;
+            /** Failure Count */
+            failure_count: number;
+            /** Confirmed Cost Usd */
+            confirmed_cost_usd: string | null;
+            /** Estimated Cost Usd */
+            estimated_cost_usd: string | null;
+            /** Unknown Cost Count */
+            unknown_cost_count: number;
+            cost_check_status: components["schemas"]["CostCheckStatus"];
+            /** Inactive Model Count */
+            inactive_model_count: number;
+        };
+        /**
          * SimulationHistoryList
-         * @description 이력 목록 응답. 요청 시각 최신 순(같으면 실행 ID 내림차순)으로 준다.
+         * @description 이력 목록 한 페이지. 정렬한 값이 같으면 실행 ID 내림차순으로 순서를 고정한다.
          *
          *     항목은 진행·결과 조회의 요약과 같은 모양이라 합계 계산을 한 곳(뷰)에서만 한다.
-         *     total 은 조건에 맞는 전체 건수, truncated 는 상한 때문에 items 가 전체보다 적은지다.
+         *     total 은 조건에 맞는 전체 건수라 items 길이보다 클 수 있다.
          */
         SimulationHistoryList: {
             /** Items */
-            items: components["schemas"]["SimulationSummary"][];
+            items: components["schemas"]["SimulationHistoryItem"][];
             /** Total */
             total: number;
-            /** Truncated */
-            truncated: boolean;
         };
         /**
          * SimulationModelResult
-         * @description 모델 한 칸의 결과. 응답 본문은 길어서 넣지 않고 원문 조회 API 로 따로 준다.
+         * @description 모델 한 칸의 결과. 화면이 모델 칸에 그대로 그릴 수 있게 응답 원문도 함께 준다.
          */
         SimulationModelResult: {
             /** Slot No */
@@ -956,6 +1373,10 @@ export interface components {
             model_status_at_run: components["schemas"]["ModelStatus"];
             /** Execution Provider */
             execution_provider: string;
+            /** Execution Config */
+            execution_config: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
             /** Actual Provider */
             actual_provider: string | null;
             /** Actual Model */
@@ -977,6 +1398,22 @@ export interface components {
             missing_required_fields: string[] | null;
             /** Comparability Note */
             comparability_note: string | null;
+            /** Response Text */
+            response_text: string | null;
+            /** Error Message */
+            error_message: string | null;
+        };
+        /**
+         * SimulationRequestErrorResponse
+         * @description 422 응답의 문서용 형식. 형식 검증 실패는 공통 코드로, 업무 규칙 위반은 시뮬레이터 코드로 나간다.
+         *
+         *     형식 검증(모델 수, 글자 수, 정렬 키 등)은 공통 오류 처리기가 VALIDATION_ERROR 로 돌려준다.
+         */
+        SimulationRequestErrorResponse: {
+            /** Code */
+            code: "VALIDATION_ERROR" | components["schemas"]["SimulationErrorCode"];
+            /** Message */
+            message: string;
         };
         /**
          * SimulationRerunDraft
@@ -1011,6 +1448,8 @@ export interface components {
             routing_policy: components["schemas"]["RerunRoutingPolicy"];
             /** Models */
             models: components["schemas"]["RerunModel"][];
+            /** Asset Ids */
+            asset_ids: string[];
             /** Rerunnable */
             rerunnable: boolean;
             blocked_reason: components["schemas"]["RerunBlockReason"] | null;
@@ -1064,6 +1503,11 @@ export interface components {
             unknown_cost_count: number;
             cost_check_status: components["schemas"]["CostCheckStatus"];
         };
+        /**
+         * SortDirection
+         * @enum {string}
+         */
+        SortDirection: "asc" | "desc";
         /**
          * SortOrder
          * @enum {string}
@@ -1334,6 +1778,10 @@ export interface operations {
     list_simulation_runs_api_simulations_get: {
         parameters: {
             query?: {
+                sort?: components["schemas"]["HistorySortColumn"];
+                direction?: components["schemas"]["SortDirection"];
+                page?: number;
+                page_size?: number;
                 start_date?: string | null;
                 end_date?: string | null;
                 scenario_id?: number | null;
@@ -1362,7 +1810,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
         };
@@ -1389,13 +1837,22 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationAccepted"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OriginNotAllowedResponse"];
+                };
+            };
             /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
             /** @description Internal Server Error */
@@ -1438,13 +1895,13 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
         };
@@ -1478,13 +1935,13 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
         };
@@ -1509,6 +1966,15 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationCancelResponse"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OriginNotAllowedResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1518,13 +1984,13 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
         };
@@ -1550,6 +2016,15 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationCancelResponse"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OriginNotAllowedResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1559,13 +2034,93 @@ export interface operations {
                     "application/json": components["schemas"]["SimulationErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
+                };
+            };
+        };
+    };
+    upload_simulation_image_api_simulations_images_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_simulation_image_api_simulations_images_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageAssetRead"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OriginNotAllowedResponse"];
+                };
+            };
+            /** @description Content Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
+                };
+            };
+        };
+    };
+    read_image_limits_api_simulations_images_limits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageLimits"];
                 };
             };
         };
@@ -1618,6 +2173,137 @@ export interface operations {
             };
         };
     };
+    register_model_api_models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetailRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"] | components["schemas"]["ModelErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelErrorResponse"];
+                };
+            };
+        };
+    };
+    list_model_providers_api_models_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderListResponse"];
+                };
+            };
+        };
+    };
+    search_openrouter_models_api_models_openrouter_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenRouterModelListResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelErrorResponse"];
+                };
+            };
+        };
+    };
     read_model_api_models__model_id__get: {
         parameters: {
             query?: never;
@@ -1654,6 +2340,210 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_model_info_api_models__model_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetailRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    change_model_status_api_models__model_id__status_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetailRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    run_model_connection_test_api_models__model_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTestResult"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelErrorResponse"];
                 };
             };
         };
@@ -1919,6 +2809,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_model_favorites_api_model_favorites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelFavoriteList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_model_favorite_api_model_favorites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelFavoriteKey"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelFavoriteRead"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelFavoriteRead"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    remove_model_favorite_api_model_favorites_delete: {
+        parameters: {
+            query: {
+                model_id: number;
+                execution_provider: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
