@@ -19,6 +19,11 @@ from app.api.usage import (
 )
 from app.db import SessionDep
 from app.schemas.common import ErrorCode
+from app.schemas.internal_requests import (
+    InternalOptions,
+    InternalRequestPage,
+    InternalRequestsQuery,
+)
 from app.schemas.internal_usage import (
     InternalFilterQuery,
     InternalSummary,
@@ -29,6 +34,7 @@ from app.schemas.project_budget import ProjectBudgetPage, ProjectRowsQuery
 from app.schemas.project_budget_save import ProjectBudgetRead, ProjectBudgetSave
 from app.schemas.project_detail import ProjectMonthQuery, ProjectUsageDetail
 from app.services import (
+    internal_requests,
     internal_usage,
     project_budget_save,
     project_budgets,
@@ -80,6 +86,19 @@ async def read_trend(
     query: Annotated[InternalFilterQuery, Query()], session: SessionDep, now: NowDep
 ) -> InternalTrend:
     return await internal_usage.daily_trend(session, _period(query, kst_today(now)))
+
+
+@router.get("/requests", responses=QUERY_ERRORS)
+async def read_requests(
+    query: Annotated[InternalRequestsQuery, Query()], session: SessionDep, now: NowDep
+) -> InternalRequestPage:
+    period = _period(query, kst_today(now))
+    return await internal_requests.list_requests(session, period, query)
+
+
+@router.get("/options")
+async def read_options(session: SessionDep) -> InternalOptions:
+    return await internal_requests.list_options(session)
 
 
 @router.get("/projects", responses=QUERY_ERRORS)
