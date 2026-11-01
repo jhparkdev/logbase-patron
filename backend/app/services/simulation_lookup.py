@@ -18,6 +18,7 @@ from app.models import (
     SimulationRun,
     TestScenario,
 )
+from app.services.model_parameters import parameter_support
 from app.services.simulation_ports import (
     ImageRef,
     ModelInfo,
@@ -71,6 +72,7 @@ class DbSimulationLookup:
                 display_name=model.display_name,
                 status=ModelStatus(model.status),
                 supports_images=IMAGE_MODALITY in model.input_modalities,
+                parameter_support=parameter_support(model.supported_parameters),
             )
             for model in rows
         }

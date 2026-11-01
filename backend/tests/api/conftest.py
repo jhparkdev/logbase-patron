@@ -46,7 +46,12 @@ async def poc_setup(factory: Factory) -> None:
 
 @pytest.fixture
 async def models(factory: Factory) -> list[int]:
-    rows = [await factory.model(status="ACTIVE") for _ in range(2)]
+    rows = [
+        await factory.model(
+            status="ACTIVE", supported_parameters=["temperature", "reasoning"]
+        )
+        for _ in range(2)
+    ]
     return [row["model_id"] for row in rows]
 
 

@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 
@@ -13,6 +14,10 @@ from app.models import (
 )
 from app.models import TestType as RunType
 from app.schemas.simulation import SimulationCreateRequest
+from app.services.model_parameters import (
+    ModelParameterUnsupportedError,
+    ParameterSupport,
+)
 from app.services.simulation_create import (
     ModelNotActiveError,
     ModelNotFoundError,
@@ -29,7 +34,12 @@ from app.services.simulation_input import (
 )
 from app.services.simulation_ports import IntakeDeps, ScenarioInfo
 from app.services.simulation_validation import DuplicateModelSelectionError
-from tests.services.simulation_fakes import FakeLookup, FakeRecorder, FakeStore
+from tests.services.simulation_fakes import (
+    FULL_PARAMETER_SUPPORT,
+    FakeLookup,
+    FakeRecorder,
+    FakeStore,
+)
 
 NOW = datetime(2026, 10, 29, 1, 0, tzinfo=UTC)
 USER_ID = 1
@@ -165,6 +175,7 @@ async def test_one_result_row_is_saved_per_slot_with_the_model_snapshot() -> Non
         openrouter_model_id="vendor/model-2",
         display_name="Mistral Nemo",
         status=ModelStatus.ACTIVE,
+        parameter_support=FULL_PARAMETER_SUPPORT,
     )
 
     await create_simulation(scenario_request(), executed_by=USER_ID, deps=intake.deps)
@@ -384,6 +395,7 @@ async def test_a_model_that_is_not_active_is_rejected(status: ModelStatus) -> No
         openrouter_model_id="vendor/model-2",
         display_name="Model 2",
         status=status,
+        parameter_support=FULL_PARAMETER_SUPPORT,
     )
 
     with pytest.raises(ModelNotActiveError) as error:
@@ -507,3 +519,94 @@ async def test_a_scenario_default_makes_an_empty_slot_equal_to_an_explicit_one()
         await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
 
     assert intake.nothing_was_saved()
+
+
+# --- 모델이 지원하지 않는 설정 ---
+def limit_support(intake: Intake, model_id: int, support: ParameterSupport) -> None:
+    model = intake.lookup.models[model_id]
+    intake.lookup.models[model_id] = replace(model, parameter_support=support)
+
+
+NO_TEMPERATURE = ParameterSupport(
+    temperature=False, reasoning_efforts=FULL_PARAMETER_SUPPORT.reasoning_efforts
+)
+NO_REASONING = ParameterSupport(temperature=True, reasoning_efforts=())
+
+
+async def test_a_run_setting_is_left_out_only_of_the_slot_that_cannot_take_it() -> None:
+    intake = Intake()
+    limit_support(intake, 2, NO_TEMPERATURE)
+    request = custom_request(
+        execution_config={"max_tokens": 300, "temperature": 0.5},
+        models=[selection(1), selection(2, "DekaLLM")],
+    )
+
+    job = await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    first, second = [slot.execution_config for slot in job.slots]
+    assert first == {"max_tokens": 300, "temperature": 0.5}
+    assert second == {"max_tokens": 300}
+    # 기록에는 실제로 보낸 값만 남아야 기록과 호출이 어긋나지 않는다
+    assert [r.execution_config for r in intake.recorder.created] == [first, second]
+    [run] = intake.store.runs
+    assert run.execution_config == {"max_tokens": 300, "temperature": 0.5}
+
+
+async def test_a_scenario_default_is_left_out_of_a_slot_that_cannot_take_it() -> None:
+    intake = Intake()
+    limit_support(intake, 1, NO_TEMPERATURE)
+
+    job = await create_simulation(
+        scenario_request(), executed_by=USER_ID, deps=intake.deps
+    )
+
+    assert [slot.execution_config for slot in job.slots] == [
+        {"max_tokens": 1024},
+        {"temperature": 0.7, "max_tokens": 1024},
+    ]
+
+
+async def test_a_value_typed_into_a_slot_that_cannot_take_it_is_rejected() -> None:
+    intake = Intake()
+    limit_support(intake, 2, NO_REASONING)
+    request = custom_request(
+        models=[selection(1), tuned(2, "DekaLLM", reasoning_effort="high")]
+    )
+
+    with pytest.raises(ModelParameterUnsupportedError) as error:
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert error.value.model_ids == [2]
+    assert error.value.parameters == ["reasoning_effort"]
+    assert intake.nothing_was_saved()
+
+
+async def test_an_effort_value_the_model_does_not_allow_is_rejected() -> None:
+    intake = Intake()
+    only_low = ParameterSupport(
+        temperature=True, reasoning_efforts=FULL_PARAMETER_SUPPORT.reasoning_efforts[:3]
+    )
+    limit_support(intake, 1, only_low)
+    request = custom_request(models=[tuned(1, reasoning_effort="max"), selection(2)])
+
+    with pytest.raises(ModelParameterUnsupportedError):
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert intake.nothing_was_saved()
+
+
+async def test_every_slot_with_a_bad_value_is_reported_at_once() -> None:
+    intake = Intake()
+    limit_support(intake, 1, NO_TEMPERATURE)
+    limit_support(intake, 2, NO_REASONING)
+    request = custom_request(
+        models=[
+            tuned(1, temperature=0.2),
+            tuned(2, "DekaLLM", reasoning_effort="low"),
+        ]
+    )
+
+    with pytest.raises(ModelParameterUnsupportedError) as error:
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert error.value.model_ids == [1, 2]

@@ -5,6 +5,7 @@ import pytest
 
 from app.api.simulation_errors import error_response_for
 from app.schemas.simulation_error import ERROR_SPECS, SimulationErrorCode
+from app.services.model_parameters import ModelParameterUnsupportedError
 from app.services.simulation_cancel_service import (
     SimulationNotFoundError,
     SlotNotFoundError,
@@ -47,6 +48,10 @@ C = SimulationErrorCode
         (ModelNotFoundError([9]), C.MODEL_NOT_FOUND),
         (ModelNotActiveError([2]), C.MODEL_NOT_ACTIVE),
         (ModelImageUnsupportedError([2]), C.MODEL_IMAGE_NOT_SUPPORTED),
+        (
+            ModelParameterUnsupportedError([2], ["temperature"]),
+            C.MODEL_PARAMETER_NOT_SUPPORTED,
+        ),
         (ImageRequiredError(), C.IMAGE_REQUIRED),
         (ImageNotFoundError([]), C.IMAGE_NOT_FOUND),
         (EmptyImageError(), C.IMAGE_EMPTY),

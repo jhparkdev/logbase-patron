@@ -10,6 +10,8 @@ from typing import Any
 
 from app.models import ModelStatus, RequestStatus, SimulationStatus
 from app.openrouter.result import CallResult, CallStatus, CostSource, CostStatus
+from app.schemas.simulation import ReasoningEffort
+from app.services.model_parameters import ParameterSupport
 from app.services.simulation_input import build_messages
 from app.services.simulation_ports import (
     ImageRef,
@@ -27,6 +29,11 @@ from app.services.simulation_ports import (
 )
 
 NOW = datetime(2026, 10, 29, 1, 0, tzinfo=UTC)
+
+# 온도와 모든 추론 강도를 받는 모델. 설정 제한이 주제가 아닌 테스트의 기본값이다
+FULL_PARAMETER_SUPPORT = ParameterSupport(
+    temperature=True, reasoning_efforts=tuple(ReasoningEffort)
+)
 
 R = RequestStatus
 
@@ -307,6 +314,7 @@ class FakeLookup:
                 display_name=f"Model {n}",
                 status=ModelStatus.ACTIVE,
                 supports_images=True,
+                parameter_support=FULL_PARAMETER_SUPPORT,
             )
             for n in range(1, 5)
         }

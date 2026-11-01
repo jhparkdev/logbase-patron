@@ -176,6 +176,31 @@ async def test_a_model_supports_images_when_its_input_modalities_say_so(
     assert found[row["model_id"]].supports_images is supports
 
 
+@pytest.mark.parametrize(
+    ("parameters", "temperature", "has_efforts"),
+    [
+        (["temperature", "reasoning"], True, True),
+        (["temperature"], True, False),
+        (["reasoning"], False, True),
+        ([], False, False),
+    ],
+)
+async def test_a_model_carries_what_settings_it_can_take(
+    factory: Factory,
+    lookup: DbSimulationLookup,
+    parameters: list[str],
+    temperature: bool,
+    has_efforts: bool,
+) -> None:
+    row = await factory.model(status="ACTIVE", supported_parameters=parameters)
+
+    found = await lookup.find_models([row["model_id"]])
+
+    support = found[row["model_id"]].parameter_support
+    assert support.temperature is temperature
+    assert bool(support.reasoning_efforts) is has_efforts
+
+
 async def test_uploaded_images_are_read_with_their_path_and_hash(
     factory: Factory, lookup: DbSimulationLookup
 ) -> None:

@@ -8,6 +8,10 @@ from typing import Any
 from app.models import CallPurpose, DataSource, InputType, UsageOrigin
 from app.models import TestType as RunType
 from app.schemas.simulation import ModelSelectionRequest, SimulationCreateRequest
+from app.services.model_parameters import (
+    drop_unsupported,
+    reject_unsupported_overrides,
+)
 from app.services.simulation_input import (
     build_messages,
     build_prompt_text,
@@ -112,7 +116,7 @@ async def create_simulation(
     json_schema = resolve_json_schema(
         request.json_schema, scenario.default_json_schema if scenario else None
     )
-    slot_configs = _resolve_slot_configs(request.models, execution_config)
+    slot_configs = _resolve_slot_configs(request.models, execution_config, models)
     shared = _RunValues(
         simulation_id=deps.new_id(),
         context=context,
@@ -175,18 +179,34 @@ async def create_simulation(
 
 
 def _resolve_slot_configs(
-    chosen_models: Sequence[ModelSelectionRequest], run_config: dict[str, Any]
+    chosen_models: Sequence[ModelSelectionRequest],
+    run_config: dict[str, Any],
+    models: dict[int, ModelInfo],
 ) -> list[dict[str, Any]]:
     """칸마다 적용할 설정을 정하고, 모델·Provider·설정이 모두 같은 칸이 있으면 거절한다.
 
-    중복은 실행 공통 설정·시나리오 기본값과 합친 적용 설정으로 판단한다(DB 제약과 같은 기준).
+    칸에 직접 넣은 설정을 모델이 받지 못하면 거절하고, 실행 공통 설정(시나리오 기본값 포함)은
+    받지 못하는 칸에서만 뺀다. 요청한 설정과 실제 호출이 달라지는 것을 막기 위해서다.
+    중복은 이렇게 정한 적용 설정으로 판단한다(DB 제약과 같은 기준). 같은 모델은 받을 수 있는
+    설정도 같으므로 공통 설정을 빼는 일이 중복 여부를 바꾸지는 않는다.
     저장 전에 판단해야 거절되었을 때 아무것도 남지 않는다.
     """
-    configs = [
-        resolve_slot_config(
-            run_config, chosen.execution_config.model_dump(exclude_none=True)
-        )
+    overrides = [
+        chosen.execution_config.model_dump(exclude_none=True)
         for chosen in chosen_models
+    ]
+    supports = [models[chosen.model_id].parameter_support for chosen in chosen_models]
+    reject_unsupported_overrides(
+        [
+            (chosen.model_id, support, override)
+            for chosen, support, override in zip(
+                chosen_models, supports, overrides, strict=True
+            )
+        ]
+    )
+    configs = [
+        resolve_slot_config(drop_unsupported(support, run_config), override)
+        for support, override in zip(supports, overrides, strict=True)
     ]
     validate_model_selection(
         [

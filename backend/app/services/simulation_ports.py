@@ -8,7 +8,7 @@ RequestRecorder 의 DB 구현은 simulation_recorders.py 이고 쓰기는 servic
 import asyncio
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Protocol
@@ -28,6 +28,7 @@ from app.models import (
     ValidationStatus,
 )
 from app.openrouter.result import CallResult
+from app.services.model_parameters import ParameterSupport
 from app.services.simulation_json_check import ValidationErrors
 
 
@@ -118,6 +119,8 @@ class ModelInfo:
     display_name: str
     status: ModelStatus
     supports_images: bool = False  # 입력 형식(input_modalities)에 image 가 있다
+    # 받을 수 있는 설정. 기본값을 두지 않아 조회하는 쪽이 빠뜨리면 바로 드러난다
+    parameter_support: ParameterSupport = field(kw_only=True)
 
 
 @dataclass(frozen=True)
