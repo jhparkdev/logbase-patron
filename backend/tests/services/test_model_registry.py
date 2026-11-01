@@ -14,6 +14,7 @@ from app.services.model_registry import (
     provider_from_model_id,
     snapshot_from_pricing,
     supports_json_schema,
+    supports_tools,
 )
 
 TESTING = ModelStatus.TESTING
@@ -143,6 +144,20 @@ def test_response_format이_있으면_JSON_Schema를_지원한다(
     parameters: list[str], expected: bool
 ) -> None:
     assert supports_json_schema(parameters) is expected
+
+
+@pytest.mark.parametrize(
+    ("parameters", "expected"),
+    [
+        (["temperature", "tools"], True),
+        ([], False),
+        (["temperature", "tool_choice"], False),
+    ],
+)
+def test_tools가_있으면_함수_호출을_지원한다(
+    parameters: list[str], expected: bool
+) -> None:
+    assert supports_tools(parameters) is expected
 
 
 @pytest.mark.parametrize(

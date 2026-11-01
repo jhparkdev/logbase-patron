@@ -15,6 +15,7 @@ CACHE_READ_KEY = "input_cache_read"
 CACHE_WRITE_KEY = "input_cache_write"
 
 RESPONSE_FORMAT_PARAMETER = "response_format"
+TOOLS_PARAMETER = "tools"
 
 # ACTIVE로 바꾸는 시점에 이 시간 안에 성공한 연결 테스트가 있어야 한다.
 ACTIVATION_TEST_WINDOW = timedelta(hours=24)
@@ -87,6 +88,11 @@ def judge_availability(
 
 def supports_json_schema(supported_parameters: Collection[str]) -> bool:
     return RESPONSE_FORMAT_PARAMETER in supported_parameters
+
+
+def supports_tools(supported_parameters: Collection[str]) -> bool:
+    """함수 호출(tools)을 지원하는지. tool_choice만 있는 경우는 지원으로 보지 않는다."""
+    return TOOLS_PARAMETER in supported_parameters
 
 
 def provider_from_model_id(openrouter_model_id: str) -> str | None:

@@ -92,6 +92,7 @@ class ModelRead(BaseModel):
     input_modalities: list[str]
     output_modalities: list[str]
     supports_json_schema: bool
+    supports_tools: bool
     context_length: int | None
     # 가격이 없으면 null("가격 미확인")
     current_price: PriceRead | None

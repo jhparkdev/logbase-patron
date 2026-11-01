@@ -106,6 +106,20 @@ async def test_response_format이_없으면_JSON_Schema를_지원하지_않는�
     assert item["supports_json_schema"] is False
 
 
+@pytest.mark.parametrize(
+    ("parameters", "expected"),
+    [(["tools", "temperature"], True), (["temperature"], False)],
+)
+async def test_tools가_있으면_함수_호출을_지원한다(
+    client: AsyncClient, factory: Factory, parameters: list[str], expected: bool
+) -> None:
+    await factory.model(supported_parameters=parameters)
+
+    item = (await client.get(MODELS)).json()["items"][0]
+
+    assert item["supports_tools"] is expected
+
+
 async def test_가격이_없는_모델은_current_price가_null이다(
     client: AsyncClient, factory: Factory
 ) -> None:
@@ -491,6 +505,16 @@ async def test_상세는_목록의_한_줄과_같은_값을_돌려준다(
     assert response.status_code == status.HTTP_200_OK
     detail = response.json()
     assert {key: detail[key] for key in listed} == listed
+
+
+async def test_상세에도_함수_호출_지원_여부가_있다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    model = await factory.model(supported_parameters=["tools"])
+
+    detail = (await client.get(detail_url(model["model_id"]))).json()
+
+    assert detail["supports_tools"] is True
 
 
 async def test_상세에는_활성화_비활성화_성공_테스트_시각이_더해진다(

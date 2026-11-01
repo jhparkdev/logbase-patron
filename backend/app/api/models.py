@@ -19,7 +19,7 @@ from app.schemas.models import (
 )
 from app.services import model_detail, model_list, model_providers
 from app.services.model_list import ModelListItem
-from app.services.model_registry import supports_json_schema
+from app.services.model_registry import supports_json_schema, supports_tools
 
 ERROR_RESPONSES = {
     status.HTTP_401_UNAUTHORIZED: {"model": ErrorResponse},
@@ -46,6 +46,7 @@ def to_model_read(item: ModelListItem) -> ModelRead:
         input_modalities=model.input_modalities,
         output_modalities=model.output_modalities,
         supports_json_schema=supports_json_schema(model.supported_parameters),
+        supports_tools=supports_tools(model.supported_parameters),
         context_length=model.context_length,
         current_price=(
             PriceRead.model_validate(item.price) if item.price is not None else None
