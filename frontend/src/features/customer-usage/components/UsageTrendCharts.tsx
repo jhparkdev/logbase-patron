@@ -41,7 +41,11 @@ export function UsageTrendCharts({ points }: { points: TrendPointView[] }) {
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip cursor={{ fill: GRID_COLOR }} content={<TaskTooltip />} />
+            <Tooltip
+              cursor={{ fill: GRID_COLOR }}
+              content={<TaskTooltip />}
+              isAnimationActive={false}
+            />
             <Bar
               dataKey="tasks"
               fill={TASK_COLOR}
@@ -71,7 +75,11 @@ export function UsageTrendCharts({ points }: { points: TrendPointView[] }) {
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip cursor={{ fill: GRID_COLOR }} content={<CostTooltip />} />
+            <Tooltip
+              cursor={{ fill: GRID_COLOR }}
+              content={<CostTooltip />}
+              isAnimationActive={false}
+            />
             <Legend
               align="left"
               verticalAlign="top"
