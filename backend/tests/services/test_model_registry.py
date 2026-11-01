@@ -221,6 +221,24 @@ def test_입력_또는_출력_단가가_없으면_가격_미확인이다(
     assert snapshot_from_pricing(pricing) is None
 
 
+@pytest.mark.parametrize(
+    "pricing",
+    [
+        {"prompt": Decimal(-1), "completion": Decimal("0.2")},
+        {"prompt": Decimal("0.1"), "completion": Decimal(-1)},
+    ],
+)
+def test_단가가_음수이면_가격_미확인이다(pricing: dict[str, Decimal]) -> None:
+    assert snapshot_from_pricing(pricing) is None
+
+
+def test_단가가_0이면_무료로_보고_가격은_확인된_것이다() -> None:
+    snapshot = snapshot_from_pricing({"prompt": Decimal(0), "completion": Decimal(0)})
+
+    assert snapshot is not None
+    assert snapshot.input_price_per_token == 0
+
+
 def snapshot(input_price: str, output_price: str) -> PriceSnapshot:
     return PriceSnapshot(
         input_price_per_token=Decimal(input_price),

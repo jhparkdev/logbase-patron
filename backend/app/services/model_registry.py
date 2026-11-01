@@ -106,11 +106,11 @@ def provider_from_model_id(openrouter_model_id: str) -> str | None:
 def snapshot_from_pricing(pricing: Mapping[str, Decimal]) -> PriceSnapshot | None:
     """OpenRouter 가격 항목에서 우리가 저장하는 단가를 꺼낸다.
 
-    입력 또는 출력 단가가 없으면 가격 미확인이라 None이다.
+    입력 또는 출력 단가가 없거나 음수이면 가격 미확인이라 None이다. 0은 무료로 본다.
     """
     prompt = pricing.get(PROMPT_KEY)
     completion = pricing.get(COMPLETION_KEY)
-    if prompt is None or completion is None:
+    if prompt is None or completion is None or prompt < 0 or completion < 0:
         return None
     return PriceSnapshot(
         input_price_per_token=prompt,
