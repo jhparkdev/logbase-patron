@@ -8,35 +8,12 @@ from fastapi import FastAPI, status
 from httpx import AsyncClient
 
 from app.api.model_deps import get_openrouter_catalog
-from app.openrouter.lookup_result import ModelInfo
 from app.schemas.model_error import ERROR_SPECS, ModelErrorCode
 from app.schemas.models import MAX_PAGE_SIZE
-from app.services.openrouter_catalog import OpenRouterUnavailableError
+from tests.api.model_helpers import FakeCatalog, info
 from tests.db_helpers import Factory
 
 SEARCH = "/api/models/openrouter"
-
-
-def info(model_id: str, **fields: Any) -> ModelInfo:
-    values: dict[str, Any] = {
-        "model_id": model_id,
-        "pricing": {},
-        "input_modalities": ["text"],
-        "supported_parameters": [],
-    }
-    return ModelInfo(**{**values, **fields})
-
-
-class FakeCatalog:
-    """OpenRouter에서 받아 온 목록 대신 정해 둔 목록을 돌려준다. models가 None이면 받지 못한 것이다."""
-
-    def __init__(self, models: list[ModelInfo] | None) -> None:
-        self.models = models
-
-    async def get(self) -> list[ModelInfo]:
-        if self.models is None:
-            raise OpenRouterUnavailableError
-        return self.models
 
 
 @pytest.fixture

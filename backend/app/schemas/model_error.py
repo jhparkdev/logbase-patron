@@ -11,6 +11,10 @@ class ModelErrorCode(StrEnum):
 
     # OpenRouter 모델 목록을 받지 못했고 보관한 목록도 없음
     OPENROUTER_UNAVAILABLE = "OPENROUTER_UNAVAILABLE"
+    # OpenRouter 모델 목록에 없는 모델 ID로 등록하려 함
+    MODEL_NOT_IN_OPENROUTER = "MODEL_NOT_IN_OPENROUTER"
+    # 이미 등록된 모델
+    MODEL_ALREADY_REGISTERED = "MODEL_ALREADY_REGISTERED"
 
 
 @dataclass(frozen=True)
@@ -26,6 +30,10 @@ ERROR_SPECS: dict[ModelErrorCode, ErrorSpec] = {
     ModelErrorCode.OPENROUTER_UNAVAILABLE: ErrorSpec(
         502, "OpenRouter 모델 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
     ),
+    ModelErrorCode.MODEL_NOT_IN_OPENROUTER: ErrorSpec(
+        422, "OpenRouter에서 찾을 수 없는 모델입니다. 모델 ID를 확인해 주세요."
+    ),
+    ModelErrorCode.MODEL_ALREADY_REGISTERED: ErrorSpec(409, "이미 등록된 모델입니다."),
 }
 
 
