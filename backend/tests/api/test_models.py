@@ -96,6 +96,32 @@ async def test_금액은_문자열로_돌려준다(client: AsyncClient, factory:
     assert price["price_status"] == "KNOWN"
 
 
+async def test_작은_단가도_지수_표기가_아닌_숫자_문자열로_돌려준다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    model = await factory.model()
+    await factory.model_price(
+        model_id=model["model_id"],
+        input_price_per_token=Decimal("0.00000003"),
+        output_price_per_token=Decimal("0.00000004"),
+        cache_read_price_per_token=Decimal("0.00000001"),
+    )
+
+    listed = (await client.get(MODELS)).json()["items"][0]["current_price"]
+    detail = (await client.get(detail_url(model["model_id"]))).json()["current_price"]
+
+    for price in (listed, detail):
+        assert Decimal(price["input_price_per_token"]) == Decimal("0.00000003")
+        assert Decimal(price["output_price_per_token"]) == Decimal("0.00000004")
+        assert Decimal(price["cache_read_price_per_token"]) == Decimal("0.00000001")
+        for field in (
+            "input_price_per_token",
+            "output_price_per_token",
+            "cache_read_price_per_token",
+        ):
+            assert "e" not in price[field].lower()
+
+
 async def test_response_format이_없으면_JSON_Schema를_지원하지_않는다(
     client: AsyncClient, factory: Factory
 ) -> None:

@@ -1,13 +1,13 @@
 """모델 관리(P-03) 요청·응답 모델."""
 
 from datetime import datetime
-from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import ConnectionTestStatus, ModelStatus, PriceSource, PriceStatus
+from app.schemas.plain_decimal import PlainDecimal
 
 # 한 페이지 개수의 기본값과 최댓값, 검색어 최대 길이
 DEFAULT_PAGE_SIZE = 20
@@ -71,10 +71,10 @@ class PriceRead(BaseModel):
     execution_provider: str | None
     currency: str
     price_status: PriceStatus
-    input_price_per_token: Decimal | None
-    output_price_per_token: Decimal | None
-    cache_read_price_per_token: Decimal | None
-    cache_write_price_per_token: Decimal | None
+    input_price_per_token: PlainDecimal | None
+    output_price_per_token: PlainDecimal | None
+    cache_read_price_per_token: PlainDecimal | None
+    cache_write_price_per_token: PlainDecimal | None
     source: PriceSource
     effective_from: datetime
     effective_to: datetime | None
