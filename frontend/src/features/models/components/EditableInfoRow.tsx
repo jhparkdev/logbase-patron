@@ -20,7 +20,7 @@ export function EditableInfoRow(props: InfoFormProps) {
           type="button"
           aria-label={`${props.label} 수정`}
           onClick={() => setEditing(true)}
-          className="grid size-6 place-items-center rounded-md text-grey-600 hover:bg-grey-100 focus-visible:outline-2 focus-visible:outline-brand"
+          className="grid size-6 place-items-center rounded-lg text-grey-600 hover:bg-grey-100 focus-visible:outline-2 focus-visible:outline-brand"
         >
           <Icon src={editIcon} className="size-3.5" />
         </button>
