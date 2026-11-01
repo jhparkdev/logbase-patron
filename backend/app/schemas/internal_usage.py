@@ -1,5 +1,7 @@
 """내부 AI 예산 관리(P-02) 요청·응답 모델. 금액은 문자열, 미확인 비용은 건수로만 내려간다."""
 
+from datetime import date
+
 from pydantic import BaseModel, ConfigDict
 
 from app.schemas.plain_decimal import PlainDecimal
@@ -28,3 +30,16 @@ class InternalSummary(BaseModel):
     includes_estimate: bool
     # 비용을 모르는 호출이 있어 합계가 최종 비용이 아닐 수 있다
     has_unknown: bool
+
+
+class InternalTrendPoint(BaseModel):
+    date: date
+    api_confirmed_usd: PlainDecimal
+    api_estimated_usd: PlainDecimal
+    unknown_cost_count: int
+
+
+class InternalTrend(BaseModel):
+    """조회 기간의 모든 KST 날짜. 호출이 없는 날도 0으로 채운다. 구독료는 날짜별로 나누지 않아 넣지 않는다."""
+
+    items: list[InternalTrendPoint]

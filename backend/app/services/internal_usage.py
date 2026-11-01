@@ -3,16 +3,24 @@
 P-01 집계(aggregation.py)와 같은 규칙이다: 미확인 비용은 금액 합계에 넣지 않고 건수로만 센다.
 """
 
+from collections.abc import Mapping
+from datetime import date, timedelta
 from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, Date, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AIRequest, CostStatus, SubscriptionCost, UsageOrigin
-from app.schemas.internal_usage import InternalSummary
+from app.schemas.internal_usage import (
+    InternalSummary,
+    InternalTrend,
+    InternalTrendPoint,
+)
 from app.services.simulation_period import DateRange, utc_bounds
 
 ZERO = Decimal(0)
+KST_ZONE = "Asia/Seoul"
 # 고객 사용(CUSTOMER_SERVICE)은 내부 비용에 섞지 않는다.
 INTERNAL_ORIGINS = (
     UsageOrigin.INTERNAL_DEVELOPMENT.value,
@@ -28,6 +36,25 @@ def api_conditions(period: DateRange) -> list[ColumnElement[bool]]:
         AIRequest.usage_origin.in_(INTERNAL_ORIGINS),
         AIRequest.requested_at >= start,
         AIRequest.requested_at < end,
+    ]
+
+
+def cost_measures() -> list[Any]:
+    """확정 합계, 추정 합계, 미확인 건수. 요약, 추이, 프로젝트 표가 같은 계산을 쓴다."""
+    return [
+        func.coalesce(
+            func.sum(AIRequest.cost_usd).filter(
+                AIRequest.cost_status == CostStatus.CONFIRMED.value
+            ),
+            ZERO,
+        ),
+        func.coalesce(
+            func.sum(AIRequest.cost_usd).filter(
+                AIRequest.cost_status == CostStatus.ESTIMATED.value
+            ),
+            ZERO,
+        ),
+        func.count().filter(AIRequest.cost_status == CostStatus.UNKNOWN.value),
     ]
 
 
@@ -47,23 +74,7 @@ def build_summary(
 
 async def summarize(session: AsyncSession, period: DateRange) -> InternalSummary:
     row = (
-        await session.execute(
-            select(
-                func.coalesce(
-                    func.sum(AIRequest.cost_usd).filter(
-                        AIRequest.cost_status == CostStatus.CONFIRMED.value
-                    ),
-                    ZERO,
-                ),
-                func.coalesce(
-                    func.sum(AIRequest.cost_usd).filter(
-                        AIRequest.cost_status == CostStatus.ESTIMATED.value
-                    ),
-                    ZERO,
-                ),
-                func.count().filter(AIRequest.cost_status == CostStatus.UNKNOWN.value),
-            ).where(*api_conditions(period))
-        )
+        await session.execute(select(*cost_measures()).where(*api_conditions(period)))
     ).one()
     confirmed, estimated, unknown_count = row
     subscription = await subscription_total(session, period)
@@ -84,3 +95,37 @@ async def subscription_total(session: AsyncSession, period: DateRange) -> Decima
         )
     )
     return total if total is not None else ZERO
+
+
+def build_trend(
+    period: DateRange, by_day: Mapping[date, tuple[Decimal, Decimal, int]]
+) -> InternalTrend:
+    """조회 기간의 모든 날짜를 순서대로 담는다. 호출이 없는 날은 0으로 채운다."""
+    items = []
+    for offset in range((period.end - period.start).days + 1):
+        day = period.start + timedelta(days=offset)
+        confirmed, estimated, unknown_count = by_day.get(day, (ZERO, ZERO, 0))
+        items.append(
+            InternalTrendPoint(
+                date=day,
+                api_confirmed_usd=confirmed,
+                api_estimated_usd=estimated,
+                unknown_cost_count=unknown_count,
+            )
+        )
+    return InternalTrend(items=items)
+
+
+async def daily_trend(session: AsyncSession, period: DateRange) -> InternalTrend:
+    """KST 날짜별 API 비용. 구독료는 일별로 나누지 않아 넣지 않는다."""
+    kst_day = func.timezone(KST_ZONE, AIRequest.requested_at).cast(Date)
+    rows = await session.execute(
+        select(kst_day, *cost_measures())
+        .where(*api_conditions(period))
+        .group_by(kst_day)
+    )
+    by_day = {
+        day: (confirmed, estimated, unknown_count)
+        for day, confirmed, estimated, unknown_count in rows
+    }
+    return build_trend(period, by_day)

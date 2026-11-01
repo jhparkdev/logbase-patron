@@ -4,13 +4,19 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.internal_usage import build_summary, summarize
+from app.services.internal_usage import (
+    build_summary,
+    build_trend,
+    daily_trend,
+    summarize,
+)
 from app.services.simulation_period import DateRange
 from tests.db_helpers import Factory
-from tests.internal_budget_helpers import UNKNOWN_COST, internal_call
+from tests.internal_budget_helpers import IN_OCTOBER, UNKNOWN_COST, internal_call
 
 OCTOBER = DateRange(date(2026, 10, 1), date(2026, 10, 31))
 HUNDRED = Decimal(100)
+NEXT_DAY = datetime(2026, 10, 11, 3, 0, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------
@@ -167,3 +173,84 @@ async def test_해지한_구독료도_그_달_청구액이라_합산한다(
     summary = await summarize(db_session, OCTOBER)
 
     assert summary.subscription_usd == Decimal(10)
+
+
+# ---------------------------------------------------------------
+# 일별 추이
+# ---------------------------------------------------------------
+def test_추이는_조회_기간의_모든_날짜를_순서대로_담고_빈_날은_0이다() -> None:
+    period = DateRange(date(2026, 10, 1), date(2026, 10, 3))
+
+    trend = build_trend(period, {date(2026, 10, 2): (Decimal(5), Decimal(2), 1)})
+
+    points = trend.items
+    assert [point.date for point in points] == [
+        date(2026, 10, 1),
+        date(2026, 10, 2),
+        date(2026, 10, 3),
+    ]
+    assert [point.api_confirmed_usd for point in points] == [0, 5, 0]
+    assert [point.api_estimated_usd for point in points] == [0, 2, 0]
+    assert [point.unknown_cost_count for point in points] == [0, 1, 0]
+
+
+async def test_추이는_날짜별로_확정_추정_미확인을_나눠_센다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    price = await factory.model_price()
+    await internal_call(factory, requested_at=IN_OCTOBER, cost_usd=Decimal(5))
+    await internal_call(
+        factory,
+        requested_at=IN_OCTOBER,
+        cost_status="ESTIMATED",
+        cost_usd=Decimal(2),
+        cost_source="PRICE_ESTIMATE",
+        price_id=price["price_id"],
+    )
+    await internal_call(factory, requested_at=NEXT_DAY, **UNKNOWN_COST)
+
+    trend = await daily_trend(
+        db_session, DateRange(date(2026, 10, 9), date(2026, 10, 12))
+    )
+
+    by_date = {point.date: point for point in trend.items}
+    assert len(trend.items) == 4
+    assert by_date[date(2026, 10, 9)].api_confirmed_usd == 0
+    assert by_date[date(2026, 10, 10)].api_confirmed_usd == Decimal(5)
+    assert by_date[date(2026, 10, 10)].api_estimated_usd == Decimal(2)
+    assert by_date[date(2026, 10, 11)].unknown_cost_count == 1
+    assert by_date[date(2026, 10, 11)].api_confirmed_usd == 0
+
+
+@pytest.mark.parametrize(
+    ("requested_at", "expected_day"),
+    [
+        (datetime(2026, 10, 10, 14, 59, 59, 999999, tzinfo=UTC), date(2026, 10, 10)),
+        (datetime(2026, 10, 10, 15, 0, tzinfo=UTC), date(2026, 10, 11)),
+    ],
+    ids=["KST 23시 59분", "KST 다음 날 0시"],
+)
+async def test_추이의_날짜는_KST_달력_기준이다(
+    db_session: AsyncSession,
+    factory: Factory,
+    requested_at: datetime,
+    expected_day: date,
+) -> None:
+    await internal_call(factory, requested_at=requested_at)
+
+    trend = await daily_trend(
+        db_session, DateRange(date(2026, 10, 10), date(2026, 10, 11))
+    )
+
+    counted = [point.date for point in trend.items if point.api_confirmed_usd > 0]
+    assert counted == [expected_day]
+
+
+async def test_추이도_고객_사용은_뺀다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await internal_call(factory, usage_origin="CUSTOMER_SERVICE", cost_usd=HUNDRED)
+
+    trend = await daily_trend(db_session, OCTOBER)
+
+    assert all(point.api_confirmed_usd == 0 for point in trend.items)

@@ -12,6 +12,7 @@ from tests.db_helpers import Factory
 from tests.internal_budget_helpers import UNKNOWN_COST, internal_call
 
 SUMMARY = "/api/usage/internal/summary"
+TREND = "/api/usage/internal/trend"
 OCTOBER = {"start_date": "2026-10-01", "end_date": "2026-10-31"}
 
 
@@ -128,3 +129,58 @@ async def test_허용하지_않는_조건은_422이다(
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert response.json()["code"] == "VALIDATION_ERROR"
+
+
+# ---------------------------------------------------------------
+# 일별 추이
+# ---------------------------------------------------------------
+async def test_추이는_기간의_날짜_수만큼_돌려주고_호출이_없는_날은_0이다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await internal_call(factory, cost_usd=Decimal("1.5"))
+    params = {"start_date": "2026-10-08", "end_date": "2026-10-12"}
+
+    response = await client.get(TREND, params=params)
+
+    assert response.status_code == status.HTTP_200_OK
+    items = response.json()["items"]
+    assert [item["date"] for item in items] == [
+        "2026-10-08",
+        "2026-10-09",
+        "2026-10-10",
+        "2026-10-11",
+        "2026-10-12",
+    ]
+    assert [Decimal(item["api_confirmed_usd"]) for item in items] == [
+        0,
+        0,
+        Decimal("1.5"),
+        0,
+        0,
+    ]
+
+
+async def test_추이의_금액도_지수_표기가_아닌_문자열이다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await internal_call(factory, cost_usd=Decimal("0.00000003"))
+
+    items = (await client.get(TREND, params=OCTOBER)).json()["items"]
+
+    amount = next(
+        item["api_confirmed_usd"] for item in items if item["date"] == "2026-10-10"
+    )
+    assert isinstance(amount, str)
+    assert "e" not in amount.lower()
+    assert Decimal(amount) == Decimal("0.00000003")
+
+
+async def test_추이도_잘못된_기간은_INVALID_PERIOD로_거절한다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    params = {"start_date": "2026-10-31", "end_date": "2026-10-01"}
+
+    response = await client.get(TREND, params=params)
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()["code"] == "INVALID_PERIOD"

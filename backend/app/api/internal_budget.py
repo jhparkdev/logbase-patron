@@ -13,8 +13,13 @@ from app.api.errors import ApiError
 from app.api.usage import PERIOD_MESSAGES, QUERY_ERRORS
 from app.db import SessionDep
 from app.schemas.common import ErrorCode
-from app.schemas.internal_usage import InternalFilterQuery, InternalSummary
-from app.services import internal_usage
+from app.schemas.internal_usage import (
+    InternalFilterQuery,
+    InternalSummary,
+    InternalTrend,
+)
+from app.schemas.project_budget import ProjectBudgetPage, ProjectRowsQuery
+from app.services import internal_usage, project_budgets
 from app.services.simulation_period import (
     DateRange,
     InvalidPeriodError,
@@ -41,3 +46,17 @@ async def read_summary(
     query: Annotated[InternalFilterQuery, Query()], session: SessionDep, now: NowDep
 ) -> InternalSummary:
     return await internal_usage.summarize(session, _period(query, kst_today(now)))
+
+
+@router.get("/trend", responses=QUERY_ERRORS)
+async def read_trend(
+    query: Annotated[InternalFilterQuery, Query()], session: SessionDep, now: NowDep
+) -> InternalTrend:
+    return await internal_usage.daily_trend(session, _period(query, kst_today(now)))
+
+
+@router.get("/projects", responses=QUERY_ERRORS)
+async def read_project_budgets(
+    query: Annotated[ProjectRowsQuery, Query()], session: SessionDep
+) -> ProjectBudgetPage:
+    return await project_budgets.list_project_budgets(session, query)
