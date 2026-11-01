@@ -3,20 +3,27 @@ import { formatCount } from "../../../shared/lib/format";
 import { useImageSelection } from "../hooks/useImageSelection";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
 import { fileKey } from "../lib/images";
-import { controlClass, IMAGE_LIMITS, TEXT_LIMIT } from "../lib/limits";
+import { controlClass, type ImageLimits, TEXT_LIMIT } from "../lib/limits";
 import type { ScenarioChoice } from "../lib/presentation";
 
-export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
-  const { selectFiles, removeFile } = useImageSelection();
+export function InputFields({
+  scenarios,
+  imageLimits,
+}: {
+  scenarios: ScenarioChoice[];
+  imageLimits: ImageLimits;
+}) {
+  const { selectFiles, removeFile, removeExisting } =
+    useImageSelection(imageLimits);
   const {
     register,
     control,
     setValue,
     formState: { errors },
   } = useFormContext<SimulatorFormValues, unknown, SimulatorDraft>();
-  const [mode, prompt, text, files] = useWatch({
+  const [mode, prompt, text, files, existingAssetIds] = useWatch({
     control,
-    name: ["mode", "prompt", "text", "files"],
+    name: ["mode", "prompt", "text", "files", "existingAssetIds"],
   });
   const fileError =
     errors.files?.message ??
@@ -128,7 +135,7 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
         <input
           id="sim-files"
           type="file"
-          accept={IMAGE_LIMITS.mimeTypes.join(",")}
+          accept={imageLimits.mimeTypes.join(",")}
           multiple
           aria-invalid={!!fileError}
           aria-describedby="sim-files-help sim-files-error"
@@ -139,9 +146,32 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
           className={`${controlClass} file:mr-3 file:rounded-lg file:border-0 file:bg-grey-100 file:px-3 file:py-1 file:text-grey-700`}
         />
         <p id="sim-files-help" className="mt-2 text-caption text-grey-600">
-          JPG·PNG·WebP · 최대 {IMAGE_LIMITS.maxCount}개 · 파일당{" "}
-          {IMAGE_LIMITS.maxBytes / 1024 / 1024}MiB
+          JPG·PNG·WebP · 최대 {imageLimits.maxCount}개 · 파일당{" "}
+          {imageLimits.maxBytes / 1024 / 1024}MiB
         </p>
+        {existingAssetIds.length > 0 && (
+          <ul
+            aria-label="재실행에 쓰는 기존 이미지"
+            className="mt-2 space-y-1 text-body-sm"
+          >
+            {existingAssetIds.map((assetId, index) => (
+              <li
+                key={assetId}
+                className="flex items-center justify-between gap-2 rounded-lg bg-grey-50 px-3 py-2"
+              >
+                <span>기존 이미지 {index + 1}</span>
+                <button
+                  type="button"
+                  aria-label={`기존 이미지 ${index + 1} 제거`}
+                  onClick={() => removeExisting(index)}
+                  className="shrink-0 rounded-lg px-2 text-grey-600 focus-visible:outline-2 focus-visible:outline-brand"
+                >
+                  제거
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         {files.length > 0 && (
           <ul className="mt-2 space-y-1 text-body-sm">
             {files.map((file, index) => (

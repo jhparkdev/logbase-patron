@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import type { components } from "../shared/api/schema";
+import { MODEL_ROW } from "./modelsApi";
 
 type Schemas = components["schemas"];
 
@@ -128,21 +129,41 @@ type Replies = {
   draft?: Reply;
 };
 
-const MODELS: Pick<
-  Schemas["ModelListResponse"],
-  "page" | "page_size" | "total"
-> & {
-  items: Pick<Schemas["ModelRead"], "model_id" | "display_name">[];
-} = {
-  items: [{ model_id: 2, display_name: "Mistral Nemo" }],
+export const ACTIVE_MODEL: Schemas["ModelRead"] = {
+  ...MODEL_ROW,
+  model_id: 2,
+  display_name: "Mistral Nemo",
+  provider: "mistralai",
+};
+
+const MODELS: Schemas["ModelListResponse"] = {
+  items: [ACTIVE_MODEL],
   page: 1,
   page_size: 100,
   total: 1,
 };
 
+export const EXECUTION_PROVIDERS: Schemas["ExecutionProviderListResponse"] = {
+  items: [
+    { execution_provider: "DeepInfra", status: 0, uptime_last_1d: "99.5" },
+    { execution_provider: "DekaLLM", status: 0, uptime_last_1d: null },
+  ],
+};
+
 function replyFor(pathname: string, replies: Replies): Reply {
   if (pathname === "/api/models")
     return replies.models ?? { status: 200, body: MODELS };
+  if (pathname.endsWith("/execution-providers"))
+    return { status: 200, body: EXECUTION_PROVIDERS };
+  if (pathname.endsWith("/images/limits"))
+    return {
+      status: 200,
+      body: {
+        max_count: 4,
+        max_bytes: 5_242_880,
+        mime_types: ["image/jpeg", "image/png", "image/webp"],
+      },
+    };
   if (pathname.endsWith("/rerun-draft"))
     return replies.draft ?? { status: 200, body: RERUN_DRAFT };
   if (pathname === "/api/simulations")

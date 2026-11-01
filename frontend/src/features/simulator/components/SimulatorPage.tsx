@@ -7,6 +7,7 @@ import { Skeleton } from "../../../shared/components/ui/Skeleton";
 import { useSimulatorForm } from "../hooks/useSimulatorForm";
 import type { ModelFavoritesView } from "../lib/favorites";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
+import { IMAGE_LIMITS, type ImageLimits } from "../lib/limits";
 import type { ModelChoice, ScenarioChoice } from "../lib/presentation";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { ComparisonConfirmationDialog } from "./ComparisonConfirmationDialog";
@@ -17,7 +18,8 @@ import {
   type SimulationResultsProps,
 } from "./SimulationResults";
 
-type SimulatorPageProps = Partial<SimulationResultsProps> & {
+export type SimulatorPageProps = Partial<SimulationResultsProps> & {
+  imageLimits?: ImageLimits;
   choices?: ModelChoice[];
   scenarios?: ScenarioChoice[];
   catalogState?: "ready" | "loading" | "error" | "unavailable";
@@ -35,6 +37,7 @@ export function SimulatorPage({
   onRun,
   initialValues,
   favorites,
+  imageLimits = IMAGE_LIMITS,
   view = { kind: "empty" },
   ...resultProps
 }: SimulatorPageProps) {
@@ -44,6 +47,7 @@ export function SimulatorPage({
     scenarios,
     onRun,
     initialValues,
+    imageLimits,
     running: view.kind === "ready" && !!view.run.status.ongoing,
   });
   return (
@@ -63,7 +67,7 @@ export function SimulatorPage({
         >
           <fieldset disabled={workflow.busy || !!workflow.pendingDraft}>
             <legend className="sr-only">시뮬레이션 입력 및 비교 설정</legend>
-            <InputFields scenarios={scenarios} />
+            <InputFields scenarios={scenarios} imageLimits={imageLimits} />
             <AdvancedSettings
               choices={choices}
               open={workflow.advancedOpen}

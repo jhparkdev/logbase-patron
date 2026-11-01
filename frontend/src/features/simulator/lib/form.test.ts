@@ -82,12 +82,35 @@ describe("시뮬레이터 입력 경계", () => {
       ).toBe(false);
     },
   );
-  test("JSON Schema는 JSON 객체 또는 boolean이며, 비어 있으면 미지정", () => {
-    for (const jsonSchema of ["", "{}", "false"])
+  test.each([
+    ["4095", true],
+    ["4096", true],
+    ["4097", false],
+  ])("출력 토큰 상한 경계 %s", (maxTokens, ok) => {
+    expect(
+      simulatorFormSchema.safeParse({ ...valid(), maxTokens }).success,
+    ).toBe(ok);
+  });
+  test("재실행 이미지와 새 파일을 합쳐 개수 한도를 검사한다", () => {
+    const png = new File(["image"], "image.png", { type: "image/png" });
+    const existingAssetIds = Array(IMAGE_LIMITS.maxCount).fill("asset");
+    expect(
+      simulatorFormSchema.safeParse({ ...valid(), existingAssetIds }).success,
+    ).toBe(true);
+    expect(
+      simulatorFormSchema.safeParse({
+        ...valid(),
+        existingAssetIds,
+        files: [png],
+      }).success,
+    ).toBe(false);
+  });
+  test("JSON Schema는 서버 계약대로 JSON 객체만 받고, 비어 있으면 미지정", () => {
+    for (const jsonSchema of ["", "{}"])
       expect(
         simulatorFormSchema.safeParse({ ...valid(), jsonSchema }).success,
       ).toBe(true);
-    for (const jsonSchema of ["{", "[]", '"text"'])
+    for (const jsonSchema of ["{", "[]", '"text"', "true", "false"])
       expect(
         simulatorFormSchema.safeParse({ ...valid(), jsonSchema }).success,
       ).toBe(false);

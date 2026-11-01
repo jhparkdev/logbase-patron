@@ -67,7 +67,8 @@ function toCost(result: Result): CostView {
 
 function toSlot(result: Result): SlotView {
   return {
-    key: result.request_id,
+    // 모델별 취소 API가 칸 번호를 받는다
+    key: String(result.slot_no),
     name: result.model_display_name_at_run,
     provider: result.execution_provider,
     actualModel: result.actual_model,
