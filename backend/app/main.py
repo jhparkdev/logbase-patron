@@ -5,7 +5,7 @@
 
 from fastapi import Depends, FastAPI
 
-from app.api import auth, health, models, simulations, usage
+from app.api import auth, health, internal_budget, models, simulations, usage
 from app.api.deps import require_allowed_origin
 from app.api.errors import install_error_handlers
 
@@ -15,7 +15,13 @@ API_PREFIX = "/api"
 PUBLIC_ROUTERS = (health.router, auth.public_router)
 # 기능 라우터. 새 기능 라우터는 여기에 추가한다. 팀 결정으로 라우터 단위 로그인 검사는 하지 않는다.
 # (기록 API는 쿠키 대신 Ingest 토큰을 쓰므로 Origin 검사 없이 따로 등록한다.)
-PROTECTED_ROUTERS = (auth.router, simulations.router, models.router, usage.router)
+PROTECTED_ROUTERS = (
+    auth.router,
+    simulations.router,
+    models.router,
+    usage.router,
+    internal_budget.router,
+)
 
 
 def create_app() -> FastAPI:
