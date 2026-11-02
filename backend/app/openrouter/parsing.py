@@ -53,7 +53,7 @@ def _get_first_choice(body: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
-def _get_cost(usage: dict[str, Any]) -> Decimal | None:
+def get_cost(usage: dict[str, Any]) -> Decimal | None:
     """usage.cost를 Decimal로 돌려준다. 없거나 믿을 수 없으면 None."""
     cost = get_number(usage, "cost")
     if cost is None or cost < 0:
@@ -122,7 +122,7 @@ def build_result_from_chat_body(
             cost_status=CostStatus.UNKNOWN,
         )
 
-    cost = _get_cost(usage)
+    cost = get_cost(usage)
     if cost is None:
         return CallResult(
             **common_fields,
