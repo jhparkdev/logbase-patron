@@ -63,7 +63,7 @@ def _project_not_found() -> ApiError:
     )
 
 
-def _period(query: InternalFilterQuery, today: date) -> DateRange:
+def period_of(query: InternalFilterQuery, today: date) -> DateRange:
     try:
         return resolve_period(query.start_date, query.end_date, today)
     except InvalidPeriodError as error:
@@ -78,21 +78,21 @@ def _period(query: InternalFilterQuery, today: date) -> DateRange:
 async def read_summary(
     query: Annotated[InternalFilterQuery, Query()], session: SessionDep, now: NowDep
 ) -> InternalSummary:
-    return await internal_usage.summarize(session, _period(query, kst_today(now)))
+    return await internal_usage.summarize(session, period_of(query, kst_today(now)))
 
 
 @router.get("/trend", responses=QUERY_ERRORS)
 async def read_trend(
     query: Annotated[InternalFilterQuery, Query()], session: SessionDep, now: NowDep
 ) -> InternalTrend:
-    return await internal_usage.daily_trend(session, _period(query, kst_today(now)))
+    return await internal_usage.daily_trend(session, period_of(query, kst_today(now)))
 
 
 @router.get("/requests", responses=QUERY_ERRORS)
 async def read_requests(
     query: Annotated[InternalRequestsQuery, Query()], session: SessionDep, now: NowDep
 ) -> InternalRequestPage:
-    period = _period(query, kst_today(now))
+    period = period_of(query, kst_today(now))
     return await internal_requests.list_requests(session, period, query)
 
 

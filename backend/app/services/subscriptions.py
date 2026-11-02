@@ -11,7 +11,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, collate, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,9 +22,21 @@ from app.models import (
     SubscriptionCost,
     SubscriptionStatus,
 )
-from app.schemas.subscription import SubscriptionProject, SubscriptionRow
+from app.schemas.models import SortOrder
+from app.schemas.subscription import (
+    SubscriptionList,
+    SubscriptionProject,
+    SubscriptionRow,
+    SubscriptionSort,
+    SubscriptionsQuery,
+)
+from app.services.aggregation import CODE_POINT_COLLATION
+from app.services.internal_usage import subscription_conditions
+from app.services.simulation_period import DateRange
 
 ENTITY_TYPE = "subscription_costs"
+# 요약 화면의 미리보기 건수
+SUBSCRIPTION_PREVIEW_ROWS = 5
 CREATE_REASON = "구독료 등록"
 UPDATE_REASON = "구독료 수정"
 # 등록 값 이름 → subscription_costs 컬럼 이름. 이력에는 컬럼 이름으로 남긴다
@@ -73,19 +85,68 @@ def _row(subscription: SubscriptionCost, project_name: str | None) -> Subscripti
     )
 
 
+def _by_name(column: Any) -> ColumnElement[str]:
+    return collate(column, CODE_POINT_COLLATION)
+
+
+def _tie_breakers() -> list[Any]:
+    return [
+        _by_name(SubscriptionCost.tool_name).asc(),
+        SubscriptionCost.subscription_id.asc(),
+    ]
+
+
+def _order(query: SubscriptionsQuery) -> list[Any]:
+    """프로젝트에 배분하지 않은 구독료는 방향과 관계없이 프로젝트 정렬의 맨 뒤다. 끝의 두 열로 순서를 고정한다."""
+    columns: dict[SubscriptionSort, Any] = {
+        SubscriptionSort.TOOL: _by_name(SubscriptionCost.tool_name),
+        SubscriptionSort.MONTH: SubscriptionCost.applied_month,
+        SubscriptionSort.AMOUNT: SubscriptionCost.amount,
+        SubscriptionSort.PROJECT: _by_name(Project.name),
+        SubscriptionSort.STATUS: SubscriptionCost.status,
+    }
+    column = columns[query.sort]
+    primary = column.desc() if query.order == SortOrder.DESC else column.asc()
+    return [primary.nulls_last(), *_tie_breakers()]
+
+
 async def list_subscriptions(
-    session: AsyncSession, month: date
-) -> list[SubscriptionRow]:
-    """그 달의 구독료. 해지된 것도 상태와 함께 나온다. 도구 이름순, 같으면 등록순이다."""
-    result = await session.execute(
+    session: AsyncSession, period: DateRange, query: SubscriptionsQuery
+) -> SubscriptionList:
+    """조회 기간이 걸치는 모든 달의 구독료. 해지된 것도 상태와 함께 나온다.
+
+    요약의 구독료 합계와 같은 조건(internal_usage.subscription_conditions)을 써서 합계가 일치한다.
+    """
+    conditions = subscription_conditions(period)
+    total = await session.scalar(
+        select(func.count()).select_from(SubscriptionCost).where(*conditions)
+    )
+    statement = (
         select(SubscriptionCost, Project.name)
         .outerjoin(Project, Project.project_id == SubscriptionCost.project_id)
-        .where(SubscriptionCost.applied_month == month.replace(day=1))
+        .where(*conditions)
+        .order_by(*_order(query))
     )
-    rows = sorted(
-        result.all(), key=lambda row: (row[0].tool_name, row[0].subscription_id)
+    if query.preview:
+        # 적용 월이 최근인 N건을 먼저 고른다. 정렬해도 "최근 N건"의 뜻이 바뀌지 않게 하기 위해서다
+        latest = (
+            select(SubscriptionCost.subscription_id)
+            .where(*conditions)
+            .order_by(SubscriptionCost.applied_month.desc(), *_tie_breakers())
+            .limit(SUBSCRIPTION_PREVIEW_ROWS)
+        )
+        statement = statement.where(SubscriptionCost.subscription_id.in_(latest))
+    else:
+        statement = statement.offset((query.page - 1) * query.page_size).limit(
+            query.page_size
+        )
+    rows = await session.execute(statement)
+    return SubscriptionList(
+        items=[_row(subscription, name) for subscription, name in rows.all()],
+        total=total or 0,
+        page=query.page,
+        page_size=query.page_size,
     )
-    return [_row(subscription, name) for subscription, name in rows]
 
 
 async def list_project_options(session: AsyncSession) -> list[SubscriptionProject]:

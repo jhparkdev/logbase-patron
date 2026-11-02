@@ -81,17 +81,25 @@ async def summarize(session: AsyncSession, period: DateRange) -> InternalSummary
     return build_summary(confirmed, estimated, unknown_count, subscription)
 
 
+def subscription_conditions(period: DateRange) -> list[ColumnElement[bool]]:
+    """조회 기간이 걸치는 모든 달의 구독료를 고르는 조건. 달의 일부만 걸쳐도 그 달 전체를 고른다.
+
+    요약의 구독료 합계와 구독료 목록이 같이 쓴다. 같은 조건의 합계가 서로 일치하게 하기 위해서다.
+    """
+    return [
+        SubscriptionCost.applied_month >= period.start.replace(day=1),
+        SubscriptionCost.applied_month <= period.end.replace(day=1),
+    ]
+
+
 async def subscription_total(session: AsyncSession, period: DateRange) -> Decimal:
     """조회 기간이 걸치는 모든 달의 구독료 합계. 달의 일부만 걸쳐도 월 금액 그대로 더한다.
 
     해지(CANCELLED) 구독료도 그 달 청구액이라 합산한다. 명세에 없는 임시 결정이다.
     """
-    first_month = period.start.replace(day=1)
-    last_month = period.end.replace(day=1)
     total = await session.scalar(
         select(func.coalesce(func.sum(SubscriptionCost.amount), ZERO)).where(
-            SubscriptionCost.applied_month >= first_month,
-            SubscriptionCost.applied_month <= last_month,
+            *subscription_conditions(period)
         )
     )
     return total if total is not None else ZERO

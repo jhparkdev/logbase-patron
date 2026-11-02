@@ -1,6 +1,7 @@
 """월 구독료(P-02) 요청·응답 모델. 금액은 문자열이고, 프로젝트가 없는 구독료(미배분)는 project_id가 null이다."""
 
 from decimal import Decimal
+from enum import StrEnum
 from typing import Annotated, Self
 
 from pydantic import (
@@ -14,9 +15,10 @@ from pydantic import (
 
 from app.models import SubscriptionStatus
 from app.schemas.decimal_string import require_decimal_string
-from app.schemas.models import MAX_MODEL_ID
+from app.schemas.internal_usage import InternalFilterQuery
+from app.schemas.models import MAX_MODEL_ID, MAX_PAGE, SortOrder
 from app.schemas.plain_decimal import PlainDecimal
-from app.schemas.usage import Month
+from app.schemas.usage import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, Month
 
 # subscription_costs.amount NUMERIC(14,4)에 들어가는 범위
 AMOUNT_MAX_DECIMAL_PLACES = 4
@@ -42,10 +44,25 @@ ShortText = Annotated[
 ]
 
 
-class SubscriptionsQuery(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class SubscriptionSort(StrEnum):
+    """구독료 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다."""
 
-    month: Month
+    TOOL = "tool"
+    MONTH = "month"
+    AMOUNT = "amount"
+    PROJECT = "project"
+    STATUS = "status"
+
+
+class SubscriptionsQuery(InternalFilterQuery):
+    """기간은 요약·추이와 같은 규칙이다. 기간을 보내지 않으면 최근 30일이 걸치는 달이다."""
+
+    sort: SubscriptionSort = SubscriptionSort.MONTH
+    order: SortOrder = SortOrder.DESC
+    # 요약 화면용 미리보기. 적용 월이 최근인 N건을 고른 뒤 그 안에서만 정렬하고 페이지는 나누지 않는다
+    preview: bool = False
+    page: int = Field(default=1, ge=1, le=MAX_PAGE)
+    page_size: int = Field(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE)
 
 
 class SubscriptionRow(BaseModel):
@@ -64,6 +81,9 @@ class SubscriptionRow(BaseModel):
 
 class SubscriptionList(BaseModel):
     items: list[SubscriptionRow]
+    total: int  # 조회 기간의 전체 구독료 수. 미리보기여도 전체 기준이다
+    page: int
+    page_size: int
 
 
 class SubscriptionProject(BaseModel):

@@ -13,7 +13,7 @@ from app.models import ChangeLog
 from tests.db_helpers import Factory
 
 BASE = "/api/subscriptions"
-OCTOBER = {"month": "2026-10"}
+OCTOBER = {"start_date": "2026-10-01", "end_date": "2026-10-31"}
 OCT = date(2026, 10, 1)
 
 
@@ -81,26 +81,159 @@ async def test_다른_달의_구독료는_목록에_없다(
 
     response = await client.get(BASE, params=OCTOBER)
 
-    assert response.json() == {"items": []}
+    assert response.json() == {"items": [], "total": 0, "page": 1, "page_size": 10}
+
+
+async def test_조회_기간이_걸치는_모든_달의_구독료를_돌려준다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    for month in (date(2026, 9, 1), OCT, date(2026, 11, 1)):
+        await factory.subscription_cost(applied_month=month)
+    params = {"start_date": "2026-09-30", "end_date": "2026-10-31"}
+
+    body = (await client.get(BASE, params=params)).json()
+
+    months = sorted(item["applied_month"] for item in body["items"])
+    assert months == ["2026-09", "2026-10"]
+    assert body["total"] == 2
+
+
+async def test_기간을_보내지_않으면_최근_30일이_걸치는_달을_조회한다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    # 고정 시각은 2026-10-01(UTC)이라 최근 30일은 2026-09-02부터 2026-10-01(KST)까지다.
+    await factory.subscription_cost(applied_month=date(2026, 9, 1))
+    await factory.subscription_cost(applied_month=OCT)
+    await factory.subscription_cost(applied_month=date(2026, 8, 1))
+
+    body = (await client.get(BASE)).json()
+
+    months = sorted(item["applied_month"] for item in body["items"])
+    assert months == ["2026-09", "2026-10"]
+
+
+async def test_정렬_기준과_방향을_따라_순서를_바꾼다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    for tool, amount in (("나", "20"), ("가", "30"), ("다", "10")):
+        await factory.subscription_cost(
+            applied_month=OCT, tool_name=tool, amount=Decimal(amount)
+        )
+    params = {**OCTOBER, "sort": "amount", "order": "asc"}
+
+    body = (await client.get(BASE, params=params)).json()
+
+    assert [item["tool_name"] for item in body["items"]] == ["다", "나", "가"]
+
+
+async def test_기본_정렬은_적용_월_최신순이다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    for month, tool in ((date(2026, 9, 1), "구월"), (OCT, "시월")):
+        await factory.subscription_cost(applied_month=month, tool_name=tool)
+    params = {"start_date": "2026-09-01", "end_date": "2026-10-31"}
+
+    body = (await client.get(BASE, params=params)).json()
+
+    assert [item["tool_name"] for item in body["items"]] == ["시월", "구월"]
+
+
+async def test_미리보기는_최근_5건을_고른_뒤_그_안에서_정렬하고_total은_전체_수이다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    for month_number, tool in enumerate("abcdefg", start=4):
+        await factory.subscription_cost(
+            applied_month=date(2026, month_number, 1), tool_name=tool
+        )
+    params = {
+        "start_date": "2026-04-01",
+        "end_date": "2026-10-31",
+        "preview": "true",
+        "sort": "tool",
+        "order": "asc",
+    }
+
+    body = (await client.get(BASE, params=params)).json()
+
+    assert [item["tool_name"] for item in body["items"]] == ["c", "d", "e", "f", "g"]
+    assert body["total"] == 7
+
+
+async def test_페이지를_나누어_돌려준다(client: AsyncClient, factory: Factory) -> None:
+    for number in range(1, 6):
+        await factory.subscription_cost(applied_month=OCT, tool_name=f"도구 {number}")
+    params = {**OCTOBER, "sort": "tool", "order": "asc", "page": 2, "page_size": 2}
+
+    body = (await client.get(BASE, params=params)).json()
+
+    assert [item["tool_name"] for item in body["items"]] == ["도구 3", "도구 4"]
+    assert (body["total"], body["page"], body["page_size"]) == (5, 2, 2)
+
+
+async def test_같은_기간의_목록_금액_합계가_요약의_구독료와_같다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    amounts = {date(2026, 9, 1): "10", OCT: "20", date(2026, 11, 1): "40"}
+    for month, amount in amounts.items():
+        await factory.subscription_cost(applied_month=month, amount=Decimal(amount))
+    period = {"start_date": "2026-09-15", "end_date": "2026-10-10"}
+
+    listed = (await client.get(BASE, params={**period, "page_size": 100})).json()
+    summary = (await client.get("/api/usage/internal/summary", params=period)).json()
+
+    total = sum(Decimal(item["amount_usd"]) for item in listed["items"])
+    assert total == Decimal(30)
+    assert Decimal(summary["subscription_usd"]) == total
 
 
 @pytest.mark.parametrize(
     "params",
     [
-        {},
-        {"month": "2026-13"},
-        {"month": "2026-10-01"},
-        {"month": "2026-10", "unknown_param": "1"},
+        {"month": "2026-10"},
+        {"unknown_param": "1"},
+        {"sort": "unknown"},
+        {"sort": "note"},
+        {"order": "up"},
+        {"page": "0"},
+        {"page_size": "0"},
+        {"page_size": "101"},
     ],
-    ids=["월 없음", "없는 월", "일까지 있음", "모르는 조건"],
+    ids=[
+        "예전 month 조건",
+        "모르는 조건",
+        "허용하지 않는 정렬",
+        "메모 정렬은 없음",
+        "허용하지 않는 방향",
+        "0쪽",
+        "0개",
+        "101개",
+    ],
 )
 async def test_잘못된_목록_조건은_422이다(
+    client: AsyncClient, params: dict[str, str]
+) -> None:
+    response = await client.get(BASE, params={**OCTOBER, **params})
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"start_date": "2026-10-01"},
+        {"start_date": "2026-10-31", "end_date": "2026-10-01"},
+        {"start_date": "2025-12-30", "end_date": "2026-12-31"},
+    ],
+    ids=["시작일만 있음", "시작일이 종료일보다 늦음", "367일"],
+)
+async def test_잘못된_기간은_INVALID_PERIOD로_거절한다(
     client: AsyncClient, params: dict[str, str]
 ) -> None:
     response = await client.get(BASE, params=params)
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    assert response.json()["code"] == "VALIDATION_ERROR"
+    assert response.json()["code"] == "INVALID_PERIOD"
 
 
 # ---------------------------------------------------------------
@@ -249,7 +382,7 @@ async def test_없는_프로젝트로_등록하면_422이다(
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert response.json()["code"] == "VALIDATION_ERROR"
-    assert (await client.get(BASE, params=OCTOBER)).json() == {"items": []}
+    assert (await client.get(BASE, params=OCTOBER)).json()["items"] == []
 
 
 async def test_금액_0은_등록할_수_있다(client: AsyncClient, factory: Factory) -> None:

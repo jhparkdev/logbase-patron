@@ -9,6 +9,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ChangeLog, SubscriptionCost, SubscriptionStatus
+from app.schemas.subscription import SubscriptionsQuery
+from app.services.internal_usage import subscription_total
+from app.services.simulation_period import DateRange
 from app.services.subscriptions import (
     SubscriptionDuplicateError,
     SubscriptionNotFoundError,
@@ -22,6 +25,9 @@ from tests.db_helpers import Factory
 
 SEPTEMBER = date(2026, 9, 1)
 OCTOBER = date(2026, 10, 1)
+NOVEMBER = date(2026, 11, 1)
+OCT_PERIOD = DateRange(date(2026, 10, 1), date(2026, 10, 31))
+SEP_OCT_PERIOD = DateRange(date(2026, 9, 1), date(2026, 10, 31))
 
 
 @pytest.fixture
@@ -70,7 +76,18 @@ async def reload(session: AsyncSession, subscription_id: int) -> SubscriptionCos
 # ---------------------------------------------------------------
 # 목록
 # ---------------------------------------------------------------
-async def test_목록은_그_달_구독료만_도구_이름순으로_프로젝트_이름과_함께_돌려준다(
+def query(**values: object) -> SubscriptionsQuery:
+    return SubscriptionsQuery.model_validate(values)
+
+
+async def tool_names(
+    session: AsyncSession, period: DateRange = OCT_PERIOD, **values: object
+) -> list[str]:
+    page = await list_subscriptions(session, period, query(**values))
+    return [row.tool_name for row in page.items]
+
+
+async def test_목록은_프로젝트_이름과_함께_돌려준다(
     db_session: AsyncSession, factory: Factory
 ) -> None:
     project = await factory.project(name="알파")
@@ -78,16 +95,17 @@ async def test_목록은_그_달_구독료만_도구_이름순으로_프로젝�
         applied_month=OCTOBER, tool_name="나 도구", project_id=project["project_id"]
     )
     await factory.subscription_cost(applied_month=OCTOBER, tool_name="가 도구")
-    await factory.subscription_cost(applied_month=SEPTEMBER, tool_name="다른 달")
 
-    rows = await list_subscriptions(db_session, OCTOBER)
+    page = await list_subscriptions(
+        db_session, OCT_PERIOD, query(sort="tool", order="asc")
+    )
 
-    assert [(row.tool_name, row.project_name) for row in rows] == [
+    assert [(row.tool_name, row.project_name) for row in page.items] == [
         ("가 도구", None),
         ("나 도구", "알파"),
     ]
-    assert rows[0].project_id is None
-    assert rows[1].project_id == project["project_id"]
+    assert page.items[0].project_id is None
+    assert page.items[1].project_id == project["project_id"]
 
 
 async def test_목록은_해지된_구독료도_상태와_함께_돌려준다(
@@ -95,9 +113,9 @@ async def test_목록은_해지된_구독료도_상태와_함께_돌려준다(
 ) -> None:
     await factory.subscription_cost(applied_month=OCTOBER, status="CANCELLED")
 
-    rows = await list_subscriptions(db_session, OCTOBER)
+    page = await list_subscriptions(db_session, OCT_PERIOD, query())
 
-    assert [row.status for row in rows] == [SubscriptionStatus.CANCELLED]
+    assert [row.status for row in page.items] == [SubscriptionStatus.CANCELLED]
 
 
 async def test_같은_이름의_도구는_등록_순서로_나온다(
@@ -106,16 +124,152 @@ async def test_같은_이름의_도구는_등록_순서로_나온다(
     first = await factory.subscription_cost(applied_month=OCTOBER, tool_name="같은")
     second = await factory.subscription_cost(applied_month=OCTOBER, tool_name="같은")
 
-    rows = await list_subscriptions(db_session, OCTOBER)
+    page = await list_subscriptions(db_session, OCT_PERIOD, query())
 
-    assert [row.subscription_id for row in rows] == [
+    assert [row.subscription_id for row in page.items] == [
         first["subscription_id"],
         second["subscription_id"],
     ]
 
 
-async def test_구독료가_없는_달은_빈_목록이다(db_session: AsyncSession) -> None:
-    assert await list_subscriptions(db_session, OCTOBER) == []
+async def test_구독료가_없는_기간은_빈_목록이다(db_session: AsyncSession) -> None:
+    page = await list_subscriptions(db_session, OCT_PERIOD, query())
+
+    assert (page.items, page.total) == ([], 0)
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "expected"),
+    [
+        (date(2026, 10, 1), date(2026, 10, 31), ["나"]),
+        (date(2026, 9, 30), date(2026, 10, 1), ["가", "나"]),
+        (date(2026, 10, 31), date(2026, 11, 1), ["나", "다"]),
+        (date(2026, 10, 15), date(2026, 10, 15), ["나"]),
+        (date(2026, 8, 31), date(2026, 8, 31), []),
+    ],
+    ids=[
+        "10월 전체",
+        "9월 말부터 10월 초",
+        "10월 말부터 11월 초",
+        "하루",
+        "구독료 없는 달",
+    ],
+)
+async def test_조회_기간이_걸치는_모든_달의_구독료가_나온다(
+    db_session: AsyncSession,
+    factory: Factory,
+    start: date,
+    end: date,
+    expected: list[str],
+) -> None:
+    for month, tool in ((SEPTEMBER, "가"), (OCTOBER, "나"), (NOVEMBER, "다")):
+        await factory.subscription_cost(applied_month=month, tool_name=tool)
+
+    names = await tool_names(
+        db_session, DateRange(start, end), sort="tool", order="asc"
+    )
+
+    assert names == expected
+
+
+async def test_기본_정렬은_적용_월_최신순이고_같은_달은_도구_이름순이다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    for month, tool in ((SEPTEMBER, "가"), (OCTOBER, "다"), (OCTOBER, "나")):
+        await factory.subscription_cost(applied_month=month, tool_name=tool)
+
+    assert await tool_names(db_session, SEP_OCT_PERIOD) == ["나", "다", "가"]
+
+
+@pytest.mark.parametrize(
+    ("sort", "order", "expected"),
+    [
+        ("tool", "asc", ["가", "나", "다"]),
+        ("tool", "desc", ["다", "나", "가"]),
+        ("month", "asc", ["나", "가", "다"]),
+        ("month", "desc", ["가", "다", "나"]),
+        ("amount", "asc", ["나", "다", "가"]),
+        ("amount", "desc", ["가", "다", "나"]),
+        ("project", "asc", ["가", "다", "나"]),
+        ("project", "desc", ["다", "가", "나"]),
+        ("status", "asc", ["가", "다", "나"]),
+        ("status", "desc", ["나", "가", "다"]),
+    ],
+)
+async def test_정렬_기준과_방향을_따르고_프로젝트가_없는_행은_맨_뒤다(
+    db_session: AsyncSession,
+    factory: Factory,
+    sort: str,
+    order: str,
+    expected: list[str],
+) -> None:
+    first = await factory.project(name="라")
+    third = await factory.project(name="마")
+    rows = [
+        ("가", OCTOBER, "30", first["project_id"], "ACTIVE"),
+        ("나", SEPTEMBER, "10", None, "CANCELLED"),
+        ("다", OCTOBER, "20", third["project_id"], "ACTIVE"),
+    ]
+    for tool, month, amount, project_id, row_status in rows:
+        await factory.subscription_cost(
+            applied_month=month,
+            tool_name=tool,
+            amount=Decimal(amount),
+            project_id=project_id,
+            status=row_status,
+        )
+
+    names = await tool_names(db_session, SEP_OCT_PERIOD, sort=sort, order=order)
+
+    assert names == expected
+
+
+async def test_미리보기는_최근_5건을_고른_뒤_그_안에서_정렬한다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    for month_number, tool in enumerate("abcdefg", start=4):
+        await factory.subscription_cost(
+            applied_month=date(2026, month_number, 1), tool_name=tool
+        )
+    period = DateRange(date(2026, 4, 1), date(2026, 10, 31))
+
+    page = await list_subscriptions(
+        db_session, period, query(preview=True, sort="tool", order="asc")
+    )
+
+    assert [row.tool_name for row in page.items] == ["c", "d", "e", "f", "g"]
+    assert page.total == 7
+
+
+async def test_페이지로_나누고_total은_전체_수이다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    for number in range(1, 6):
+        await factory.subscription_cost(
+            applied_month=OCTOBER, tool_name=f"도구 {number}"
+        )
+    ordered = {"sort": "tool", "order": "asc", "page_size": 2}
+
+    second = await list_subscriptions(db_session, OCT_PERIOD, query(**ordered, page=2))
+    beyond = await list_subscriptions(db_session, OCT_PERIOD, query(**ordered, page=9))
+
+    assert [row.tool_name for row in second.items] == ["도구 3", "도구 4"]
+    assert (second.total, second.page, second.page_size) == (5, 2, 2)
+    assert (beyond.items, beyond.total) == ([], 5)
+
+
+async def test_같은_기간의_목록_금액_합계가_요약의_구독료_합계와_같다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    amounts = {SEPTEMBER: "10", OCTOBER: "20", NOVEMBER: "40"}
+    for month, amount in amounts.items():
+        await factory.subscription_cost(applied_month=month, amount=Decimal(amount))
+    period = DateRange(date(2026, 9, 15), date(2026, 10, 10))
+
+    page = await list_subscriptions(db_session, period, query(page_size=100))
+
+    expected = await subscription_total(db_session, period)
+    assert sum(row.amount_usd for row in page.items) == expected == Decimal(30)
 
 
 # ---------------------------------------------------------------
