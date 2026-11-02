@@ -18,7 +18,8 @@ class HistorySortColumn(StrEnum):
     """이력 목록의 정렬 열(허용 목록). 값은 이력 화면의 URL 정렬 키와 같다.
 
     요약 뷰의 어느 열로 정렬할지는 서비스(simulation_history.py)가 정한다. 총 비용(totalCost)은
-    요약 뷰에 합계 열이 생기면 여기와 서비스의 열 대응표에 한 줄씩 추가한다.
+    요약의 total_cost_usd 와 같은 값이다. 금액을 아는 호출이 없는 실행은 0 으로 보지 않고
+    다른 빈 값처럼 방향과 관계없이 맨 뒤에 둔다.
     """
 
     REQUESTED_AT = "requestedAt"
@@ -27,6 +28,7 @@ class HistorySortColumn(StrEnum):
     MODEL_COUNT = "modelCount"
     STATUS = "status"
     COST_STATUS = "costStatus"
+    TOTAL_COST = "totalCost"
 
 
 class SortDirection(StrEnum):

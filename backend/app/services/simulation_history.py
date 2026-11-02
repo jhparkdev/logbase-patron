@@ -31,14 +31,23 @@ _SUMMARY = table(
 )
 
 
-# 화면의 정렬 키 → v_simulation_summary 열 이름
-_SORT_COLUMNS = {
-    HistorySortColumn.REQUESTED_AT: "requested_at",
-    HistorySortColumn.ID: "simulation_id",
-    HistorySortColumn.SCENARIO: "scenario_code",
-    HistorySortColumn.MODEL_COUNT: "model_count",
-    HistorySortColumn.STATUS: "status",
-    HistorySortColumn.COST_STATUS: "cost_check_status",
+# 응답의 total_cost_usd 와 같은 값(확정 + 추정, 한쪽만 있으면 그 값, 둘 다 없으면 null).
+# 뷰가 낸 두 합계를 더할 뿐이고, 없는 쪽을 0 으로 채우지 않는다
+_TOTAL_COST = func.coalesce(
+    _SUMMARY.c.confirmed_cost_usd + _SUMMARY.c.estimated_cost_usd,
+    _SUMMARY.c.confirmed_cost_usd,
+    _SUMMARY.c.estimated_cost_usd,
+)
+
+# 화면의 정렬 키 → v_simulation_summary 의 열(또는 열로 만든 값)
+_SORT_COLUMNS: dict[HistorySortColumn, ColumnElement[object]] = {
+    HistorySortColumn.REQUESTED_AT: _SUMMARY.c.requested_at,
+    HistorySortColumn.ID: _SUMMARY.c.simulation_id,
+    HistorySortColumn.SCENARIO: _SUMMARY.c.scenario_code,
+    HistorySortColumn.MODEL_COUNT: _SUMMARY.c.model_count,
+    HistorySortColumn.STATUS: _SUMMARY.c.status,
+    HistorySortColumn.COST_STATUS: _SUMMARY.c.cost_check_status,
+    HistorySortColumn.TOTAL_COST: _TOTAL_COST,
 }
 
 
@@ -90,7 +99,7 @@ def _inactive_model_count() -> ColumnElement[int]:
 
 
 def _ordering(query: SimulationHistoryQuery) -> list[ColumnElement[object]]:
-    column = _SUMMARY.c[_SORT_COLUMNS[query.sort]]
+    column = _SORT_COLUMNS[query.sort]
     chosen = column.asc() if query.direction == SortDirection.ASC else column.desc()
     # 값이 없는 행(직접 작성 실행의 시나리오 등)은 방향과 관계없이 뒤로 보낸다.
     # 같은 값이면 실행 ID 로 순서를 고정해 페이지를 넘겨도 겹치거나 빠지지 않게 한다
