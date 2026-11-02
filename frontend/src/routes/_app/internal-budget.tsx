@@ -8,7 +8,6 @@ import {
 } from "../../features/internal-budget/api/budget";
 import { BudgetFilters } from "../../features/internal-budget/components/BudgetFilters";
 import { BudgetFullList } from "../../features/internal-budget/components/BudgetFullList";
-import { CostTrendCard } from "../../features/internal-budget/components/CostTrendCard";
 import { ProjectBudgetTable } from "../../features/internal-budget/components/ProjectBudgetTable";
 import { ProjectPanel } from "../../features/internal-budget/components/ProjectPanel";
 import { RequestHistoryTable } from "../../features/internal-budget/components/RequestHistoryTable";
@@ -92,7 +91,6 @@ function InternalBudgetPage() {
               <SummaryCards filter={shown} />
             </DataBlock>
           </div>
-          <CostTrendCard />
           <ProjectBudgetTable search={shown} refreshing={refreshing} />
           <SubscriptionTable search={shown} refreshing={refreshing} />
           <RequestHistoryTable search={shown} refreshing={refreshing} />

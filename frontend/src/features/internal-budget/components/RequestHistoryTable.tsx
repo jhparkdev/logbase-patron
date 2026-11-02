@@ -1,6 +1,7 @@
 import { Badge } from "../../../shared/components/ui/Badge";
 import { CostAmount } from "../../../shared/components/ui/CostAmount";
 import { ExecutionBadge } from "../../../shared/components/ui/ExecutionBadge";
+import { Result } from "../../../shared/components/ui/Result";
 import { TextLink } from "../../../shared/components/ui/TextLink";
 import { formatCount, formatKstDateTime } from "../../../shared/lib/format";
 import { costView } from "../../../shared/lib/request";
@@ -9,7 +10,6 @@ import type { ListColumn } from "../lib/list";
 import type { BudgetSearch } from "../lib/search";
 import { originLabel } from "../lib/view";
 import { ListTable } from "./ListTable";
-import { NoUsageResult } from "./NoUsageResult";
 
 const TITLE = "상세 API 사용 이력";
 
@@ -93,7 +93,12 @@ export function RequestHistoryTable({
       query={requestRowsOptions(search)}
       columns={COLUMNS}
       rowKey={(row) => row.request_id}
-      empty={<NoUsageResult />}
+      empty={
+        <Result
+          title="이 조건에는 API 사용 내역이 없어요"
+          description="기간을 넓히거나 프로젝트·모델 조건을 바꿔 보세요."
+        />
+      }
       refreshing={refreshing}
       onPageChange={onPageChange}
     />
