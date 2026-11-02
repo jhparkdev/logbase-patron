@@ -7289,6 +7289,13 @@
             "type": "array",
             "title": "Asset Ids"
           },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/ImageAssetRead"
+            },
+            "type": "array",
+            "title": "Images"
+          },
           "output_type": {
             "$ref": "#/components/schemas/OutputType"
           },
@@ -7329,13 +7336,14 @@
           "routing_policy",
           "models",
           "asset_ids",
+          "images",
           "output_type",
           "image_config",
           "rerunnable",
           "blocked_reason"
         ],
         "title": "SimulationRerunDraft",
-        "description": "재실행 초안(S-09) 응답. 과거 실행의 입력값을 그대로 돌려주어 화면 입력칸을 채운다.\n\n입력 필드는 비교 실행 요청(SimulationCreateRequest)과 같고, 화면이 안내에 쓰는\nrerunnable·blocked_reason 과 모델 칸의 현재 상태가 더해진다. 사용자가 고친 값은\n그 둘을 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).\n과거 이력은 지금 규칙으로 다시 거절하지 않는다. 새 실행 요청이 들어올 때 검증한다."
+        "description": "재실행 초안(S-09) 응답. 과거 실행의 입력값을 그대로 돌려주어 화면 입력칸을 채운다.\n\n입력 필드는 비교 실행 요청(SimulationCreateRequest)과 같고, 화면이 안내에 쓰는\nrerunnable·blocked_reason 과 모델 칸의 현재 상태가 더해진다. 사용자가 고친 값은\n그 둘과 images 를 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).\n과거 이력은 지금 규칙으로 다시 거절하지 않는다. 새 실행 요청이 들어올 때 검증한다."
       },
       "SimulationStatus": {
         "type": "string",
