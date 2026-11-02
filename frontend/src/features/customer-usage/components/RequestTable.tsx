@@ -5,6 +5,7 @@ import {
   type Column,
   DataTable,
 } from "../../../shared/components/ui/DataTable";
+import { ExecutionBadge } from "../../../shared/components/ui/ExecutionBadge";
 import { Pagination } from "../../../shared/components/ui/Pagination";
 import { RefreshingBar } from "../../../shared/components/ui/RefreshingBar";
 import { Result } from "../../../shared/components/ui/Result";
@@ -12,10 +13,10 @@ import { SectionCard } from "../../../shared/components/ui/SectionCard";
 import { TableSkeleton } from "../../../shared/components/ui/TableSkeleton";
 import { TextLink } from "../../../shared/components/ui/TextLink";
 import { formatCount, formatKstDateTime } from "../../../shared/lib/format";
+import { costView } from "../../../shared/lib/request";
 import { type CustomerRequestRow, requestRowsOptions } from "../api/usage";
 import { usePageChange, useRequestSort } from "../hooks/useUsageList";
 import type { CustomerUsageSearch } from "../lib/search";
-import { costView, executionStatus } from "../lib/view";
 import { ViewAllLink } from "./ViewAllLink";
 
 const TITLE = "상세 API 호출 내역";
@@ -90,20 +91,6 @@ const COLUMNS: Column<CustomerRequestRow>[] = [
     render: (row) => <ExecutionBadge status={row.status} />,
   },
 ];
-
-/** 비용 상태 배지와 모양을 구분하려고 테두리와 점으로 그린다(docs/design/tokens.md). */
-function ExecutionBadge({ status }: { status: CustomerRequestRow["status"] }) {
-  const { label, dotClass } = executionStatus(status);
-  return (
-    <span className="inline-flex h-6 items-center gap-1.5 rounded-full border border-grey-200 px-2 text-caption font-bold whitespace-nowrap">
-      <span
-        aria-hidden="true"
-        className={`size-1.5 rounded-full ${dotClass}`}
-      />
-      {label}
-    </span>
-  );
-}
 
 type RequestTableProps = {
   search: CustomerUsageSearch;

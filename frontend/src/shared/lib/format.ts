@@ -73,3 +73,15 @@ export function formatUsd(amount: string, precision: UsdPrecision): string {
 export function formatCount(count: number): string {
   return GROUPING.format(count);
 }
+
+const ZERO_AMOUNT = /^0+(\.0+)?$/;
+
+/** API가 문자열로 준 금액이 0인지. 추정 금액이 0이면 ≈를 붙이지 않을 때 쓴다. */
+export function isZeroAmount(amount: string): boolean {
+  return ZERO_AMOUNT.test(amount);
+}
+
+/** 금액에 넣지 못한 비용 미확인 호출 수 안내. 미확인이 없으면 문구가 없다. */
+export function unreflectedText(unknownCount: number): string | undefined {
+  return unknownCount > 0 ? `미확인 ${unknownCount}건 미반영` : undefined;
+}

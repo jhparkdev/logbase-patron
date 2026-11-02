@@ -14,7 +14,6 @@ import { SummarySkeleton } from "../../features/customer-usage/components/Summar
 import { UsageFilters } from "../../features/customer-usage/components/UsageFilters";
 import { UsageFullList } from "../../features/customer-usage/components/UsageFullList";
 import { UsageTrendCard } from "../../features/customer-usage/components/UsageTrendCard";
-import { budgetMonthOf } from "../../features/customer-usage/lib/budget";
 import {
   customerUsageSearchSchema,
   filterFormValues,
@@ -23,6 +22,7 @@ import {
 import { DataBlock } from "../../shared/components/ui/DataBlock";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 import { RefreshingBar } from "../../shared/components/ui/RefreshingBar";
+import { budgetMonthOf } from "../../shared/lib/budget";
 
 export const Route = createFileRoute("/_app/customer-usage")({
   validateSearch: customerUsageSearchSchema,
