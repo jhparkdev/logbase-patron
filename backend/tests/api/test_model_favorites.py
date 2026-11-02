@@ -1,10 +1,12 @@
-"""/api/model-favorites 테스트. 사용자별 모델+Provider 즐겨찾기의 인증 경계와 계약을 확인한다."""
+"""/api/model-favorites 테스트. 첫 활성 계정의 모델+Provider 즐겨찾기 계약을 확인한다."""
 
 from typing import Any
 
 import pytest
 from httpx import AsyncClient, Response
+from sqlalchemy import select
 
+from app.models import UserModelFavorite
 from tests.api.test_auth import log_in, make_user
 from tests.db_helpers import Factory
 
@@ -39,7 +41,20 @@ async def new_model_id(factory: Factory) -> int:
     return int((await factory.model())["model_id"])
 
 
-async def test_every_route_requires_a_login_session(
+async def test_every_route_works_without_a_login_session(
+    client: AsyncClient, factory: Factory
+) -> None:
+    # 팀 결정으로 로그인 검사를 하지 않는다. 즐겨찾기는 첫 활성 계정의 것으로 다룬다
+    await make_user(factory)
+    model_id = await new_model_id(factory)
+
+    assert (await add(client, model_id, PROVIDER)).status_code == 201
+    assert await listed(client) == [(model_id, PROVIDER)]
+    assert (await remove(client, model_id, PROVIDER)).status_code == 204
+    assert await listed(client) == []
+
+
+async def test_without_an_active_account_every_route_is_refused(
     client: AsyncClient, factory: Factory
 ) -> None:
     model_id = await new_model_id(factory)
@@ -167,20 +182,20 @@ async def test_removing_a_favorite_that_does_not_exist_is_not_an_error(
     assert (await remove(client, MISSING_MODEL_ID, PROVIDER)).status_code == 204
 
 
-async def test_favorites_are_private_to_each_user(
+async def test_favorites_belong_to_the_first_active_account_whoever_is_logged_in(
     client: AsyncClient, factory: Factory, signed_in: dict[str, Any]
 ) -> None:
+    # 지금은 계정 하나만 쓰므로 누가 로그인했든 같은 즐겨찾기를 본다
     model_id = await new_model_id(factory)
     await add(client, model_id, PROVIDER)
     other = await make_user(factory)
     assert (await log_in(client, other["email"])).status_code == 200
 
-    assert await listed(client) == []
-    # 다른 사용자가 같은 항목을 지워도 남의 즐겨찾기는 그대로다
-    assert (await remove(client, model_id, PROVIDER)).status_code == 204
-    assert (await add(client, model_id, PROVIDER)).status_code == 201
-    assert (await log_in(client, signed_in["email"])).status_code == 200
     assert await listed(client) == [(model_id, PROVIDER)]
+    owners = await factory.session.scalars(
+        select(UserModelFavorite.user_id).where(UserModelFavorite.model_id == model_id)
+    )
+    assert owners.all() == [signed_in["user_id"]]
 
 
 @pytest.mark.usefixtures("signed_in")
