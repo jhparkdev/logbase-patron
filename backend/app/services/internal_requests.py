@@ -98,6 +98,7 @@ def _request_order(query: InternalRequestsQuery) -> list[Any]:
         InternalRequestSort.COST: AIRequest.cost_usd,
         InternalRequestSort.COST_STATUS: AIRequest.cost_status,
         InternalRequestSort.STATUS: AIRequest.status,
+        InternalRequestSort.ORIGIN: AIRequest.usage_origin,
     }
     column = columns[query.sort]
     primary = column.desc() if query.order == SortOrder.DESC else column.asc()

@@ -100,6 +100,20 @@ async def test_정렬과_미리보기와_페이지_조건을_받는다(
     assert paged.json()["total"] == 3
 
 
+async def test_호출_이력은_호출_출처로_정렬할_수_있다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    for origin in ("SYSTEM_TEST", "INTERNAL_DEVELOPMENT"):
+        await internal_call(factory, usage_origin=origin)
+
+    response = await client.get(
+        REQUESTS, params={**OCTOBER, "sort": "origin", "order": "asc"}
+    )
+
+    origins = [row["usage_origin"] for row in response.json()["items"]]
+    assert origins == ["INTERNAL_DEVELOPMENT", "SYSTEM_TEST"]
+
+
 async def test_기간을_보내지_않으면_최근_30일을_조회한다(
     client: AsyncClient, factory: Factory
 ) -> None:

@@ -8,8 +8,9 @@ from typing import Annotated
 from fastapi import APIRouter, Path, Query, status
 from fastapi.responses import JSONResponse
 
-from app.api.deps import DevUserDep
+from app.api.deps import DevUserDep, NowDep
 from app.api.errors import ApiError
+from app.api.internal_budget import period_of
 from app.api.usage import DETAIL_ERRORS, QUERY_ERRORS
 from app.db import SessionDep
 from app.schemas.common import ErrorCode, ErrorResponse
@@ -28,6 +29,7 @@ from app.schemas.subscription_error import (
     SubscriptionErrorResponse,
 )
 from app.services import subscriptions
+from app.services.simulation_period import kst_today
 from app.services.subscriptions import (
     SubscriptionDuplicateError,
     SubscriptionNotFoundError,
@@ -55,11 +57,10 @@ def _project_not_found() -> ApiError:
 
 @router.get("", responses=QUERY_ERRORS)
 async def read_subscriptions(
-    query: Annotated[SubscriptionsQuery, Query()], session: SessionDep
+    query: Annotated[SubscriptionsQuery, Query()], session: SessionDep, now: NowDep
 ) -> SubscriptionList:
-    return SubscriptionList(
-        items=await subscriptions.list_subscriptions(session, query.month)
-    )
+    period = period_of(query, kst_today(now))
+    return await subscriptions.list_subscriptions(session, period, query)
 
 
 @router.get("/options")

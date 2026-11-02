@@ -2497,6 +2497,42 @@
               ],
               "title": "End Date"
             }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
           }
         ],
         "responses": {
@@ -2563,6 +2599,42 @@
                 }
               ],
               "title": "End Date"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
             }
           }
         ],
@@ -2803,12 +2875,48 @@
             }
           },
           {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          },
+          {
             "name": "sort",
             "in": "query",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/ProjectRowSort",
-              "default": "used"
+              "default": "usage"
             }
           },
           {
@@ -3026,13 +3134,107 @@
         "operationId": "read_subscriptions_api_subscriptions_get",
         "parameters": [
           {
-            "name": "month",
+            "name": "start_date",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string",
-              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
-              "title": "Month"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SubscriptionSort",
+              "default": "month"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "default": "desc"
+            }
+          },
+          {
+            "name": "preview",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Preview"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Page Size"
             }
           }
         ],
@@ -4464,7 +4666,8 @@
           "tokens",
           "cost",
           "costStatus",
-          "status"
+          "status",
+          "origin"
         ],
         "title": "InternalRequestSort",
         "description": "호출 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다."
@@ -4498,6 +4701,10 @@
           "has_unknown": {
             "type": "boolean",
             "title": "Has Unknown"
+          },
+          "subscription_excluded": {
+            "type": "boolean",
+            "title": "Subscription Excluded"
           }
         },
         "type": "object",
@@ -4508,7 +4715,8 @@
           "total_managed_usd",
           "unknown_cost_count",
           "includes_estimate",
-          "has_unknown"
+          "has_unknown",
+          "subscription_excluded"
         ],
         "title": "InternalSummary",
         "description": "비용 요약 카드. 미확인 비용은 금액에 넣지 않고 건수로만 센다."
@@ -7055,11 +7263,26 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
           }
         },
         "type": "object",
         "required": [
-          "items"
+          "items",
+          "total",
+          "page",
+          "page_size"
         ],
         "title": "SubscriptionList"
       },
@@ -7182,6 +7405,18 @@
           "note"
         ],
         "title": "SubscriptionRow"
+      },
+      "SubscriptionSort": {
+        "type": "string",
+        "enum": [
+          "tool",
+          "month",
+          "amount",
+          "project",
+          "status"
+        ],
+        "title": "SubscriptionSort",
+        "description": "구독료 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다."
       },
       "SubscriptionStatus": {
         "type": "string",
