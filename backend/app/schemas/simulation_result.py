@@ -1,8 +1,16 @@
+from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Self
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, Field, JsonValue, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    Field,
+    JsonValue,
+    computed_field,
+    model_validator,
+)
 
 from app.models import (
     CostStatus,
@@ -34,6 +42,7 @@ class SimulationSummary(BaseModel):
 
     confirmed_cost_usd·estimated_cost_usd 가 null 이면 그 상태의 호출이 하나도 없다는 뜻이다(0 이 아님).
     비용 미확인 호출은 금액 합계에 넣지 않고 unknown_cost_count 로 센다.
+    total_cost_usd 만은 뷰의 칸이 아니다. 뷰가 낸 두 합계를 더할 뿐 호출을 다시 합산하지 않는다.
     """
 
     simulation_id: UUID
@@ -52,6 +61,20 @@ class SimulationSummary(BaseModel):
     estimated_cost_usd: Money | None
     unknown_cost_count: Count
     cost_check_status: CostCheckStatus
+
+    @computed_field
+    @property
+    def total_cost_usd(self) -> Money | None:
+        """확정 + 추정. 금액을 아는 호출이 없으면 null 이다(0 이 아님).
+
+        미확인 호출은 들어 있지 않다. 일부만 더한 값인지는 unknown_cost_count·cost_check_status 로 안다.
+        """
+        known = [
+            cost
+            for cost in (self.confirmed_cost_usd, self.estimated_cost_usd)
+            if cost is not None
+        ]
+        return sum(known, Decimal(0)) if known else None
 
 
 class SimulationModelResult(BaseModel):

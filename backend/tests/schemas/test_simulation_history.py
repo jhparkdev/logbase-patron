@@ -79,6 +79,7 @@ def test_openapi_lists_the_sort_columns() -> None:
         "modelCount",
         "status",
         "costStatus",
+        "totalCost",
     ]
 
 

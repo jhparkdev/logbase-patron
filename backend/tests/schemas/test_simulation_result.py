@@ -87,6 +87,52 @@ def test_summary_total_with_no_matching_calls_stays_null_never_zero() -> None:
     assert dumped["estimated_cost_usd"] is None
 
 
+@pytest.mark.parametrize(
+    ("confirmed", "estimated", "total"),
+    [
+        ("0.000123", "0.000002", "0.000125"),
+        ("0.000123", None, "0.000123"),
+        (None, "0.000002", "0.000002"),
+    ],
+)
+def test_total_cost_is_confirmed_plus_estimated(
+    confirmed: str | None, estimated: str | None, total: str
+) -> None:
+    dumped = SimulationSummary(
+        **summary_body(confirmed_cost_usd=confirmed, estimated_cost_usd=estimated)
+    ).model_dump(mode="json")
+
+    assert dumped["total_cost_usd"] == total
+
+
+def test_total_cost_without_any_known_cost_stays_null_never_zero() -> None:
+    # 금액을 아는 호출이 하나도 없으면 총 비용도 모른다. 0 으로 보이면 지출이 없던 것처럼 읽힌다
+    dumped = SimulationSummary(
+        **summary_body(
+            confirmed_cost_usd=None, estimated_cost_usd=None, unknown_cost_count=2
+        )
+    ).model_dump(mode="json")
+
+    assert dumped["total_cost_usd"] is None
+
+
+def test_total_cost_leaves_out_unknown_calls_and_says_so() -> None:
+    # 미확인 호출은 금액에 넣지 않는다. 합계가 일부라는 것은 개수와 확인 상태가 알려 준다
+    dumped = SimulationSummary(
+        **summary_body(confirmed_cost_usd="0.000123", unknown_cost_count=1)
+    ).model_dump(mode="json")
+
+    assert dumped["total_cost_usd"] == "0.000123"
+    assert dumped["unknown_cost_count"] == 1
+    assert dumped["cost_check_status"] == "미확인 포함"
+
+
+def test_total_cost_is_in_the_response_contract() -> None:
+    schema = SimulationSummary.model_json_schema(mode="serialization")
+
+    assert "total_cost_usd" in schema["required"]
+
+
 def test_cost_check_status_values_come_from_the_view() -> None:
     schema = SimulationSummary.model_json_schema()
 
