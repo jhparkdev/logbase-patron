@@ -33,7 +33,9 @@ test("상세 패널은 조회 종료일이 속한 달의 사용 요약과 월 �
   renderAt("/customer-usage?from=2026-09-20&to=2026-10-15&detail=3");
 
   const panel = await screen.findByRole("dialog", { name: "A기업" });
-  expect(within(panel).getByText("2026-10 사용 요약")).toBeTruthy();
+  expect(
+    within(panel).getByRole("heading", { name: "2026-10 사용액 · 추정 포함" }),
+  ).toBeTruthy();
   expect(
     within(panel).getByLabelText<HTMLInputElement>("적용 시작 월").value,
   ).toBe("2026-10");

@@ -11,7 +11,19 @@ const FILL_CLASS = {
   over: "bg-red-500",
 } as const;
 
-export function UsageBar({ usage }: { usage: UsageView }) {
+/** 표 안은 얇게(md), 상세 패널 요약처럼 회색 바탕 위에서 강조할 때는 두껍고 진하게(lg) 그린다. */
+const TRACK_CLASS = {
+  md: "h-1.5 bg-grey-100",
+  lg: "h-2.5 bg-grey-200",
+} as const;
+
+export function UsageBar({
+  usage,
+  size = "md",
+}: {
+  usage: UsageView;
+  size?: keyof typeof TRACK_CLASS;
+}) {
   if (usage.status === "unset") {
     return <span className="text-grey-600">예산을 정하면 사용률이 보여요</span>;
   }
@@ -29,7 +41,10 @@ export function UsageBar({ usage }: { usage: UsageView }) {
         value={fill}
         className="sr-only"
       />
-      <div aria-hidden="true" className="h-1.5 flex-1 rounded-full bg-grey-100">
+      <div
+        aria-hidden="true"
+        className={`flex-1 rounded-full ${TRACK_CLASS[size]}`}
+      >
         <div
           className={`h-full rounded-full ${FILL_CLASS[usage.status]}`}
           // 너비는 서버가 준 사용률에서 정해지므로 inline style로 둔다.
