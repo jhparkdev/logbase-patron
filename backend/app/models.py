@@ -453,6 +453,45 @@ class APIKey(Base):
     updated_at: Mapped[datetime] = updated_at_column()
 
 
+class CommandCodeKey(Base):
+    """구성원별 Command Code Key 매핑. Key 원문은 저장하지 않는다. 삭제하지 않고 is_active=false로 비활성화.
+
+    OpenRouter Key(api_keys)와 달리 고객·프로젝트에 귀속되지 않고 비용 집계에도 들어가지 않아 따로 둔다.
+    """
+
+    __tablename__ = "command_code_keys"
+    __table_args__ = (
+        CheckConstraint(
+            "member_name <> '' AND member_name = btrim(member_name)",
+            name="command_code_keys_member_name_check",
+        ),
+        # Key 원문을 실수로 넣어도 거절되도록 정해진 형식의 이름만 받는다.
+        column_check(
+            "command_code_keys",
+            "secret_ref",
+            "secret_ref ~ '^COMMAND_CODE_KEY_[A-Z0-9_]+$'",
+        ),
+        Index(
+            "uq_command_code_keys_active_member",
+            "member_name",
+            unique=True,
+            postgresql_where=text("is_active"),
+        ),
+        {
+            "comment": "구성원별 Command Code Key 매핑. 원문은 저장하지 않고 참조 이름만 저장"
+        },
+    )
+
+    command_code_key_id: Mapped[int] = bigint_identity_pk()
+    member_name: Mapped[str] = mapped_column(Text)
+    secret_ref: Mapped[str] = mapped_column(
+        Text, unique=True, comment="Key 원문을 찾는 참조 이름. 원문 저장 금지"
+    )
+    is_active: Mapped[bool] = is_active_column()
+    created_at: Mapped[datetime] = created_at_column()
+    updated_at: Mapped[datetime] = updated_at_column()
+
+
 class UserSession(Base):
     """4.6 로그인 세션 (v0.5). 토큰 원문은 저장하지 않고 SHA-256 해시만 둔다.
 
