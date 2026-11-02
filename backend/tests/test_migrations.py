@@ -36,6 +36,7 @@ DESIGN_TABLES = {
     "ai_requests",
     "ai_request_payloads",
     "input_assets",
+    "output_assets",
     "cost_adjustments",
     "simulation_run_assets",
     "simulation_results",
@@ -52,6 +53,7 @@ ALEMBIC_VERSION_TABLE = "alembic_version"
 NO_CHARGE_REVISION = "7b2e4f6a9c10"
 SIMULATOR_SETTINGS_REVISION = "264258125f67"
 API_KEY_SERVICE_REVISION = "3f1c9a7e2b64"
+OUTPUT_ASSETS_REVISION = "a4d8e2c61f37"
 
 
 def _schema_objects(database_url: URL) -> tuple[set[str], set[str]]:
@@ -350,6 +352,63 @@ async def test_api_key_service_downgrade_stops_when_a_mapping_exists(
 
     assert caught.value.orig.sqlstate == "23514"
     assert await _api_key_row(db_session, key["key_id"]) == dict(key)
+    assert (
+        await db_session.scalar(text("SELECT version_num FROM alembic_version"))
+        == version
+    )
+
+
+def _run_output_assets_migration(
+    session: Session, config: Config, *, upgrade: bool
+) -> None:
+    revision = ScriptDirectory.from_config(config).get_revision(OUTPUT_ASSETS_REVISION)
+    assert revision is not None
+    migrate = revision.module.upgrade if upgrade else revision.module.downgrade
+    with Operations.context(MigrationContext.configure(session.connection())):
+        migrate()
+
+
+async def _table_exists(session: AsyncSession, table: str) -> bool:
+    return bool(
+        await session.scalar(
+            text("SELECT to_regclass(:name) IS NOT NULL"), {"name": table}
+        )
+    )
+
+
+async def test_output_assets_downgrade_drops_the_table_only_when_empty(
+    db_session: AsyncSession, alembic_config: Config
+) -> None:
+    await db_session.run_sync(
+        _run_output_assets_migration, alembic_config, upgrade=False
+    )
+    assert not await _table_exists(db_session, "output_assets")
+
+    await db_session.run_sync(
+        _run_output_assets_migration, alembic_config, upgrade=True
+    )
+    assert await _table_exists(db_session, "output_assets")
+
+
+async def test_output_assets_downgrade_stops_when_an_image_is_recorded(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    """결과 이미지 기록이 있으면 지우지 않고 멈춘다."""
+    image = await factory.output_asset()
+    version = await db_session.scalar(text("SELECT version_num FROM alembic_version"))
+
+    with pytest.raises(DBAPIError, match="Cannot downgrade.*output images") as caught:
+        async with db_session.begin_nested():
+            await db_session.run_sync(
+                _run_output_assets_migration, alembic_config, upgrade=False
+            )
+
+    assert caught.value.orig.sqlstate == "23514"
+    saved = await db_session.execute(
+        text("SELECT * FROM output_assets WHERE output_asset_id = :id"),
+        {"id": image["output_asset_id"]},
+    )
+    assert dict(saved.mappings().one()) == dict(image)
     assert (
         await db_session.scalar(text("SELECT version_num FROM alembic_version"))
         == version
