@@ -112,6 +112,17 @@ class Factory:
             "api_keys", {"display_name": f"Key {n}", "environment": "DEV", **values}
         )
 
+    async def command_code_key(self, **values: Any) -> RowMapping:
+        n = self._next()
+        return await self.insert(
+            "command_code_keys",
+            {
+                "member_name": f"구성원 {n}",
+                "secret_ref": f"COMMAND_CODE_KEY_{n}",
+                **values,
+            },
+        )
+
     async def user_session(self, **values: Any) -> RowMapping:
         n = self._next()
         if "user_id" not in values:
