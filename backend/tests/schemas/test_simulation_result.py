@@ -63,6 +63,8 @@ def result_body(**overrides: object) -> dict[str, object]:
         "comparability_note": None,
         "response_text": None,
         "error_message": None,
+        "output_type": "TEXT",
+        "output_images": [],
     }
     body.update(overrides)
     return body

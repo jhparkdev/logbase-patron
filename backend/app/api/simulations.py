@@ -14,6 +14,7 @@ from app.api.simulation_deps import (
 )
 from app.api.simulation_errors import SimulationRoute
 from app.api.simulation_images import router as images_router
+from app.api.simulation_output_images import router as output_images_router
 from app.db import SessionDep
 from app.schemas.simulation import SimulationAccepted, SimulationCreateRequest
 from app.schemas.simulation_cancel import (
@@ -182,5 +183,6 @@ def _to_cancel_response(report: CancelReport) -> SimulationCancelResponse:
     )
 
 
-# 경로가 /{simulation_id} 와 겹치지 않는 /images 는 끝에 붙인다
+# 경로가 /{simulation_id} 와 겹치지 않는 /images, /output-images 는 끝에 붙인다
 router.include_router(images_router)
+router.include_router(output_images_router)

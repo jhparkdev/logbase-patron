@@ -1,4 +1,4 @@
-"""시뮬레이터 이미지 업로드. 검사한 파일을 저장소에 쓰고 DB(input_assets)에는 경로·해시만 남긴다."""
+"""시뮬레이터 이미지 업로드와 읽기. 검사한 파일을 저장소에 쓰고 DB(input_assets)에는 경로·해시만 남긴다."""
 
 import hashlib
 import uuid
@@ -9,6 +9,11 @@ from app.models import InputAsset
 from app.schemas.simulation_image import ImageMimeType
 from app.services.image_storage import ImageStorage
 from app.services.simulation_image_check import check_image
+from app.services.simulation_image_source import (
+    StoredImage,
+    StoredImageNotFoundError,
+    read_stored,
+)
 
 # 저장 키의 폴더. 키는 버킷·루트 없는 상대 경로라 로컬 폴더와 GCS 에서 같은 값이 통한다
 STORAGE_FOLDER = "simulator"
@@ -62,3 +67,13 @@ async def save_image(
     session.add(asset)
     await session.flush()
     return asset
+
+
+async def read_input_image(
+    session: AsyncSession, storage: ImageStorage, asset_id: uuid.UUID
+) -> StoredImage:
+    """올린 이미지를 읽는다. 이력·재실행 화면이 입력 이미지를 다시 보여 줄 때 쓴다."""
+    asset = await session.get(InputAsset, asset_id)
+    if asset is None:
+        raise StoredImageNotFoundError
+    return await read_stored(storage, asset.storage_path, asset.sha256, asset.mime_type)

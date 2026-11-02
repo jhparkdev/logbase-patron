@@ -26,7 +26,7 @@ from app.services.simulation_ports import (
     SimulatorContext,
 )
 
-# OpenRouter 모델 정보에서 이미지를 받는다는 표시(input_modalities 의 값)
+# OpenRouter 모델 정보에서 이미지를 받거나 만든다는 표시(input_modalities·output_modalities 의 값)
 IMAGE_MODALITY = "image"
 
 # 시뮬레이터 호출을 귀속하는 PoC 프로젝트·서비스·Key. 값은 DB 담당 seed 와 같다.
@@ -72,6 +72,7 @@ class DbSimulationLookup:
                 display_name=model.display_name,
                 status=ModelStatus(model.status),
                 supports_images=IMAGE_MODALITY in model.input_modalities,
+                generates_images=IMAGE_MODALITY in model.output_modalities,
                 parameter_support=parameter_support(model.supported_parameters),
             )
             for model in rows

@@ -13,6 +13,7 @@ from app.services.simulation_cancel_service import (
 from app.services.simulation_create import (
     ImageNotFoundError,
     ImageRequiredError,
+    ModelImageOutputUnsupportedError,
     ModelImageUnsupportedError,
     ModelNotActiveError,
     ModelNotFoundError,
@@ -24,6 +25,7 @@ from app.services.simulation_image_check import (
     ImageTooLargeError,
     UnsupportedImageTypeError,
 )
+from app.services.simulation_image_source import StoredImageNotFoundError
 from app.services.simulation_input import InputRequiredError
 from app.services.simulation_lookup import SimulatorContextMissingError
 from app.services.simulation_period import InvalidPeriodError, InvalidPeriodReason
@@ -48,6 +50,7 @@ C = SimulationErrorCode
         (ModelNotFoundError([9]), C.MODEL_NOT_FOUND),
         (ModelNotActiveError([2]), C.MODEL_NOT_ACTIVE),
         (ModelImageUnsupportedError([2]), C.MODEL_IMAGE_NOT_SUPPORTED),
+        (ModelImageOutputUnsupportedError([2]), C.MODEL_IMAGE_OUTPUT_NOT_SUPPORTED),
         (
             ModelParameterUnsupportedError([2], ["temperature"]),
             C.MODEL_PARAMETER_NOT_SUPPORTED,
@@ -57,6 +60,7 @@ C = SimulationErrorCode
         (EmptyImageError(), C.IMAGE_EMPTY),
         (ImageTooLargeError(), C.IMAGE_TOO_LARGE),
         (UnsupportedImageTypeError(), C.IMAGE_TYPE_NOT_SUPPORTED),
+        (StoredImageNotFoundError(), C.IMAGE_FILE_NOT_FOUND),
         (SimulationNotFoundError(), C.SIMULATION_NOT_FOUND),
         (SlotNotFoundError(), C.SLOT_NOT_FOUND),
         (InvalidPeriodError(InvalidPeriodReason.INCOMPLETE), C.PERIOD_INCOMPLETE),

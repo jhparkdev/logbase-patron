@@ -258,6 +258,22 @@ class Factory:
             },
         )
 
+    async def output_asset(self, **values: Any) -> RowMapping:
+        if "request_id" not in values:
+            values["request_id"] = (await self.ai_request())["request_id"]
+        output_asset_id = values.setdefault("output_asset_id", uuid.uuid4())
+        return await self.insert(
+            "output_assets",
+            {
+                "sort_order": 0,
+                "storage_path": f"simulator/output/{output_asset_id}.png",
+                "sha256": "0" * SHA256_HEX_LENGTH,
+                "mime_type": "image/png",
+                "file_size_bytes": 1,
+                **values,
+            },
+        )
+
     async def cost_adjustment(self, **values: Any) -> RowMapping:
         if "request_id" not in values:
             values["request_id"] = (await self.ai_request())["request_id"]
