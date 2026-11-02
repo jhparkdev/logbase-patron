@@ -224,6 +224,27 @@ async def test_정렬_기준과_방향을_따르고_프로젝트가_없는_행�
     assert names == expected
 
 
+async def test_프로젝트를_고르면_그_프로젝트에_배분한_구독료만_나온다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    mine = await factory.project(name="내 프로젝트")
+    other = await factory.project(name="다른 프로젝트")
+    await factory.subscription_cost(
+        applied_month=OCTOBER, tool_name="내 것", project_id=mine["project_id"]
+    )
+    await factory.subscription_cost(
+        applied_month=OCTOBER, tool_name="남의 것", project_id=other["project_id"]
+    )
+    await factory.subscription_cost(applied_month=OCTOBER, tool_name="미배분")
+
+    page = await list_subscriptions(
+        db_session, OCT_PERIOD, query(project_id=mine["project_id"])
+    )
+
+    assert [row.tool_name for row in page.items] == ["내 것"]
+    assert page.total == 1
+
+
 async def test_미리보기는_최근_5건을_고른_뒤_그_안에서_정렬한다(
     db_session: AsyncSession, factory: Factory
 ) -> None:

@@ -369,3 +369,25 @@ async def test_선택_목록은_사용_중인_프로젝트와_내부_호출에_�
     assert "중단됨" not in project_names
     assert [option.name for option in options.services] == ["내부 서비스"]
     assert [option.name for option in options.models] == ["내부 모델"]
+
+
+async def test_프로젝트와_모델을_고른_요약의_확정_비용이_같은_조건의_목록_합계와_같다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    project = await factory.project()
+    model = await factory.model()
+    await internal_call(
+        factory,
+        project_id=project["project_id"],
+        model_id=model["model_id"],
+        cost_usd=Decimal(2),
+    )
+    await internal_call(factory, project_id=project["project_id"], cost_usd=Decimal(3))
+    await internal_call(factory, model_id=model["model_id"], cost_usd=Decimal(4))
+    filters = {"project_id": project["project_id"], "model_id": model["model_id"]}
+
+    summary = await summarize(db_session, PERIOD, **filters)
+    page = await list_requests(db_session, PERIOD, query(**filters))
+
+    listed = sum((row.cost_usd for row in page.items if row.cost_usd), Decimal(0))
+    assert summary.api_confirmed_usd == listed == Decimal(2)

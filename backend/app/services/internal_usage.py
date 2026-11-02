@@ -29,14 +29,24 @@ INTERNAL_ORIGINS = (
 )
 
 
-def api_conditions(period: DateRange) -> list[ColumnElement[bool]]:
-    """기간 안의 내부 호출만 고르는 조건. KST 날짜를 UTC 시각 범위로 바꿔 비교한다."""
+def api_conditions(
+    period: DateRange, project_id: int | None = None, model_id: int | None = None
+) -> list[ColumnElement[bool]]:
+    """기간 안의 내부 호출만 고르는 조건. KST 날짜를 UTC 시각 범위로 바꿔 비교한다.
+
+    프로젝트나 모델을 주면 그 호출만 고른다.
+    """
     start, end = utc_bounds(period)
-    return [
+    conditions = [
         AIRequest.usage_origin.in_(INTERNAL_ORIGINS),
         AIRequest.requested_at >= start,
         AIRequest.requested_at < end,
     ]
+    if project_id is not None:
+        conditions.append(AIRequest.project_id == project_id)
+    if model_id is not None:
+        conditions.append(AIRequest.model_id == model_id)
+    return conditions
 
 
 def cost_measures() -> list[Any]:
@@ -59,7 +69,11 @@ def cost_measures() -> list[Any]:
 
 
 def build_summary(
-    confirmed: Decimal, estimated: Decimal, unknown_count: int, subscription: Decimal
+    confirmed: Decimal,
+    estimated: Decimal,
+    unknown_count: int,
+    subscription: Decimal,
+    subscription_excluded: bool = False,
 ) -> InternalSummary:
     return InternalSummary(
         api_confirmed_usd=confirmed,
@@ -69,37 +83,54 @@ def build_summary(
         unknown_cost_count=unknown_count,
         includes_estimate=estimated > 0,
         has_unknown=unknown_count > 0,
+        subscription_excluded=subscription_excluded,
     )
 
 
-async def summarize(session: AsyncSession, period: DateRange) -> InternalSummary:
-    row = (
-        await session.execute(select(*cost_measures()).where(*api_conditions(period)))
-    ).one()
+async def summarize(
+    session: AsyncSession,
+    period: DateRange,
+    project_id: int | None = None,
+    model_id: int | None = None,
+) -> InternalSummary:
+    """프로젝트를 고르면 그 프로젝트에 배분한 구독료만 더한다. 모델을 고르면 구독료는 뺀다."""
+    conditions = api_conditions(period, project_id, model_id)
+    row = (await session.execute(select(*cost_measures()).where(*conditions))).one()
     confirmed, estimated, unknown_count = row
-    subscription = await subscription_total(session, period)
-    return build_summary(confirmed, estimated, unknown_count, subscription)
+    excluded = model_id is not None
+    subscription = (
+        ZERO if excluded else await subscription_total(session, period, project_id)
+    )
+    return build_summary(confirmed, estimated, unknown_count, subscription, excluded)
 
 
-def subscription_conditions(period: DateRange) -> list[ColumnElement[bool]]:
+def subscription_conditions(
+    period: DateRange, project_id: int | None = None
+) -> list[ColumnElement[bool]]:
     """조회 기간이 걸치는 모든 달의 구독료를 고르는 조건. 달의 일부만 걸쳐도 그 달 전체를 고른다.
 
     요약의 구독료 합계와 구독료 목록이 같이 쓴다. 같은 조건의 합계가 서로 일치하게 하기 위해서다.
+    프로젝트를 주면 그 프로젝트에 배분한 구독료만 고른다. 배분하지 않은 구독료는 빠진다.
     """
-    return [
+    conditions = [
         SubscriptionCost.applied_month >= period.start.replace(day=1),
         SubscriptionCost.applied_month <= period.end.replace(day=1),
     ]
+    if project_id is not None:
+        conditions.append(SubscriptionCost.project_id == project_id)
+    return conditions
 
 
-async def subscription_total(session: AsyncSession, period: DateRange) -> Decimal:
+async def subscription_total(
+    session: AsyncSession, period: DateRange, project_id: int | None = None
+) -> Decimal:
     """조회 기간이 걸치는 모든 달의 구독료 합계. 달의 일부만 걸쳐도 월 금액 그대로 더한다.
 
     해지(CANCELLED) 구독료도 그 달 청구액이라 합산한다. 명세에 없는 임시 결정이다.
     """
     total = await session.scalar(
         select(func.coalesce(func.sum(SubscriptionCost.amount), ZERO)).where(
-            *subscription_conditions(period)
+            *subscription_conditions(period, project_id)
         )
     )
     return total if total is not None else ZERO
@@ -124,12 +155,17 @@ def build_trend(
     return InternalTrend(items=items)
 
 
-async def daily_trend(session: AsyncSession, period: DateRange) -> InternalTrend:
+async def daily_trend(
+    session: AsyncSession,
+    period: DateRange,
+    project_id: int | None = None,
+    model_id: int | None = None,
+) -> InternalTrend:
     """KST 날짜별 API 비용. 구독료는 일별로 나누지 않아 넣지 않는다."""
     kst_day = func.timezone(KST_ZONE, AIRequest.requested_at).cast(Date)
     rows = await session.execute(
         select(kst_day, *cost_measures())
-        .where(*api_conditions(period))
+        .where(*api_conditions(period, project_id, model_id))
         .group_by(kst_day)
     )
     by_day = {

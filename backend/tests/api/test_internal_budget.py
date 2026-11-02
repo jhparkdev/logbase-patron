@@ -184,3 +184,102 @@ async def test_추이도_잘못된_기간은_INVALID_PERIOD로_거절한다(
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert response.json()["code"] == "INVALID_PERIOD"
+
+
+# ---------------------------------------------------------------
+# 프로젝트·모델 조건
+# ---------------------------------------------------------------
+async def test_프로젝트를_고르면_요약이_그_프로젝트_기준이다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    mine = await factory.project()
+    other = await factory.project()
+    await internal_call(factory, project_id=mine["project_id"], cost_usd=Decimal(2))
+    await internal_call(factory, project_id=other["project_id"], cost_usd=Decimal(5))
+    month = date(2026, 10, 1)
+    await factory.subscription_cost(
+        applied_month=month, amount=Decimal(10), project_id=mine["project_id"]
+    )
+    await factory.subscription_cost(applied_month=month, amount=Decimal(40))
+    params = {**OCTOBER, "project_id": mine["project_id"]}
+
+    body = (await client.get(SUMMARY, params=params)).json()
+
+    assert Decimal(body["api_confirmed_usd"]) == Decimal(2)
+    assert Decimal(body["subscription_usd"]) == Decimal(10)
+    assert Decimal(body["total_managed_usd"]) == Decimal(12)
+    assert body["subscription_excluded"] is False
+
+
+async def test_모델을_고르면_요약에서_구독료가_빠지고_제외_표시가_켜진다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    model = await factory.model()
+    other = await factory.model()
+    await internal_call(factory, model_id=model["model_id"], cost_usd=Decimal(2))
+    await internal_call(factory, model_id=other["model_id"], cost_usd=Decimal(5))
+    await factory.subscription_cost(applied_month=date(2026, 10, 1), amount=Decimal(10))
+    params = {**OCTOBER, "model_id": model["model_id"]}
+
+    body = (await client.get(SUMMARY, params=params)).json()
+
+    assert Decimal(body["api_confirmed_usd"]) == Decimal(2)
+    assert Decimal(body["subscription_usd"]) == 0
+    assert body["subscription_excluded"] is True
+
+
+async def test_조건이_없으면_제외_표시가_꺼져_있다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    body = (await client.get(SUMMARY, params=OCTOBER)).json()
+
+    assert body["subscription_excluded"] is False
+
+
+async def test_추이도_프로젝트와_모델_조건을_따른다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    project = await factory.project()
+    model = await factory.model()
+    await internal_call(
+        factory,
+        project_id=project["project_id"],
+        model_id=model["model_id"],
+        cost_usd=Decimal(2),
+    )
+    await internal_call(factory, cost_usd=Decimal(5))
+    params = {
+        **OCTOBER,
+        "project_id": project["project_id"],
+        "model_id": model["model_id"],
+    }
+
+    body = (await client.get(TREND, params=params)).json()
+
+    total = sum(Decimal(point["api_confirmed_usd"]) for point in body["items"])
+    assert total == Decimal(2)
+
+
+@pytest.mark.parametrize("endpoint", [SUMMARY, TREND], ids=["요약", "추이"])
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"project_id": "0"},
+        {"project_id": "abc"},
+        {"model_id": "-1"},
+        {"model_id": "abc"},
+    ],
+    ids=[
+        "프로젝트 ID 0",
+        "프로젝트 ID가 숫자 아님",
+        "모델 ID 음수",
+        "모델 ID가 숫자 아님",
+    ],
+)
+async def test_잘못된_프로젝트_모델_번호는_422이다(
+    client: AsyncClient, endpoint: str, params: dict[str, str]
+) -> None:
+    response = await client.get(endpoint, params={**OCTOBER, **params})
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()["code"] == "VALIDATION_ERROR"

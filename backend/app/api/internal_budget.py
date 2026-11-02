@@ -28,6 +28,7 @@ from app.schemas.internal_usage import (
     InternalFilterQuery,
     InternalSummary,
     InternalTrend,
+    InternalUsageQuery,
 )
 from app.schemas.models import MAX_MODEL_ID
 from app.schemas.project_budget import ProjectBudgetPage, ProjectRowsQuery
@@ -76,16 +77,22 @@ def period_of(query: InternalFilterQuery, today: date) -> DateRange:
 
 @router.get("/summary", responses=QUERY_ERRORS)
 async def read_summary(
-    query: Annotated[InternalFilterQuery, Query()], session: SessionDep, now: NowDep
+    query: Annotated[InternalUsageQuery, Query()], session: SessionDep, now: NowDep
 ) -> InternalSummary:
-    return await internal_usage.summarize(session, period_of(query, kst_today(now)))
+    period = period_of(query, kst_today(now))
+    return await internal_usage.summarize(
+        session, period, query.project_id, query.model_id
+    )
 
 
 @router.get("/trend", responses=QUERY_ERRORS)
 async def read_trend(
-    query: Annotated[InternalFilterQuery, Query()], session: SessionDep, now: NowDep
+    query: Annotated[InternalUsageQuery, Query()], session: SessionDep, now: NowDep
 ) -> InternalTrend:
-    return await internal_usage.daily_trend(session, period_of(query, kst_today(now)))
+    period = period_of(query, kst_today(now))
+    return await internal_usage.daily_trend(
+        session, period, query.project_id, query.model_id
+    )
 
 
 @router.get("/requests", responses=QUERY_ERRORS)

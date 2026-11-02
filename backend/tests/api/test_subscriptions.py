@@ -186,6 +186,22 @@ async def test_같은_기간의_목록_금액_합계가_요약의_구독료와_�
     assert Decimal(summary["subscription_usd"]) == total
 
 
+async def test_프로젝트를_고르면_그_프로젝트에_배분한_구독료만_돌려준다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    mine = await factory.project(name="내 프로젝트")
+    await factory.subscription_cost(
+        applied_month=OCT, tool_name="내 것", project_id=mine["project_id"]
+    )
+    await factory.subscription_cost(applied_month=OCT, tool_name="미배분")
+    params = {**OCTOBER, "project_id": mine["project_id"]}
+
+    body = (await client.get(BASE, params=params)).json()
+
+    assert [item["tool_name"] for item in body["items"]] == ["내 것"]
+    assert body["total"] == 1
+
+
 @pytest.mark.parametrize(
     "params",
     [
@@ -197,6 +213,8 @@ async def test_같은_기간의_목록_금액_합계가_요약의_구독료와_�
         {"page": "0"},
         {"page_size": "0"},
         {"page_size": "101"},
+        {"project_id": "0"},
+        {"model_id": "1"},
     ],
     ids=[
         "예전 month 조건",
@@ -207,6 +225,8 @@ async def test_같은_기간의_목록_금액_합계가_요약의_구독료와_�
         "0쪽",
         "0개",
         "101개",
+        "프로젝트 ID 0",
+        "모델 조건은 없음",
     ],
 )
 async def test_잘못된_목록_조건은_422이다(

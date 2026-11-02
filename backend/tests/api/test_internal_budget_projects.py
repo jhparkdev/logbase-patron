@@ -226,3 +226,59 @@ async def test_잘못된_조건은_422이다(
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert response.json()["code"] == "VALIDATION_ERROR"
+
+
+async def test_프로젝트를_고르면_그_프로젝트_한_행만_돌려준다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await project_with_usage(factory, "다른", "5", budget="100")
+    target = await project_with_usage(factory, "대상", "10", budget="100")
+    params = {**OCTOBER, "project_id": target}
+
+    body = (await client.get(PROJECTS, params=params)).json()
+
+    assert names(body) == ["대상"]
+    assert body["total"] == 1
+
+
+async def test_모델을_고르면_그_모델의_호출만_사용액이고_구독료는_뺀다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    project = await factory.project(name="프로젝트")
+    project_id = project["project_id"]
+    model = await factory.model()
+    other = await factory.model()
+    await factory.budget(project_id=project_id, monthly_amount_usd=Decimal(100))
+    await internal_call(
+        factory, project_id=project_id, model_id=model["model_id"], cost_usd=Decimal(10)
+    )
+    await internal_call(
+        factory, project_id=project_id, model_id=other["model_id"], cost_usd=Decimal(30)
+    )
+    await factory.subscription_cost(
+        applied_month=date(2026, 10, 1), amount=Decimal(5), project_id=project_id
+    )
+    params = {**OCTOBER, "model_id": model["model_id"]}
+
+    unfiltered = (await client.get(PROJECTS, params=OCTOBER)).json()["items"][0]
+    filtered = (await client.get(PROJECTS, params=params)).json()["items"][0]
+
+    assert Decimal(unfiltered["used_usd"]) == Decimal(45)
+    assert Decimal(filtered["used_usd"]) == Decimal(10)
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"project_id": "0"},
+        {"project_id": "abc"},
+        {"model_id": "-1"},
+    ],
+    ids=["프로젝트 ID 0", "프로젝트 ID가 숫자 아님", "모델 ID 음수"],
+)
+async def test_잘못된_프로젝트_모델_번호는_422이다(
+    client: AsyncClient, params: dict[str, str]
+) -> None:
+    response = await client.get(PROJECTS, params={**OCTOBER, **params})
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT

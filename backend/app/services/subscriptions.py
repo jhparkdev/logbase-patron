@@ -117,7 +117,7 @@ async def list_subscriptions(
 
     요약의 구독료 합계와 같은 조건(internal_usage.subscription_conditions)을 써서 합계가 일치한다.
     """
-    conditions = subscription_conditions(period)
+    conditions = subscription_conditions(period, query.project_id)
     total = await session.scalar(
         select(func.count()).select_from(SubscriptionCost).where(*conditions)
     )

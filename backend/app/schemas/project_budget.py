@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.models import MAX_PAGE, SortOrder
 from app.schemas.plain_decimal import PlainDecimal
-from app.schemas.usage import Month
+from app.schemas.usage import Month, RowId
 from app.services.budget_policy import BudgetStatus
 
 # 전체보기 한 페이지 개수. 기본값은 화면의 PAGE_SIZE와 같다
@@ -29,6 +29,9 @@ class ProjectRowsQuery(BaseModel):
 
     # 예산은 월 단위라 이 달의 예산과 사용액을 비교한다. 형식은 YYYY-MM이다
     month: Month
+    # 프로젝트나 모델을 고르면 요약과 같은 조건으로 사용액을 센다. 모델을 고르면 구독료는 뺀다
+    project_id: RowId | None = None
+    model_id: RowId | None = None
     # 예산을 넘었거나 넘을 것 같은 프로젝트가 위에 오도록 기본은 사용률이다
     sort: ProjectRowSort = ProjectRowSort.USAGE
     order: SortOrder = SortOrder.DESC

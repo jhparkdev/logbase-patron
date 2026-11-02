@@ -57,6 +57,8 @@ class SubscriptionSort(StrEnum):
 class SubscriptionsQuery(InternalFilterQuery):
     """기간은 요약·추이와 같은 규칙이다. 기간을 보내지 않으면 최근 30일이 걸치는 달이다."""
 
+    # 고르면 그 프로젝트에 배분한 구독료만 나온다. 배분하지 않은 구독료는 빠진다
+    project_id: ProjectId | None = None
     sort: SubscriptionSort = SubscriptionSort.MONTH
     order: SortOrder = SortOrder.DESC
     # 요약 화면용 미리보기. 적용 월이 최근인 N건을 고른 뒤 그 안에서만 정렬하고 페이지는 나누지 않는다

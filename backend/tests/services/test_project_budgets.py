@@ -312,7 +312,7 @@ async def seven_projects(factory: Factory) -> None:
 
 async def usage_project(
     factory: Factory, name: str, *, cost: str, budget: str | None = None
-) -> None:
+) -> int:
     project = await factory.project(name=name)
     if budget is not None:
         await factory.budget(
@@ -321,6 +321,7 @@ async def usage_project(
     await internal_call(
         factory, project_id=project["project_id"], cost_usd=Decimal(cost)
     )
+    return project["project_id"]
 
 
 async def test_기본은_사용률이_높은_순서이고_예산이_없는_프로젝트는_맨_뒤다(
@@ -437,3 +438,84 @@ async def test_예산이_없으면_사용액_상위_5개를_고른_뒤_그_안�
         "project 7",
     ]
     assert page.total == 7
+
+
+# ---------------------------------------------------------------
+# 프로젝트·모델 조건
+# ---------------------------------------------------------------
+async def test_프로젝트를_고르면_그_프로젝트_한_행만_나온다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await usage_project(factory, "다른", cost="5", budget="100")
+    target = await usage_project(factory, "대상", cost="10", budget="100")
+
+    page = await list_project_budgets(
+        db_session, ProjectRowsQuery(month=OCT, project_id=target)
+    )
+
+    assert [item.project_id for item in page.items] == [target]
+    assert page.total == 1
+
+
+async def test_없는_프로젝트를_고르면_빈_목록이다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await usage_project(factory, "있는", cost="5")
+
+    page = await list_project_budgets(
+        db_session, ProjectRowsQuery(month=OCT, project_id=987654)
+    )
+
+    assert (page.items, page.total) == ([], 0)
+
+
+async def test_모델을_고르면_그_모델의_호출만_사용액이고_구독료는_뺀다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    project = await factory.project(name="프로젝트")
+    project_id = project["project_id"]
+    model = await factory.model()
+    other = await factory.model()
+    await factory.budget(project_id=project_id, monthly_amount_usd=Decimal(100))
+    await internal_call(
+        factory, project_id=project_id, model_id=model["model_id"], cost_usd=Decimal(10)
+    )
+    await internal_call(
+        factory, project_id=project_id, model_id=other["model_id"], cost_usd=Decimal(30)
+    )
+    await internal_call(
+        factory, project_id=project_id, model_id=other["model_id"], **UNKNOWN_COST
+    )
+    await factory.subscription_cost(
+        applied_month=OCT, amount=Decimal(5), project_id=project_id
+    )
+
+    unfiltered = await project_budget_rows(db_session, OCT)
+    filtered = await project_budget_rows(db_session, OCT, model_id=model["model_id"])
+
+    assert unfiltered[0].used_usd == Decimal(45)
+    assert filtered[0].used_usd == Decimal(10)
+    assert filtered[0].unknown_cost_count == 0
+    assert unfiltered[0].unknown_cost_count == 1
+
+
+async def test_프로젝트와_모델을_함께_고르면_둘_다_맞는_호출만_사용액이다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    mine = await factory.project(name="내 프로젝트")
+    other = await factory.project(name="다른 프로젝트")
+    model = await factory.model()
+    for project in (mine, other):
+        await internal_call(
+            factory,
+            project_id=project["project_id"],
+            model_id=model["model_id"],
+            cost_usd=Decimal(7),
+        )
+
+    rows = await project_budget_rows(
+        db_session, OCT, project_id=mine["project_id"], model_id=model["model_id"]
+    )
+
+    pairs = [(row.project_id, row.used_usd) for row in rows]
+    assert pairs == [(mine["project_id"], Decimal(7))]
