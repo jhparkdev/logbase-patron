@@ -110,7 +110,7 @@ export function HistoryTable({
                 </button>
               </td>
               <td className={cell}>
-                <span className="line-clamp-2 break-words" title={row.scenario}>
+                <span className="line-clamp-2" title={row.scenario}>
                   {row.scenario}
                 </span>
               </td>

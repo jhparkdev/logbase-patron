@@ -45,7 +45,7 @@ TDS Badge의 Weak 형태다. 배경은 `*-weak`(같은 색 16%), 글자는 같�
 | `text-label` | 13/19.5 | 라벨, 표 머리글, 경로 표시 |
 | `text-caption` | 12/18 | 보조 설명, 배지 |
 
-모두 TDS 타이포그래피 표에 있는 크기다. 글꼴은 영문·숫자 Inter, 한글 Noto Sans KR이다(Google Fonts, 굵기 400·500·600·700). 받지 못하면 시스템 글꼴(Mac은 SF Pro·Apple SD 산돌고딕, Windows는 맑은 고딕)로 보인다.
+모두 TDS 타이포그래피 표에 있는 크기다. 글꼴은 영문·숫자 Inter, 한글 Noto Sans KR이다(Google Fonts, 굵기 400·500·600·700). 받지 못하면 시스템 글꼴(Mac은 SF Pro·Apple SD 산돌고딕, Windows는 맑은 고딕)로 보인다. 한글은 단어 단위로 줄을 바꾸고(`body`에 `keep-all`), 칸보다 긴 단어만 끊는다. 짧은 글은 줄 길이를 고르게 나누고(`text-balance`), AI 응답·Prompt·JSON처럼 원문 줄바꿈을 보여 주는 곳만 `text-wrap`으로 되돌린다. ID·파일 이름처럼 아무 데서나 끊어도 되는 값만 `break-all`을 붙인다.
 
 ## 모서리와 간격
 - `rounded-control`(10px): 버튼 M, 입력 칸
