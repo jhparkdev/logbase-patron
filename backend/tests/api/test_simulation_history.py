@@ -122,6 +122,7 @@ async def test_a_list_item_is_the_same_summary_the_detail_shows(
         for item in listed
     ] == [detail]
     assert detail["confirmed_cost_usd"] == "0.000125000000000000"
+    assert Decimal(detail["total_cost_usd"]) == Decimal("0.000125")
 
 
 @pytest.mark.usefixtures("signed_in")

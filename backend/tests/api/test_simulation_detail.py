@@ -136,7 +136,42 @@ async def test_the_summary_total_equals_the_sum_of_the_slots(
         if r["cost_status"] == "CONFIRMED"
     )
     assert Decimal(body["summary"]["confirmed_cost_usd"]) == confirmed
+    assert Decimal(body["summary"]["total_cost_usd"]) == confirmed
     assert body["summary"]["cost_check_status"] == "확정"
+
+
+@pytest.mark.usefixtures("signed_in")
+async def test_the_total_adds_estimated_slots_and_leaves_out_unknown_ones(
+    client: AsyncClient, factory: Factory
+) -> None:
+    run = await factory.simulation_run(status="PARTIAL_SUCCESS")
+    # 추정 비용은 가격 근거가 있어야 기록된다(DB 제약)
+    price_id = (await factory.model_price())["price_id"]
+    slots = [
+        ("CONFIRMED", Decimal("0.000123"), None),
+        ("ESTIMATED", Decimal("0.000002"), price_id),
+        ("UNKNOWN", None, None),
+    ]
+    for slot_no, (cost_status, cost, price) in enumerate(slots, start=1):
+        request = await factory.ai_request(
+            usage_origin="SIMULATION",
+            simulation_id=run["simulation_id"],
+            status="SUCCESS",
+            cost_status=cost_status,
+            cost_usd=cost,
+            price_id=price,
+        )
+        await factory.simulation_result(
+            simulation_id=run["simulation_id"],
+            request_id=request["request_id"],
+            slot_no=slot_no,
+        )
+
+    summary = (await client.get(detail_url(run["simulation_id"]))).json()["summary"]
+
+    assert Decimal(summary["total_cost_usd"]) == Decimal("0.000125")
+    assert summary["unknown_cost_count"] == 1
+    assert summary["cost_check_status"] == "미확인 포함"
 
 
 # --- 진행 중 ---
