@@ -51,7 +51,7 @@ export function UsageFilters({ values, onSubmit }: UsageFiltersProps) {
           render={({ field }) => (
             <Select
               label={select.label}
-              showLabel
+              labelPosition="side"
               value={field.value}
               options={[
                 { value: "", label: select.all },

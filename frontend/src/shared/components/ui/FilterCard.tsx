@@ -22,7 +22,7 @@ export function FilterCard({ onSubmit, error, children }: FilterCardProps) {
       onSubmit={onSubmit}
       className="rounded-2xl bg-white p-4"
     >
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         {children}
         <Button type="submit" className="ml-auto">
           조회

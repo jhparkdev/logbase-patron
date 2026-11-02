@@ -55,7 +55,7 @@ export function BudgetFilters({ values, onSubmit }: BudgetFiltersProps) {
           render={({ field }) => (
             <Select
               label={select.label}
-              showLabel
+              labelPosition="side"
               value={field.value}
               options={[
                 { value: "", label: select.all },
@@ -66,7 +66,7 @@ export function BudgetFilters({ values, onSubmit }: BudgetFiltersProps) {
               ]}
               onChange={field.onChange}
               disabled={options.data === undefined}
-              className="w-50"
+              className="w-44"
             />
           )}
         />
