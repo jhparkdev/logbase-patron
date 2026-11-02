@@ -23,6 +23,8 @@ type DataTableProps<T> = {
   onSortChange?: (key: string) => void;
   /** 행이 없을 때 보여 줄 내용(결과 블록) */
   empty: ReactNode;
+  /** 행 바탕처럼 행마다 달라지는 모양. 예: 실패한 호출을 연하게 물들임 */
+  rowClassName?: (row: T) => string;
 };
 
 /** 정렬은 서버가 한다. 이 표는 정렬 상태를 보여 주고, 바꿀 칸만 알린다. */
@@ -34,6 +36,7 @@ export function DataTable<T>({
   sort,
   onSortChange,
   empty,
+  rowClassName,
 }: DataTableProps<T>) {
   return (
     <div className="overflow-x-auto rounded-b-2xl">
@@ -79,7 +82,7 @@ export function DataTable<T>({
             rows.map((row) => (
               <tr
                 key={rowKey(row)}
-                className="border-t border-grey-100 hover:bg-grey-50"
+                className={`border-t border-grey-100 hover:bg-grey-50 ${rowClassName?.(row) ?? ""}`}
               >
                 {columns.map((column) => (
                   <td

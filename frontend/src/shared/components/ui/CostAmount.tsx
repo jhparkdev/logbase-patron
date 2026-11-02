@@ -17,10 +17,12 @@ export function CostAmount({ cost, precision }: CostAmountProps) {
     return <Badge tone="yellow">미확인</Badge>;
   }
   if (cost.kind === "confirmed") {
-    return <span>{formatUsd(cost.amount, precision)}</span>;
+    return (
+      <span className="font-semibold">{formatUsd(cost.amount, precision)}</span>
+    );
   }
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-1.5 font-semibold text-blue-600">
       ≈ {formatUsd(cost.amount, precision)}
       <Badge tone="blue">추정</Badge>
     </span>
