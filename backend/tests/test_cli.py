@@ -103,6 +103,43 @@ async def test_seed_twice_changes_nothing(db_session: AsyncSession) -> None:
     assert await _row_counts(db_session) == EXPECTED_ROWS
 
 
+async def test_data_summary_scenario_asks_for_structured_output(
+    db_session: AsyncSession,
+) -> None:
+    """요약 및 구조화 시나리오는 프롬프트와 Schema 둘 다 구조화를 요구한다."""
+    await cli.apply_seed(await db_session.connection())
+
+    row = (
+        await db_session.execute(
+            text(
+                "SELECT prompt_template, default_json_schema FROM test_scenarios "
+                "WHERE scenario_code = 'DATA_SUMMARY'"
+            )
+        )
+    ).one()
+
+    assert "JSON Schema" in row.prompt_template
+    assert "{{data}}" in row.prompt_template
+    assert row.default_json_schema["required"] == ["summary", "key_points"]
+
+
+async def test_past_data_summary_runs_keep_the_conditions_they_ran_with(
+    db_session: AsyncSession,
+) -> None:
+    """실행에는 당시 값을 복사해 두므로 시나리오를 고쳐도 과거 실행의 조건은 그대로다."""
+    await cli.apply_seed(await db_session.connection())
+
+    runs_with_schema = await db_session.scalar(
+        text(
+            "SELECT count(*) FROM simulation_runs AS run "
+            "JOIN test_scenarios USING (scenario_id) "
+            "WHERE scenario_code = 'DATA_SUMMARY' AND run.json_schema IS NOT NULL"
+        )
+    )
+
+    assert runs_with_schema == 0
+
+
 async def test_ids_after_seed_do_not_collide(db_session: AsyncSession) -> None:
     """시드는 고정 ID로 넣지만 번호 생성기도 맞춰 두므로, 시드 뒤 새 행을 넣어도 ID가 겹치지 않는다."""
     connection = await db_session.connection()
