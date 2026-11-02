@@ -357,11 +357,20 @@ async def _check_rerun_source(
 async def _find_images(
     request: SimulationCreateRequest, deps: IntakeDeps
 ) -> tuple[ImageRef, ...]:
-    """요청한 순서대로 이미지를 돌려준다. 하나라도 올려 둔 적이 없으면 거절한다."""
+    """요청한 순서대로 이미지를 돌려준다. 하나라도 올려 둔 적이 없거나 파일이 사라졌으면 거절한다.
+
+    파일은 실행을 만들기 전에 확인한다. 만든 뒤에 못 읽으면 모든 칸이 실패로 남는데,
+    실패 이력은 지울 수 없어 이력과 성공률에 계속 섞인다.
+    """
     if not request.asset_ids:
         return ()
     found = await deps.lookup.find_images(request.asset_ids)
-    missing = [asset_id for asset_id in request.asset_ids if asset_id not in found]
+    missing = [
+        asset_id
+        for asset_id in request.asset_ids
+        if asset_id not in found
+        or not await deps.image_files.exists(found[asset_id].storage_path)
+    ]
     if missing:
         raise ImageNotFoundError(missing)
     return tuple(found[asset_id] for asset_id in request.asset_ids)

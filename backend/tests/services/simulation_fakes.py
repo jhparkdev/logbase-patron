@@ -425,3 +425,13 @@ class FakeLookup:
 
     async def simulator_context(self) -> SimulatorContext:
         return self.context
+
+
+class FakeImageFiles:
+    """저장소의 이미지 파일. 기본은 모든 파일이 있고, missing 에 넣은 키만 없다."""
+
+    def __init__(self) -> None:
+        self.missing: set[str] = set()
+
+    async def exists(self, key: str) -> bool:
+        return key not in self.missing

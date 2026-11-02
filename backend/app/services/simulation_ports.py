@@ -356,6 +356,12 @@ class ImageSource(Protocol):
     async def data_url(self, image: ImageRef) -> str: ...
 
 
+class ImageFiles(Protocol):
+    """저장소에 이미지 파일이 실제로 있는지 본다. 접수 때 읽기만 한다."""
+
+    async def exists(self, key: str) -> bool: ...
+
+
 @dataclass(frozen=True)
 class IntakeDeps:
     """요청 접수에 필요한 것. 현재 시각과 새 ID 는 주입한다."""
@@ -363,6 +369,7 @@ class IntakeDeps:
     lookup: SimulationLookup
     recorder: RequestRecorder
     store: SimulationStore
+    image_files: ImageFiles
     now: Callable[[], datetime]
     new_id: Callable[[], uuid.UUID]
 

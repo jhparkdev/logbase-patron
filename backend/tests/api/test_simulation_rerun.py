@@ -16,7 +16,7 @@ from tests.image_samples import png
 
 SCHEMA = {"type": "object", "required": ["title"]}
 # 초안에서 화면 안내에만 쓰고 새 실행 요청에는 싣지 않는 값과 모델 칸의 현재 상태
-GUIDANCE_FIELDS = {"rerunnable", "blocked_reason"}
+GUIDANCE_FIELDS = {"rerunnable", "blocked_reason", "images"}
 CURRENT_MODEL_FIELDS = {"current_display_name", "current_status", "selectable"}
 
 
@@ -149,14 +149,17 @@ async def test_only_the_final_attempt_of_each_slot_is_offered(
     assert [m["model_id"] for m in draft["models"]] == [m["model_id"] for m in final]
 
 
-async def run_with_images(factory: Factory, *paths: str) -> tuple[Any, list[str]]:
+async def run_with_images(
+    factory: Factory, *paths: str, filenames: list[str | None] | None = None
+) -> tuple[Any, list[str]]:
     run = await factory.simulation_run()
     simulation_id = run["simulation_id"]
     for slot_no in (1, 2):
         await factory.simulation_result(simulation_id=simulation_id, slot_no=slot_no)
     asset_ids = []
-    for order, path in enumerate(paths, start=1):
-        asset = await factory.input_asset(storage_path=path)
+    names = filenames or [None] * len(paths)
+    for order, (path, name) in enumerate(zip(paths, names, strict=True), start=1):
+        asset = await factory.input_asset(storage_path=path, original_filename=name)
         await factory.simulation_run_asset(
             simulation_id=simulation_id, asset_id=asset["asset_id"], sort_order=order
         )
@@ -178,6 +181,49 @@ async def test_a_run_whose_image_files_remain_is_offered_with_its_images_in_orde
 
     assert (draft["rerunnable"], draft["blocked_reason"]) == (True, None)
     assert draft["asset_ids"] == asset_ids
+
+
+@pytest.mark.usefixtures("signed_in")
+async def test_the_draft_names_each_image_it_was_run_with(
+    client: AsyncClient, factory: Factory, image_storage: LocalImageStorage
+) -> None:
+    # 상세·재실행 화면이 "이미지 1" 대신 올린 파일 이름을 보여 주게 한다
+    await image_storage.write("simulator/front.png", png())
+    await image_storage.write("simulator/unnamed.png", png())
+    simulation_id, asset_ids = await run_with_images(
+        factory,
+        "simulator/front.png",
+        "simulator/unnamed.png",
+        filenames=["앞면.png", None],
+    )
+
+    draft = (await client.get(draft_url(simulation_id))).json()
+
+    assert draft["images"] == [
+        {
+            "asset_id": asset_ids[0],
+            "mime_type": "image/png",
+            "file_size_bytes": 1,
+            "original_filename": "앞면.png",
+        },
+        {
+            "asset_id": asset_ids[1],
+            "mime_type": "image/png",
+            "file_size_bytes": 1,
+            "original_filename": None,
+        },
+    ]
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in", "manager")
+async def test_a_text_only_run_has_no_images(
+    client: AsyncClient, models: list[int]
+) -> None:
+    simulation_id = await past_run_id(client, models)
+
+    draft = (await client.get(draft_url(simulation_id))).json()
+
+    assert (draft["asset_ids"], draft["images"]) == ([], [])
 
 
 @pytest.mark.usefixtures("signed_in", "image_storage")

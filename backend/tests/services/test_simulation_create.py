@@ -19,6 +19,7 @@ from app.services.model_parameters import (
     ParameterSupport,
 )
 from app.services.simulation_create import (
+    ImageNotFoundError,
     ModelNotActiveError,
     ModelNotFoundError,
     RerunSourceNotFoundError,
@@ -32,10 +33,11 @@ from app.services.simulation_input import (
     build_messages,
     compute_input_hash,
 )
-from app.services.simulation_ports import IntakeDeps, ScenarioInfo
+from app.services.simulation_ports import ImageRef, IntakeDeps, ScenarioInfo
 from app.services.simulation_validation import DuplicateModelSelectionError
 from tests.services.simulation_fakes import (
     FULL_PARAMETER_SUPPORT,
+    FakeImageFiles,
     FakeLookup,
     FakeRecorder,
     FakeStore,
@@ -56,11 +58,13 @@ class Intake:
         self.lookup = FakeLookup()
         self.recorder = FakeRecorder()
         self.store = FakeStore(self.recorder)
+        self.image_files = FakeImageFiles()
         self._next = iter(range(1, 100))
         self.deps = IntakeDeps(
             lookup=self.lookup,
             recorder=self.recorder,
             store=self.store,
+            image_files=self.image_files,
             now=lambda: NOW,
             new_id=lambda: uuid.UUID(int=next(self._next)),
         )
@@ -610,3 +614,44 @@ async def test_every_slot_with_a_bad_value_is_reported_at_once() -> None:
         await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
 
     assert error.value.model_ids == [1, 2]
+
+
+FRONT, BACK = uuid.UUID(int=31), uuid.UUID(int=32)
+
+
+def uploaded(intake: Intake, *asset_ids: uuid.UUID) -> None:
+    for asset_id in asset_ids:
+        intake.lookup.images[asset_id] = ImageRef(
+            asset_id=asset_id,
+            storage_path=f"simulator/{asset_id}.png",
+            mime_type="image/png",
+            sha256="0" * 64,
+        )
+
+
+async def test_images_whose_files_remain_are_accepted() -> None:
+    intake = Intake()
+    uploaded(intake, FRONT, BACK)
+
+    job = await create_simulation(
+        custom_request(asset_ids=[FRONT, BACK]), executed_by=USER_ID, deps=intake.deps
+    )
+
+    assert [image.asset_id for image in job.images] == [FRONT, BACK]
+
+
+async def test_an_image_whose_file_is_gone_is_refused_before_a_run_exists() -> None:
+    # 실행을 만든 뒤 칸마다 실패로 남기면 지울 수 없는 실패 이력이 성공률을 끌어내린다
+    intake = Intake()
+    uploaded(intake, FRONT, BACK)
+    intake.image_files.missing.add(f"simulator/{BACK}.png")
+
+    with pytest.raises(ImageNotFoundError) as error:
+        await create_simulation(
+            custom_request(asset_ids=[FRONT, BACK]),
+            executed_by=USER_ID,
+            deps=intake.deps,
+        )
+
+    assert error.value.asset_ids == [BACK]
+    assert intake.nothing_was_saved()

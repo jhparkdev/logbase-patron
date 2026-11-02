@@ -28,6 +28,7 @@ from app.schemas.simulation_history import (
     RerunRoutingPolicy,
     SimulationRerunDraft,
 )
+from app.schemas.simulation_image import ImageAssetRead
 from app.services.image_storage import ImageStorage
 from app.services.simulation_output_config import split_stored_config
 from app.services.simulation_validation import is_model_selectable
@@ -48,15 +49,15 @@ def build_rerun_draft(
     run: SimulationRun,
     slots: Sequence[PastSlot],
     *,
-    asset_ids: Sequence[uuid.UUID] = (),
+    images: Sequence[ImageAssetRead] = (),
     assets_available: bool = True,
 ) -> SimulationRerunDraft:
-    """과거 실행 행과 칸들로 초안을 만든다. slots 는 칸 번호 순서, asset_ids 는 올린 순서여야 한다.
+    """과거 실행 행과 칸들로 초안을 만든다. slots 는 칸 번호 순서, images 는 올린 순서여야 한다.
 
     이미지 파일을 더는 구할 수 없으면 막는다. 같은 입력이 아닌 채로 돌리면 비교가 달라지기 때문이다.
     """
     blocked = (
-        RerunBlockReason.INPUT_MISSING if asset_ids and not assets_available else None
+        RerunBlockReason.INPUT_MISSING if images and not assets_available else None
     )
     # 기록된 설정을 요청 모양으로 나눈다. 이미지 옵션은 실행에 한 번만 있고 칸마다 같다
     output_type, text_config, image_config = split_stored_config(run.execution_config)
@@ -75,7 +76,8 @@ def build_rerun_draft(
             )
         ),
         models=[_to_rerun_model(slot) for slot in slots],
-        asset_ids=list(asset_ids),
+        asset_ids=[image.asset_id for image in images],
+        images=list(images),
         output_type=output_type,
         image_config=image_config,
         rerunnable=blocked is None,
@@ -105,17 +107,17 @@ async def get_rerun_draft(
     return build_rerun_draft(
         run,
         await _past_slots(session, simulation_id),
-        asset_ids=[asset_id for asset_id, _ in assets],
+        images=[image for image, _ in assets],
         assets_available=all([await storage.exists(path) for _, path in assets]),
     )
 
 
 async def _past_assets(
     session: AsyncSession, simulation_id: uuid.UUID
-) -> list[tuple[uuid.UUID, str]]:
-    """과거 실행에 쓴 이미지의 (asset_id, 저장 경로). 올린 순서다."""
-    rows = await session.execute(
-        select(InputAsset.asset_id, InputAsset.storage_path)
+) -> list[tuple[ImageAssetRead, str]]:
+    """과거 실행에 쓴 이미지와 그 저장 경로. 올린 순서다."""
+    rows = await session.scalars(
+        select(InputAsset)
         .join(
             SimulationRunAsset,
             SimulationRunAsset.asset_id == InputAsset.asset_id,
@@ -123,7 +125,18 @@ async def _past_assets(
         .where(SimulationRunAsset.simulation_id == simulation_id)
         .order_by(SimulationRunAsset.sort_order)
     )
-    return [(asset_id, path) for asset_id, path in rows]
+    return [
+        (
+            ImageAssetRead(
+                asset_id=asset.asset_id,
+                mime_type=asset.mime_type,
+                file_size_bytes=asset.file_size_bytes,
+                original_filename=asset.original_filename,
+            ),
+            asset.storage_path,
+        )
+        for asset in rows
+    ]
 
 
 async def _past_slots(
