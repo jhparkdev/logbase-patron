@@ -13,6 +13,7 @@ from app.models import (
     TestType,
     ValidationStatus,
 )
+from app.schemas.simulation_output import OutputImageRead, OutputType
 from app.schemas.simulation_types import Money
 from app.services.simulation_validation import MAX_MODEL_COUNT, MIN_MODEL_COUNT
 
@@ -82,6 +83,10 @@ class SimulationModelResult(BaseModel):
     response_text: str | None
     # 실패한 칸에 화면이 보여 줄 문구. 내부 예외 원문이 아니라 정해진 사용자 문구다. 실패가 아니면 null
     error_message: str | None
+    # IMAGE 칸은 response_text 대신 output_images 에 결과가 있다
+    output_type: OutputType
+    # 모델이 만든 그림(돌려준 순서). 텍스트 칸, 끝나지 않았거나 취소된 칸은 빈 목록이다
+    output_images: list[OutputImageRead]
 
     @model_validator(mode="after")
     def _cost_unknown_means_null(self) -> Self:

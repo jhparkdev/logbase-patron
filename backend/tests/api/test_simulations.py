@@ -38,7 +38,12 @@ from tests.api.simulation_helpers import (
 from tests.api.test_auth import log_in, make_user
 from tests.conftest import TEST_BASE_URL, TEST_ORIGIN
 from tests.db_helpers import T0, Factory
-from tests.services.simulation_fakes import FakeCaller, FakeImageSource
+from tests.services.simulation_fakes import (
+    FakeCaller,
+    FakeImageGenerator,
+    FakeImageSource,
+    FakeOutputStore,
+)
 
 TEMPLATE = "다음 상품 정보로 작성하세요.\n{{product_info}}"
 
@@ -279,6 +284,8 @@ async def test_after_the_answer_the_run_finishes_in_the_database(
             store=ScopedSimulationStore(sessions),  # type: ignore[arg-type]
             now=lambda: T0 + timedelta(seconds=5),
             images=FakeImageSource(),
+            image_generator=FakeImageGenerator(),
+            outputs=FakeOutputStore(),
         )
     )
     app.dependency_overrides[get_simulation_manager] = lambda: manager

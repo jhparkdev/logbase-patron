@@ -177,6 +177,23 @@ async def test_a_model_supports_images_when_its_input_modalities_say_so(
 
 
 @pytest.mark.parametrize(
+    ("modalities", "generates"),
+    [(["image"], True), (["text", "image"], True), (["text"], False), ([], False)],
+)
+async def test_a_model_makes_images_when_its_output_modalities_say_so(
+    factory: Factory,
+    lookup: DbSimulationLookup,
+    modalities: list[str],
+    generates: bool,
+) -> None:
+    row = await factory.model(status="ACTIVE", output_modalities=modalities)
+
+    found = await lookup.find_models([row["model_id"]])
+
+    assert found[row["model_id"]].generates_images is generates
+
+
+@pytest.mark.parametrize(
     ("parameters", "temperature", "has_efforts"),
     [
         (["temperature", "reasoning"], True, True),

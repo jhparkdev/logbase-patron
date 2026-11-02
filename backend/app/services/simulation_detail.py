@@ -5,16 +5,26 @@
 """
 
 import uuid
+from collections import defaultdict
+from collections.abc import Sequence
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AIRequest, AIRequestPayload, RequestStatus, SimulationResult
+from app.models import (
+    AIRequest,
+    AIRequestPayload,
+    OutputAsset,
+    RequestStatus,
+    SimulationResult,
+)
+from app.schemas.simulation_output import OutputImageRead
 from app.schemas.simulation_result import (
     SimulationDetailResponse,
     SimulationModelResult,
     SimulationSummary,
 )
+from app.services.simulation_output_config import stored_output_type
 
 _SUMMARY = text(
     "SELECT * FROM v_simulation_summary WHERE simulation_id = :simulation_id"
@@ -55,15 +65,45 @@ async def _final_results(
         )
         .order_by(SimulationResult.slot_no)
     )
+    finals = rows.all()
+    images = await _output_images(
+        session, [result.request_id for result, _, _ in finals]
+    )
     return [
-        _to_model_result(result, request, response_text)
-        for result, request, response_text in rows
+        _to_model_result(result, request, response_text, images[result.request_id])
+        for result, request, response_text in finals
     ]
 
 
+async def _output_images(
+    session: AsyncSession, request_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, list[OutputImageRead]]:
+    """칸마다 만든 그림. 모델이 돌려준 순서다."""
+    rows = await session.scalars(
+        select(OutputAsset)
+        .where(OutputAsset.request_id.in_(request_ids))
+        .order_by(OutputAsset.request_id, OutputAsset.sort_order)
+    )
+    images: dict[uuid.UUID, list[OutputImageRead]] = defaultdict(list)
+    for asset in rows:
+        images[asset.request_id].append(
+            OutputImageRead(
+                output_asset_id=asset.output_asset_id,
+                sort_order=asset.sort_order,
+                mime_type=asset.mime_type,
+                file_size_bytes=asset.file_size_bytes,
+            )
+        )
+    return images
+
+
 def _to_model_result(
-    result: SimulationResult, request: AIRequest, response_text: str | None
+    result: SimulationResult,
+    request: AIRequest,
+    response_text: str | None,
+    output_images: list[OutputImageRead],
 ) -> SimulationModelResult:
+    cancelled = request.status == RequestStatus.CANCELLED
     return SimulationModelResult(
         slot_no=result.slot_no,
         request_id=result.request_id,
@@ -86,8 +126,12 @@ def _to_model_result(
         schema_validation_status=result.schema_validation_status,
         missing_required_fields=result.missing_required_fields,
         comparability_note=result.comparability_note,
-        # 취소된 칸의 원문은 취소 뒤 늦게 도착해 대조용으로만 남긴 것이라 결과로 보여 주지 않는다
-        response_text=(
-            None if request.status == RequestStatus.CANCELLED else response_text
+        # 취소된 칸의 원문·그림은 취소 뒤 늦게 도착해 대조용으로만 남긴 것이라 결과로 보여 주지 않는다
+        response_text=None if cancelled else response_text,
+        output_type=stored_output_type(request.execution_config),
+        # 그림은 성공한 칸에만 싣는다. 그림을 저장한 뒤 결과를 기록하기 전에 서버가 멈추면
+        # 정리 작업이 칸을 실패로 끝내는데, 그 칸에 그림이 보이면 실패와 결과가 어긋난다
+        output_images=(
+            output_images if request.status == RequestStatus.SUCCESS else []
         ),
     )

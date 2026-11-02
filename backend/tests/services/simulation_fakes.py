@@ -9,8 +9,10 @@ from decimal import Decimal
 from typing import Any
 
 from app.models import ModelStatus, RequestStatus, SimulationStatus
+from app.openrouter.image_result import GeneratedImage, ImageCallResult
 from app.openrouter.result import CallResult, CallStatus, CostSource, CostStatus
 from app.schemas.simulation import ReasoningEffort
+from app.schemas.simulation_output import OutputType
 from app.services.model_parameters import ParameterSupport
 from app.services.simulation_input import build_messages
 from app.services.simulation_ports import (
@@ -86,6 +88,78 @@ class FakeCaller:
             # OpenRouter 의 생성 ID 는 호출마다 다르다. DB 도 고유값으로 강제한다
             return ok(generation_id=f"gen-{next(self._generation_ids)}")
         return await behavior(kwargs)
+
+
+ImageBehavior = Callable[[dict[str, Any]], Awaitable[ImageCallResult]]
+
+
+def image_ok(count: int = 1, generation_id: str = "img-gen") -> ImageCallResult:
+    return ImageCallResult(
+        status=CallStatus.SUCCESS,
+        images=tuple(
+            GeneratedImage(data=png_bytes(n), media_type="image/png")
+            for n in range(count)
+        ),
+        requested_model="m",
+        generation_id=generation_id,
+        prompt_tokens=10,
+        completion_tokens=1290,
+        cost_usd=Decimal("0.04"),
+        cost_status=CostStatus.CONFIRMED,
+        cost_source=CostSource.API_RESPONSE,
+        started_at=NOW,
+        finished_at=NOW,
+        latency_ms=2000,
+    )
+
+
+def image_failed(status: RequestStatus = R.FAILED) -> ImageCallResult:
+    """비용 미확인으로 끝난 이미지 호출. status 는 FAILED·TIMEOUT·CANCELLED 중 하나다."""
+    return ImageCallResult(
+        status=CallStatus(status.value),
+        requested_model="m",
+        cost_status=CostStatus.UNKNOWN,
+        started_at=NOW,
+        finished_at=NOW,
+        latency_ms=100,
+    )
+
+
+def png_bytes(n: int) -> bytes:
+    """칸이 돌려준 n 번째 그림. 형식 머리 바이트 뒤에 번호를 붙여 서로 다르게 한다."""
+    return b"\x89PNG\r\n\x1a\n" + bytes([n])
+
+
+class FakeImageGenerator:
+    """모델 ID 별로 정해 둔 동작을 실행하는 가짜 generate_image. 기본은 한 장을 돌려준다."""
+
+    def __init__(self, behaviors: Mapping[str, ImageBehavior] | None = None) -> None:
+        self.behaviors = dict(behaviors or {})
+        self.calls: list[dict[str, Any]] = []
+        self._generation_ids = itertools.count(1)
+
+    async def __call__(self, **kwargs: Any) -> ImageCallResult:
+        self.calls.append(kwargs)
+        behavior = self.behaviors.get(kwargs["model_id"])
+        if behavior is None:
+            # DB 가 생성 ID 를 고유값으로 강제하므로 호출마다 다르게 준다
+            return image_ok(generation_id=f"img-gen-{next(self._generation_ids)}")
+        return await behavior(kwargs)
+
+
+class FakeOutputStore:
+    """저장소와 output_assets 대신 칸별로 받은 그림을 기록한다."""
+
+    def __init__(self) -> None:
+        self.saved: dict[uuid.UUID, list[GeneratedImage]] = {}
+        self.failing = False
+
+    async def save(
+        self, request_id: uuid.UUID, images: Sequence[GeneratedImage]
+    ) -> None:
+        if self.failing:
+            raise OSError("저장소 오류")
+        self.saved[request_id] = list(images)
 
 
 class FakeRecorder:
@@ -216,7 +290,10 @@ class FakeStore:
         self.finished.append((status, now))
 
 
-def make_slots(count: int, max_tokens: int = 4096) -> list[SlotPlan]:
+def make_slots(
+    count: int, max_tokens: int = 4096, config: Mapping[str, Any] | None = None
+) -> list[SlotPlan]:
+    """칸 목록. config 를 주면 모든 칸의 설정을 그 값으로 한다(이미지 실행)."""
     return [
         SlotPlan(
             slot_no=n,
@@ -224,7 +301,9 @@ def make_slots(count: int, max_tokens: int = 4096) -> list[SlotPlan]:
             model_id=n,
             openrouter_model_id=f"vendor/model-{n}",
             execution_provider=f"Provider{n}",
-            execution_config={"max_tokens": max_tokens},
+            execution_config=dict(config)
+            if config is not None
+            else {"max_tokens": max_tokens},
         )
         for n in range(1, count + 1)
     ]
@@ -241,9 +320,14 @@ class Harness:
         allow_fallbacks: bool = False,
         max_tokens: int = 4096,
         images: Sequence[ImageRef] = (),
+        output_type: OutputType = OutputType.TEXT,
+        image_behaviors: Mapping[str, ImageBehavior] | None = None,
+        slot_config: Mapping[str, Any] | None = None,
     ) -> None:
-        self.slots = make_slots(count, max_tokens)
+        self.slots = make_slots(count, max_tokens, slot_config)
         self.caller = FakeCaller(behaviors)
+        self.image_generator = FakeImageGenerator(image_behaviors)
+        self.outputs = FakeOutputStore()
         self.recorder = FakeRecorder(self.slots)
         self.store = FakeStore(self.recorder)
         self.images = FakeImageSource()
@@ -256,6 +340,7 @@ class Harness:
             json_schema=json_schema,
             allow_fallbacks=allow_fallbacks,
             images=images,
+            output_type=output_type,
         )
         self.store.known_simulations.add(self.job.simulation_id)
         self.deps = SimulationDeps(
@@ -264,6 +349,8 @@ class Harness:
             store=self.store,
             now=lambda: NOW,
             images=self.images,
+            image_generator=self.image_generator,
+            outputs=self.outputs,
         )
 
     def model(self, slot_no: int) -> str:

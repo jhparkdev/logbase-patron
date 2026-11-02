@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from app.models import ModelStatus, SimulationStatus, TestType
+from app.schemas.simulation_output import ImageConfig, OutputType
 from app.schemas.simulation_result import SimulationSummary
 from app.services.simulation_validation import MAX_MODEL_COUNT, MIN_MODEL_COUNT
 
@@ -128,6 +129,9 @@ class SimulationRerunDraft(BaseModel):
     ]
     # 과거 실행에 쓴 이미지(올린 순서). 새 실행 요청에 그대로 보내면 같은 이미지로 다시 돌린다
     asset_ids: list[UUID]
+    # 이미지 생성 실행이면 IMAGE 와 그때의 이미지 옵션. execution_config 에는 텍스트 설정만 남는다
+    output_type: OutputType
+    image_config: ImageConfig | None
     rerunnable: bool
     blocked_reason: RerunBlockReason | None
 

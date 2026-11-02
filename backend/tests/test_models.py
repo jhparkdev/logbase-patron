@@ -342,6 +342,8 @@ LOWER_BOUNDS: list[tuple[str, str, str, Any, Any, dict[str, Any], set[str]]] = [
         set(),
     ),
     ("input_assets", "input_asset", "file_size_bytes", 0, -1, {}, set()),
+    ("output_assets", "output_asset", "file_size_bytes", 0, -1, {}, set()),
+    ("output_assets", "output_asset", "sort_order", 0, -1, {}, set()),
     (
         "budgets",
         "budget",
@@ -1338,6 +1340,42 @@ async def test_result_request_belongs_to_same_simulation(
             simulation_id=simulation_id, request_id=other_request["request_id"]
         ),
         constraint="fk_simulation_results_request",
+    )
+
+
+async def test_output_asset_order_is_unique_per_request(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    """uq_output_assets_request_order: 한 호출이 만든 이미지의 순서는 겹치지 않는다."""
+    request_id = (await factory.ai_request())["request_id"]
+    await factory.output_asset(request_id=request_id, sort_order=0)
+    await factory.output_asset(request_id=request_id, sort_order=1)
+    await factory.output_asset(sort_order=0)
+
+    await expect_rejected(
+        db_session,
+        factory.output_asset(request_id=request_id, sort_order=1),
+        constraint="uq_output_assets_request_order",
+    )
+
+
+async def test_output_asset_requires_existing_request_and_keeps_it(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    """결과 이미지는 실제 호출에만 붙고, 이미지가 있는 호출은 지울 수 없다."""
+    constraint = "output_assets_request_id_fkey"
+    await expect_rejected(
+        db_session, factory.output_asset(request_id=uuid.uuid4()), constraint=constraint
+    )
+    request_id = (await factory.ai_request())["request_id"]
+    await factory.output_asset(request_id=request_id)
+
+    await expect_rejected(
+        db_session,
+        db_session.execute(
+            text("DELETE FROM ai_requests WHERE request_id = :id"), {"id": request_id}
+        ),
+        constraint=constraint,
     )
 
 

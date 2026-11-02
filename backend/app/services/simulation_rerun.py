@@ -29,6 +29,7 @@ from app.schemas.simulation_history import (
     SimulationRerunDraft,
 )
 from app.services.image_storage import ImageStorage
+from app.services.simulation_output_config import split_stored_config
 from app.services.simulation_validation import is_model_selectable
 
 
@@ -57,6 +58,8 @@ def build_rerun_draft(
     blocked = (
         RerunBlockReason.INPUT_MISSING if asset_ids and not assets_available else None
     )
+    # 기록된 설정을 요청 모양으로 나눈다. 이미지 옵션은 실행에 한 번만 있고 칸마다 같다
+    output_type, text_config, image_config = split_stored_config(run.execution_config)
     return SimulationRerunDraft(
         rerun_of_simulation_id=run.simulation_id,
         test_type=run.test_type,
@@ -64,7 +67,7 @@ def build_rerun_draft(
         prompt_text=run.prompt_text,
         input_text=run.input_text,
         json_schema=run.json_schema,
-        execution_config=run.execution_config,
+        execution_config=text_config,
         routing_policy=RerunRoutingPolicy(
             # 값이 없던 기록은 새 실행의 기본값으로 읽는다
             allow_fallbacks=run.routing_policy.get(
@@ -73,6 +76,8 @@ def build_rerun_draft(
         ),
         models=[_to_rerun_model(slot) for slot in slots],
         asset_ids=list(asset_ids),
+        output_type=output_type,
+        image_config=image_config,
         rerunnable=blocked is None,
         blocked_reason=blocked,
     )
@@ -82,7 +87,7 @@ def _to_rerun_model(slot: PastSlot) -> RerunModel:
     return RerunModel(
         model_id=slot.model_id,
         execution_provider=slot.execution_provider,
-        execution_config=slot.execution_config,
+        execution_config=split_stored_config(slot.execution_config)[1],
         current_display_name=slot.current_display_name,
         current_status=slot.current_status,
         selectable=is_model_selectable(slot.current_status),

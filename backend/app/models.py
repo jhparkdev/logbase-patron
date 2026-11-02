@@ -1034,6 +1034,35 @@ class InputAsset(Base):
     created_at: Mapped[datetime] = created_at_column()
 
 
+class OutputAsset(Base):
+    """이미지 생성 호출이 만든 결과 이미지 참조. 파일은 저장소에 두고 DB에는 경로·해시만 둔다.
+
+    사람이 올린 입력 이미지(InputAsset)와 생기는 경로·검증이 달라 따로 둔다.
+    실행한 사람은 호출(ai_requests.executed_by)에 있다. 삭제하거나 덮어쓰지 않는다.
+    """
+
+    __tablename__ = "output_assets"
+    __table_args__ = (
+        column_check("output_assets", "sort_order", "sort_order >= 0"),
+        column_check("output_assets", "file_size_bytes", "file_size_bytes >= 0"),
+        UniqueConstraint(
+            "request_id", "sort_order", name="uq_output_assets_request_order"
+        ),
+        {"comment": "이미지 생성 결과 참조. 파일은 저장소에 보관, DB에는 경로·해시만"},
+    )
+
+    output_asset_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    request_id: Mapped[uuid.UUID] = mapped_column(Uuid, fk("ai_requests.request_id"))
+    sort_order: Mapped[int] = mapped_column(
+        SmallInteger, comment="한 호출이 돌려준 이미지 순서(0부터)"
+    )
+    storage_path: Mapped[str] = mapped_column(Text)
+    sha256: Mapped[str] = mapped_column(CHAR(SHA256_HEX_LENGTH))
+    mime_type: Mapped[str] = mapped_column(Text)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = created_at_column()
+
+
 class CostAdjustment(Base):
     """6.5 호출 비용 정정 이력. adjusted_by_user_id NULL = 시스템 정산."""
 

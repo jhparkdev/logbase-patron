@@ -27,7 +27,9 @@ from app.models import (
     UsageOrigin,
     ValidationStatus,
 )
+from app.openrouter.image_result import GeneratedImage, ImageCallResult
 from app.openrouter.result import CallResult
+from app.schemas.simulation_output import OutputType
 from app.services.model_parameters import ParameterSupport
 from app.services.simulation_json_check import ValidationErrors
 
@@ -97,6 +99,8 @@ class SimulationJob:
     json_schema: dict[str, Any] | None
     allow_fallbacks: bool
     images: Sequence[ImageRef] = ()
+    # IMAGE 면 칸마다 이미지 생성(ImageGenerator)을 부르고, 올린 이미지는 참고 이미지로 보낸다
+    output_type: OutputType = OutputType.TEXT
 
 
 @dataclass(frozen=True)
@@ -119,6 +123,7 @@ class ModelInfo:
     display_name: str
     status: ModelStatus
     supports_images: bool = False  # 입력 형식(input_modalities)에 image 가 있다
+    generates_images: bool = False  # 출력 형식(output_modalities)에 image 가 있다
     # 받을 수 있는 설정. 기본값을 두지 않아 조회하는 쪽이 빠뜨리면 바로 드러난다
     parameter_support: ParameterSupport = field(kw_only=True)
 
@@ -219,6 +224,37 @@ class ModelCaller(Protocol):
         temperature: float | None = None,
         reasoning_effort: str | None = None,
     ) -> CallResult: ...
+
+
+class ImageGenerator(Protocol):
+    """openrouter/client.py 의 generate_image 에서 시뮬레이터가 쓰는 인자. 실패해도 예외 없이 결과로 돌려준다."""
+
+    async def __call__(
+        self,
+        *,
+        request_id: uuid.UUID,
+        model_id: str,
+        prompt: str,
+        timeout_seconds: float,
+        input_image_urls: list[str] | None,
+        provider_order: list[str],
+        allow_fallbacks: bool,
+        cancel: asyncio.Event,
+        n: int | None = None,
+        resolution: str | None = None,
+        aspect_ratio: str | None = None,
+        quality: str | None = None,
+    ) -> ImageCallResult: ...
+
+
+class OutputImageStore(Protocol):
+    """이미지 생성 결과를 저장소와 output_assets 에 남긴다. 삭제하거나 덮어쓰지 않는다."""
+
+    async def save(
+        self, request_id: uuid.UUID, images: Sequence[GeneratedImage]
+    ) -> None:
+        """받은 순서대로 저장한다(sort_order 는 0부터). 하나라도 못 쓰면 예외를 던진다."""
+        ...
 
 
 class RequestRecorder(Protocol):
@@ -338,3 +374,5 @@ class SimulationDeps:
     store: SimulationStore
     now: Callable[[], datetime]  # 현재 시각은 주입한다
     images: ImageSource
+    image_generator: ImageGenerator
+    outputs: OutputImageStore
