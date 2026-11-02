@@ -59,6 +59,7 @@ LookupCall = Callable[[OpenRouterClient], Awaitable[LookupResult[Any]]]
 
 LOOKUP_CALLS: dict[str, LookupCall] = {
     "list_models": lambda client: client.list_models(),
+    "get_model_endpoints": lambda client: client.get_model_endpoints("a/b"),
     "get_generation": lambda client: client.get_generation("gen-abc"),
     "get_key_usage": lambda client: client.get_key_usage(),
     "list_keys": lambda client: client.list_keys("ws-1"),
@@ -67,6 +68,7 @@ LOOKUP_CALLS: dict[str, LookupCall] = {
 # 조회 함수별로 정상 응답 모양
 LOOKUP_BODIES: dict[str, dict[str, Any]] = {
     "list_models": {"data": [{"id": "mistralai/mistral-nemo"}]},
+    "get_model_endpoints": {"data": {"endpoints": [{"provider_name": "DekaLLM"}]}},
     "get_generation": {"data": {"total_cost": 0.1}},
     "get_key_usage": {"data": {"usage": 0.1}},
     "list_keys": {"data": [{"hash": "h1", "name": "key"}]},
@@ -101,6 +103,45 @@ async def test_모델_목록은_Key_없이_공개_주소로_부른다(factory: C
     assert result.ok
     assert result.data is not None
     assert result.data[0].model_id == "mistralai/mistral-nemo"
+
+
+async def test_모델의_업체_목록은_Key_없이_모델_ID_경로로_부른다(
+    factory: ClientFactory,
+) -> None:
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return respond_with("get_model_endpoints")(request)
+
+    result = await factory(handler).get_model_endpoints("mistralai/mistral-nemo")
+
+    request = captured[0]
+    assert request.method == "GET"
+    expected_url = f"{OPENROUTER_BASE_URL}/models/mistralai/mistral-nemo/endpoints"
+    assert str(request.url) == expected_url
+    assert "Authorization" not in request.headers
+    assert result.ok
+    assert result.data is not None
+    assert [item.provider_name for item in result.data] == ["DekaLLM"]
+
+
+async def test_모델의_업체_목록_404는_http_status로_알리고_다시_보내지_않는다(
+    factory: ClientFactory,
+) -> None:
+    call_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        return httpx.Response(404, json={"error": {"code": 404}})
+
+    result = await factory(handler).get_model_endpoints("a/gone")
+
+    assert not result.ok
+    assert result.http_status == 404
+    assert call_count == 1
+    assert factory.sleeps == []
 
 
 async def test_호출_조회는_generation_ID와_Key로_부른다(factory: ClientFactory) -> None:

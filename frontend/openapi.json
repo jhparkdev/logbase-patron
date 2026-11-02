@@ -1131,6 +1131,79 @@
         }
       }
     },
+    "/api/models/{model_id}/execution-providers": {
+      "get": {
+        "tags": [
+          "models",
+          "models"
+        ],
+        "summary": "List Execution Providers",
+        "operationId": "list_execution_providers_api_models__model_id__execution_providers_get",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionProviderListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ModelErrorResponse"
+                    }
+                  ],
+                  "title": "Response 404 List Execution Providers Api Models  Model Id  Execution Providers Get"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          }
+        }
+      }
+    },
     "/api/models/{model_id}": {
       "patch": {
         "tags": [
@@ -2424,6 +2497,42 @@
               ],
               "title": "End Date"
             }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
           }
         ],
         "responses": {
@@ -2490,6 +2599,42 @@
                 }
               ],
               "title": "End Date"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
             }
           }
         ],
@@ -2730,12 +2875,48 @@
             }
           },
           {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          },
+          {
             "name": "sort",
             "in": "query",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/ProjectRowSort",
-              "default": "used"
+              "default": "usage"
             }
           },
           {
@@ -2953,13 +3134,107 @@
         "operationId": "read_subscriptions_api_subscriptions_get",
         "parameters": [
           {
-            "name": "month",
+            "name": "start_date",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string",
-              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
-              "title": "Month"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SubscriptionSort",
+              "default": "month"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "default": "desc"
+            }
+          },
+          {
+            "name": "preview",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Preview"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Page Size"
             }
           }
         ],
@@ -4005,6 +4280,60 @@
         "title": "ExecutionConfig",
         "description": "모델 실행 설정. 시나리오 기본 실행 설정(test_scenarios.default_execution_config)과 같은 항목이다.\n\n허용 항목만 받는다. provider·response_format 같은 키가 섞여 업체 고정이나 Schema 전달을\n덮어쓰는 일을 막기 위해서다. 보내지 않은 항목은 모델 기본값(또는 시나리오 기본값)을 쓴다."
       },
+      "ExecutionProviderListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionProviderRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ExecutionProviderListResponse"
+      },
+      "ExecutionProviderRead": {
+        "properties": {
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "uptime_last_1d": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uptime Last 1D"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_provider",
+          "status",
+          "uptime_last_1d"
+        ],
+        "title": "ExecutionProviderRead",
+        "description": "모델 하나를 처리하는 서버 업체 한 곳. 모델 제공사(예: mistralai)와는 다르다.\n\nexecution_provider는 비교 실행 요청의 execution_provider에 그대로 쓴다."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4337,7 +4666,8 @@
           "tokens",
           "cost",
           "costStatus",
-          "status"
+          "status",
+          "origin"
         ],
         "title": "InternalRequestSort",
         "description": "호출 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다."
@@ -4371,6 +4701,10 @@
           "has_unknown": {
             "type": "boolean",
             "title": "Has Unknown"
+          },
+          "subscription_excluded": {
+            "type": "boolean",
+            "title": "Subscription Excluded"
           }
         },
         "type": "object",
@@ -4381,7 +4715,8 @@
           "total_managed_usd",
           "unknown_cost_count",
           "includes_estimate",
-          "has_unknown"
+          "has_unknown",
+          "subscription_excluded"
         ],
         "title": "InternalSummary",
         "description": "비용 요약 카드. 미확인 비용은 금액에 넣지 않고 건수로만 센다."
@@ -4685,7 +5020,9 @@
           "MODEL_ALREADY_REGISTERED",
           "INVALID_STATUS_TRANSITION",
           "TEST_NOT_PASSED",
-          "OPENROUTER_KEY_MISSING"
+          "OPENROUTER_KEY_MISSING",
+          "EXECUTION_PROVIDERS_UNAVAILABLE",
+          "OPENROUTER_MODEL_NOT_FOUND"
         ],
         "title": "ModelErrorCode",
         "description": "프론트엔드는 이 값으로 상황별로 화면을 나눈다."
@@ -6926,11 +7263,26 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
           }
         },
         "type": "object",
         "required": [
-          "items"
+          "items",
+          "total",
+          "page",
+          "page_size"
         ],
         "title": "SubscriptionList"
       },
@@ -7053,6 +7405,18 @@
           "note"
         ],
         "title": "SubscriptionRow"
+      },
+      "SubscriptionSort": {
+        "type": "string",
+        "enum": [
+          "tool",
+          "month",
+          "amount",
+          "project",
+          "status"
+        ],
+        "title": "SubscriptionSort",
+        "description": "구독료 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다."
       },
       "SubscriptionStatus": {
         "type": "string",

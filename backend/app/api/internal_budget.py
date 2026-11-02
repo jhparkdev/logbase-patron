@@ -28,6 +28,7 @@ from app.schemas.internal_usage import (
     InternalFilterQuery,
     InternalSummary,
     InternalTrend,
+    InternalUsageQuery,
 )
 from app.schemas.models import MAX_MODEL_ID
 from app.schemas.project_budget import ProjectBudgetPage, ProjectRowsQuery
@@ -63,7 +64,7 @@ def _project_not_found() -> ApiError:
     )
 
 
-def _period(query: InternalFilterQuery, today: date) -> DateRange:
+def period_of(query: InternalFilterQuery, today: date) -> DateRange:
     try:
         return resolve_period(query.start_date, query.end_date, today)
     except InvalidPeriodError as error:
@@ -76,23 +77,29 @@ def _period(query: InternalFilterQuery, today: date) -> DateRange:
 
 @router.get("/summary", responses=QUERY_ERRORS)
 async def read_summary(
-    query: Annotated[InternalFilterQuery, Query()], session: SessionDep, now: NowDep
+    query: Annotated[InternalUsageQuery, Query()], session: SessionDep, now: NowDep
 ) -> InternalSummary:
-    return await internal_usage.summarize(session, _period(query, kst_today(now)))
+    period = period_of(query, kst_today(now))
+    return await internal_usage.summarize(
+        session, period, query.project_id, query.model_id
+    )
 
 
 @router.get("/trend", responses=QUERY_ERRORS)
 async def read_trend(
-    query: Annotated[InternalFilterQuery, Query()], session: SessionDep, now: NowDep
+    query: Annotated[InternalUsageQuery, Query()], session: SessionDep, now: NowDep
 ) -> InternalTrend:
-    return await internal_usage.daily_trend(session, _period(query, kst_today(now)))
+    period = period_of(query, kst_today(now))
+    return await internal_usage.daily_trend(
+        session, period, query.project_id, query.model_id
+    )
 
 
 @router.get("/requests", responses=QUERY_ERRORS)
 async def read_requests(
     query: Annotated[InternalRequestsQuery, Query()], session: SessionDep, now: NowDep
 ) -> InternalRequestPage:
-    period = _period(query, kst_today(now))
+    period = period_of(query, kst_today(now))
     return await internal_requests.list_requests(session, period, query)
 
 

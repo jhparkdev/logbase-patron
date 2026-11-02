@@ -24,12 +24,14 @@ from app.openrouter.errors import (
 from app.openrouter.failures import build_cancelled_result, build_failure_result
 from app.openrouter.json_access import get_str
 from app.openrouter.lookup_parsing import (
+    parse_endpoints,
     parse_generation,
     parse_key_usage,
     parse_keys,
     parse_models,
 )
 from app.openrouter.lookup_result import (
+    EndpointInfo,
     GenerationInfo,
     KeyInfo,
     KeyUsage,
@@ -206,6 +208,16 @@ class OpenRouterClient:
         """모델 목록과 가격을 가져온다. 공개 엔드포인트라 Key를 보내지 않는다."""
         fetched = await self._get_json("/models", token=None)
         return _convert(fetched, parse_models)
+
+    async def get_model_endpoints(
+        self, model_id: str
+    ) -> LookupResult[list[EndpointInfo]]:
+        """모델 하나를 처리하는 서버 업체 목록을 가져온다. 공개 엔드포인트라 Key를 보내지 않는다.
+
+        모델이 없으면 404이고, 결과의 http_status로 알 수 있다.
+        """
+        fetched = await self._get_json(f"/models/{model_id}/endpoints", token=None)
+        return _convert(fetched, parse_endpoints)
 
     async def get_generation(self, generation_id: str) -> LookupResult[GenerationInfo]:
         """호출 하나의 실제 비용을 조회한다. 비용 대조에 쓴다."""

@@ -85,46 +85,56 @@ def build_row(
 
 
 async def project_budget_rows(
-    session: AsyncSession, month: date
+    session: AsyncSession,
+    month: date,
+    project_id: int | None = None,
+    model_id: int | None = None,
 ) -> list[ProjectBudgetRow]:
-    """사용 중인 모든 프로젝트의 그 달 예산 현황. 호출이 없는 프로젝트도 0으로 나온다."""
-    projects = (
-        await session.execute(
-            select(Project.project_id, Project.name).where(Project.is_active)
-        )
-    ).all()
+    """사용 중인 모든 프로젝트의 그 달 예산 현황. 호출이 없는 프로젝트도 0으로 나온다.
+
+    프로젝트를 고르면 그 프로젝트 한 행만 나온다. 모델을 고르면 그 모델의 호출만 사용액이고
+    구독료는 뺀다(요약과 같은 규칙이다).
+    """
+    projects_statement = select(Project.project_id, Project.name).where(
+        Project.is_active
+    )
+    if project_id is not None:
+        projects_statement = projects_statement.where(Project.project_id == project_id)
+    projects = (await session.execute(projects_statement)).all()
     usage_rows = await session.execute(
         select(AIRequest.project_id, *cost_measures())
-        .where(*api_conditions(month_period(month)))
+        .where(*api_conditions(month_period(month), project_id, model_id))
         .group_by(AIRequest.project_id)
     )
     usage = {
-        project_id: (confirmed, estimated, unknown_count)
-        for project_id, confirmed, estimated, unknown_count in usage_rows
+        owner: (confirmed, estimated, unknown_count)
+        for owner, confirmed, estimated, unknown_count in usage_rows
     }
-    subscription_rows = await session.execute(
-        select(SubscriptionCost.project_id, func.sum(SubscriptionCost.amount))
-        .where(
-            SubscriptionCost.applied_month == month.replace(day=1),
-            SubscriptionCost.project_id.is_not(None),
+    subscriptions: dict[int, Decimal] = {}
+    if model_id is None:
+        subscription_rows = await session.execute(
+            select(SubscriptionCost.project_id, func.sum(SubscriptionCost.amount))
+            .where(
+                SubscriptionCost.applied_month == month.replace(day=1),
+                SubscriptionCost.project_id.is_not(None),
+            )
+            .group_by(SubscriptionCost.project_id)
         )
-        .group_by(SubscriptionCost.project_id)
-    )
-    subscriptions = {project_id: total for project_id, total in subscription_rows}
+        subscriptions = {owner: total for owner, total in subscription_rows}
     budget_rows = await session.scalars(select(Budget).where(*budget_conditions(month)))
     budgets = {budget.project_id: budget.monthly_amount_usd for budget in budget_rows}
 
     rows = []
-    for project_id, name in projects:
-        confirmed, estimated, unknown_count = usage.get(project_id, (ZERO, ZERO, 0))
+    for owner, name in projects:
+        confirmed, estimated, unknown_count = usage.get(owner, (ZERO, ZERO, 0))
         rows.append(
             build_row(
-                project_id,
+                owner,
                 name,
-                budgets.get(project_id),
+                budgets.get(owner),
                 confirmed,
                 estimated,
-                subscriptions.get(project_id, ZERO),
+                subscriptions.get(owner, ZERO),
                 unknown_count,
             )
         )
@@ -134,11 +144,19 @@ async def project_budget_rows(
 def sort_rows(
     rows: Sequence[ProjectBudgetRow], sort: ProjectRowSort, descending: bool
 ) -> list[ProjectBudgetRow]:
-    """값이 없는 행(예산 미설정)은 정렬 방향과 관계없이 맨 뒤에 둔다. 같은 값은 프로젝트 이름순이다."""
+    """값이 없는 행(예산 미설정)은 정렬 방향과 관계없이 맨 뒤에 두고 사용액이 큰 순서로 놓는다.
+
+    값이 있는 행의 같은 값은 프로젝트 이름순이다.
+    """
     key = SORT_KEYS[sort]
     by_name = sorted(rows, key=lambda row: (row.project_name, row.project_id))
     present = [row for row in by_name if key(row) is not None]
-    missing = [row for row in by_name if key(row) is None]
+    # 사용액이 같으면 이미 이름순이고, 파이썬 정렬은 같은 값의 순서를 바꾸지 않는다
+    missing = sorted(
+        (row for row in by_name if key(row) is None),
+        key=lambda row: row.used_usd,
+        reverse=True,
+    )
     return sorted(present, key=key, reverse=descending) + missing
 
 
@@ -147,8 +165,9 @@ def page_rows(
 ) -> list[ProjectBudgetRow]:
     descending = query.order == SortOrder.DESC
     if query.preview:
-        # 사용액이 큰 N개를 먼저 고른다. 정렬해도 "상위 N개"의 뜻이 바뀌지 않게 하기 위해서다
-        top = sort_rows(rows, ProjectRowSort.USED, True)[:PROJECT_PREVIEW_ROWS]
+        # 사용률이 높은 N개를 먼저 고른다. 정렬해도 "상위 N개"의 뜻이 바뀌지 않게 하기 위해서다.
+        # 예산이 없는 프로젝트는 사용률이 없어 예산이 있는 프로젝트 뒤에서 사용액 순으로 채워진다
+        top = sort_rows(rows, ProjectRowSort.USAGE, True)[:PROJECT_PREVIEW_ROWS]
         return sort_rows(top, query.sort, descending)
     ordered = sort_rows(rows, query.sort, descending)
     start = (query.page - 1) * query.page_size
@@ -159,7 +178,9 @@ async def list_project_budgets(
     session: AsyncSession, query: ProjectRowsQuery
 ) -> ProjectBudgetPage:
     """행 수가 프로젝트 수로 작아 메모리에서 정렬한다. 상태 정렬이 판단 함수의 결과를 그대로 쓰게 하기 위해서다."""
-    rows = await project_budget_rows(session, query.month)
+    rows = await project_budget_rows(
+        session, query.month, query.project_id, query.model_id
+    )
     return ProjectBudgetPage(
         items=page_rows(rows, query),
         total=len(rows),

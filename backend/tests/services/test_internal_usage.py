@@ -4,6 +4,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.schemas.internal_usage import InternalTrend
 from app.services.internal_usage import (
     build_summary,
     build_trend,
@@ -254,3 +255,119 @@ async def test_추이도_고객_사용은_뺀다(
     trend = await daily_trend(db_session, OCTOBER)
 
     assert all(point.api_confirmed_usd == 0 for point in trend.items)
+
+
+# ---------------------------------------------------------------
+# 프로젝트·모델 조건
+# ---------------------------------------------------------------
+def total_of(trend: InternalTrend) -> Decimal:
+    return sum((point.api_confirmed_usd for point in trend.items), Decimal(0))
+
+
+async def test_프로젝트를_고르면_그_프로젝트의_호출과_귀속_구독료만_집계한다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    mine = await factory.project()
+    other = await factory.project()
+    await internal_call(factory, project_id=mine["project_id"], cost_usd=Decimal(2))
+    await internal_call(factory, project_id=other["project_id"], cost_usd=Decimal(5))
+    await internal_call(factory, project_id=mine["project_id"], **UNKNOWN_COST)
+    month = date(2026, 10, 1)
+    await factory.subscription_cost(
+        applied_month=month, amount=Decimal(10), project_id=mine["project_id"]
+    )
+    await factory.subscription_cost(
+        applied_month=month, amount=Decimal(20), project_id=other["project_id"]
+    )
+    # 어느 프로젝트에도 배분하지 않은 구독료는 프로젝트를 고르면 빠진다.
+    await factory.subscription_cost(applied_month=month, amount=Decimal(40))
+
+    summary = await summarize(db_session, OCTOBER, project_id=mine["project_id"])
+
+    assert summary.api_confirmed_usd == Decimal(2)
+    assert summary.unknown_cost_count == 1
+    assert summary.subscription_usd == Decimal(10)
+    assert summary.total_managed_usd == Decimal(12)
+    assert summary.subscription_excluded is False
+
+
+async def test_모델을_고르면_그_모델의_호출만_집계하고_구독료는_뺀다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    model = await factory.model()
+    other = await factory.model()
+    await internal_call(factory, model_id=model["model_id"], cost_usd=Decimal(2))
+    await internal_call(factory, model_id=other["model_id"], cost_usd=Decimal(5))
+    await factory.subscription_cost(applied_month=date(2026, 10, 1), amount=Decimal(10))
+
+    summary = await summarize(db_session, OCTOBER, model_id=model["model_id"])
+
+    assert summary.api_confirmed_usd == Decimal(2)
+    assert summary.subscription_usd == 0
+    assert summary.total_managed_usd == Decimal(2)
+    assert summary.subscription_excluded is True
+
+
+async def test_프로젝트와_모델을_함께_고르면_둘_다_맞는_호출만_집계하고_구독료는_뺀다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    project = await factory.project()
+    model = await factory.model()
+    await internal_call(
+        factory,
+        project_id=project["project_id"],
+        model_id=model["model_id"],
+        cost_usd=Decimal(2),
+    )
+    await internal_call(factory, project_id=project["project_id"], cost_usd=Decimal(3))
+    await internal_call(factory, model_id=model["model_id"], cost_usd=Decimal(4))
+    await factory.subscription_cost(
+        applied_month=date(2026, 10, 1),
+        amount=Decimal(10),
+        project_id=project["project_id"],
+    )
+
+    summary = await summarize(
+        db_session,
+        OCTOBER,
+        project_id=project["project_id"],
+        model_id=model["model_id"],
+    )
+
+    assert summary.api_confirmed_usd == Decimal(2)
+    assert summary.subscription_usd == 0
+    assert summary.subscription_excluded is True
+
+
+async def test_조건이_없으면_구독료를_빼지_않는다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await factory.subscription_cost(applied_month=date(2026, 10, 1), amount=Decimal(10))
+
+    summary = await summarize(db_session, OCTOBER)
+
+    assert summary.subscription_usd == Decimal(10)
+    assert summary.subscription_excluded is False
+
+
+async def test_추이도_프로젝트와_모델_조건을_따른다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    project = await factory.project()
+    model = await factory.model()
+    other = await factory.model()
+    await internal_call(
+        factory,
+        project_id=project["project_id"],
+        model_id=model["model_id"],
+        cost_usd=Decimal(2),
+    )
+    await internal_call(factory, model_id=other["model_id"], cost_usd=Decimal(5))
+
+    by_project = await daily_trend(
+        db_session, OCTOBER, project_id=project["project_id"]
+    )
+    by_model = await daily_trend(db_session, OCTOBER, model_id=other["model_id"])
+
+    assert total_of(by_project) == Decimal(2)
+    assert total_of(by_model) == Decimal(5)

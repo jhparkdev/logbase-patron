@@ -5,7 +5,7 @@ from datetime import date
 from pydantic import BaseModel, ConfigDict
 
 from app.schemas.plain_decimal import PlainDecimal
-from app.schemas.usage import QueryDate
+from app.schemas.usage import QueryDate, RowId
 
 
 class InternalFilterQuery(BaseModel):
@@ -15,6 +15,13 @@ class InternalFilterQuery(BaseModel):
 
     start_date: QueryDate | None = None  # KST 달력 기준, 포함
     end_date: QueryDate | None = None  # KST 달력 기준, 포함
+
+
+class InternalUsageQuery(InternalFilterQuery):
+    """요약·추이 조건. 프로젝트와 모델을 고르면 호출 이력 표와 같은 조건으로 집계한다."""
+
+    project_id: RowId | None = None
+    model_id: RowId | None = None
 
 
 class InternalSummary(BaseModel):
@@ -30,6 +37,8 @@ class InternalSummary(BaseModel):
     includes_estimate: bool
     # 비용을 모르는 호출이 있어 합계가 최종 비용이 아닐 수 있다
     has_unknown: bool
+    # 모델을 고르면 구독료는 모델과 관계가 없어 합계에서 뺀다. 화면이 "구독료 제외"를 알리는 데 쓴다
+    subscription_excluded: bool
 
 
 class InternalTrendPoint(BaseModel):

@@ -268,6 +268,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{model_id}/execution-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Execution Providers */
+        get: operations["list_execution_providers_api_models__model_id__execution_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{model_id}": {
         parameters: {
             query?: never;
@@ -935,6 +952,25 @@ export interface components {
             max_tokens?: number | null;
             reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
         };
+        /** ExecutionProviderListResponse */
+        ExecutionProviderListResponse: {
+            /** Items */
+            items: components["schemas"]["ExecutionProviderRead"][];
+        };
+        /**
+         * ExecutionProviderRead
+         * @description 모델 하나를 처리하는 서버 업체 한 곳. 모델 제공사(예: mistralai)와는 다르다.
+         *
+         *     execution_provider는 비교 실행 요청의 execution_provider에 그대로 쓴다.
+         */
+        ExecutionProviderRead: {
+            /** Execution Provider */
+            execution_provider: string;
+            /** Status */
+            status: number | null;
+            /** Uptime Last 1D */
+            uptime_last_1d: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1057,7 +1093,7 @@ export interface components {
          * @description 호출 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다.
          * @enum {string}
          */
-        InternalRequestSort: "requestedAt" | "project" | "service" | "model" | "taskType" | "tokens" | "cost" | "costStatus" | "status";
+        InternalRequestSort: "requestedAt" | "project" | "service" | "model" | "taskType" | "tokens" | "cost" | "costStatus" | "status" | "origin";
         /**
          * InternalSummary
          * @description 비용 요약 카드. 미확인 비용은 금액에 넣지 않고 건수로만 센다.
@@ -1077,6 +1113,8 @@ export interface components {
             includes_estimate: boolean;
             /** Has Unknown */
             has_unknown: boolean;
+            /** Subscription Excluded */
+            subscription_excluded: boolean;
         };
         /**
          * InternalTrend
@@ -1179,7 +1217,7 @@ export interface components {
          * @description 프론트엔드는 이 값으로 상황별로 화면을 나눈다.
          * @enum {string}
          */
-        ModelErrorCode: "OPENROUTER_UNAVAILABLE" | "MODEL_NOT_IN_OPENROUTER" | "MODEL_ALREADY_REGISTERED" | "INVALID_STATUS_TRANSITION" | "TEST_NOT_PASSED" | "OPENROUTER_KEY_MISSING";
+        ModelErrorCode: "OPENROUTER_UNAVAILABLE" | "MODEL_NOT_IN_OPENROUTER" | "MODEL_ALREADY_REGISTERED" | "INVALID_STATUS_TRANSITION" | "TEST_NOT_PASSED" | "OPENROUTER_KEY_MISSING" | "EXECUTION_PROVIDERS_UNAVAILABLE" | "OPENROUTER_MODEL_NOT_FOUND";
         /**
          * ModelErrorResponse
          * @description 공통 오류 형식 {code, message}에서 code를 모델 관리 코드로 좁힌 응답.
@@ -1973,6 +2011,12 @@ export interface components {
         SubscriptionList: {
             /** Items */
             items: components["schemas"]["SubscriptionRow"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
         };
         /** SubscriptionOptions */
         SubscriptionOptions: {
@@ -2008,6 +2052,12 @@ export interface components {
             /** Note */
             note: string | null;
         };
+        /**
+         * SubscriptionSort
+         * @description 구독료 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다.
+         * @enum {string}
+         */
+        SubscriptionSort: "tool" | "month" | "amount" | "project" | "status";
         /**
          * SubscriptionStatus
          * @enum {string}
@@ -2823,6 +2873,55 @@ export interface operations {
             };
         };
     };
+    list_execution_providers_api_models__model_id__execution_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutionProviderListResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"] | components["schemas"]["ModelErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelErrorResponse"];
+                };
+            };
+        };
+    };
     read_model_api_models__model_id__get: {
         parameters: {
             query?: never;
@@ -3444,6 +3543,8 @@ export interface operations {
             query?: {
                 start_date?: string | null;
                 end_date?: string | null;
+                project_id?: number | null;
+                model_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -3476,6 +3577,8 @@ export interface operations {
             query?: {
                 start_date?: string | null;
                 end_date?: string | null;
+                project_id?: number | null;
+                model_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -3567,6 +3670,8 @@ export interface operations {
         parameters: {
             query: {
                 month: string;
+                project_id?: number | null;
+                model_id?: number | null;
                 sort?: components["schemas"]["ProjectRowSort"];
                 order?: components["schemas"]["SortOrder"];
                 preview?: boolean;
@@ -3696,8 +3801,15 @@ export interface operations {
     };
     read_subscriptions_api_subscriptions_get: {
         parameters: {
-            query: {
-                month: string;
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+                project_id?: number | null;
+                sort?: components["schemas"]["SubscriptionSort"];
+                order?: components["schemas"]["SortOrder"];
+                preview?: boolean;
+                page?: number;
+                page_size?: number;
             };
             header?: never;
             path?: never;

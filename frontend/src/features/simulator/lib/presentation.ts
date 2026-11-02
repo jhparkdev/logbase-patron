@@ -53,6 +53,10 @@ export type SlotView = {
   response: string | null;
   errorMessage?: string;
   comparisonNote?: string | null;
+  // 실행 당시의 모델 상태. 현재 상태와 다를 수 있다.
+  statusAtRun?: string;
+  // 이 칸에 실제로 적용한 설정. 빈 배열은 모델 기본값으로 호출했다는 뜻이다.
+  settings?: readonly { label: string; value: string }[];
 };
 export type RunView = {
   key: string;
@@ -89,17 +93,14 @@ export function selectionIssues(
   scenarios: ScenarioChoice[],
 ): string[] {
   const issues: string[] = [];
+  const hasImages = draft.files.length + draft.existingAssetIds.length > 0;
   const scenario =
     draft.mode === "scenario"
       ? scenarios.find((item) => item.key === draft.scenarioKey)
       : undefined;
   if (draft.mode === "scenario" && !scenario)
     issues.push("시나리오를 다시 선택하시기 바랍니다.");
-  if (
-    draft.mode === "scenario" &&
-    scenario?.imageRequired &&
-    !draft.files.length
-  )
+  if (draft.mode === "scenario" && scenario?.imageRequired && !hasImages)
     issues.push("선택한 시나리오에 사용할 이미지를 추가하시기 바랍니다.");
   const seen = new Set<string>();
   for (const comparison of draft.comparisons) {
@@ -110,7 +111,7 @@ export function selectionIssues(
       );
       continue;
     }
-    if (draft.files.length && !choice.supportsImages)
+    if (hasImages && !choice.supportsImages)
       issues.push(`${choice.name}은 이미지 입력을 지원하지 않습니다.`);
     const settings = requestedSettings(comparison, draft, scenario?.defaults);
     for (const key of [

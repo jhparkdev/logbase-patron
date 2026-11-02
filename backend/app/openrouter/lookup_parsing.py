@@ -16,7 +16,13 @@ from app.openrouter.json_access import (
     get_str,
     to_number,
 )
-from app.openrouter.lookup_result import GenerationInfo, KeyInfo, KeyUsage, ModelInfo
+from app.openrouter.lookup_result import (
+    EndpointInfo,
+    GenerationInfo,
+    KeyInfo,
+    KeyUsage,
+    ModelInfo,
+)
 
 ISO_DATE_LENGTH = len("2026-12-31")
 
@@ -93,6 +99,31 @@ def parse_models(body: dict[str, Any]) -> list[ModelInfo] | None:
             )
         )
     return models
+
+
+def parse_endpoints(body: dict[str, Any]) -> list[EndpointInfo] | None:
+    """모델 하나의 서버 업체 목록을 읽는다. 같은 이름은 처음 것만 남긴다.
+
+    같은 업체가 정밀도(fp8, fp16 등)별로 여러 번 나올 수 있다고 보고 이름으로 합친다.
+    provider.order에는 이름만 들어가기 때문이다. 실제로 겹치는지는 확인하지 못했다.
+    """
+    data = body.get("data")
+    if not isinstance(data, dict) or not isinstance(data.get("endpoints"), list):
+        return None
+
+    endpoints: dict[str, EndpointInfo] = {}
+    for item in data["endpoints"]:
+        if not isinstance(item, dict):
+            continue
+        name = get_str(item, "provider_name")
+        if not name or name in endpoints:
+            continue
+        endpoints[name] = EndpointInfo(
+            provider_name=name,
+            status=get_int(item, "status"),
+            uptime_last_1d=get_number(item, "uptime_last_1d"),
+        )
+    return list(endpoints.values())
 
 
 def parse_generation(body: dict[str, Any]) -> GenerationInfo | None:
