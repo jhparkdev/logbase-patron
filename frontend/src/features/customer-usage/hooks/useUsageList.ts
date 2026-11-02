@@ -22,6 +22,7 @@ export function useCustomerSort() {
           ...prev,
           ...customerSortParams(nextSort(sort, key)),
         }),
+        resetScroll: false,
       }),
   };
 }
@@ -39,6 +40,7 @@ export function useRequestSort() {
           ...prev,
           ...requestSortParams(nextSort(sort, key)),
         }),
+        resetScroll: false,
       }),
   };
 }

@@ -103,6 +103,22 @@ test("전체 목록에서 머리글을 누르면 정렬이 주소에 남고 1페
   );
 });
 
+test("머리글을 눌러 정렬해도 화면을 맨 위로 올리지 않는다", async () => {
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  const router = renderAt(`/internal-budget?${PERIOD}`);
+  const sortButton = await screen.findByRole("button", {
+    name: /비용 \(USD\)/,
+  });
+  scrollTo.mockClear();
+
+  fireEvent.click(sortButton);
+  await waitFor(() =>
+    expect(routeMatch(router, ROUTE_ID)?.search).toHaveProperty("requestsSort"),
+  );
+
+  expect(scrollTo).not.toHaveBeenCalled();
+});
+
 test("전체 목록에서 조회하면 목록은 유지하고 1페이지로 돌아간다", async () => {
   const router = renderAt(`/internal-budget?${PERIOD}&view=projects&page=3`);
   const { to } = await periodInputs();

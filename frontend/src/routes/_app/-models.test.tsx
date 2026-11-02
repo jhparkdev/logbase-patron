@@ -45,6 +45,18 @@ test("머리글을 누르면 정렬 조건이 주소에 남는다", async () => 
   await waitFor(() => expect(sortStateOf("Model ID")).toBe("descending"));
 });
 
+test("머리글을 눌러 정렬해도 화면을 맨 위로 올리지 않는다", async () => {
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  renderAt("/models");
+  await screen.findByRole("table", { name: "등록된 AI 모델" });
+  scrollTo.mockClear();
+
+  fireEvent.click(screen.getByRole("button", { name: /Model ID/ }));
+  await waitFor(() => expect(sortStateOf("Model ID")).toBe("ascending"));
+
+  expect(scrollTo).not.toHaveBeenCalled();
+});
+
 test("허용하지 않는 정렬 값은 무시한다", async () => {
   renderAt("/models?sort=password&order=sideways");
 

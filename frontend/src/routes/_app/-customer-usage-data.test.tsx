@@ -129,6 +129,25 @@ test("머리글을 누르면 그 표의 정렬만 주소에 남기고 1페이지
   );
 });
 
+for (const [tableName, header, sortParam] of [
+  ["고객별 사용 현황", "사용률 (추정 포함)", "customersSort"],
+  ["상세 API 호출 내역", "비용 (USD)", "requestsSort"],
+] as const) {
+  test(`${tableName} 머리글을 눌러 정렬해도 화면을 맨 위로 올리지 않는다`, async () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const router = renderAt(OCTOBER);
+    const table = await tableNamed(tableName);
+    scrollTo.mockClear();
+
+    fireEvent.click(within(table).getByRole("button", { name: header }));
+    await waitFor(() =>
+      expect(routeMatch(router, ROUTE_ID)?.search).toHaveProperty(sortParam),
+    );
+
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+}
+
 test("전체보기는 페이지를 주소에 남기고 그 페이지를 요청한다", async () => {
   const { requests } = stubCustomerUsageApi();
   const router = renderAt(`${OCTOBER}&view=customers`);

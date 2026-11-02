@@ -17,6 +17,7 @@ export function useModelSort() {
           ...prev,
           ...modelSortParams(nextSort(sort, key)),
         }),
+        resetScroll: false,
       }),
   };
 }
