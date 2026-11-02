@@ -51,7 +51,7 @@ export function DataTable<T>({
                   aria-sort={
                     column.sortable ? ARIA_SORT[direction ?? "none"] : undefined
                   }
-                  className={`px-4 py-2.5 font-medium whitespace-nowrap ${alignClass(column.align)}`}
+                  className={`px-4 py-2.5 font-medium whitespace-nowrap first:pl-6 last:pr-6 ${alignClass(column.align)}`}
                 >
                   {column.sortable && onSortChange ? (
                     <button
@@ -84,7 +84,7 @@ export function DataTable<T>({
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={`h-12 px-4 ${alignClass(column.align)}`}
+                    className={`h-12 px-4 first:pl-6 last:pr-6 ${alignClass(column.align)}`}
                   >
                     {column.render(row)}
                   </td>
