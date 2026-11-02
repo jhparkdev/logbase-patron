@@ -29,6 +29,9 @@ class SimulationErrorCode(StrEnum):
     IMAGE_EMPTY = "IMAGE_EMPTY"  # 빈 파일을 올림
     IMAGE_TOO_LARGE = "IMAGE_TOO_LARGE"  # 파일이 한도보다 큼
     IMAGE_TYPE_NOT_SUPPORTED = "IMAGE_TYPE_NOT_SUPPORTED"  # JPG·PNG·WebP 가 아님
+    IMAGE_FILE_NOT_FOUND = (
+        "IMAGE_FILE_NOT_FOUND"  # 내려받을 이미지의 기록이나 파일이 없음
+    )
     PROVIDER_NOT_AVAILABLE = "PROVIDER_NOT_AVAILABLE"
     PERIOD_INCOMPLETE = "PERIOD_INCOMPLETE"
     PERIOD_START_AFTER_END = "PERIOD_START_AFTER_END"
@@ -96,6 +99,9 @@ ERROR_SPECS: dict[SimulationErrorCode, ErrorSpec] = {
     ),
     SimulationErrorCode.IMAGE_TYPE_NOT_SUPPORTED: ErrorSpec(
         415, "JPG·PNG·WebP 이미지만 올릴 수 있습니다."
+    ),
+    SimulationErrorCode.IMAGE_FILE_NOT_FOUND: ErrorSpec(
+        404, "이미지를 찾을 수 없습니다."
     ),
     SimulationErrorCode.PROVIDER_NOT_AVAILABLE: ErrorSpec(
         422, "선택한 모델에서 사용할 수 없는 Provider 입니다."

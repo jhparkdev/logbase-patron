@@ -8,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import InputAsset
 from app.services.image_storage import LocalImageStorage
-from app.services.simulation_assets import save_image
+from app.services.simulation_assets import read_input_image, save_image
 from app.services.simulation_image_check import UnsupportedImageTypeError
+from app.services.simulation_image_source import StoredImageNotFoundError
 from tests.db_helpers import Factory
 from tests.image_samples import jpeg, png
 
@@ -113,3 +114,38 @@ async def test_a_rejected_image_leaves_no_row_and_no_file(
 
     assert await asset_count(db_session) == 0
     assert list(tmp_path.rglob("*")) == []
+
+
+async def test_an_uploaded_image_is_read_back_with_its_type(
+    db_session: AsyncSession, factory: Factory, tmp_path: Path
+) -> None:
+    storage = LocalImageStorage(tmp_path)
+    data = jpeg(120)
+    await save_image(
+        db_session,
+        storage,
+        data=data,
+        filename="a.jpg",
+        uploaded_by=await user_id(factory),
+        asset_id=ASSET_ID,
+    )
+
+    image = await read_input_image(db_session, storage, ASSET_ID)
+
+    assert (image.data, image.mime_type) == (data, "image/jpeg")
+
+
+async def test_an_unknown_uploaded_image_is_not_found(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    with pytest.raises(StoredImageNotFoundError):
+        await read_input_image(db_session, LocalImageStorage(tmp_path), uuid.uuid4())
+
+
+async def test_an_uploaded_image_whose_file_is_gone_is_not_found(
+    db_session: AsyncSession, factory: Factory, tmp_path: Path
+) -> None:
+    row = await factory.input_asset()
+
+    with pytest.raises(StoredImageNotFoundError):
+        await read_input_image(db_session, LocalImageStorage(tmp_path), row["asset_id"])
