@@ -4,6 +4,7 @@
 """
 
 import hashlib
+import logging
 import uuid
 from collections.abc import Callable, Sequence
 
@@ -20,6 +21,9 @@ from app.services.simulation_image_source import (
     StoredImageNotFoundError,
     read_stored,
 )
+
+# 로그에는 request_id 와 저장 키만 남긴다. 그림 내용은 남기지 않는다
+logger = logging.getLogger(__name__)
 
 OUTPUT_FOLDER = f"{STORAGE_FOLDER}/output"
 # 머리 바이트로 알 수 없는 형식. 응답이 알려 준 형식(예: image/svg+xml)은 믿지 않고 그림으로 내보내지 않는다
@@ -43,25 +47,37 @@ async def save_output_images(
     """받은 순서대로 파일을 쓰고 output_assets 행을 만든다. commit 은 부르는 쪽이 한다.
 
     파일을 먼저 쓰므로, 행을 만들다 실패해도 없는 파일을 가리키는 행은 생기지 않는다.
+    도중에 실패하면 이미 쓴 파일은 기록 없이 남는다. 비용이 나간 결과라 지우지 않고 키를 로그에 남긴다.
     """
-    for sort_order, image in enumerate(images):
-        output_asset_id = new_id()
-        mime = detect_image_mime(image.data)
-        extension = _EXTENSIONS[mime] if mime else _UNKNOWN_EXTENSION
-        key = f"{OUTPUT_FOLDER}/{output_asset_id}{extension}"
-        await storage.write(key, image.data)
-        session.add(
-            OutputAsset(
-                output_asset_id=output_asset_id,
-                request_id=request_id,
-                sort_order=sort_order,
-                storage_path=key,
-                sha256=hashlib.sha256(image.data).hexdigest(),
-                mime_type=mime.value if mime else UNKNOWN_IMAGE_TYPE,
-                file_size_bytes=len(image.data),
+    written: list[str] = []
+    try:
+        for sort_order, image in enumerate(images):
+            output_asset_id = new_id()
+            mime = detect_image_mime(image.data)
+            extension = _EXTENSIONS[mime] if mime else _UNKNOWN_EXTENSION
+            key = f"{OUTPUT_FOLDER}/{output_asset_id}{extension}"
+            await storage.write(key, image.data)
+            written.append(key)
+            session.add(
+                OutputAsset(
+                    output_asset_id=output_asset_id,
+                    request_id=request_id,
+                    sort_order=sort_order,
+                    storage_path=key,
+                    sha256=hashlib.sha256(image.data).hexdigest(),
+                    mime_type=mime.value if mime else UNKNOWN_IMAGE_TYPE,
+                    file_size_bytes=len(image.data),
+                )
             )
-        )
-    await session.flush()
+        await session.flush()
+    except Exception:
+        if written:
+            logger.error(
+                "output image files left without a record: request_id=%s keys=%s",
+                request_id,
+                written,
+            )
+        raise
 
 
 async def read_output_image(

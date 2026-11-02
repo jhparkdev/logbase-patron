@@ -108,6 +108,45 @@ async def test_an_unrecognised_format_is_kept_as_opaque_bytes(
     assert await storage.read(row.storage_path) == data
 
 
+class FailingSecondWrite(LocalImageStorage):
+    """두 번째 파일부터 쓰지 못하는 저장소(디스크가 가득 찬 경우)."""
+
+    def __init__(self, root: Path) -> None:
+        super().__init__(root)
+        self.writes = 0
+
+    async def write(self, key: str, data: bytes) -> None:
+        self.writes += 1
+        if self.writes > 1:
+            raise OSError("disk full")
+        await super().write(key, data)
+
+
+async def test_a_failed_save_keeps_written_files_and_logs_where_they_are(
+    db_session: AsyncSession,
+    factory: Factory,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # 비용이 나간 결과라 지우지 않는다. 기록 없이 남은 파일을 나중에 찾을 수 있게 로그에 남긴다
+    storage = FailingSecondWrite(tmp_path)
+    rid = await request_id(factory)
+    first_key = f"simulator/output/{uuid.UUID(int=1)}.png"
+
+    with pytest.raises(OSError):
+        await save_output_images(
+            db_session,
+            storage,
+            rid,
+            [GeneratedImage(data=png()), GeneratedImage(data=png())],
+            new_id=id_maker(),
+        )
+
+    assert await storage.read(first_key) == png()
+    assert str(rid) in caplog.text
+    assert first_key in caplog.text
+
+
 async def test_a_stored_output_image_is_read_back_with_its_type(
     db_session: AsyncSession, factory: Factory, tmp_path: Path
 ) -> None:
@@ -146,11 +185,18 @@ async def test_an_output_image_whose_file_is_gone_is_not_found(
 
 
 async def test_an_output_image_whose_file_was_changed_is_not_served(
-    db_session: AsyncSession, factory: Factory, tmp_path: Path
+    db_session: AsyncSession,
+    factory: Factory,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    # 화면에는 없는 그림과 같게 보이고, 바뀐 파일은 운영자가 찾을 수 있게 로그에 남긴다
     storage = LocalImageStorage(tmp_path)
     row = await factory.output_asset()  # 해시는 0 으로 채운 값이다
     await storage.write(row["storage_path"], png())
 
-    with pytest.raises(ImageIntegrityError):
+    with pytest.raises(StoredImageNotFoundError) as raised:
         await read_output_image(db_session, storage, row["output_asset_id"])
+
+    assert isinstance(raised.value.__cause__, ImageIntegrityError)
+    assert row["storage_path"] in caplog.text

@@ -108,6 +108,15 @@ async def test_an_output_image_whose_file_is_gone_is_404(
     assert_not_found(await client.get(f"{OUTPUT_IMAGES}/{row['output_asset_id']}"))
 
 
+async def test_an_output_image_whose_file_was_changed_is_404(
+    client: AsyncClient, factory: Factory, image_storage: LocalImageStorage
+) -> None:
+    row = await factory.output_asset()  # 해시는 0 으로 채운 값이다
+    await image_storage.write(row["storage_path"], png())
+
+    assert_not_found(await client.get(f"{OUTPUT_IMAGES}/{row['output_asset_id']}"))
+
+
 @pytest.mark.usefixtures("image_storage")
 async def test_a_malformed_output_image_id_is_422(client: AsyncClient) -> None:
     assert (await client.get(f"{OUTPUT_IMAGES}/not-a-uuid")).status_code == 422

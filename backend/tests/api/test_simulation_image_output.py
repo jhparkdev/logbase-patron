@@ -145,16 +145,25 @@ async def test_an_image_run_with_a_model_that_cannot_make_images_is_422(
     assert response.json()["code"] == "MODEL_IMAGE_OUTPUT_NOT_SUPPORTED"
 
 
+@pytest.mark.parametrize(
+    ("status", "error_type"),
+    [
+        # 취소 뒤 늦게 도착한 결과는 대조용으로만 남기고 결과로 보여 주지 않는다
+        ("CANCELLED", None),
+        # 그림을 저장한 뒤 결과를 기록하기 전에 서버가 멈추면, 정리 작업이 칸을 실패로 끝낸다
+        ("FAILED", "UNKNOWN_ERROR"),
+    ],
+)
 @pytest.mark.usefixtures("image_storage")
-async def test_images_of_a_cancelled_slot_are_not_shown(
-    client: AsyncClient, factory: Factory
+async def test_images_of_a_slot_that_did_not_succeed_are_not_shown(
+    client: AsyncClient, factory: Factory, status: str, error_type: str | None
 ) -> None:
-    # 취소 뒤 늦게 도착한 결과는 대조용으로만 남기고 결과로 보여 주지 않는다
     run = await factory.simulation_run(execution_config={"output_type": "IMAGE"})
     request = await factory.ai_request(
         usage_origin="SIMULATION",
         simulation_id=run["simulation_id"],
-        status="CANCELLED",
+        status=status,
+        error_type=error_type,
         execution_config={"output_type": "IMAGE"},
     )
     await factory.simulation_result(
@@ -165,5 +174,5 @@ async def test_images_of_a_cancelled_slot_are_not_shown(
     body = (await client.get(f"{CREATE}/{run['simulation_id']}")).json()
 
     [result] = body["results"]
-    assert result["status"] == "CANCELLED"
+    assert result["status"] == status
     assert result["output_images"] == []

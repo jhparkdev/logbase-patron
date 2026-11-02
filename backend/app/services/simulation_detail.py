@@ -129,5 +129,9 @@ def _to_model_result(
         # 취소된 칸의 원문·그림은 취소 뒤 늦게 도착해 대조용으로만 남긴 것이라 결과로 보여 주지 않는다
         response_text=None if cancelled else response_text,
         output_type=stored_output_type(request.execution_config),
-        output_images=[] if cancelled else output_images,
+        # 그림은 성공한 칸에만 싣는다. 그림을 저장한 뒤 결과를 기록하기 전에 서버가 멈추면
+        # 정리 작업이 칸을 실패로 끝내는데, 그 칸에 그림이 보이면 실패와 결과가 어긋난다
+        output_images=(
+            output_images if request.status == RequestStatus.SUCCESS else []
+        ),
     )

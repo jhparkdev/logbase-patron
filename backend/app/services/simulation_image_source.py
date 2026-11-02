@@ -2,10 +2,14 @@
 
 import base64
 import hashlib
+import logging
 from dataclasses import dataclass
 
 from app.services.image_storage import ImageNotStoredError, ImageStorage
 from app.services.simulation_ports import ImageRef
+
+# 로그에는 저장 키만 남긴다. 키는 ID 로 만든 경로라 그림 내용이나 사용자 정보가 없다
+logger = logging.getLogger(__name__)
 
 
 class ImageIntegrityError(RuntimeError):
@@ -35,10 +39,16 @@ class StoredImage:
 async def read_stored(
     storage: ImageStorage, key: str, sha256: str, mime_type: str
 ) -> StoredImage:
-    """화면에 내려 줄 이미지를 읽는다. 파일이 없으면 기록이 없는 것과 같게 본다."""
+    """화면에 내려 줄 이미지를 읽는다. 파일이 없거나 기록과 다르면 기록이 없는 것과 같게 본다.
+
+    기록과 다른 파일은 내려 주지 않는다. 화면에는 없는 그림과 같게 보이고, 원인은 서버 로그에 남긴다.
+    """
     try:
         data = await read_verified(storage, key, sha256)
     except ImageNotStoredError as error:
+        raise StoredImageNotFoundError from error
+    except ImageIntegrityError as error:
+        logger.error("stored image does not match its recorded hash: key=%s", key)
         raise StoredImageNotFoundError from error
     return StoredImage(data=data, mime_type=mime_type)
 
