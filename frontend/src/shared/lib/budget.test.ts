@@ -1,6 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { schemaErrors } from "../../test/schemaErrors";
-import { budgetFormSchema } from "./budget";
+import {
+  amountForInput,
+  budgetFormSchema,
+  budgetMonthOf,
+  budgetStatusBadge,
+  usageView,
+} from "./budget";
 
 describe("budgetFormSchema", () => {
   const valid = { amount: "5000", effectiveFrom: "2026-10" };
@@ -36,5 +42,68 @@ describe("budgetFormSchema", () => {
         effectiveFrom: "적용 시작 월을 골라 주세요.",
       });
     }
+  });
+});
+
+describe("budgetMonthOf", () => {
+  test("조회 기간 종료일이 속한 달이다", () => {
+    expect(budgetMonthOf({ from: "2026-10-02", to: "2026-10-31" })).toBe(
+      "2026-10",
+    );
+  });
+
+  test("기간이 두 달에 걸치면 종료일의 달이다", () => {
+    expect(budgetMonthOf({ from: "2026-09-30", to: "2026-10-01" })).toBe(
+      "2026-10",
+    );
+    expect(budgetMonthOf({ from: "2025-12-31", to: "2026-01-01" })).toBe(
+      "2026-01",
+    );
+  });
+});
+
+describe("usageView", () => {
+  test("서버의 상태를 그대로 쓰고 사용률은 정수로 보여 준다", () => {
+    expect(usageView({ status: "WARNING", usage_pct: "82.60" })).toEqual({
+      status: "warning",
+      percent: 83,
+    });
+    expect(usageView({ status: "OVER", usage_pct: "121.00" })).toEqual({
+      status: "over",
+      percent: 121,
+    });
+    expect(usageView({ status: "NORMAL", usage_pct: "0.00" })).toEqual({
+      status: "normal",
+      percent: 0,
+    });
+  });
+
+  test("예산이 없으면 0%가 아니라 미설정이다", () => {
+    expect(usageView({ status: "UNSET", usage_pct: null })).toEqual({
+      status: "unset",
+    });
+  });
+});
+
+describe("budgetStatusBadge", () => {
+  test.each([
+    ["NORMAL", "정상", "green"],
+    ["WARNING", "주의", "yellow"],
+    ["OVER", "초과", "red"],
+    ["UNSET", "미설정", "grey"],
+  ] as const)("%s는 %s로 보여 준다", (status, label, tone) => {
+    expect(budgetStatusBadge(status)).toEqual({ label, tone });
+  });
+});
+
+describe("amountForInput", () => {
+  test("입력 칸에 넣을 때 뒤쪽 0만 지운다", () => {
+    expect(amountForInput("1.970000000000000000")).toBe("1.97");
+    expect(amountForInput("90.000000000000000000")).toBe("90");
+    expect(amountForInput("100")).toBe("100");
+  });
+
+  test("예산이 없으면 빈 칸이다", () => {
+    expect(amountForInput(null)).toBe("");
   });
 });

@@ -75,7 +75,7 @@ export function InputFields({
               {scenarios.map((item) => (
                 <option key={item.key} value={item.key}>
                   {item.name}
-                  {item.imageRequired ? " · 이미지 필요" : ""}
+                  {item.imageRequired ? "(이미지 필요)" : ""}
                 </option>
               ))}
             </select>

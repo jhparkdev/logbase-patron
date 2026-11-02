@@ -12,14 +12,11 @@ import { SimulatorPage, type SimulatorPageProps } from "./SimulatorPage";
 const RESTORE_TITLES = {
   unavailable: "재실행 조건 불러오기를 준비하고 있습니다",
   missing: "재실행할 입력을 찾을 수 없습니다",
-  scenario: "시나리오 실행의 재실행을 준비하고 있습니다",
   error: "재실행 조건을 불러오지 못했습니다",
 };
 const RESTORE_DESCRIPTIONS = {
   unavailable:
     "API가 연결되면 과거 입력과 현재 모델 정보를 확인해 복원할 수 있습니다.",
-  scenario:
-    "시나리오 목록이 연결되면 복원할 수 있습니다. 원래 이력을 확인하거나 새 조건으로 준비하시기 바랍니다.",
   missing: "원래 이력을 확인하거나 잠시 후 다시 시도하시기 바랍니다.",
   error: "원래 이력을 확인하거나 잠시 후 다시 시도하시기 바랍니다.",
 };

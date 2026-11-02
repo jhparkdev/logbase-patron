@@ -9,6 +9,7 @@ import {
   RERUN_DRAFT,
   RUN_DETAIL,
   RUN_ID,
+  SCENARIOS,
 } from "../../test/simulationHistoryApi";
 
 beforeAll(() => {
@@ -40,6 +41,7 @@ function stub(overrides: Record<string, Reply> = {}) {
         status: 200,
         body: { items: [ACTIVE_MODEL], page: 1, page_size: 100, total: 1 },
       };
+    if (key === "GET /api/scenarios") return { status: 200, body: SCENARIOS };
     if (path.endsWith("/execution-providers"))
       return { status: 200, body: EXECUTION_PROVIDERS };
     if (key === "GET /api/simulations/images/limits")
@@ -354,13 +356,123 @@ test("지금 고를 수 없는 업체는 비우고 안내한다", async () => {
   ).toBeDefined();
 });
 
-test("시나리오 실행은 직접 작성으로 바꾸지 않고 재실행을 막는다", async () => {
-  stub();
+/** 시나리오 목록을 다 받아야 기본 시나리오를 고를 수 있다. */
+async function chooseScenarioMode() {
+  const option = await screen.findByRole("option", { name: "기본 시나리오" });
+  await waitFor(() => expect(option.hasAttribute("disabled")).toBe(false));
+  fireEvent.change(screen.getByLabelText("테스트 유형"), {
+    target: { value: "scenario" },
+  });
+}
+
+test("활성 시나리오만 요청하고, 고르면 Prompt를 채워 시나리오 실행으로 접수한다", async () => {
+  const api = stub();
+  renderAt("/simulator");
+  await chooseTwoProviders();
+  await chooseScenarioMode();
+  fireEvent.change(screen.getByLabelText("시나리오"), {
+    target: { value: "3" },
+  });
+  expect((screen.getByLabelText("Prompt") as HTMLTextAreaElement).value).toBe(
+    "다음 데이터를 요약하세요.",
+  );
+  const [list] = api.find("GET", "/api/scenarios");
+  expect(new URL(list.request.url).searchParams.get("include_inactive")).toBe(
+    "false",
+  );
+  await confirmRun();
+  await waitFor(() =>
+    expect(api.find("POST", "/api/simulations")).toHaveLength(1),
+  );
+  const [post] = api.find("POST", "/api/simulations");
+  expect(await post.request.json()).toMatchObject({
+    test_type: "SCENARIO",
+    scenario_id: 3,
+    prompt_text: "다음 데이터를 요약하세요.",
+  });
+});
+
+test("시나리오 목록을 받지 못해도 직접 작성 실행은 할 수 있다", async () => {
+  stub({
+    "GET /api/scenarios": {
+      status: 500,
+      body: { code: "INTERNAL_ERROR", message: "내부" },
+    },
+  });
+  renderAt("/simulator");
+  await chooseTwoProviders();
+  expect(
+    screen
+      .getByRole("option", { name: "기본 시나리오" })
+      .hasAttribute("disabled"),
+  ).toBe(true);
+  expect(screen.getByRole("button", { name: "비교 실행" })).toBeDefined();
+});
+
+const SCENARIO_DRAFT = {
+  ...CUSTOM_DRAFT,
+  test_type: "SCENARIO",
+  scenario_id: 3,
+};
+
+test("시나리오 실행의 재실행은 시나리오를 그대로 복원해 원본 ID와 함께 보낸다", async () => {
+  const api = stub({
+    [`GET /api/simulations/${RUN_ID}/rerun-draft`]: {
+      status: 200,
+      body: SCENARIO_DRAFT,
+    },
+  });
+  renderAt(`/simulator?sourceRun=${RUN_ID}`);
+  const prompt = await screen.findByLabelText("Prompt");
+  expect((prompt as HTMLTextAreaElement).value).toBe("과거 Prompt 원문");
+  expect(
+    (screen.getByLabelText("테스트 유형") as HTMLSelectElement).value,
+  ).toBe("scenario");
+  expect((screen.getByLabelText("시나리오") as HTMLSelectElement).value).toBe(
+    "3",
+  );
+  // 지금은 비활성인 원본 시나리오도 찾을 수 있어야 한다
+  const [list] = api.find("GET", "/api/scenarios");
+  expect(new URL(list.request.url).searchParams.get("include_inactive")).toBe(
+    "true",
+  );
+  expect(api.find("POST", "/api/simulations")).toEqual([]);
+  await confirmRun();
+  await waitFor(() =>
+    expect(api.find("POST", "/api/simulations")).toHaveLength(1),
+  );
+  const [post] = api.find("POST", "/api/simulations");
+  expect(await post.request.json()).toMatchObject({
+    test_type: "SCENARIO",
+    scenario_id: 3,
+    rerun_of_simulation_id: RUN_ID,
+    prompt_text: "과거 Prompt 원문",
+  });
+});
+
+test("시나리오 목록을 받지 못하면 재실행을 직접 작성으로 바꾸지 않고 다시 시도하게 한다", async () => {
+  const overrides: Record<string, Reply> = {
+    [`GET /api/simulations/${RUN_ID}/rerun-draft`]: {
+      status: 200,
+      body: SCENARIO_DRAFT,
+    },
+    "GET /api/scenarios": {
+      status: 500,
+      body: { code: "INTERNAL_ERROR", message: "내부" },
+    },
+  };
+  stub(overrides);
   renderAt(`/simulator?sourceRun=${RUN_ID}`);
   expect(
-    await screen.findByText("시나리오 실행의 재실행을 준비하고 있습니다"),
+    await screen.findByText("재실행 조건을 불러오지 못했습니다"),
   ).toBeDefined();
   expect(screen.queryByLabelText("Prompt")).toBeNull();
+  delete overrides["GET /api/scenarios"];
+  fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+  expect(await screen.findByLabelText("Prompt")).toBeDefined();
+  expect((screen.getByLabelText("시나리오") as HTMLSelectElement).value).toBe(
+    "3",
+  );
 });
 
 test("없는 재실행 원본은 찾을 수 없다고 안내한다", async () => {

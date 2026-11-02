@@ -795,9 +795,11 @@ export const dbMock = {
     {
       key: "3",
       name: "데이터 요약 및 구조화",
-      prompt: "다음 데이터를 5줄 이내로 요약하세요.\n{{data}}",
+      prompt:
+        "다음 데이터를 5줄 이내로 요약하고, 지정한 JSON Schema에 맞춰 구조화하세요.\n{{data}}",
       defaults: { maxTokens: 512, temperature: 0.3 },
-      schemaText: "",
+      schemaText:
+        '{"type": "object", "required": ["summary", "key_points"], "properties": {"summary": {"type": "string"}, "key_points": {"type": "array", "items": {"type": "string"}}}}',
       imageRequired: false,
     },
     {

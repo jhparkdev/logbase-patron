@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { beforeAll, expect, test } from "vitest";
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { stubInternalBudgetApi } from "../../test/internalBudgetApi";
 import { changePeriod, periodInputs } from "../../test/periodInputs";
 import { renderAt, routeMatch } from "../../test/renderAt";
 
@@ -10,6 +11,12 @@ beforeAll(() => {
     this.open = true;
   };
 });
+
+beforeEach(() => {
+  stubInternalBudgetApi();
+});
+
+afterEach(() => vi.restoreAllMocks());
 
 const ROUTE_ID = "/_app/internal-budget";
 
@@ -144,7 +151,9 @@ test("요약 화면에서 머리글을 누르면 그 표의 정렬만 주소에 
     }),
   );
 
-  fireEvent.click(screen.getByRole("button", { name: /월 예산 \(USD\)/ }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: /월 예산 \(USD\)/ }),
+  );
   await waitFor(() =>
     expect(routeMatch(router, ROUTE_ID)?.search).toEqual({
       from: "2026-10-01",
@@ -158,9 +167,9 @@ test("요약 화면에서 머리글을 누르면 그 표의 정렬만 주소에 
 });
 
 test("주소에 프로젝트 번호가 있으면 프로젝트 상세 패널을 열고, 닫으면 그 값만 지운다", async () => {
-  const router = renderAt(`/internal-budget?${PERIOD}&project=3`);
+  const router = renderAt(`/internal-budget?${PERIOD}&detail=3`);
 
-  await screen.findByRole("dialog", { name: "프로젝트 상세" });
+  await screen.findByRole("dialog", { name: "사내 챗봇 구축" });
   // 패널 머리의 X. 폼 아래에도 같은 동작의 "닫기"가 있다.
   fireEvent.click(screen.getAllByRole("button", { name: "닫기" })[0]);
 
