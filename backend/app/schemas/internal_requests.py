@@ -25,6 +25,8 @@ class InternalRequestSort(StrEnum):
     COST = "cost"
     COST_STATUS = "costStatus"
     STATUS = "status"
+    # 호출 출처(내부 개발, 시뮬레이션, 시스템 테스트)
+    ORIGIN = "origin"
 
 
 class InternalRequestsQuery(InternalFilterQuery):

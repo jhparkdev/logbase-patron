@@ -245,6 +245,29 @@ async def test_프로젝트와_서비스는_화면에_보이는_이름순으로_
     assert shown == expected
 
 
+@pytest.mark.parametrize(
+    ("order", "expected"),
+    [
+        (SortOrder.ASC, ["INTERNAL_DEVELOPMENT", "SIMULATION", "SYSTEM_TEST"]),
+        (SortOrder.DESC, ["SYSTEM_TEST", "SIMULATION", "INTERNAL_DEVELOPMENT"]),
+    ],
+)
+async def test_출처는_내부_개발_시뮬레이션_시스템_테스트_순으로_정렬한다(
+    db_session: AsyncSession,
+    factory: Factory,
+    order: SortOrder,
+    expected: list[str],
+) -> None:
+    for origin in ("SIMULATION", "SYSTEM_TEST", "INTERNAL_DEVELOPMENT"):
+        await internal_call(factory, usage_origin=origin)
+
+    page = await list_requests(
+        db_session, PERIOD, query(sort=InternalRequestSort.ORIGIN, order=order)
+    )
+
+    assert [row.usage_origin for row in page.items] == expected
+
+
 # ---------------------------------------------------------------
 # 미리보기와 페이지
 # ---------------------------------------------------------------
