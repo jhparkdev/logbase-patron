@@ -12,7 +12,7 @@ export const HISTORY_ITEM: Schemas["SimulationHistoryItem"] = {
   simulation_id: RUN_ID,
   rerun_of_simulation_id: null,
   test_type: "SCENARIO",
-  scenario_code: "PRODUCT_DESCRIPTION",
+  scenario_code: "DATA_SUMMARY",
   status: "PARTIAL_SUCCESS",
   model_count: 2,
   requested_at: "2026-10-22T01:00:00Z",
@@ -121,10 +121,25 @@ export const RERUN_DRAFT: Schemas["SimulationRerunDraft"] = {
   blocked_reason: null,
 };
 
+export const SCENARIO: Schemas["ScenarioRead"] = {
+  scenario_id: 3,
+  scenario_code: "DATA_SUMMARY",
+  name: "데이터 요약",
+  description: null,
+  input_type: "TEXT",
+  prompt_template: "다음 데이터를 요약하세요.",
+  default_json_schema: null,
+  default_execution_config: {},
+  is_active: true,
+};
+
+export const SCENARIOS: Schemas["ScenarioList"] = { items: [SCENARIO] };
+
 type Reply = { status: number; body: unknown };
 type Replies = {
   list?: Reply;
   models?: Reply;
+  scenarios?: Reply;
   detail?: Reply;
   draft?: Reply;
 };
@@ -153,6 +168,8 @@ export const EXECUTION_PROVIDERS: Schemas["ExecutionProviderListResponse"] = {
 function replyFor(pathname: string, replies: Replies): Reply {
   if (pathname === "/api/models")
     return replies.models ?? { status: 200, body: MODELS };
+  if (pathname === "/api/scenarios")
+    return replies.scenarios ?? { status: 200, body: SCENARIOS };
   if (pathname.endsWith("/execution-providers"))
     return { status: 200, body: EXECUTION_PROVIDERS };
   if (pathname.endsWith("/images/limits"))

@@ -22,16 +22,25 @@ const STATUS_TONES: Record<RunStatus, HistoryRow["status"]["tone"]> = {
   CANCELLED: "grey",
 };
 const CUSTOM_LABEL = "Custom Prompt";
-const NOT_RECORDED = "미기록";
+const SCENARIO_LABEL = "기본 시나리오";
 const NOT_SPECIFIED = "미지정";
+const NO_SCENARIO_NAMES: ReadonlyMap<string, string> = new Map();
 const JSON_INDENT = 2;
 
 export function isRunOngoing(status: RunStatus): boolean {
   return status === "PENDING" || status === "RUNNING";
 }
 
+/** 이력 응답에는 시나리오 코드만 있다. 코드는 내부 값이라 화면에는 이름으로 바꿔 보여 준다. */
+export function scenarioNames(
+  scenarios: readonly Pick<Schemas["ScenarioRead"], "scenario_code" | "name">[],
+): ReadonlyMap<string, string> {
+  return new Map(scenarios.map((item) => [item.scenario_code, item.name]));
+}
+
 export function toHistoryRow(
   item: Schemas["SimulationHistoryItem"],
+  names: ReadonlyMap<string, string> = NO_SCENARIO_NAMES,
 ): HistoryRow {
   return {
     key: item.simulation_id,
@@ -39,7 +48,7 @@ export function toHistoryRow(
     scenario:
       item.test_type === "CUSTOM"
         ? CUSTOM_LABEL
-        : (item.scenario_code ?? NOT_RECORDED),
+        : (names.get(item.scenario_code ?? "") ?? SCENARIO_LABEL),
     modelCount: item.model_count,
     status: {
       label: STATUS_LABELS[item.status],
@@ -61,6 +70,15 @@ export function toModelOptions(
   return models.map((model) => ({
     key: String(model.model_id),
     name: model.display_name,
+  }));
+}
+
+export function toScenarioOptions(
+  scenarios: readonly Pick<Schemas["ScenarioRead"], "scenario_id" | "name">[],
+): HistoryOption[] {
+  return scenarios.map((scenario) => ({
+    key: String(scenario.scenario_id),
+    name: scenario.name,
   }));
 }
 
@@ -99,7 +117,7 @@ export function toHistoryDetail(
     settings: [
       {
         label: "테스트 유형",
-        value: draft.test_type === "SCENARIO" ? "기본 시나리오" : CUSTOM_LABEL,
+        value: draft.test_type === "SCENARIO" ? SCENARIO_LABEL : CUSTOM_LABEL,
       },
       {
         label: "공통 Temperature",

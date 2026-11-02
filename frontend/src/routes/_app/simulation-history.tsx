@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   historyListOptions,
   historyModelsQuery,
+  historyScenariosQuery,
 } from "../../features/simulation-history/api/history";
 import { HistoryPage } from "../../features/simulation-history/components/HistoryPage";
 import { useHistoryData } from "../../features/simulation-history/hooks/useHistoryData";
@@ -16,6 +17,7 @@ export const Route = createFileRoute("/_app/simulation-history")({
   loader: ({ context: { queryClient }, deps }) => {
     void queryClient.prefetchQuery(historyListOptions(deps));
     void queryClient.prefetchQuery(historyModelsQuery);
+    void queryClient.prefetchQuery(historyScenariosQuery);
   },
   component: HistoryRoute,
 });
@@ -33,6 +35,7 @@ function HistoryRoute() {
       view={data.view}
       detail={data.detail}
       models={data.models}
+      scenarios={data.scenarios}
       onRetry={data.retryList}
       onRetryDetail={data.retryDetail}
       onRerun={(key) => {

@@ -11,6 +11,8 @@ const CATALOG_STALE_TIME_MS = 60_000;
 const PROVIDERS_STALE_TIME_MS = 5 * 60_000;
 /** 이미지 한도는 배포할 때만 바뀐다. */
 const LIMITS_STALE_TIME_MS = 60 * 60_000;
+/** 시나리오는 운영 명령으로만 바뀐다. */
+const SCENARIOS_STALE_TIME_MS = 5 * 60_000;
 /** 진행 중인 실행을 다시 읽는 간격. 백엔드 진행 조회 계약의 5초와 같다. */
 const RUN_POLL_INTERVAL_MS = 5_000;
 /** 모델 목록 API의 한 페이지 최대 크기 */
@@ -39,6 +41,21 @@ export const activeModelsQuery = queryOptions({
   staleTime: CATALOG_STALE_TIME_MS,
   retry: false,
 });
+
+/** 새 실행은 활성 시나리오만 고른다. 재실행은 지금 비활성인 원본도 찾아야 한다. */
+export function scenariosOptions(includeInactive: boolean) {
+  return queryOptions({
+    queryKey: [ROOT_KEY, "scenarios", includeInactive],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/scenarios", {
+          params: { query: { include_inactive: includeInactive } },
+        }),
+      ),
+    staleTime: SCENARIOS_STALE_TIME_MS,
+    retry: false,
+  });
+}
 
 export function executionProvidersOptions(modelId: number) {
   return queryOptions({

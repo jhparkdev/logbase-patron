@@ -26,7 +26,11 @@ export type ScenarioChoice = {
   prompt: string;
   imageRequired: boolean;
   schemaText: string;
-  defaults: { temperature?: number; maxTokens?: number };
+  defaults: {
+    temperature?: number;
+    maxTokens?: number;
+    reasoningEffort?: string;
+  };
 };
 export type StatusView = {
   label: string;

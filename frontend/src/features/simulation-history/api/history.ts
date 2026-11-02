@@ -8,6 +8,8 @@ const ROOT_KEY = "simulation-history";
 const HISTORY_STALE_TIME_MS = 30_000;
 /** 모델 선택지는 등록할 때만 늘어난다. */
 const MODEL_OPTIONS_STALE_TIME_MS = 5 * 60_000;
+/** 시나리오는 운영 명령으로만 바뀐다. */
+const SCENARIO_OPTIONS_STALE_TIME_MS = 5 * 60_000;
 /** 진행 중인 실행을 다시 읽는 간격. 백엔드 진행 조회 계약의 5초와 같다. */
 const RUN_POLL_INTERVAL_MS = 5_000;
 /** 모델 목록 API의 한 페이지 최대 크기 */
@@ -76,5 +78,18 @@ export const historyModelsQuery = queryOptions({
       }),
     ),
   staleTime: MODEL_OPTIONS_STALE_TIME_MS,
+  retry: false,
+});
+
+/** 시나리오 필터 선택지. 지금 비활성인 시나리오의 과거 실행도 찾도록 포함한다. */
+export const historyScenariosQuery = queryOptions({
+  queryKey: [ROOT_KEY, "scenarios"],
+  queryFn: async () =>
+    unwrap(
+      await api.GET("/api/scenarios", {
+        params: { query: { include_inactive: true } },
+      }),
+    ),
+  staleTime: SCENARIO_OPTIONS_STALE_TIME_MS,
   retry: false,
 });

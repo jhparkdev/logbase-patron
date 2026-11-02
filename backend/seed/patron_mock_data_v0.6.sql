@@ -226,8 +226,8 @@ INSERT INTO test_scenarios (scenario_id, scenario_code, name, description, input
 상품명: {{product_name}}', '{"type": "object", "required": ["color", "material", "category"], "properties": {"color": {"type": "string"}, "material": {"type": "string"}, "category": {"type": "string"}}}'::jsonb, '{"temperature": 0.2, "max_tokens": 512}'::jsonb, true),
   (2, 'PRODUCT_COPY', '상품 설명 및 마케팅 문구 생성', '상품 정보로 상세 설명과 마케팅 문구 작성', 'TEXT', '다음 상품 정보로 상세 설명 3문단과 마케팅 문구 1줄을 작성하세요.
 {{product_info}}', NULL, '{"temperature": 0.7, "max_tokens": 1024}'::jsonb, true),
-  (3, 'DATA_SUMMARY', '데이터 요약 및 구조화', '긴 상품 리뷰·스펙 데이터를 요약', 'TEXT', '다음 데이터를 5줄 이내로 요약하세요.
-{{data}}', NULL, '{"temperature": 0.3, "max_tokens": 512}'::jsonb, true),
+  (3, 'DATA_SUMMARY', '데이터 요약 및 구조화', '긴 상품 리뷰·스펙 데이터를 요약하고 구조화', 'TEXT', '다음 데이터를 5줄 이내로 요약하고, 지정한 JSON Schema에 맞춰 구조화하세요.
+{{data}}', '{"type": "object", "required": ["summary", "key_points"], "properties": {"summary": {"type": "string"}, "key_points": {"type": "array", "items": {"type": "string"}}}}'::jsonb, '{"temperature": 0.3, "max_tokens": 512}'::jsonb, true),
   (4, 'TEXT_TO_JSON', '비정형 텍스트 → JSON 변환', '비정형 상품 설명을 지정 JSON 구조로 변환', 'TEXT', '다음 텍스트를 지정한 JSON Schema에 맞춰 변환하세요.
 {{text}}', '{"type": "object", "required": ["name", "price", "options"], "properties": {"name": {"type": "string"}, "price": {"type": "integer"}, "options": {"type": "array", "items": {"type": "string"}}}}'::jsonb, '{"temperature": 0, "max_tokens": 512}'::jsonb, true),
   (5, 'GENERAL_REASONING', '일반 분석 및 추론', '판매 데이터 기반 간단한 분석·추론', 'TEXT', '다음 판매 데이터를 보고 다음 달 재고 전략을 제안하세요.

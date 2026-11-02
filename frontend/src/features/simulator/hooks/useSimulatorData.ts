@@ -10,6 +10,7 @@ import {
   rerunDraftOptions,
   runKey,
   runOptions,
+  scenariosOptions,
   uploadImage,
 } from "../api/simulator";
 import { toModelChoices } from "../lib/catalog";
@@ -19,6 +20,7 @@ import { toCreateRequest } from "../lib/request";
 import { rerunRestoreView } from "../lib/rerun-draft";
 import { sortSlots } from "../lib/result-sort";
 import { toRunView } from "../lib/run-view";
+import { toScenarioChoice } from "../lib/scenarios";
 
 function useCatalog() {
   const models = useQuery(activeModelsQuery);
@@ -101,6 +103,7 @@ export function useSimulatorData({
   const catalog = useCatalog();
   const results = useRun(runId, sort);
   const limits = useQuery(imageLimitsQuery);
+  const scenarios = useQuery(scenariosOptions(!!sourceRun));
   const draft = useQuery({
     ...rerunDraftOptions(sourceRun ?? ""),
     enabled: !!sourceRun,
@@ -115,6 +118,8 @@ export function useSimulatorData({
             : draft.error instanceof ApiError && draft.error.status === 404
               ? "missing"
               : "error",
+          scenarios: scenarios.data?.items,
+          scenariosFailed: scenarios.isError,
         },
         sourceRun,
         catalog.choices,
@@ -123,8 +128,12 @@ export function useSimulatorData({
   return {
     ...catalog,
     results,
+    scenarios: (scenarios.data?.items ?? []).map(toScenarioChoice),
     restore,
-    retryDraft: () => void draft.refetch(),
+    retryDraft: () => {
+      void draft.refetch();
+      void scenarios.refetch();
+    },
     imageLimits: limits.data && {
       mimeTypes: limits.data.mime_types,
       maxCount: limits.data.max_count,

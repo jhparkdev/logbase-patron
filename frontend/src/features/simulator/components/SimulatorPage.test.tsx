@@ -269,6 +269,25 @@ test.each([1, 2])(
   },
 );
 
+test("이미지가 필요한 시나리오만 선택지 이름 뒤에 괄호로 표시한다", () => {
+  render(
+    <SimulatorPage
+      choices={dbMock.choices}
+      scenarios={dbMock.scenarios}
+      onRun={vi.fn()}
+    />,
+  );
+  fireEvent.change(screen.getByLabelText("테스트 유형"), {
+    target: { value: "scenario" },
+  });
+  expect(
+    screen.getByRole("option", { name: "상품 이미지·속성 분석(이미지 필요)" }),
+  ).toBeDefined();
+  expect(
+    screen.getByRole("option", { name: "상품 설명 및 마케팅 문구 생성" }),
+  ).toBeDefined();
+});
+
 test("기존 DB 시나리오의 Prompt·Schema를 복원하고 공통 설정은 기본값을 따른다", () => {
   render(
     <SimulatorPage
