@@ -18,7 +18,7 @@ export type BudgetListView = (typeof LIST_VIEWS)[number];
 
 /** 표마다 정렬할 수 있는 칸(표의 칸 key와 같다). 목록 표가 빠지거나 남으면 타입 검사에서 잡힌다. */
 export const BUDGET_LIST_SORTS = {
-  // 프로젝트·이력 표는 백엔드 정렬 허용 목록에 없는 값을 쓰면 타입 검사에서 잡힌다.
+  // 백엔드 정렬 허용 목록에 없는 값을 쓰면 타입 검사에서 잡힌다.
   projects: [
     "project",
     "budget",
@@ -26,7 +26,13 @@ export const BUDGET_LIST_SORTS = {
     "usage",
     "status",
   ] as const satisfies readonly Schemas["ProjectRowSort"][],
-  subscriptions: ["tool", "month", "amount", "project", "status"],
+  subscriptions: [
+    "tool",
+    "month",
+    "amount",
+    "project",
+    "status",
+  ] as const satisfies readonly Schemas["SubscriptionSort"][],
   requests: [
     "requestedAt",
     "project",
@@ -144,6 +150,16 @@ export function requestRowsQuery(search: BudgetSearch) {
   return {
     ...internalFilterQuery(search),
     ...listPageQuery(search, "requests"),
+    ...(sort && order ? { sort, order } : {}),
+  };
+}
+
+/** 구독료 표 요청 조건. 조회 기간이 걸치는 모든 달을 받아 요약의 구독료 합계와 같은 조건이다. */
+export function subscriptionRowsQuery(search: BudgetSearch) {
+  const { subscriptionsSort: sort, subscriptionsOrder: order } = search;
+  return {
+    ...internalFilterQuery(search),
+    ...listPageQuery(search, "subscriptions"),
     ...(sort && order ? { sort, order } : {}),
   };
 }

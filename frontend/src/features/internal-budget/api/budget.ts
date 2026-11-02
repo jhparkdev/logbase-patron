@@ -7,10 +7,12 @@ import {
   internalFilterQuery,
   projectRowsQuery,
   requestRowsQuery,
+  subscriptionRowsQuery,
 } from "../lib/search";
 
 export type ProjectBudgetRow = components["schemas"]["ProjectBudgetRow"];
 export type InternalRequestRow = components["schemas"]["InternalRequestRow"];
+export type SubscriptionRow = components["schemas"]["SubscriptionRow"];
 type BudgetSave = components["schemas"]["ProjectBudgetSave"];
 
 const ROOT_KEY = "internal-budget";
@@ -51,6 +53,17 @@ export function requestRowsOptions(search: BudgetSearch) {
       unwrap(
         await api.GET("/api/usage/internal/requests", { params: { query } }),
       ),
+    staleTime: USAGE_STALE_TIME_MS,
+    retry: false,
+  });
+}
+
+export function subscriptionRowsOptions(search: BudgetSearch) {
+  const query = subscriptionRowsQuery(search);
+  return queryOptions({
+    queryKey: [ROOT_KEY, "subscriptions", query],
+    queryFn: async () =>
+      unwrap(await api.GET("/api/subscriptions", { params: { query } })),
     staleTime: USAGE_STALE_TIME_MS,
     retry: false,
   });

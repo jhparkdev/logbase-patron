@@ -4,6 +4,7 @@ import {
   internalSummaryQuery,
   projectRowsOptions,
   requestRowsOptions,
+  subscriptionRowsOptions,
 } from "../../features/internal-budget/api/budget";
 import { BudgetFilters } from "../../features/internal-budget/components/BudgetFilters";
 import { BudgetFullList } from "../../features/internal-budget/components/BudgetFullList";
@@ -28,6 +29,9 @@ export const Route = createFileRoute("/_app/internal-budget")({
   loader: ({ context: { queryClient }, deps }) => {
     if (deps.view === undefined || deps.view === "projects") {
       void queryClient.prefetchQuery(projectRowsOptions(deps));
+    }
+    if (deps.view === undefined || deps.view === "subscriptions") {
+      void queryClient.prefetchQuery(subscriptionRowsOptions(deps));
     }
     if (deps.view === undefined || deps.view === "requests") {
       void queryClient.prefetchQuery(requestRowsOptions(deps));
@@ -86,7 +90,7 @@ function InternalBudgetPage() {
           </div>
           <CostTrendCard />
           <ProjectBudgetTable search={shown} refreshing={refreshing} />
-          <SubscriptionTable />
+          <SubscriptionTable search={shown} refreshing={refreshing} />
           <RequestHistoryTable search={shown} refreshing={refreshing} />
         </>
       ) : (

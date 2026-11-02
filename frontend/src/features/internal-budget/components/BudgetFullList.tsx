@@ -1,6 +1,5 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { TextLink } from "../../../shared/components/ui/TextLink";
-import type { PagingControls } from "../lib/list";
 import type { BudgetListView, BudgetSearch } from "../lib/search";
 import { ProjectBudgetTable } from "./ProjectBudgetTable";
 import { RequestHistoryTable } from "./RequestHistoryTable";
@@ -22,10 +21,8 @@ export function BudgetFullList({
   refreshing,
 }: BudgetFullListProps) {
   const navigate = route.useNavigate();
-  const paging: PagingControls = {
-    page: search.page ?? 1,
-    onPageChange: (page) => navigate({ search: (prev) => ({ ...prev, page }) }),
-  };
+  const onPageChange = (page: number) =>
+    navigate({ search: (prev) => ({ ...prev, page }) });
 
   return (
     <>
@@ -42,15 +39,21 @@ export function BudgetFullList({
         <ProjectBudgetTable
           search={search}
           refreshing={refreshing}
-          onPageChange={paging.onPageChange}
+          onPageChange={onPageChange}
         />
       )}
-      {view === "subscriptions" && <SubscriptionTable paging={paging} />}
+      {view === "subscriptions" && (
+        <SubscriptionTable
+          search={search}
+          refreshing={refreshing}
+          onPageChange={onPageChange}
+        />
+      )}
       {view === "requests" && (
         <RequestHistoryTable
           search={search}
           refreshing={refreshing}
-          onPageChange={paging.onPageChange}
+          onPageChange={onPageChange}
         />
       )}
     </>

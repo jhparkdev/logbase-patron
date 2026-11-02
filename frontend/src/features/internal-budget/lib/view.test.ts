@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { originLabel } from "./view";
+import { originLabel, subscriptionStatusBadge } from "./view";
 
 describe("originLabel", () => {
   test.each([
@@ -9,5 +9,18 @@ describe("originLabel", () => {
     ["CUSTOMER_SERVICE", "고객 사용"],
   ] as const)("%s는 %s로 보여 준다", (origin, label) => {
     expect(originLabel(origin)).toBe(label);
+  });
+});
+
+describe("subscriptionStatusBadge", () => {
+  test("사용 중은 초록, 해지는 회색 배지다", () => {
+    expect(subscriptionStatusBadge("ACTIVE")).toEqual({
+      label: "사용 중",
+      tone: "green",
+    });
+    expect(subscriptionStatusBadge("CANCELLED")).toEqual({
+      label: "해지",
+      tone: "grey",
+    });
   });
 });

@@ -14,6 +14,7 @@ export const SUMMARY: Schemas["InternalSummary"] = {
   unknown_cost_count: 3,
   includes_estimate: true,
   has_unknown: true,
+  subscription_excluded: false,
 };
 
 export const PROJECTS: Schemas["ProjectBudgetPage"] = {
@@ -99,6 +100,38 @@ export const REQUESTS: Schemas["InternalRequestPage"] = {
   page_size: 10,
 };
 
+export const SUBSCRIPTIONS: Schemas["SubscriptionList"] = {
+  items: [
+    {
+      subscription_id: 1,
+      subscription_reference: "command-code-team",
+      tool_name: "Command Code",
+      subscription_type: "Team",
+      applied_month: "2026-10",
+      amount_usd: "100.0000",
+      project_id: 1,
+      project_name: "사내 챗봇 구축",
+      status: "ACTIVE",
+      note: null,
+    },
+    {
+      subscription_id: 2,
+      subscription_reference: "notion-ai",
+      tool_name: "Notion AI",
+      subscription_type: null,
+      applied_month: "2026-09",
+      amount_usd: "20.0000",
+      project_id: null,
+      project_name: null,
+      status: "CANCELLED",
+      note: "9월에 해지",
+    },
+  ],
+  total: 12,
+  page: 1,
+  page_size: 10,
+};
+
 export const PROJECT_DETAIL: Schemas["ProjectUsageDetail"] = {
   project_id: 1,
   project_name: "사내 챗봇 구축",
@@ -141,6 +174,7 @@ const DEFAULT_REPLIES = {
   summary: ok(SUMMARY),
   projects: ok(PROJECTS),
   requests: ok(REQUESTS),
+  subscriptions: ok(SUBSCRIPTIONS),
   detail: ok(PROJECT_DETAIL),
   budget: ok(SAVED_BUDGET),
 };
@@ -148,10 +182,14 @@ const DEFAULT_REPLIES = {
 /** 경로 끝부분별 응답을 바꾼다. 예: { summary: { status: 500, body: {} } } */
 type Replies = Partial<Record<keyof typeof DEFAULT_REPLIES, Reply>>;
 
+const SUBSCRIPTIONS_PATH = "/api/subscriptions";
 const PROJECT_DETAIL_PATH = /^projects\/\d+$/;
 const PROJECT_BUDGET_PATH = /^projects\/\d+\/budget$/;
 
 function blockOf(pathname: string): keyof typeof DEFAULT_REPLIES {
+  if (pathname === SUBSCRIPTIONS_PATH) {
+    return "subscriptions";
+  }
   const last = pathname.slice(BASE.length + 1);
   if (PROJECT_DETAIL_PATH.test(last)) {
     return "detail";
