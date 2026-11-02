@@ -655,6 +655,23 @@ export interface paths {
         patch: operations["update_subscription_api_subscriptions__subscription_id__patch"];
         trace?: never;
     };
+    "/api/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Simulation Scenarios */
+        get: operations["list_simulation_scenarios_api_scenarios_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1028,6 +1045,11 @@ export interface components {
          * @enum {string}
          */
         ImageMimeType: "image/jpeg" | "image/png" | "image/webp";
+        /**
+         * InputType
+         * @enum {string}
+         */
+        InputType: "TEXT" | "IMAGE" | "TEXT_IMAGE";
         /**
          * InternalOptions
          * @description 선택 상자 목록. 프로젝트는 사용 중인 것, 서비스와 모델은 내부 호출에 쓰인 것만 준다.
@@ -1675,6 +1697,41 @@ export interface components {
              * @default false
              */
             allow_fallbacks: boolean;
+        };
+        /**
+         * ScenarioList
+         * @description 시나리오 전체 목록. 건수가 적은 관리 데이터라 페이지를 나누지 않는다.
+         */
+        ScenarioList: {
+            /** Items */
+            items: components["schemas"]["ScenarioRead"][];
+        };
+        /**
+         * ScenarioRead
+         * @description 시나리오 하나. 실행 때 합칠 기본값을 화면이 미리 채우도록 그대로 준다.
+         */
+        ScenarioRead: {
+            /** Scenario Id */
+            scenario_id: number;
+            /** Scenario Code */
+            scenario_code: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            input_type: components["schemas"]["InputType"];
+            /** Prompt Template */
+            prompt_template: string;
+            /** Default Json Schema */
+            default_json_schema: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            /** Default Execution Config */
+            default_execution_config: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /** Is Active */
+            is_active: boolean;
         };
         /**
          * SimulationAccepted
@@ -3939,6 +3996,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_simulation_scenarios_api_scenarios_get: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioList"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
         };
