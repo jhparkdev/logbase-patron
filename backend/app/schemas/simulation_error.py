@@ -22,6 +22,8 @@ class SimulationErrorCode(StrEnum):
     MODEL_NOT_ACTIVE = "MODEL_NOT_ACTIVE"
     # 이미지를 보냈는데 고른 모델 중에 이미지를 받지 못하는 모델이 있다
     MODEL_IMAGE_NOT_SUPPORTED = "MODEL_IMAGE_NOT_SUPPORTED"
+    # 이미지 생성 실행인데 고른 모델 중에 이미지를 만들지 못하는 모델이 있다
+    MODEL_IMAGE_OUTPUT_NOT_SUPPORTED = "MODEL_IMAGE_OUTPUT_NOT_SUPPORTED"
     # 칸에 직접 넣은 온도·추론 강도를 그 모델이 받지 못한다
     MODEL_PARAMETER_NOT_SUPPORTED = "MODEL_PARAMETER_NOT_SUPPORTED"
     IMAGE_REQUIRED = "IMAGE_REQUIRED"  # 이미지가 필요한 시나리오인데 이미지가 없음
@@ -79,6 +81,9 @@ ERROR_SPECS: dict[SimulationErrorCode, ErrorSpec] = {
     ),
     SimulationErrorCode.MODEL_IMAGE_NOT_SUPPORTED: ErrorSpec(
         422, "이미지를 지원하지 않는 모델이 있습니다. 해당 모델을 빼 주세요."
+    ),
+    SimulationErrorCode.MODEL_IMAGE_OUTPUT_NOT_SUPPORTED: ErrorSpec(
+        422, "이미지를 만들지 못하는 모델이 있습니다. 해당 모델을 빼 주세요."
     ),
     SimulationErrorCode.MODEL_PARAMETER_NOT_SUPPORTED: ErrorSpec(
         422,

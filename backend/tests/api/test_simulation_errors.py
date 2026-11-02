@@ -13,6 +13,7 @@ from app.services.simulation_cancel_service import (
 from app.services.simulation_create import (
     ImageNotFoundError,
     ImageRequiredError,
+    ModelImageOutputUnsupportedError,
     ModelImageUnsupportedError,
     ModelNotActiveError,
     ModelNotFoundError,
@@ -49,6 +50,7 @@ C = SimulationErrorCode
         (ModelNotFoundError([9]), C.MODEL_NOT_FOUND),
         (ModelNotActiveError([2]), C.MODEL_NOT_ACTIVE),
         (ModelImageUnsupportedError([2]), C.MODEL_IMAGE_NOT_SUPPORTED),
+        (ModelImageOutputUnsupportedError([2]), C.MODEL_IMAGE_OUTPUT_NOT_SUPPORTED),
         (
             ModelParameterUnsupportedError([2], ["temperature"]),
             C.MODEL_PARAMETER_NOT_SUPPORTED,

@@ -113,6 +113,21 @@ def _inline_part(part: Mapping[str, Any], data_urls: Mapping[str, str]) -> Any:
     return {**part, "image_url": {**part["image_url"], "url": data_urls[asset_id]}}
 
 
+def image_call_inputs(
+    messages: Sequence[Mapping[str, Any]],
+) -> tuple[str, list[str]]:
+    """build_messages 로 만든 사용자 메시지를 이미지 생성 입력(글, 참고 이미지 URL 목록)으로 나눈다.
+
+    이미지 생성은 메시지가 아니라 글 하나와 참고 이미지를 받는다. 참고 이미지는 올린 순서다.
+    """
+    content = messages[0]["content"]
+    if not isinstance(content, list):
+        return content, []
+    text = next(part["text"] for part in content if part["type"] == "text")
+    urls = [part["image_url"]["url"] for part in content if part["type"] == "image_url"]
+    return text, urls
+
+
 def compute_input_hash(prompt_text: str, input_text: str | None) -> str:
     """실행의 입력 해시. seed 와 같은 식(sha256(프롬프트 + 입력 텍스트))이다.
 

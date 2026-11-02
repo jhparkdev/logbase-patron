@@ -5,6 +5,7 @@ import pytest
 
 from app.models import ModelStatus, SimulationRun
 from app.schemas.simulation_history import RerunBlockReason
+from app.schemas.simulation_output import ImageConfig, OutputType
 from app.services.simulation_rerun import PastSlot, build_rerun_draft
 
 PAST_ID = uuid.UUID("0192a3c4-0000-7000-8000-000000000001")
@@ -156,4 +157,33 @@ def test_each_model_comes_back_with_the_settings_that_were_applied() -> None:
     assert [m.execution_config for m in draft.models] == [
         {"max_tokens": 100, "reasoning_effort": "low"},
         {"max_tokens": 100, "reasoning_effort": "high"},
+    ]
+
+
+IMAGE_STORED = {"output_type": "IMAGE", "n": 2, "aspect_ratio": "16:9"}
+
+
+def test_an_image_run_comes_back_as_an_image_request() -> None:
+    # 기록된 설정을 요청 모양으로 나눈다. 그대로 돌려주면 새 실행 요청이 모르는 항목으로 거절된다
+    run = past_run(json_schema=None, execution_config=IMAGE_STORED)
+    slots = [
+        slot(1, execution_config=IMAGE_STORED),
+        slot(2, execution_config=IMAGE_STORED),
+    ]
+
+    draft = build_rerun_draft(run, slots)
+
+    assert draft.output_type == OutputType.IMAGE
+    assert draft.image_config == ImageConfig(n=2, aspect_ratio="16:9")
+    assert draft.execution_config == {}
+    assert [model.execution_config for model in draft.models] == [{}, {}]
+
+
+def test_a_text_run_comes_back_as_a_text_request() -> None:
+    draft = build_rerun_draft(past_run(), SLOTS)
+
+    assert (draft.output_type, draft.image_config) == (OutputType.TEXT, None)
+    assert [model.execution_config for model in draft.models] == [
+        {"max_tokens": 4096},
+        {"max_tokens": 4096},
     ]

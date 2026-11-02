@@ -217,6 +217,8 @@ def draft_body(**overrides: object) -> dict[str, object]:
             rerun_model(model_id=2, execution_provider="DekaLLM"),
         ],
         "asset_ids": [],
+        "output_type": "TEXT",
+        "image_config": None,
         "rerunnable": True,
         "blocked_reason": None,
     }

@@ -16,6 +16,7 @@ from pydantic import (
 
 from app.models import TestType
 from app.schemas.simulation_image import MAX_IMAGE_COUNT
+from app.schemas.simulation_output import ImageConfig, OutputType
 
 # 모델 선택 규칙은 services 의 순수 검증 모듈에 한 번만 정의하고 여기서는 가져다 쓴다.
 # 그 모듈이 schemas 를 가져오게 만들면 순환 import 가 되므로 그러지 않는다.
@@ -135,6 +136,23 @@ class SimulationCreateRequest(BaseModel):
     asset_ids: Annotated[list[UUID], Field(max_length=MAX_IMAGE_COUNT)] = Field(
         default_factory=list
     )
+    # IMAGE 면 모든 칸이 OpenRouter 이미지 생성(/images)으로 호출되고, 올린 이미지는 참고 이미지가 된다
+    output_type: OutputType = OutputType.TEXT
+    image_config: ImageConfig | None = None  # IMAGE 실행에만 보낸다
+
+    @model_validator(mode="after")
+    def _settings_match_output_type(self) -> Self:
+        # 이미지 호출은 텍스트 설정과 Schema 를 보내지 않는다. 받아 두면 기록과 실제 호출이 달라진다
+        if self.output_type == OutputType.TEXT:
+            if self.image_config is not None:
+                raise ValueError("이미지 옵션은 이미지 생성 실행에만 보낼 수 있다")
+            return self
+        if self.json_schema is not None:
+            raise ValueError("이미지 생성 실행에는 JSON Schema 를 보낼 수 없다")
+        configs = [self.execution_config, *(m.execution_config for m in self.models)]
+        if any(config.model_dump(exclude_none=True) for config in configs):
+            raise ValueError("이미지 생성 실행에는 텍스트 실행 설정을 보낼 수 없다")
+        return self
 
     @model_validator(mode="after")
     def _no_image_twice(self) -> Self:

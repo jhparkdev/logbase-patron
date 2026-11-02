@@ -8,6 +8,7 @@ from typing import Any
 from app.models import CallPurpose, DataSource, InputType, UsageOrigin
 from app.models import TestType as RunType
 from app.schemas.simulation import ModelSelectionRequest, SimulationCreateRequest
+from app.schemas.simulation_output import OutputType
 from app.services.model_parameters import (
     drop_unsupported,
     reject_unsupported_overrides,
@@ -23,6 +24,7 @@ from app.services.simulation_input import (
     resolve_slot_config,
     validate_input_present,
 )
+from app.services.simulation_output_config import build_image_execution_config
 from app.services.simulation_ports import (
     ImageRef,
     IntakeDeps,
@@ -93,6 +95,14 @@ class ModelImageUnsupportedError(ValueError):
         self.model_ids = model_ids
 
 
+class ModelImageOutputUnsupportedError(ValueError):
+    """이미지 생성 실행인데 고른 모델 중에 이미지를 만들지 못하는 모델이 있다."""
+
+    def __init__(self, model_ids: list[int]) -> None:
+        super().__init__("이미지를 만들지 못하는 모델이다")
+        self.model_ids = model_ids
+
+
 async def create_simulation(
     request: SimulationCreateRequest, *, executed_by: int, deps: IntakeDeps
 ) -> SimulationJob:
@@ -107,16 +117,23 @@ async def create_simulation(
     models = await _find_selectable_models(request, deps)
     images = await _find_images(request, deps)
     _check_image_rules(scenario, images, models)
+    _check_output_rules(request.output_type, models)
     context = await deps.lookup.simulator_context()
 
-    execution_config = resolve_execution_config(
-        request.execution_config.model_dump(exclude_none=True),
-        scenario.default_execution_config if scenario else None,
-    )
-    json_schema = resolve_json_schema(
-        request.json_schema, scenario.default_json_schema if scenario else None
-    )
-    slot_configs = _resolve_slot_configs(request.models, execution_config, models)
+    if request.output_type == OutputType.IMAGE:
+        # 이미지 호출은 텍스트 설정과 Schema 를 보내지 않으므로 시나리오 기본값도 쓰지 않는다
+        execution_config = build_image_execution_config(request.image_config)
+        json_schema = None
+        slot_configs = _image_slot_configs(request.models, execution_config)
+    else:
+        execution_config = resolve_execution_config(
+            request.execution_config.model_dump(exclude_none=True),
+            scenario.default_execution_config if scenario else None,
+        )
+        json_schema = resolve_json_schema(
+            request.json_schema, scenario.default_json_schema if scenario else None
+        )
+        slot_configs = _resolve_slot_configs(request.models, execution_config, models)
     shared = _RunValues(
         simulation_id=deps.new_id(),
         context=context,
@@ -175,7 +192,22 @@ async def create_simulation(
         json_schema=json_schema,
         allow_fallbacks=request.routing_policy.allow_fallbacks,
         images=images,
+        output_type=request.output_type,
     )
+
+
+def _image_slot_configs(
+    chosen_models: Sequence[ModelSelectionRequest], image_config: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """이미지 실행은 모든 칸에 같은 옵션을 보낸다. 같은 모델·Provider 두 칸은 같은 비교 대상이라 거절한다."""
+    configs = [dict(image_config) for _ in chosen_models]
+    validate_model_selection(
+        [
+            ModelSelection(chosen.model_id, chosen.execution_provider, config)
+            for chosen, config in zip(chosen_models, configs, strict=True)
+        ]
+    )
+    return configs
 
 
 def _resolve_slot_configs(
@@ -352,6 +384,15 @@ def _check_image_rules(
         ]
         if unsupported:
             raise ModelImageUnsupportedError(unsupported)
+
+
+def _check_output_rules(output_type: OutputType, models: dict[int, ModelInfo]) -> None:
+    """이미지 생성 실행에는 이미지를 만드는 모델만 고를 수 있다. 비용이 나가기 전에 접수에서 막는다."""
+    if output_type != OutputType.IMAGE:
+        return
+    unsupported = [mid for mid, model in models.items() if not model.generates_images]
+    if unsupported:
+        raise ModelImageOutputUnsupportedError(unsupported)
 
 
 async def _find_selectable_models(

@@ -19,6 +19,7 @@ from app.services.image_storage import ImageStorage, LocalImageStorage
 from app.services.simulation_cancel_service import CancelDeps
 from app.services.simulation_image_source import StorageImageSource
 from app.services.simulation_manager import SimulationManager
+from app.services.simulation_output_assets import ScopedOutputImageStore
 from app.services.simulation_ports import ModelCaller, SimulationDeps
 from app.services.simulation_recorders import ScopedRequestRecorder
 from app.services.simulation_recovery import run_recovery_loop
@@ -26,8 +27,8 @@ from app.services.simulation_registry import CancelRegistry
 from app.services.simulation_scoped_store import ScopedSimulationStore
 
 
-def get_model_caller(api_key: SecretStr | None) -> ModelCaller:
-    """모델을 부르는 함수(OpenRouterClient.call_model).
+def get_openrouter_client(api_key: SecretStr | None) -> OpenRouterClient:
+    """텍스트 호출(call_model)과 이미지 생성(generate_image)이 함께 쓰는 클라이언트.
 
     Key 가 없으면 실행을 받지 않는다. 의존성이 저장보다 먼저 풀리므로 아무것도 저장되지 않는다.
     """
@@ -37,10 +38,14 @@ def get_model_caller(api_key: SecretStr | None) -> ModelCaller:
             "OPENROUTER_API_KEY 가 설정되지 않아 비교 실행을 받을 수 없다"
         )
     # 클라이언트는 _shared_manager 가 프로세스에 하나만 만들므로 앱 수명 동안 재사용된다
-    client = OpenRouterClient(
+    return OpenRouterClient(
         http_client=httpx.AsyncClient(), api_key=api_key.get_secret_value()
     )
-    return client.call_model
+
+
+def get_model_caller(api_key: SecretStr | None) -> ModelCaller:
+    """모델을 부르는 함수(OpenRouterClient.call_model)."""
+    return get_openrouter_client(api_key).call_model
 
 
 @lru_cache
@@ -74,13 +79,17 @@ def _shared_manager(
 ) -> SimulationManager:
     """프로세스에 하나만 둔다. 모델 호출기가 연결되어야 만들어진다."""
     sessions = get_sessionmaker()
+    client = get_openrouter_client(api_key)
+    storage = LocalImageStorage(image_storage_dir)
     return SimulationManager(
         SimulationDeps(
-            caller=get_model_caller(api_key),
+            caller=client.call_model,
             recorder=ScopedRequestRecorder(sessions),
             store=ScopedSimulationStore(sessions),
             now=lambda: datetime.now(UTC),
-            images=StorageImageSource(LocalImageStorage(image_storage_dir)),
+            images=StorageImageSource(storage),
+            image_generator=client.generate_image,
+            outputs=ScopedOutputImageStore(sessions, storage),
         ),
         registry=get_cancel_registry(),
     )

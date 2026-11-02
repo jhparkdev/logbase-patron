@@ -26,6 +26,7 @@ from app.services.simulation_cancel_service import (
 from app.services.simulation_create import (
     ImageNotFoundError,
     ImageRequiredError,
+    ModelImageOutputUnsupportedError,
     ModelImageUnsupportedError,
     ModelNotActiveError,
     ModelNotFoundError,
@@ -55,6 +56,7 @@ _CODE_OF_ERROR: dict[type[Exception], SimulationErrorCode] = {
     ModelNotFoundError: C.MODEL_NOT_FOUND,
     ModelNotActiveError: C.MODEL_NOT_ACTIVE,
     ModelImageUnsupportedError: C.MODEL_IMAGE_NOT_SUPPORTED,
+    ModelImageOutputUnsupportedError: C.MODEL_IMAGE_OUTPUT_NOT_SUPPORTED,
     ModelParameterUnsupportedError: C.MODEL_PARAMETER_NOT_SUPPORTED,
     ImageRequiredError: C.IMAGE_REQUIRED,
     ImageNotFoundError: C.IMAGE_NOT_FOUND,

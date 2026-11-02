@@ -10,6 +10,8 @@ from app.models import SimulationStatus
 from app.openrouter.errors import ErrorType as CallErrorType
 from app.openrouter.failures import build_failure_result
 from app.openrouter.result import CallResult, CallStatus
+from app.schemas.simulation_output import OutputType
+from app.services.simulation_image_call import generate_slot_images
 from app.services.simulation_input import (
     HEARTBEAT_INTERVAL_SECONDS,
     SIMULATION_TIMEOUT_SECONDS,
@@ -21,6 +23,7 @@ from app.services.simulation_ports import (
     SimulationJob,
     SimulationStore,
     SlotPlan,
+    SlotRecord,
 )
 from app.services.simulation_registry import CancelRegistry
 from app.services.simulation_status import compute_overall_status, is_run_finished
@@ -157,27 +160,23 @@ async def _run_slot(
     try:
         if to_send is None:
             raise _ImagesUnavailableError
-        result = await deps.caller(
-            request_id=slot.request_id,
-            model_id=slot.openrouter_model_id,
-            messages=to_send,
-            timeout_seconds=timeout_seconds,
-            json_schema=job.json_schema,
-            provider_order=[slot.execution_provider],
-            allow_fallbacks=job.allow_fallbacks,
-            cancel=cancel,
-            # 칸 설정에는 call_model 이 받는 항목(SENT_EXECUTION_SETTINGS)만 있고 max_tokens 는 항상 있다.
-            # 아무도 정하지 않은 항목은 빠져 있어 인자로도 보내지 않는다
-            **slot.execution_config,
-        )
+        if job.output_type == OutputType.IMAGE:
+            record = await generate_slot_images(
+                slot, job, deps, cancel, timeout_seconds, to_send
+            )
+        else:
+            record = await _call_text_model(
+                slot, job, deps, cancel, timeout_seconds, to_send
+            )
     except Exception as error:  # noqa: BLE001 - 예상 밖 오류는 이 칸의 실패로 바꿔 기록한다
         logger.error(
             "model call raised: request_id=%s error=%s",
             slot.request_id,
             type(error).__name__,
         )
-        result = _unexpected_failure(slot, started_at, deps.now())
-    record = to_slot_record(result, job.json_schema)
+        record = to_slot_record(
+            _unexpected_failure(slot, started_at, deps.now()), job.json_schema
+        )
     if not await deps.recorder.record_finished(slot.request_id, record, deps.now()):
         # 이미 취소로 끝난 칸이다. 종료된 호출의 상태는 바꾸지 않고, 늦게 온 결과는 대조용으로만 남긴다
         await deps.recorder.keep_late_result(slot.request_id, job.messages, record)
@@ -186,6 +185,30 @@ async def _run_slot(
         slot.request_id, job.messages, record.response_text
     )
     await deps.store.save_validation(slot.request_id, record)
+
+
+async def _call_text_model(
+    slot: SlotPlan,
+    job: SimulationJob,
+    deps: SimulationDeps,
+    cancel: asyncio.Event,
+    timeout_seconds: float,
+    to_send: list[dict[str, Any]],
+) -> SlotRecord:
+    result = await deps.caller(
+        request_id=slot.request_id,
+        model_id=slot.openrouter_model_id,
+        messages=to_send,
+        timeout_seconds=timeout_seconds,
+        json_schema=job.json_schema,
+        provider_order=[slot.execution_provider],
+        allow_fallbacks=job.allow_fallbacks,
+        cancel=cancel,
+        # 칸 설정에는 call_model 이 받는 항목(SENT_EXECUTION_SETTINGS)만 있고 max_tokens 는 항상 있다.
+        # 아무도 정하지 않은 항목은 빠져 있어 인자로도 보내지 않는다
+        **slot.execution_config,
+    )
+    return to_slot_record(result, job.json_schema)
 
 
 def _unexpected_failure(
