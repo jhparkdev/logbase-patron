@@ -36,13 +36,11 @@ export function UsageFilters({ values, onSubmit }: UsageFiltersProps) {
     reValidateMode: "onSubmit",
   });
   const periodMessage = errors.from?.message ?? errors.to?.message;
-  const periodError =
-    periodMessage === undefined
-      ? undefined
-      : { id: periodErrorId, message: periodMessage };
-
   return (
-    <FilterCard onSubmit={handleSubmit(onSubmit)} error={periodError}>
+    <FilterCard
+      onSubmit={handleSubmit(onSubmit)}
+      errors={[{ id: periodErrorId, message: periodMessage }]}
+    >
       {SELECTS.map((select) => (
         <Controller
           key={select.name}
@@ -71,7 +69,7 @@ export function UsageFilters({ values, onSubmit }: UsageFiltersProps) {
         label="기간"
         fromInput={register("from")}
         toInput={register("to")}
-        errorId={periodError?.id}
+        errorId={periodMessage && periodErrorId}
       />
     </FilterCard>
   );

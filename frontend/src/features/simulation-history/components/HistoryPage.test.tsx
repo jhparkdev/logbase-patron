@@ -134,7 +134,7 @@ test("두 번째 페이지에서 조회하면 첫 페이지로 돌아간다", as
 test("필터는 조회할 때 제출하고 역전된 날짜를 입력하면 URL 변경을 막는다", async () => {
   const onSearch = vi.fn();
   render(<HistoryPage search={search} onSearch={onSearch} />);
-  fireEvent.change(screen.getByLabelText("조회 시작일"), {
+  fireEvent.change(screen.getByLabelText("시작일"), {
     target: { value: "2026-10-31" },
   });
   expect(onSearch).not.toHaveBeenCalled();
@@ -143,7 +143,7 @@ test("필터는 조회할 때 제출하고 역전된 날짜를 입력하면 URL 
     await screen.findByText("시작일은 종료일보다 늦을 수 없어요."),
   ).toBeDefined();
   expect(onSearch).not.toHaveBeenCalled();
-  fireEvent.change(screen.getByLabelText("조회 시작일"), {
+  fireEvent.change(screen.getByLabelText("시작일"), {
     target: { value: "2026-10-01" },
   });
   fireEvent.change(screen.getByLabelText("Simulation ID"), {
@@ -160,6 +160,26 @@ test("필터는 조회할 때 제출하고 역전된 날짜를 입력하면 URL 
     ),
   );
 });
+test("기간과 실행 ID가 모두 틀리면 두 오류를 함께 보여 주고 각 칸에 연결한다", async () => {
+  render(<HistoryPage search={search} onSearch={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("시작일"), {
+    target: { value: "2099-12-31" },
+  });
+  fireEvent.change(screen.getByLabelText("Simulation ID"), {
+    target: { value: "run-1" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "조회" }));
+
+  const describedText = (label: string) => {
+    const id = screen.getByLabelText(label).getAttribute("aria-describedby");
+    return id && document.getElementById(id)?.textContent;
+  };
+  await waitFor(() =>
+    expect(describedText("시작일")).toBe("시작일은 종료일보다 늦을 수 없어요."),
+  );
+  expect(describedText("Simulation ID")).toBe("실행 ID 형식을 확인해 주세요.");
+});
+
 test("UUID가 아닌 실행 ID는 조회하지 않고 고칠 수 있게 안내한다", async () => {
   const onSearch = vi.fn();
   render(<HistoryPage search={search} onSearch={onSearch} />);
