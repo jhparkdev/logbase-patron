@@ -1,10 +1,10 @@
-"""모델+Provider 즐겨찾기 라우터. 로그인한 사용자 본인의 것만 다룬다."""
+"""모델+Provider 즐겨찾기 라우터. 로그인 검사 없이 첫 활성 계정(DevUserDep)의 것을 다룬다."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Response, status
 
-from app.api.deps import CurrentUserDep
+from app.api.deps import DevUserDep
 from app.api.errors import VALIDATION_MESSAGE, ApiError
 from app.db import SessionDep
 from app.schemas.common import ErrorCode, ErrorResponse
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/model-favorites", tags=["model-favorites"])
 
 @router.get("")
 async def list_model_favorites(
-    user: CurrentUserDep, session: SessionDep
+    user: DevUserDep, session: SessionDep
 ) -> ModelFavoriteList:
     rows = await model_favorites.list_favorites(session, user.user_id)
     return ModelFavoriteList(items=[ModelFavoriteRead.model_validate(r) for r in rows])
@@ -38,7 +38,7 @@ async def list_model_favorites(
 async def add_model_favorite(
     body: ModelFavoriteKey,
     response: Response,
-    user: CurrentUserDep,
+    user: DevUserDep,
     session: SessionDep,
 ) -> ModelFavoriteRead:
     """등록한다. 이미 있으면 200 으로 같은 항목을 돌려줘 화면이 두 번 눌러도 안전하다."""
@@ -61,10 +61,10 @@ async def add_model_favorite(
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_model_favorite(
     key: Annotated[ModelFavoriteKey, Query()],
-    user: CurrentUserDep,
+    user: DevUserDep,
     session: SessionDep,
 ) -> Response:
-    """해제한다. 없는 항목도 204 다. 삭제와 목록은 로그인 사용자 본인 행에만 닿는다."""
+    """해제한다. 없는 항목도 204 다. 삭제와 목록은 그 계정의 행에만 닿는다."""
     await model_favorites.remove_favorite(
         session, user.user_id, key.model_id, key.execution_provider
     )
