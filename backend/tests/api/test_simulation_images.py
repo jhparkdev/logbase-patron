@@ -294,7 +294,7 @@ async def test_the_rerun_draft_of_an_image_run_goes_back_as_a_new_request(
     new_request = {
         key: value
         for key, value in draft.items()
-        if key not in {"rerunnable", "blocked_reason"}
+        if key not in {"rerunnable", "blocked_reason", "images"}
     }
     new_request["models"] = [
         {

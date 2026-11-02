@@ -218,6 +218,7 @@ def draft_body(**overrides: object) -> dict[str, object]:
             rerun_model(model_id=2, execution_provider="DekaLLM"),
         ],
         "asset_ids": [],
+        "images": [],
         "output_type": "TEXT",
         "image_config": None,
         "rerunnable": True,
@@ -253,9 +254,9 @@ def test_draft_points_back_to_the_original_run() -> None:
 def test_draft_inputs_can_be_sent_back_as_a_new_run_request() -> None:
     # 화면은 초안을 채워 놓고 사용자가 고친 값을 비교 실행 요청으로 보낸다. 두 모양이 어긋나면 안 된다
     # 원본 실행 ID 도 함께 넘어가므로 새 실행이 어느 실행의 재실행인지 남는다.
-    # rerunnable·blocked_reason 은 화면 안내용이라 새 실행 요청에는 싣지 않는다
+    # rerunnable·blocked_reason·images 는 화면 안내·표시용이라 새 실행 요청에는 싣지 않는다
     sent = SimulationRerunDraft(**draft_body()).model_dump(
-        mode="json", exclude={"rerunnable", "blocked_reason"}
+        mode="json", exclude={"rerunnable", "blocked_reason", "images"}
     )
 
     request = SimulationCreateRequest(**sent)

@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from app.models import ModelStatus, SimulationStatus, TestType
+from app.schemas.simulation_image import ImageAssetRead
 from app.schemas.simulation_output import ImageConfig, OutputType
 from app.schemas.simulation_result import SimulationSummary
 from app.services.simulation_validation import MAX_MODEL_COUNT, MIN_MODEL_COUNT
@@ -113,7 +114,7 @@ class SimulationRerunDraft(BaseModel):
 
     입력 필드는 비교 실행 요청(SimulationCreateRequest)과 같고, 화면이 안내에 쓰는
     rerunnable·blocked_reason 과 모델 칸의 현재 상태가 더해진다. 사용자가 고친 값은
-    그 둘을 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).
+    그 둘과 images 를 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).
     과거 이력은 지금 규칙으로 다시 거절하지 않는다. 새 실행 요청이 들어올 때 검증한다.
     """
 
@@ -131,6 +132,8 @@ class SimulationRerunDraft(BaseModel):
     ]
     # 과거 실행에 쓴 이미지(올린 순서). 새 실행 요청에 그대로 보내면 같은 이미지로 다시 돌린다
     asset_ids: list[UUID]
+    # asset_ids 와 같은 순서의 파일 이름 등. 화면 표시용이라 새 실행 요청에는 싣지 않는다
+    images: list[ImageAssetRead]
     # 이미지 생성 실행이면 IMAGE 와 그때의 이미지 옵션. execution_config 에는 텍스트 설정만 남는다
     output_type: OutputType
     image_config: ImageConfig | None

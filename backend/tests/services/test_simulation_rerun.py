@@ -5,6 +5,7 @@ import pytest
 
 from app.models import ModelStatus, SimulationRun
 from app.schemas.simulation_history import RerunBlockReason
+from app.schemas.simulation_image import ImageAssetRead
 from app.schemas.simulation_output import ImageConfig, OutputType
 from app.services.simulation_rerun import PastSlot, build_rerun_draft
 
@@ -120,29 +121,57 @@ def test_a_model_that_can_no_longer_be_chosen_does_not_block_the_rerun() -> None
 IMAGE_IDS = [uuid.UUID(int=21), uuid.UUID(int=22)]
 
 
+def image(asset_id: uuid.UUID, filename: str | None) -> ImageAssetRead:
+    return ImageAssetRead(
+        asset_id=asset_id,
+        mime_type="image/png",
+        file_size_bytes=1,
+        original_filename=filename,
+    )
+
+
+IMAGES = [image(IMAGE_IDS[0], "앞면.png"), image(IMAGE_IDS[1], "뒷면.png")]
+
+
 def test_a_run_with_images_whose_files_remain_can_be_rerun_with_them() -> None:
-    draft = build_rerun_draft(past_run(), SLOTS, asset_ids=IMAGE_IDS)
+    draft = build_rerun_draft(past_run(), SLOTS, images=IMAGES)
 
     assert (draft.rerunnable, draft.blocked_reason) == (True, None)
     # 올린 순서가 곧 모델에 보낸 순서다
     assert draft.asset_ids == IMAGE_IDS
 
 
+def test_each_image_comes_back_with_its_file_name_in_the_same_order() -> None:
+    # 화면이 "이미지 1" 대신 올린 파일 이름을 보여 줄 수 있어야 한다
+    draft = build_rerun_draft(past_run(), SLOTS, images=IMAGES)
+
+    assert draft.images == IMAGES
+    assert [i.asset_id for i in draft.images] == draft.asset_ids
+
+
+def test_an_image_uploaded_without_a_file_name_comes_back_with_none() -> None:
+    images = [image(IMAGE_IDS[0], None)]
+
+    draft = build_rerun_draft(past_run(), SLOTS, images=images)
+
+    assert draft.images[0].original_filename is None
+
+
 def test_a_run_whose_image_files_are_gone_cannot_be_restored() -> None:
     # 다른 이미지로 돌리면 같은 입력의 비교가 아니다
-    draft = build_rerun_draft(
-        past_run(), SLOTS, asset_ids=IMAGE_IDS, assets_available=False
-    )
+    draft = build_rerun_draft(past_run(), SLOTS, images=IMAGES, assets_available=False)
 
     assert draft.rerunnable is False
     assert draft.blocked_reason == RerunBlockReason.INPUT_MISSING
     assert draft.asset_ids == IMAGE_IDS
+    # 복원은 막아도 무엇을 올렸었는지는 보여 준다
+    assert draft.images == IMAGES
 
 
 def test_a_text_only_run_has_no_images_to_restore() -> None:
     draft = build_rerun_draft(past_run(), SLOTS, assets_available=False)
 
-    assert (draft.rerunnable, draft.asset_ids) == (True, [])
+    assert (draft.rerunnable, draft.asset_ids, draft.images) == (True, [], [])
 
 
 def test_each_model_comes_back_with_the_settings_that_were_applied() -> None:
