@@ -55,7 +55,7 @@ describe("budgetSearchSchema 정렬·전체 목록", () => {
     const sorts = {
       projectsSort: "budget",
       projectsOrder: "desc",
-      requestsSort: "cost",
+      requestsSort: "origin",
       requestsOrder: "asc",
     };
     expect(parse({ ...PERIOD, ...sorts })).toEqual({ ...PERIOD, ...sorts });

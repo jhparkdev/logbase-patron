@@ -27,13 +27,13 @@ export const BUDGET_LIST_SORTS = {
     "status",
   ] as const satisfies readonly Schemas["ProjectRowSort"][],
   subscriptions: ["tool", "month", "amount", "project", "status"],
-  // 구분(호출 출처) 칸은 백엔드가 정렬하지 못해 넣지 않는다.
   requests: [
     "requestedAt",
     "project",
     "model",
     "tokens",
     "cost",
+    "origin",
     "status",
   ] as const satisfies readonly Schemas["InternalRequestSort"][],
 } as const satisfies Record<BudgetListView, readonly string[]>;

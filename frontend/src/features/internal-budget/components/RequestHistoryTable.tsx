@@ -30,12 +30,11 @@ const UNCLASSIFIED_LABEL = "미분류";
 /** 토큰 수를 알 수 없을 때. 비용 미확인과 달리 금액이 아니다. */
 const NO_VALUE = "–";
 
-/** 정렬하는 칸의 key는 정렬 허용 목록의 값만 쓴다. 구분 칸은 백엔드가 정렬하지 못한다. */
-type RequestColumn = Omit<Column<InternalRequestRow>, "key" | "sortable"> &
-  (
-    | { key: (typeof BUDGET_LIST_SORTS)["requests"][number]; sortable: true }
-    | { key: "origin"; sortable: false }
-  );
+/** 칸의 key는 정렬 허용 목록의 값만 쓴다. 머리글을 누르면 그 값이 주소와 요청의 정렬 칸이 된다. */
+type RequestColumn = Omit<Column<InternalRequestRow>, "key" | "sortable"> & {
+  key: (typeof BUDGET_LIST_SORTS)["requests"][number];
+  sortable: true;
+};
 
 const COLUMNS: RequestColumn[] = [
   {
@@ -84,7 +83,7 @@ const COLUMNS: RequestColumn[] = [
   {
     key: "origin",
     header: "구분",
-    sortable: false,
+    sortable: true,
     render: (row) => <Badge tone="grey">{originLabel(row.usage_origin)}</Badge>,
   },
   {

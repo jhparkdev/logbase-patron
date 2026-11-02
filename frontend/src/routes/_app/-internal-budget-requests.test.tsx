@@ -56,20 +56,33 @@ test("요약 화면은 조회 기간으로 최근 이력 미리보기를 요청�
   expect(url.searchParams.has("page")).toBe(false);
 });
 
-test("구분 칸은 서버가 정렬하지 못해 정렬 버튼이 없고, 다른 칸은 머리글로 정렬해 다시 요청한다", async () => {
+test("머리글을 누르면 그 칸으로 정렬해 다시 요청한다. 구분(호출 출처) 칸도 정렬한다", async () => {
   const { requests } = stubInternalBudgetApi();
-  renderAt(OCTOBER);
+  const router = renderAt(OCTOBER);
 
   const table = await screen.findByRole("table", { name: TITLE });
-  expect(within(table).queryByRole("button", { name: "구분" })).toBeNull();
   fireEvent.click(within(table).getByRole("button", { name: /비용/ }));
-
   await waitFor(() =>
     expect(
       requestUrls(requests).some(
         (url) =>
           url.searchParams.get("sort") === "cost" &&
           url.searchParams.get("order") === "asc",
+      ),
+    ).toBe(true),
+  );
+
+  fireEvent.click(within(table).getByRole("button", { name: /구분/ }));
+  await waitFor(() =>
+    expect(routeMatch(router, ROUTE_ID)?.search).toMatchObject({
+      requestsSort: "origin",
+      requestsOrder: "asc",
+    }),
+  );
+  await waitFor(() =>
+    expect(
+      requestUrls(requests).some(
+        (url) => url.searchParams.get("sort") === "origin",
       ),
     ).toBe(true),
   );
