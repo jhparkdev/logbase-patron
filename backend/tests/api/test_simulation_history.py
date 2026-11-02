@@ -229,6 +229,50 @@ async def test_empty_values_go_last_in_either_direction(
     assert ids == [from_scenario, custom]
 
 
+async def run_with_costs(factory: Factory, *slots: tuple[str, Decimal | None]) -> str:
+    """칸마다 (비용 상태, 금액)을 준 실행. 추정 비용은 가격 근거가 있어야 기록된다(DB 제약)."""
+    run = await factory.simulation_run(requested_at=T0, status="PARTIAL_SUCCESS")
+    price_id = (await factory.model_price())["price_id"]
+    for slot_no, (cost_status, cost) in enumerate(slots, start=1):
+        request = await factory.ai_request(
+            usage_origin="SIMULATION",
+            simulation_id=run["simulation_id"],
+            status="SUCCESS",
+            cost_status=cost_status,
+            cost_usd=cost,
+            price_id=price_id if cost_status == "ESTIMATED" else None,
+        )
+        await factory.simulation_result(
+            simulation_id=run["simulation_id"],
+            request_id=request["request_id"],
+            slot_no=slot_no,
+        )
+    return str(run["simulation_id"])
+
+
+@pytest.mark.usefixtures("signed_in")
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+async def test_the_history_is_sorted_by_the_total_of_confirmed_and_estimated_costs(
+    client: AsyncClient, factory: Factory, direction: str
+) -> None:
+    # 한쪽 합계만 있어도 그 금액 자리에 선다. 금액을 아는 호출이 없는 실행만 0 이 아니라 맨 뒤다
+    confirmed_only = await run_with_costs(factory, ("CONFIRMED", Decimal("0.003")))
+    estimated_only = await run_with_costs(factory, ("ESTIMATED", Decimal("0.002")))
+    both = await run_with_costs(
+        factory,
+        ("CONFIRMED", Decimal("0.0005")),
+        ("ESTIMATED", Decimal("0.0005")),
+        ("UNKNOWN", None),
+    )
+    unknown_only = await run_with_costs(factory, ("UNKNOWN", None))
+
+    ids = await listed_ids(client, sort="totalCost", direction=direction)
+
+    ascending = [both, estimated_only, confirmed_only]
+    known = ascending if direction == "asc" else ascending[::-1]
+    assert ids == [*known, unknown_only]
+
+
 @pytest.mark.usefixtures("signed_in")
 async def test_sorting_applies_before_paging(
     client: AsyncClient, factory: Factory
