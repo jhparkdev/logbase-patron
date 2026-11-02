@@ -2392,24 +2392,6 @@
         ],
         "summary": "List Model Favorites",
         "operationId": "list_model_favorites_api_model_favorites_get",
-        "parameters": [
-          {
-            "name": "patron_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Patron Session"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2417,16 +2399,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ModelFavoriteList"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2440,24 +2412,6 @@
         "summary": "Add Model Favorite",
         "description": "등록한다. 이미 있으면 200 으로 같은 항목을 돌려줘 화면이 두 번 눌러도 안전하다.",
         "operationId": "add_model_favorite_api_model_favorites_post",
-        "parameters": [
-          {
-            "name": "patron_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Patron Session"
-            }
-          }
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2506,7 +2460,7 @@
           "model-favorites"
         ],
         "summary": "Remove Model Favorite",
-        "description": "해제한다. 없는 항목도 204 다. 삭제와 목록은 로그인 사용자 본인 행에만 닿는다.",
+        "description": "해제한다. 없는 항목도 204 다. 삭제와 목록은 그 계정의 행에만 닿는다.",
         "operationId": "remove_model_favorite_api_model_favorites_delete",
         "parameters": [
           {
@@ -2526,22 +2480,6 @@
               "type": "string",
               "minLength": 1,
               "title": "Execution Provider"
-            }
-          },
-          {
-            "name": "patron_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Patron Session"
             }
           }
         ],
