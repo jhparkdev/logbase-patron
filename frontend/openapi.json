@@ -763,6 +763,112 @@
         }
       }
     },
+    "/api/simulations/images/{asset_id}": {
+      "get": {
+        "tags": [
+          "simulations",
+          "simulation-images"
+        ],
+        "summary": "Download Simulation Image",
+        "description": "올린 이미지 파일. 화면은 <img src> 로 이 주소를 쓴다.",
+        "operationId": "download_simulation_image_api_simulations_images__asset_id__get",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "이미지 파일 내용",
+            "content": {
+              "image/jpeg": {},
+              "image/png": {},
+              "image/webp": {}
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationRequestErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/simulations/output-images/{output_asset_id}": {
+      "get": {
+        "tags": [
+          "simulations",
+          "simulation-images"
+        ],
+        "summary": "Download Output Image",
+        "description": "모델이 만든 이미지 파일. 화면은 <img src> 로 이 주소를 쓴다.",
+        "operationId": "download_output_image_api_simulations_output_images__output_asset_id__get",
+        "parameters": [
+          {
+            "name": "output_asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Output Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "이미지 파일 내용",
+            "content": {
+              "image/jpeg": {},
+              "image/png": {},
+              "image/webp": {}
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationRequestErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/models": {
       "get": {
         "tags": [
@@ -4412,10 +4518,11 @@
           "scenario",
           "modelCount",
           "status",
-          "costStatus"
+          "costStatus",
+          "totalCost"
         ],
         "title": "HistorySortColumn",
-        "description": "이력 목록의 정렬 열(허용 목록). 값은 이력 화면의 URL 정렬 키와 같다.\n\n요약 뷰의 어느 열로 정렬할지는 서비스(simulation_history.py)가 정한다. 총 비용(totalCost)은\n요약 뷰에 합계 열이 생기면 여기와 서비스의 열 대응표에 한 줄씩 추가한다."
+        "description": "이력 목록의 정렬 열(허용 목록). 값은 이력 화면의 URL 정렬 키와 같다.\n\n요약 뷰의 어느 열로 정렬할지는 서비스(simulation_history.py)가 정한다. 총 비용(totalCost)은\n요약의 total_cost_usd 와 같은 값이다. 금액을 아는 호출이 없는 실행은 0 으로 보지 않고\n다른 빈 값처럼 방향과 관계없이 맨 뒤에 둔다."
       },
       "ImageAssetRead": {
         "properties": {
@@ -4454,6 +4561,61 @@
         "title": "ImageAssetRead",
         "description": "올린 이미지 한 장. 비교 실행 요청에는 asset_id 만 보낸다."
       },
+      "ImageConfig": {
+        "properties": {
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N"
+          },
+          "aspect_ratio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{1,2}:\\d{1,2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aspect Ratio"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z]{1,16}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageQuality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ImageConfig",
+        "description": "이미지 생성 옵션. 모든 칸에 같은 값을 보낸다. 보내지 않은 항목은 모델 기본값을 쓴다."
+      },
       "ImageLimits": {
         "properties": {
           "max_count": {
@@ -4490,6 +4652,17 @@
         ],
         "title": "ImageMimeType",
         "description": "받는 이미지 형식. 파일 내용의 머리 바이트로 판단한다."
+      },
+      "ImageQuality": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "low",
+          "medium",
+          "high"
+        ],
+        "title": "ImageQuality",
+        "description": "OpenRouter 이미지 생성의 quality 값."
       },
       "InputType": {
         "type": "string",
@@ -5582,6 +5755,47 @@
         "title": "OriginNotAllowedResponse",
         "description": "403 응답의 문서용 형식. 상태를 바꾸는 요청의 Origin 이 허용한 화면 주소가 아닐 때다."
       },
+      "OutputImageRead": {
+        "properties": {
+          "output_asset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Output Asset Id"
+          },
+          "sort_order": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Sort Order"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "file_size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "File Size Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "output_asset_id",
+          "sort_order",
+          "mime_type",
+          "file_size_bytes"
+        ],
+        "title": "OutputImageRead",
+        "description": "칸 하나가 만든 결과 이미지 한 장. 파일은 GET /simulations/output-images/{output_asset_id} 로 받는다."
+      },
+      "OutputType": {
+        "type": "string",
+        "enum": [
+          "TEXT",
+          "IMAGE"
+        ],
+        "title": "OutputType",
+        "description": "실행 한 건이 만드는 결과. 한 실행의 모든 칸이 같은 종류다."
+      },
       "PriceRead": {
         "properties": {
           "price_id": {
@@ -6529,6 +6743,20 @@
             "type": "array",
             "maxItems": 4,
             "title": "Asset Ids"
+          },
+          "output_type": {
+            "$ref": "#/components/schemas/OutputType",
+            "default": "TEXT"
+          },
+          "image_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -6576,12 +6804,14 @@
           "MODEL_NOT_FOUND",
           "MODEL_NOT_ACTIVE",
           "MODEL_IMAGE_NOT_SUPPORTED",
+          "MODEL_IMAGE_OUTPUT_NOT_SUPPORTED",
           "MODEL_PARAMETER_NOT_SUPPORTED",
           "IMAGE_REQUIRED",
           "IMAGE_NOT_FOUND",
           "IMAGE_EMPTY",
           "IMAGE_TOO_LARGE",
           "IMAGE_TYPE_NOT_SUPPORTED",
+          "IMAGE_FILE_NOT_FOUND",
           "PROVIDER_NOT_AVAILABLE",
           "PERIOD_INCOMPLETE",
           "PERIOD_START_AFTER_END",
@@ -6724,6 +6954,20 @@
             "maximum": 4.0,
             "minimum": 0.0,
             "title": "Inactive Model Count"
+          },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "decimal_places": 18
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd",
+            "description": "확정 + 추정. 금액을 아는 호출이 없으면 null 이다(0 이 아님).\n\n미확인 호출은 들어 있지 않다. 일부만 더한 값인지는 unknown_cost_count·cost_check_status 로 안다.",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -6744,7 +6988,8 @@
           "estimated_cost_usd",
           "unknown_cost_count",
           "cost_check_status",
-          "inactive_model_count"
+          "inactive_model_count",
+          "total_cost_usd"
         ],
         "title": "SimulationHistoryItem",
         "description": "이력 목록 한 행. 진행·결과 조회의 요약에 재실행 판단용 값 하나를 더한다."
@@ -6960,6 +7205,16 @@
               }
             ],
             "title": "Error Message"
+          },
+          "output_type": {
+            "$ref": "#/components/schemas/OutputType"
+          },
+          "output_images": {
+            "items": {
+              "$ref": "#/components/schemas/OutputImageRead"
+            },
+            "type": "array",
+            "title": "Output Images"
           }
         },
         "type": "object",
@@ -6985,7 +7240,9 @@
           "missing_required_fields",
           "comparability_note",
           "response_text",
-          "error_message"
+          "error_message",
+          "output_type",
+          "output_images"
         ],
         "title": "SimulationModelResult",
         "description": "모델 한 칸의 결과. 화면이 모델 칸에 그대로 그릴 수 있게 응답 원문도 함께 준다."
@@ -7094,6 +7351,19 @@
             "type": "array",
             "title": "Asset Ids"
           },
+          "output_type": {
+            "$ref": "#/components/schemas/OutputType"
+          },
+          "image_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "rerunnable": {
             "type": "boolean",
             "title": "Rerunnable"
@@ -7121,6 +7391,8 @@
           "routing_policy",
           "models",
           "asset_ids",
+          "output_type",
+          "image_config",
           "rerunnable",
           "blocked_reason"
         ],
@@ -7248,6 +7520,20 @@
           },
           "cost_check_status": {
             "$ref": "#/components/schemas/CostCheckStatus"
+          },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "decimal_places": 18
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd",
+            "description": "확정 + 추정. 금액을 아는 호출이 없으면 null 이다(0 이 아님).\n\n미확인 호출은 들어 있지 않다. 일부만 더한 값인지는 unknown_cost_count·cost_check_status 로 안다.",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -7267,10 +7553,11 @@
           "confirmed_cost_usd",
           "estimated_cost_usd",
           "unknown_cost_count",
-          "cost_check_status"
+          "cost_check_status",
+          "total_cost_usd"
         ],
         "title": "SimulationSummary",
-        "description": "비교 실행 한 건의 요약. v_simulation_summary 한 행과 같은 칸이며 여기서 다시 계산하지 않는다.\n\nconfirmed_cost_usd·estimated_cost_usd 가 null 이면 그 상태의 호출이 하나도 없다는 뜻이다(0 이 아님).\n비용 미확인 호출은 금액 합계에 넣지 않고 unknown_cost_count 로 센다."
+        "description": "비교 실행 한 건의 요약. v_simulation_summary 한 행과 같은 칸이며 여기서 다시 계산하지 않는다.\n\nconfirmed_cost_usd·estimated_cost_usd 가 null 이면 그 상태의 호출이 하나도 없다는 뜻이다(0 이 아님).\n비용 미확인 호출은 금액 합계에 넣지 않고 unknown_cost_count 로 센다.\ntotal_cost_usd 만은 뷰의 칸이 아니다. 뷰가 낸 두 합계를 더할 뿐 호출을 다시 합산하지 않는다."
       },
       "SortDirection": {
         "type": "string",
