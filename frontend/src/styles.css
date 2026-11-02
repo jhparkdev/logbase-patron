@@ -9,8 +9,8 @@
   --text-*: initial;
 
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic",
-    system-ui, sans-serif;
+    "Inter", "Noto Sans KR", -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 
   /* TDS 타이포그래피 표에서 데스크톱에 쓰는 크기 */
   --text-title: 26px;
