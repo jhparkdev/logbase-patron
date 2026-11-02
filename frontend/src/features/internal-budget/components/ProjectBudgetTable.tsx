@@ -23,7 +23,7 @@ const COLUMNS: ListColumn<"projects", ProjectBudgetRow>[] = [
       <TextLink
         from="/internal-budget"
         to="/internal-budget"
-        search={(prev) => ({ ...prev, project: row.project_id })}
+        search={(prev) => ({ ...prev, detail: row.project_id })}
       >
         {row.project_name}
       </TextLink>

@@ -167,7 +167,7 @@ test("요약 화면에서 머리글을 누르면 그 표의 정렬만 주소에 
 });
 
 test("주소에 프로젝트 번호가 있으면 프로젝트 상세 패널을 열고, 닫으면 그 값만 지운다", async () => {
-  const router = renderAt(`/internal-budget?${PERIOD}&project=3`);
+  const router = renderAt(`/internal-budget?${PERIOD}&detail=3`);
 
   await screen.findByRole("dialog", { name: "사내 챗봇 구축" });
   // 패널 머리의 X. 폼 아래에도 같은 동작의 "닫기"가 있다.

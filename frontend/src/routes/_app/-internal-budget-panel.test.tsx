@@ -5,10 +5,11 @@ import {
   PROJECT_DETAIL,
   stubInternalBudgetApi,
 } from "../../test/internalBudgetApi";
-import { renderAt } from "../../test/renderAt";
+import { renderAt, routeMatch } from "../../test/renderAt";
 
+const ROUTE_ID = "/_app/internal-budget";
 const OCTOBER = "/internal-budget?from=2026-10-01&to=2026-10-31";
-const PANEL = `${OCTOBER}&project=1`;
+const PANEL = `${OCTOBER}&detail=1`;
 const NAME = "사내 챗봇 구축";
 
 beforeAll(() => {
@@ -137,7 +138,7 @@ test("없는 프로젝트 번호면 찾을 수 없다고 알리고 다시 시도
       body: { code: "NOT_FOUND", message: "프로젝트를 찾을 수 없어요." },
     },
   });
-  renderAt(`${OCTOBER}&project=99`);
+  renderAt(`${OCTOBER}&detail=99`);
 
   const dialog = await screen.findByRole("dialog", { name: "프로젝트 상세" });
   expect(
@@ -163,4 +164,21 @@ test("상세를 불러오지 못하면 패널 안에서 다시 시도할 수 있
   fireEvent.click(within(dialog).getByRole("button", { name: "다시 시도" }));
 
   expect(await panel()).toBeTruthy();
+});
+
+test("이 프로젝트 사용 내역 보기를 누르면 패널을 닫고 화면 전체에 프로젝트 조건을 건다", async () => {
+  const router = renderAt(`${PANEL}&view=requests&page=2`);
+
+  const dialog = await panel();
+  fireEvent.click(
+    within(dialog).getByRole("link", { name: /이 프로젝트 사용 내역 보기/ }),
+  );
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(routeMatch(router, ROUTE_ID)?.search).toEqual({
+    from: "2026-10-01",
+    to: "2026-10-31",
+    view: "requests",
+    project: 1,
+  });
 });

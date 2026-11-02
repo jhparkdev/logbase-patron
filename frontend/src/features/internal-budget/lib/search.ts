@@ -64,8 +64,11 @@ export const budgetSearchSchema = z
     view: z.enum(LIST_VIEWS).optional().catch(undefined),
     /** 전체보기에서만 쓴다. */
     page: positiveInt,
-    /** 상세 패널을 연 프로젝트 번호(projects.project_id). 요약 화면과 전체보기 어디서든 연다. */
+    /** 조회 조건. 없으면 전체다. 상세 패널의 "이 프로젝트 사용 내역 보기"도 project를 건다. */
     project: positiveInt,
+    model: positiveInt,
+    /** 상세 패널을 연 프로젝트 번호(projects.project_id). 요약 화면과 전체보기 어디서든 연다. */
+    detail: positiveInt,
     /** "new"면 구독료 등록 패널을 연다. */
     subscription: z.literal("new").optional().catch(undefined),
     // 정렬은 표마다 따로 둔다. 같은 표면 요약 화면과 전체보기에서 정렬이 이어진다.
@@ -117,9 +120,59 @@ export function listSortParams(
   };
 }
 
-/** 주소의 조회 기간을 내부 비용 API의 조회 조건으로 바꾼다. */
-export function internalFilterQuery({ from, to }: Period) {
+/** 화면 전체에 걸리는 조회 조건. 기간은 항상 있고 프로젝트·모델은 고르지 않으면 전체다. */
+export type BudgetFilter = Pick<
+  BudgetSearch,
+  "from" | "to" | "project" | "model"
+>;
+
+/** 조회 조건 폼. 선택 상자의 "전체"는 빈 문자열이다. 기간 규칙은 조회를 누를 때 검사한다. */
+export const budgetFilterFormSchema = periodSchema.and(
+  z.object({ project: z.string(), model: z.string() }),
+);
+
+export type BudgetFilterForm = z.output<typeof budgetFilterFormSchema>;
+
+function idText(id: number | undefined): string {
+  return id === undefined ? "" : String(id);
+}
+
+function idOf(text: string): number | undefined {
+  return text === "" ? undefined : Number(text);
+}
+
+/** 주소의 조건을 폼 값으로 바꾼다. */
+export function filterFormValues(search: BudgetFilter): BudgetFilterForm {
+  return {
+    from: search.from,
+    to: search.to,
+    project: idText(search.project),
+    model: idText(search.model),
+  };
+}
+
+/** 조회를 눌렀을 때 주소에 남길 값. 조건이 바뀌면 1페이지로 돌아간다. */
+export function filterSearchParams(values: BudgetFilterForm) {
+  return {
+    from: values.from,
+    to: values.to,
+    project: idOf(values.project),
+    model: idOf(values.model),
+    page: undefined,
+  };
+}
+
+function periodQuery({ from, to }: Period) {
   return { start_date: from, end_date: to };
+}
+
+/** 주소의 조회 조건을 내부 비용 API의 조회 조건으로 바꾼다. 요약·프로젝트 표·이력이 함께 쓴다. */
+export function internalFilterQuery(filter: BudgetFilter) {
+  return {
+    ...periodQuery(filter),
+    project_id: filter.project,
+    model_id: filter.model,
+  };
 }
 
 /** 요약 화면은 미리보기(서버가 정한 N건 안에서 정렬), 그 목록의 전체보기는 페이지를 나눠 요청한다. */
@@ -139,6 +192,8 @@ export function projectRowsQuery(search: BudgetSearch) {
   const { projectsSort: sort, projectsOrder: order } = search;
   return {
     month: budgetMonthOf(search),
+    project_id: search.project,
+    model_id: search.model,
     ...listPageQuery(search, "projects"),
     ...(sort && order ? { sort, order } : {}),
   };
@@ -154,11 +209,15 @@ export function requestRowsQuery(search: BudgetSearch) {
   };
 }
 
-/** 구독료 표 요청 조건. 조회 기간이 걸치는 모든 달을 받아 요약의 구독료 합계와 같은 조건이다. */
+/**
+ * 구독료 표 요청 조건. 조회 기간이 걸치는 모든 달을 받아 요약의 구독료 합계와 같은 조건이다.
+ * 구독료는 모델과 관계없어 모델 조건은 보내지 않는다(요약은 모델 조건이면 구독료를 뺀다).
+ */
 export function subscriptionRowsQuery(search: BudgetSearch) {
   const { subscriptionsSort: sort, subscriptionsOrder: order } = search;
   return {
-    ...internalFilterQuery(search),
+    ...periodQuery(search),
+    project_id: search.project,
     ...listPageQuery(search, "subscriptions"),
     ...(sort && order ? { sort, order } : {}),
   };

@@ -1,8 +1,8 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api, unwrap } from "../../../shared/api/client";
 import type { components } from "../../../shared/api/schema";
-import type { Period } from "../../../shared/lib/period";
 import {
+  type BudgetFilter,
   type BudgetSearch,
   internalFilterQuery,
   projectRowsQuery,
@@ -18,9 +18,18 @@ type BudgetSave = components["schemas"]["ProjectBudgetSave"];
 const ROOT_KEY = "internal-budget";
 /** 호출 기록은 계속 쌓이지만 조회 버튼으로 다시 보는 화면이라 잠깐은 캐시를 쓴다. */
 const USAGE_STALE_TIME_MS = 30_000;
+/** 프로젝트·모델 목록은 거의 바뀌지 않는다. */
+const OPTIONS_STALE_TIME_MS = 5 * 60_000;
 
-export function internalSummaryQuery(period: Period) {
-  const query = internalFilterQuery(period);
+export const internalOptionsQuery = queryOptions({
+  queryKey: [ROOT_KEY, "options"],
+  queryFn: async () => unwrap(await api.GET("/api/usage/internal/options")),
+  staleTime: OPTIONS_STALE_TIME_MS,
+  retry: false,
+});
+
+export function internalSummaryQuery(filter: BudgetFilter) {
+  const query = internalFilterQuery(filter);
   return queryOptions({
     queryKey: [ROOT_KEY, "summary", query],
     queryFn: async () =>

@@ -6,6 +6,15 @@ type Schemas = components["schemas"];
 const BASE = "/api/usage/internal";
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
+export const OPTIONS: Schemas["InternalOptions"] = {
+  projects: [
+    { id: 1, name: "사내 챗봇 구축" },
+    { id: 2, name: "문서 요약" },
+  ],
+  services: [{ id: 10, name: "사내 챗봇" }],
+  models: [{ id: 20, name: "openai/gpt-4o" }],
+};
+
 export const SUMMARY: Schemas["InternalSummary"] = {
   api_confirmed_usd: "1240.500000000000",
   api_estimated_usd: "320.150000000000",
@@ -171,6 +180,7 @@ function ok(body: unknown): Reply {
 }
 
 const DEFAULT_REPLIES = {
+  options: ok(OPTIONS),
   summary: ok(SUMMARY),
   projects: ok(PROJECTS),
   requests: ok(REQUESTS),

@@ -5,13 +5,17 @@ import estimatedCostIcon from "../../../assets/estimatedCost.svg";
 import managedCostIcon from "../../../assets/managedCost.svg";
 import { StatCard } from "../../../shared/components/ui/StatCard";
 import { formatUsd, isZeroAmount } from "../../../shared/lib/format";
-import type { Period } from "../../../shared/lib/period";
 import { internalSummaryQuery } from "../api/budget";
-import { managedTotalCaption, SUMMARY_LABELS } from "../lib/summary";
+import type { BudgetFilter } from "../lib/search";
+import {
+  managedTotalCaption,
+  SUMMARY_LABELS,
+  subscriptionCaption,
+} from "../lib/summary";
 
 /** 비용 요약 카드 4개. 합계는 서버가 계산한 값을 그대로 보여 준다. */
-export function SummaryCards({ period }: { period: Period }) {
-  const { data } = useSuspenseQuery(internalSummaryQuery(period));
+export function SummaryCards({ filter }: { filter: BudgetFilter }) {
+  const { data } = useSuspenseQuery(internalSummaryQuery(filter));
   const estimated = formatUsd(data.api_estimated_usd, "summary");
   return (
     <div className="grid grid-cols-4 gap-4">
@@ -40,7 +44,7 @@ export function SummaryCards({ period }: { period: Period }) {
         unit="USD"
         icon={calendarIcon}
         iconTone="blue"
-        caption="각 서비스 월 구독료"
+        caption={subscriptionCaption(data.subscription_excluded)}
       />
       <StatCard
         label={SUMMARY_LABELS.total}
@@ -48,7 +52,10 @@ export function SummaryCards({ period }: { period: Period }) {
         unit="USD"
         icon={managedCostIcon}
         iconTone="blue"
-        caption={managedTotalCaption(data.unknown_cost_count)}
+        caption={managedTotalCaption(
+          data.unknown_cost_count,
+          data.subscription_excluded,
+        )}
       />
     </div>
   );

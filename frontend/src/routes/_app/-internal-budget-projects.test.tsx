@@ -101,7 +101,7 @@ test("프로젝트명을 누르면 그 프로젝트의 상세 패널을 연다",
   fireEvent.click(within(table).getByRole("link", { name: "사내 챗봇 구축" }));
 
   await screen.findByRole("dialog", { name: "사내 챗봇 구축" });
-  expect(routeMatch(router, ROUTE_ID)?.search.project).toBe(1);
+  expect(routeMatch(router, ROUTE_ID)?.search.detail).toBe(1);
 });
 
 test("프로젝트가 없으면 등록된 프로젝트가 없다고 알린다", async () => {

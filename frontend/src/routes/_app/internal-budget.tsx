@@ -16,7 +16,11 @@ import { SubscriptionPanel } from "../../features/internal-budget/components/Sub
 import { SubscriptionTable } from "../../features/internal-budget/components/SubscriptionTable";
 import { SummaryCards } from "../../features/internal-budget/components/SummaryCards";
 import { SummarySkeleton } from "../../features/internal-budget/components/SummarySkeleton";
-import { budgetSearchSchema } from "../../features/internal-budget/lib/search";
+import {
+  budgetSearchSchema,
+  filterFormValues,
+  filterSearchParams,
+} from "../../features/internal-budget/lib/search";
 import { DataBlock } from "../../shared/components/ui/DataBlock";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 import { RefreshingBar } from "../../shared/components/ui/RefreshingBar";
@@ -55,7 +59,7 @@ function InternalBudgetPage() {
     navigate({
       search: (prev) => ({
         ...prev,
-        project: undefined,
+        detail: undefined,
         subscription: undefined,
       }),
     });
@@ -68,11 +72,11 @@ function InternalBudgetPage() {
       />
       <BudgetFilters
         // 뒤로 가기처럼 주소가 바깥에서 바뀌면 폼을 새 값으로 다시 그린다.
-        key={`${search.from}~${search.to}`}
-        period={{ from: search.from, to: search.to }}
-        onSubmit={(period) =>
+        key={`${search.from}~${search.to}~${search.project}~${search.model}`}
+        values={filterFormValues(search)}
+        onSubmit={(values) =>
           navigate({
-            search: (prev) => ({ ...prev, ...period, page: undefined }),
+            search: (prev) => ({ ...prev, ...filterSearchParams(values) }),
           })
         }
       />
@@ -85,7 +89,7 @@ function InternalBudgetPage() {
               errorTitle="요약을 불러오지 못했어요"
               resetKey={JSON.stringify(internalSummaryQuery(shown).queryKey)}
             >
-              <SummaryCards period={shown} />
+              <SummaryCards filter={shown} />
             </DataBlock>
           </div>
           <CostTrendCard />
@@ -100,9 +104,9 @@ function InternalBudgetPage() {
           refreshing={refreshing}
         />
       )}
-      {search.project !== undefined && (
+      {search.detail !== undefined && (
         <ProjectPanel
-          projectId={search.project}
+          projectId={search.detail}
           month={month}
           onClose={closePanel}
         />

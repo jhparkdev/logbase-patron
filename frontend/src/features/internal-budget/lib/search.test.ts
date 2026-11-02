@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   budgetSearchSchema,
+  filterFormValues,
+  filterSearchParams,
   internalFilterQuery,
   listSortOf,
   projectRowsQuery,
@@ -105,22 +107,22 @@ describe("budgetSearchSchema 정렬·전체 목록", () => {
 
 describe("budgetSearchSchema 상세 패널", () => {
   test("프로젝트 번호는 1 이상의 정수만, 구독료는 new만 받는다", () => {
-    expect(parse({ ...PERIOD, project: 3, subscription: "new" })).toEqual({
+    expect(parse({ ...PERIOD, detail: 3, subscription: "new" })).toEqual({
       ...PERIOD,
-      project: 3,
+      detail: 3,
       subscription: "new",
     });
-    for (const project of [0, -1, 1.5, "abc"]) {
-      expect(parse({ ...PERIOD, project })).toEqual(PERIOD);
+    for (const detail of [0, -1, 1.5, "abc"]) {
+      expect(parse({ ...PERIOD, detail })).toEqual(PERIOD);
     }
     expect(parse({ ...PERIOD, subscription: 7 })).toEqual(PERIOD);
   });
 
   test("전체 목록에서도 패널 값을 받는다", () => {
-    expect(parse({ ...PERIOD, view: "projects", project: 3 })).toEqual({
+    expect(parse({ ...PERIOD, view: "projects", detail: 3 })).toEqual({
       ...PERIOD,
       view: "projects",
-      project: 3,
+      detail: 3,
     });
   });
 });
@@ -242,5 +244,52 @@ describe("subscriptionRowsQuery", () => {
       page: 3,
       page_size: 10,
     });
+  });
+});
+
+describe("프로젝트·모델 조건", () => {
+  test("주소의 프로젝트·모델 번호는 1 이상의 정수만 받는다", () => {
+    expect(parse({ ...PERIOD, project: 1, model: 20 })).toEqual({
+      ...PERIOD,
+      project: 1,
+      model: 20,
+    });
+    expect(parse({ ...PERIOD, project: 0, model: "all" })).toEqual(PERIOD);
+  });
+
+  test("조회 조건은 기간과 함께 프로젝트·모델을 API에 보낸다", () => {
+    expect(
+      internalFilterQuery(parse({ ...PERIOD, project: 1, model: 20 })),
+    ).toEqual({
+      start_date: "2026-10-01",
+      end_date: "2026-10-20",
+      project_id: 1,
+      model_id: 20,
+    });
+  });
+
+  test("구독료 표는 모델과 관계없어 프로젝트 조건만 보낸다", () => {
+    expect(
+      subscriptionRowsQuery(parse({ ...PERIOD, project: 1, model: 20 })),
+    ).toEqual({
+      start_date: "2026-10-01",
+      end_date: "2026-10-20",
+      project_id: 1,
+      preview: true,
+    });
+  });
+
+  test("폼 값은 선택 상자용 문자열이고, 전체는 빈 문자열이다", () => {
+    expect(filterFormValues(parse({ ...PERIOD, project: 1 }))).toEqual({
+      ...PERIOD,
+      project: "1",
+      model: "",
+    });
+  });
+
+  test("조회를 누르면 번호로 바꿔 주소에 남기고 1페이지로 돌아간다", () => {
+    expect(filterSearchParams({ ...PERIOD, project: "", model: "20" })).toEqual(
+      { ...PERIOD, project: undefined, model: 20, page: undefined },
+    );
   });
 });

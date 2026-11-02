@@ -2,6 +2,7 @@ import { ApiError } from "../../../shared/api/client";
 import type { components } from "../../../shared/api/schema";
 import { BudgetForm } from "../../../shared/components/budget/BudgetForm";
 import { Badge } from "../../../shared/components/ui/Badge";
+import { TextLink } from "../../../shared/components/ui/TextLink";
 import { amountForInput, budgetStatusBadge } from "../../../shared/lib/budget";
 import {
   formatCount,
@@ -60,6 +61,20 @@ export function ProjectPanelContent({
         <p className="text-label text-grey-700">
           {projectUsageText(detail.budget)}
         </p>
+        <TextLink
+          from="/internal-budget"
+          to="/internal-budget"
+          // 패널을 닫고 화면 전체에 이 프로젝트 조건을 건다. 목록은 그대로 두고 1페이지로 돌아간다.
+          search={(prev) => ({
+            ...prev,
+            detail: undefined,
+            project: projectId,
+            page: undefined,
+          })}
+          className="self-start text-body-sm"
+        >
+          이 프로젝트 사용 내역 보기<span aria-hidden="true"> ›</span>
+        </TextLink>
       </section>
       <section className="flex flex-col gap-3">
         <h3 className="font-bold">월 예산</h3>
