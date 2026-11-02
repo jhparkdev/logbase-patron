@@ -5,6 +5,7 @@
 """
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -25,6 +26,12 @@ class ScopedSimulationStore:
     async def insert_result(self, result: NewResult) -> None:
         async with self._sessions.begin() as session:
             await DbSimulationStore(session).insert_result(result)
+
+    async def insert_run_assets(
+        self, simulation_id: uuid.UUID, asset_ids: Sequence[uuid.UUID]
+    ) -> None:
+        async with self._sessions.begin() as session:
+            await DbSimulationStore(session).insert_run_assets(simulation_id, asset_ids)
 
     async def mark_started(self, simulation_id: uuid.UUID, now: datetime) -> None:
         async with self._sessions.begin() as session:

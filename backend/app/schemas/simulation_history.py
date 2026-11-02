@@ -6,23 +6,50 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from app.models import ModelStatus, SimulationStatus, TestType
+from app.schemas.simulation_image import ImageAssetRead
+from app.schemas.simulation_output import ImageConfig, OutputType
 from app.schemas.simulation_result import SimulationSummary
 from app.services.simulation_validation import MAX_MODEL_COUNT, MIN_MODEL_COUNT
 
-# 한 번에 내려주는 이력의 상한. 정렬·페이지는 화면이 하므로 서버는 거른 결과를 통째로 준다.
-# 상한을 넘으면 최신 순으로 자르고 truncated 로 알린다. 잘린 목록을 전체처럼 정렬해 보이지 않기 위해서다
-MAX_HISTORY_ITEMS = 1000
+DEFAULT_PAGE_SIZE = 10  # 이력 화면 목업의 "10개씩 보기"
+MAX_PAGE_SIZE = 100
+
+
+class HistorySortColumn(StrEnum):
+    """이력 목록의 정렬 열(허용 목록). 값은 이력 화면의 URL 정렬 키와 같다.
+
+    요약 뷰의 어느 열로 정렬할지는 서비스(simulation_history.py)가 정한다. 총 비용(totalCost)은
+    요약의 total_cost_usd 와 같은 값이다. 금액을 아는 호출이 없는 실행은 0 으로 보지 않고
+    다른 빈 값처럼 방향과 관계없이 맨 뒤에 둔다.
+    """
+
+    REQUESTED_AT = "requestedAt"
+    ID = "id"
+    SCENARIO = "scenario"
+    MODEL_COUNT = "modelCount"
+    STATUS = "status"
+    COST_STATUS = "costStatus"
+    TOTAL_COST = "totalCost"
+
+
+class SortDirection(StrEnum):
+    ASC = "asc"
+    DESC = "desc"
 
 
 class SimulationHistoryQuery(BaseModel):
     """이력 목록(S-08) 조회 조건. 화면은 이 값을 URL 검색 파라미터에 둔다.
 
-    정렬과 페이지는 화면이 한다(팀 결정). 그 파라미터를 받는 척 무시하지 않도록 모르는 값은 거절한다.
+    정렬과 페이지는 서버가 한다. 화면이 받은 한 페이지만 다시 정렬하면 전체 순서와 어긋나기 때문이다.
     기간이 올바른지(시작≤종료, 366일 이내)는 오늘 날짜가 필요해 서비스가 판단한다.
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    sort: HistorySortColumn = HistorySortColumn.REQUESTED_AT
+    direction: SortDirection = SortDirection.DESC
+    page: Annotated[int, Field(ge=1)] = 1
+    page_size: Annotated[int, Field(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE
     start_date: date | None = None  # KST 달력 기준, 포함
     end_date: date | None = None  # KST 달력 기준, 포함
     # 검색 조건(기준서 8.3). 지정하지 않으면 거르지 않는다
@@ -32,22 +59,22 @@ class SimulationHistoryQuery(BaseModel):
     simulation_id: UUID | None = None
 
 
+class SimulationHistoryItem(SimulationSummary):
+    """이력 목록 한 행. 진행·결과 조회의 요약에 재실행 판단용 값 하나를 더한다."""
+
+    # 이 실행에 쓴 모델 중 지금은 선택할 수 없는 모델 수(서로 다른 모델 기준)
+    inactive_model_count: Annotated[int, Field(ge=0, le=MAX_MODEL_COUNT)]
+
+
 class SimulationHistoryList(BaseModel):
-    """이력 목록 응답. 요청 시각 최신 순(같으면 실행 ID 내림차순)으로 준다.
+    """이력 목록 한 페이지. 정렬한 값이 같으면 실행 ID 내림차순으로 순서를 고정한다.
 
     항목은 진행·결과 조회의 요약과 같은 모양이라 합계 계산을 한 곳(뷰)에서만 한다.
-    total 은 조건에 맞는 전체 건수, truncated 는 상한 때문에 items 가 전체보다 적은지다.
+    total 은 조건에 맞는 전체 건수라 items 길이보다 클 수 있다.
     """
 
-    items: list[SimulationSummary]
+    items: Annotated[list[SimulationHistoryItem], Field(max_length=MAX_PAGE_SIZE)]
     total: Annotated[int, Field(ge=0)]
-    truncated: bool
-
-    @model_validator(mode="after")
-    def _truncated_matches_count(self) -> Self:
-        if self.truncated != (self.total > len(self.items)):
-            raise ValueError("truncated 는 total 이 items 보다 많을 때만 true 다")
-        return self
 
 
 class RerunRoutingPolicy(BaseModel):
@@ -63,7 +90,7 @@ class RerunRoutingPolicy(BaseModel):
 class RerunBlockReason(StrEnum):
     """재실행을 시작할 수 없는 사유. 모델 상태는 사유가 아니다(교체·제외하면 되므로)."""
 
-    INPUT_MISSING = "INPUT_MISSING"  # 저장된 입력을 복원할 수 없다
+    INPUT_MISSING = "INPUT_MISSING"  # 저장된 입력(이미지 파일)을 더는 구할 수 없다
 
 
 class RerunModel(BaseModel):
@@ -72,6 +99,9 @@ class RerunModel(BaseModel):
     # 과거에 고른 값. 새 실행 요청의 모델 칸과 같은 이름이다
     model_id: int
     execution_provider: str
+    # 이 칸에 실제로 적용했던 설정(실행 공통 설정과 합친 값). 그대로 보내면 같은 조건으로 다시 돌린다.
+    # 과거 이력은 지금 규칙으로 다시 거절하지 않으므로 dict 로 받는다
+    execution_config: dict[str, JsonValue]
     # 현재 값. 실행 당시 이름·상태(결과 조회 응답)와 다를 수 있다
     current_display_name: str
     current_status: ModelStatus
@@ -84,7 +114,7 @@ class SimulationRerunDraft(BaseModel):
 
     입력 필드는 비교 실행 요청(SimulationCreateRequest)과 같고, 화면이 안내에 쓰는
     rerunnable·blocked_reason 과 모델 칸의 현재 상태가 더해진다. 사용자가 고친 값은
-    그 둘을 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).
+    그 둘과 images 를 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).
     과거 이력은 지금 규칙으로 다시 거절하지 않는다. 새 실행 요청이 들어올 때 검증한다.
     """
 
@@ -100,6 +130,13 @@ class SimulationRerunDraft(BaseModel):
         list[RerunModel],
         Field(min_length=MIN_MODEL_COUNT, max_length=MAX_MODEL_COUNT),
     ]
+    # 과거 실행에 쓴 이미지(올린 순서). 새 실행 요청에 그대로 보내면 같은 이미지로 다시 돌린다
+    asset_ids: list[UUID]
+    # asset_ids 와 같은 순서의 파일 이름 등. 화면 표시용이라 새 실행 요청에는 싣지 않는다
+    images: list[ImageAssetRead]
+    # 이미지 생성 실행이면 IMAGE 와 그때의 이미지 옵션. execution_config 에는 텍스트 설정만 남는다
+    output_type: OutputType
+    image_config: ImageConfig | None
     rerunnable: bool
     blocked_reason: RerunBlockReason | None
 

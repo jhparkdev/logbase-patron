@@ -48,6 +48,92 @@ const run = (slots: SlotView[]): RunView => ({
   slots,
 });
 
+test("진행 중인 칸에만 실행 중 표시를 보여 준다", () => {
+  render(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: run([
+          slot({
+            status: { label: "진행 중", tone: "grey", ongoing: true },
+            response: null,
+          }),
+          slot({ key: "slot-2", name: "둘째 모델" }),
+        ]),
+      }}
+    />,
+  );
+  const [first, second] = screen.getAllByRole("article");
+  expect(
+    within(first).getByRole("status", { name: "테스트 모델 실행 중" }),
+  ).toBeDefined();
+  expect(within(second).queryByRole("status")).toBeNull();
+});
+
+test("실행 당시 모델 상태가 있는 칸만 표시한다", () => {
+  render(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: run([
+          slot({ statusAtRun: "비활성" }),
+          slot({ key: "slot-2", name: "둘째 모델" }),
+        ]),
+      }}
+    />,
+  );
+  const [first, second] = screen.getAllByRole("article");
+  expect(within(first).getByText("실행 당시 모델 상태: 비활성")).toBeDefined();
+  expect(within(second).queryByText(/실행 당시 모델 상태/)).toBeNull();
+});
+
+test("모델 칸마다 적용 설정을 따로 보여 주고 값이 없으면 모델 기본값으로 안내한다", () => {
+  render(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: run([
+          slot({
+            settings: [{ label: "Temperature", value: "0" }],
+          }),
+          slot({ key: "slot-2", name: "둘째 모델", settings: [] }),
+          slot({ key: "slot-3", name: "셋째 모델" }),
+        ]),
+      }}
+    />,
+  );
+  const [first, second, third] = screen.getAllByRole("article");
+  expect(within(first).getByText("적용 설정")).toBeDefined();
+  expect(within(first).getByText("Temperature")).toBeDefined();
+  expect(within(first).getByText("0")).toBeDefined();
+  expect(within(second).getByText("모델 기본값")).toBeDefined();
+  expect(within(third).queryByText("적용 설정")).toBeNull();
+});
+
+test("서버가 합계를 주지 않으면 금액이 있어도 합계를 미확인으로 표시하지 않는다", () => {
+  const page = render(
+    <SimulationResults
+      view={{ kind: "ready", run: { ...run([]), totalCost: null } }}
+    />,
+  );
+  expect(screen.queryByText(/비교 비용 합계/)).toBeNull();
+  expect(screen.getByText("추정 포함")).toBeDefined();
+  page.rerender(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: {
+          ...run([]),
+          confirmedCost: null,
+          estimatedCost: null,
+          totalCost: null,
+        },
+      }}
+    />,
+  );
+  expect(screen.getByText(/비교 비용 합계/).textContent).toContain("미확인");
+});
+
 test("실행·비용·검증 상태를 독립적으로 표시하고 원문을 보존한다", () => {
   render(
     <SimulationResults
@@ -151,10 +237,10 @@ test.each(["loading", "error", "empty"] as const)(
     expect(
       screen.getByText(
         kind === "loading"
-          ? "실행 결과를 불러오고 있어요"
+          ? "실행 결과를 불러오고 있습니다"
           : kind === "error"
-            ? "실행 결과를 불러오지 못했어요"
-            : "아직 실행 결과가 없어요",
+            ? "실행 결과를 불러오지 못했습니다"
+            : "아직 실행 결과가 없습니다",
       ),
     ).toBeDefined();
   },

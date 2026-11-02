@@ -3,20 +3,27 @@ import { formatCount } from "../../../shared/lib/format";
 import { useImageSelection } from "../hooks/useImageSelection";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
 import { fileKey } from "../lib/images";
-import { controlClass, IMAGE_LIMITS, TEXT_LIMIT } from "../lib/limits";
+import { controlClass, type ImageLimits, TEXT_LIMIT } from "../lib/limits";
 import type { ScenarioChoice } from "../lib/presentation";
 
-export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
-  const { selectFiles, removeFile } = useImageSelection();
+export function InputFields({
+  scenarios,
+  imageLimits,
+}: {
+  scenarios: ScenarioChoice[];
+  imageLimits: ImageLimits;
+}) {
+  const { selectFiles, removeFile, removeExisting } =
+    useImageSelection(imageLimits);
   const {
     register,
     control,
     setValue,
     formState: { errors },
   } = useFormContext<SimulatorFormValues, unknown, SimulatorDraft>();
-  const [mode, prompt, text, files] = useWatch({
+  const [mode, prompt, text, files, existingAssetIds] = useWatch({
     control,
-    name: ["mode", "prompt", "text", "files"],
+    name: ["mode", "prompt", "text", "files", "existingAssetIds"],
   });
   const fileError =
     errors.files?.message ??
@@ -64,11 +71,11 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
               aria-describedby="sim-scenario-error"
               className={controlClass}
             >
-              <option value="">시나리오를 선택해 주세요</option>
+              <option value="">시나리오를 선택하시기 바랍니다</option>
               {scenarios.map((item) => (
                 <option key={item.key} value={item.key}>
                   {item.name}
-                  {item.imageRequired ? " · 이미지 필요" : ""}
+                  {item.imageRequired ? "(이미지 필요)" : ""}
                 </option>
               ))}
             </select>
@@ -90,7 +97,7 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
             {...register("text")}
             id="sim-text"
             rows={4}
-            placeholder="분석할 텍스트를 입력해 주세요"
+            placeholder="분석할 텍스트를 입력하시기 바랍니다"
             aria-invalid={!!errors.text}
             aria-describedby="sim-text-count sim-text-error"
             className={`${controlClass} resize-y`}
@@ -110,7 +117,7 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
           {...register("prompt")}
           id="sim-prompt"
           rows={9}
-          placeholder="모델이 수행할 작업을 입력해 주세요"
+          placeholder="모델이 수행할 작업을 입력하시기 바랍니다"
           aria-invalid={!!errors.prompt}
           aria-describedby="sim-prompt-count sim-prompt-error"
           className={`${controlClass} resize-y`}
@@ -128,7 +135,7 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
         <input
           id="sim-files"
           type="file"
-          accept={IMAGE_LIMITS.mimeTypes.join(",")}
+          accept={imageLimits.mimeTypes.join(",")}
           multiple
           aria-invalid={!!fileError}
           aria-describedby="sim-files-help sim-files-error"
@@ -139,9 +146,32 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
           className={`${controlClass} file:mr-3 file:rounded-lg file:border-0 file:bg-grey-100 file:px-3 file:py-1 file:text-grey-700`}
         />
         <p id="sim-files-help" className="mt-2 text-caption text-grey-600">
-          JPG·PNG·WebP · 최대 {IMAGE_LIMITS.maxCount}개 · 파일당{" "}
-          {IMAGE_LIMITS.maxBytes / 1024 / 1024}MiB
+          JPG·PNG·WebP · 최대 {imageLimits.maxCount}개 · 파일당{" "}
+          {imageLimits.maxBytes / 1024 / 1024}MiB
         </p>
+        {existingAssetIds.length > 0 && (
+          <ul
+            aria-label="재실행에 쓰는 기존 이미지"
+            className="mt-2 space-y-1 text-body-sm"
+          >
+            {existingAssetIds.map((assetId, index) => (
+              <li
+                key={assetId}
+                className="flex items-center justify-between gap-2 rounded-lg bg-grey-50 px-3 py-2"
+              >
+                <span>기존 이미지 {index + 1}</span>
+                <button
+                  type="button"
+                  aria-label={`기존 이미지 ${index + 1} 제거`}
+                  onClick={() => removeExisting(index)}
+                  className="shrink-0 rounded-lg px-2 text-grey-600 focus-visible:outline-2 focus-visible:outline-brand"
+                >
+                  제거
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         {files.length > 0 && (
           <ul className="mt-2 space-y-1 text-body-sm">
             {files.map((file, index) => (
@@ -177,7 +207,7 @@ export function InputFields({ scenarios }: { scenarios: ScenarioChoice[] }) {
           id="sim-schema"
           rows={4}
           spellCheck={false}
-          placeholder="출력 형식을 검증할 Schema를 입력해 주세요"
+          placeholder="출력 형식을 검증할 Schema를 입력하시기 바랍니다"
           aria-invalid={!!errors.jsonSchema}
           aria-describedby="sim-schema-error"
           className={`${controlClass} resize-y font-mono`}

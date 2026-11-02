@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <!-- 뱃지 자리를 본체에서 도려낸다. 아이콘은 mask로 그려서 흰색 채우기로 가리면 꽉 찬 원이 된다 -->
+  <defs>
+    <mask id="cut">
+      <rect width="24" height="24" fill="white" />
+      <circle cx="17.5" cy="17.5" r="7" fill="black" />
+    </mask>
+  </defs>
+  <g mask="url(#cut)">
+    <!-- 신용카드 (기본 비용 메타포) -->
+    <rect x="2" y="4" width="20" height="14" rx="2" />
+    <line x1="2" y1="9" x2="22" y2="9" />
+  </g>
+  <!-- 추정 물음표 뱃지 (우측 하단) -->
+  <circle cx="17.5" cy="17.5" r="5.5" stroke-width="1.75" />
+  <path d="M15.8 16a1.8 1.8 0 1 1 2.5 1.6c-.5.2-.8.6-.8 1.1" stroke-width="1.6" stroke-linecap="round" />
+  <circle cx="17.5" cy="20.3" r=".9" fill="currentColor" stroke="none" />
+</svg>

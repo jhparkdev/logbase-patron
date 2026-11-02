@@ -28,12 +28,27 @@ class ModelInfo(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     model_id: str
+    # OpenRouter가 주는 사람이 읽는 이름(예: "OpenAI: GPT-4o"). 없으면 None이다.
+    name: str | None = None
     # 모델 대표 가격(토큰당 USD). 실제 처리 업체의 단가와 다를 수 있다.
     pricing: dict[str, Decimal]
     input_modalities: list[str]
+    output_modalities: list[str] = Field(default_factory=list)
     supported_parameters: list[str]
     context_length: int | None = None
     expiration_date: date | None = None
+
+
+class EndpointInfo(BaseModel):
+    """모델 하나를 실제로 처리하는 서버 업체 한 곳. provider_name은 provider.order에 그대로 쓴다."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider_name: str
+    # OpenRouter가 주는 상태 값 그대로다. 정상일 때 0인 것은 보았지만 다른 값의 뜻은 확인하지 못했다.
+    status: int | None = None
+    # 최근 1일 가동률(%)
+    uptime_last_1d: Decimal | None = None
 
 
 class GenerationInfo(BaseModel):

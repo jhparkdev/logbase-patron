@@ -9,8 +9,14 @@ from decimal import Decimal
 from typing import Any
 
 from app.models import ModelStatus, RequestStatus, SimulationStatus
+from app.openrouter.image_result import GeneratedImage, ImageCallResult
 from app.openrouter.result import CallResult, CallStatus, CostSource, CostStatus
+from app.schemas.simulation import ReasoningEffort
+from app.schemas.simulation_output import OutputType
+from app.services.model_parameters import ParameterSupport
+from app.services.simulation_input import build_messages
 from app.services.simulation_ports import (
+    ImageRef,
     ModelInfo,
     NewRequest,
     NewResult,
@@ -25,6 +31,11 @@ from app.services.simulation_ports import (
 )
 
 NOW = datetime(2026, 10, 29, 1, 0, tzinfo=UTC)
+
+# 온도와 모든 추론 강도를 받는 모델. 설정 제한이 주제가 아닌 테스트의 기본값이다
+FULL_PARAMETER_SUPPORT = ParameterSupport(
+    temperature=True, reasoning_efforts=tuple(ReasoningEffort)
+)
 
 R = RequestStatus
 
@@ -79,6 +90,78 @@ class FakeCaller:
         return await behavior(kwargs)
 
 
+ImageBehavior = Callable[[dict[str, Any]], Awaitable[ImageCallResult]]
+
+
+def image_ok(count: int = 1, generation_id: str = "img-gen") -> ImageCallResult:
+    return ImageCallResult(
+        status=CallStatus.SUCCESS,
+        images=tuple(
+            GeneratedImage(data=png_bytes(n), media_type="image/png")
+            for n in range(count)
+        ),
+        requested_model="m",
+        generation_id=generation_id,
+        prompt_tokens=10,
+        completion_tokens=1290,
+        cost_usd=Decimal("0.04"),
+        cost_status=CostStatus.CONFIRMED,
+        cost_source=CostSource.API_RESPONSE,
+        started_at=NOW,
+        finished_at=NOW,
+        latency_ms=2000,
+    )
+
+
+def image_failed(status: RequestStatus = R.FAILED) -> ImageCallResult:
+    """비용 미확인으로 끝난 이미지 호출. status 는 FAILED·TIMEOUT·CANCELLED 중 하나다."""
+    return ImageCallResult(
+        status=CallStatus(status.value),
+        requested_model="m",
+        cost_status=CostStatus.UNKNOWN,
+        started_at=NOW,
+        finished_at=NOW,
+        latency_ms=100,
+    )
+
+
+def png_bytes(n: int) -> bytes:
+    """칸이 돌려준 n 번째 그림. 형식 머리 바이트 뒤에 번호를 붙여 서로 다르게 한다."""
+    return b"\x89PNG\r\n\x1a\n" + bytes([n])
+
+
+class FakeImageGenerator:
+    """모델 ID 별로 정해 둔 동작을 실행하는 가짜 generate_image. 기본은 한 장을 돌려준다."""
+
+    def __init__(self, behaviors: Mapping[str, ImageBehavior] | None = None) -> None:
+        self.behaviors = dict(behaviors or {})
+        self.calls: list[dict[str, Any]] = []
+        self._generation_ids = itertools.count(1)
+
+    async def __call__(self, **kwargs: Any) -> ImageCallResult:
+        self.calls.append(kwargs)
+        behavior = self.behaviors.get(kwargs["model_id"])
+        if behavior is None:
+            # DB 가 생성 ID 를 고유값으로 강제하므로 호출마다 다르게 준다
+            return image_ok(generation_id=f"img-gen-{next(self._generation_ids)}")
+        return await behavior(kwargs)
+
+
+class FakeOutputStore:
+    """저장소와 output_assets 대신 칸별로 받은 그림을 기록한다."""
+
+    def __init__(self) -> None:
+        self.saved: dict[uuid.UUID, list[GeneratedImage]] = {}
+        self.failing = False
+
+    async def save(
+        self, request_id: uuid.UUID, images: Sequence[GeneratedImage]
+    ) -> None:
+        if self.failing:
+            raise OSError("저장소 오류")
+        self.saved[request_id] = list(images)
+
+
 class FakeRecorder:
     """services/requests.py 의 조건부 상태 변경을 메모리로 흉내 낸다."""
 
@@ -88,8 +171,9 @@ class FakeRecorder:
             s.request_id: R.PENDING for s in slots
         }
         self.records: dict[uuid.UUID, SlotRecord] = {}
-        self.payloads: dict[uuid.UUID, tuple[list[dict[str, str]], str | None]] = {}
+        self.payloads: dict[uuid.UUID, tuple[list[dict[str, Any]], str | None]] = {}
         self.fail_on_record: set[uuid.UUID] = set()
+        self.late: dict[uuid.UUID, SlotRecord] = {}
 
     async def create_pending(self, request: NewRequest) -> None:
         self.created.append(request)
@@ -115,16 +199,39 @@ class FakeRecorder:
     async def save_payload(
         self,
         request_id: uuid.UUID,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         response_text: str | None,
     ) -> None:
         self.payloads[request_id] = (messages, response_text)
+
+    async def keep_late_result(
+        self,
+        request_id: uuid.UUID,
+        messages: list[dict[str, Any]],
+        record: SlotRecord,
+    ) -> None:
+        if self.statuses[request_id] == R.CANCELLED:
+            self.late[request_id] = record
 
     async def cancel_if_open(self, request_id: uuid.UUID, now: datetime) -> bool:
         if self.statuses[request_id] in (R.PENDING, R.RUNNING):
             self.statuses[request_id] = R.CANCELLED
             return True
         return False
+
+
+class FakeImageSource:
+    """저장소를 읽는 대신 asset_id 로 정해 둔 data URL 을 돌려준다. 읽은 이미지를 기록한다."""
+
+    def __init__(self) -> None:
+        self.loaded: list[uuid.UUID] = []
+        self.failing: set[uuid.UUID] = set()
+
+    async def data_url(self, image: ImageRef) -> str:
+        self.loaded.append(image.asset_id)
+        if image.asset_id in self.failing:
+            raise OSError("저장소 오류")
+        return f"data:{image.mime_type};base64,{image.asset_id.hex}"
 
 
 class FakeStore:
@@ -140,6 +247,7 @@ class FakeStore:
         self.results: list[NewResult] = []
         self.known_simulations: set[uuid.UUID] = set()
         self.slot_numbers: dict[uuid.UUID, int] = {}
+        self.run_assets: list[tuple[uuid.UUID, list[uuid.UUID]]] = []
 
     async def insert_run(self, run: NewRun) -> None:
         self.runs.append(run)
@@ -148,6 +256,11 @@ class FakeStore:
         self.results.append(result)
         self.known_simulations.add(result.simulation_id)
         self.slot_numbers[result.request_id] = result.slot_no
+
+    async def insert_run_assets(
+        self, simulation_id: uuid.UUID, asset_ids: Sequence[uuid.UUID]
+    ) -> None:
+        self.run_assets.append((simulation_id, list(asset_ids)))
 
     async def list_slots(self, simulation_id: uuid.UUID) -> list[SlotState] | None:
         if simulation_id not in self.known_simulations:
@@ -177,7 +290,10 @@ class FakeStore:
         self.finished.append((status, now))
 
 
-def make_slots(count: int) -> list[SlotPlan]:
+def make_slots(
+    count: int, max_tokens: int = 4096, config: Mapping[str, Any] | None = None
+) -> list[SlotPlan]:
+    """칸 목록. config 를 주면 모든 칸의 설정을 그 값으로 한다(이미지 실행)."""
     return [
         SlotPlan(
             slot_no=n,
@@ -185,6 +301,9 @@ def make_slots(count: int) -> list[SlotPlan]:
             model_id=n,
             openrouter_model_id=f"vendor/model-{n}",
             execution_provider=f"Provider{n}",
+            execution_config=dict(config)
+            if config is not None
+            else {"max_tokens": max_tokens},
         )
         for n in range(1, count + 1)
     ]
@@ -200,20 +319,28 @@ class Harness:
         json_schema: dict[str, Any] | None = None,
         allow_fallbacks: bool = False,
         max_tokens: int = 4096,
+        images: Sequence[ImageRef] = (),
+        output_type: OutputType = OutputType.TEXT,
+        image_behaviors: Mapping[str, ImageBehavior] | None = None,
+        slot_config: Mapping[str, Any] | None = None,
     ) -> None:
-        self.slots = make_slots(count)
+        self.slots = make_slots(count, max_tokens, slot_config)
         self.caller = FakeCaller(behaviors)
+        self.image_generator = FakeImageGenerator(image_behaviors)
+        self.outputs = FakeOutputStore()
         self.recorder = FakeRecorder(self.slots)
         self.store = FakeStore(self.recorder)
+        self.images = FakeImageSource()
         self.store.slot_numbers = {s.request_id: s.slot_no for s in self.slots}
-        self.messages = [{"role": "user", "content": "질문"}]
+        self.messages: list[dict[str, Any]] = build_messages("질문", images)
         self.job = SimulationJob(
             simulation_id=uuid.uuid4(),
             slots=self.slots,
             messages=self.messages,
             json_schema=json_schema,
-            max_tokens=max_tokens,
             allow_fallbacks=allow_fallbacks,
+            images=images,
+            output_type=output_type,
         )
         self.store.known_simulations.add(self.job.simulation_id)
         self.deps = SimulationDeps(
@@ -221,6 +348,9 @@ class Harness:
             recorder=self.recorder,
             store=self.store,
             now=lambda: NOW,
+            images=self.images,
+            image_generator=self.image_generator,
+            outputs=self.outputs,
         )
 
     def model(self, slot_no: int) -> str:
@@ -270,10 +400,13 @@ class FakeLookup:
                 openrouter_model_id=f"vendor/model-{n}",
                 display_name=f"Model {n}",
                 status=ModelStatus.ACTIVE,
+                supports_images=True,
+                parameter_support=FULL_PARAMETER_SUPPORT,
             )
             for n in range(1, 5)
         }
         self.simulations: set[uuid.UUID] = set()
+        self.images: dict[uuid.UUID, ImageRef] = {}
         self.context = SimulatorContext(project_id=3, key_id=1, service_id=4)
 
     async def find_scenario(self, scenario_id: int) -> ScenarioInfo | None:
@@ -285,5 +418,20 @@ class FakeLookup:
     async def simulation_exists(self, simulation_id: uuid.UUID) -> bool:
         return simulation_id in self.simulations
 
+    async def find_images(
+        self, asset_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, ImageRef]:
+        return {aid: self.images[aid] for aid in asset_ids if aid in self.images}
+
     async def simulator_context(self) -> SimulatorContext:
         return self.context
+
+
+class FakeImageFiles:
+    """저장소의 이미지 파일. 기본은 모든 파일이 있고, missing 에 넣은 키만 없다."""
+
+    def __init__(self) -> None:
+        self.missing: set[str] = set()
+
+    async def exists(self, key: str) -> bool:
+        return key not in self.missing

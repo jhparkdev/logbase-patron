@@ -11,6 +11,7 @@ from app.models import (
     RequestStatus,
     SimulationResult,
     SimulationRun,
+    SimulationRunAsset,
     SimulationStatus,
     ValidationStatus,
 )
@@ -316,3 +317,27 @@ async def test_a_finished_run_is_never_rewritten(
         LATER,
         None,
     )
+
+
+# --- 이미지 연결 ---
+
+
+async def test_run_images_are_linked_in_the_order_given_starting_from_one(
+    factory: Factory, store: DbSimulationStore, db_session: AsyncSession
+) -> None:
+    run = await new_run(factory)
+    await store.insert_run(run)
+    first = await factory.input_asset()
+    second = await factory.input_asset()
+
+    await store.insert_run_assets(
+        run.simulation_id, [second["asset_id"], first["asset_id"]]
+    )
+
+    rows = await db_session.execute(
+        select(SimulationRunAsset.asset_id, SimulationRunAsset.sort_order)
+        .where(SimulationRunAsset.simulation_id == run.simulation_id)
+        .order_by(SimulationRunAsset.sort_order)
+    )
+    # DB 담당 seed 도 1부터 센다
+    assert list(rows) == [(second["asset_id"], 1), (first["asset_id"], 2)]

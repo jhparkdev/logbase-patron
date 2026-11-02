@@ -1,14 +1,18 @@
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal
 
-from app.schemas.common import ErrorResponse
+from app.schemas.common import ErrorCode, ErrorResponse
+from app.schemas.simulation_image import MAX_IMAGE_BYTES
 from app.services.simulation_period import MAX_PERIOD_DAYS, InvalidPeriodReason
 
 
 class SimulationErrorCode(StrEnum):
     """시뮬레이터 API 의 오류 코드. 프론트엔드는 이 값으로 상황별로 분기한다."""
 
-    INVALID_REQUEST = "INVALID_REQUEST"  # 형식·범위 검증 실패(모델 수, 중복 선택 등)
+    INVALID_REQUEST = "INVALID_REQUEST"  # 형식·범위 검증 실패(모델 수 등)
+    # 같은 모델·Provider 를 설정까지 같게 두 번 골랐다. 설정이 다르면 별도 비교 대상이라 허용한다
+    DUPLICATE_MODEL_SELECTION = "DUPLICATE_MODEL_SELECTION"
     INPUT_REQUIRED = "INPUT_REQUIRED"  # 프롬프트 템플릿에 채울 입력 데이터가 없음
     SIMULATION_NOT_FOUND = "SIMULATION_NOT_FOUND"
     SLOT_NOT_FOUND = "SLOT_NOT_FOUND"
@@ -16,6 +20,20 @@ class SimulationErrorCode(StrEnum):
     SCENARIO_NOT_FOUND = "SCENARIO_NOT_FOUND"
     MODEL_NOT_FOUND = "MODEL_NOT_FOUND"
     MODEL_NOT_ACTIVE = "MODEL_NOT_ACTIVE"
+    # 이미지를 보냈는데 고른 모델 중에 이미지를 받지 못하는 모델이 있다
+    MODEL_IMAGE_NOT_SUPPORTED = "MODEL_IMAGE_NOT_SUPPORTED"
+    # 이미지 생성 실행인데 고른 모델 중에 이미지를 만들지 못하는 모델이 있다
+    MODEL_IMAGE_OUTPUT_NOT_SUPPORTED = "MODEL_IMAGE_OUTPUT_NOT_SUPPORTED"
+    # 칸에 직접 넣은 온도·추론 강도를 그 모델이 받지 못한다
+    MODEL_PARAMETER_NOT_SUPPORTED = "MODEL_PARAMETER_NOT_SUPPORTED"
+    IMAGE_REQUIRED = "IMAGE_REQUIRED"  # 이미지가 필요한 시나리오인데 이미지가 없음
+    IMAGE_NOT_FOUND = "IMAGE_NOT_FOUND"  # 올리지 않았거나 없는 asset_id
+    IMAGE_EMPTY = "IMAGE_EMPTY"  # 빈 파일을 올림
+    IMAGE_TOO_LARGE = "IMAGE_TOO_LARGE"  # 파일이 한도보다 큼
+    IMAGE_TYPE_NOT_SUPPORTED = "IMAGE_TYPE_NOT_SUPPORTED"  # JPG·PNG·WebP 가 아님
+    IMAGE_FILE_NOT_FOUND = (
+        "IMAGE_FILE_NOT_FOUND"  # 내려받을 이미지의 기록이나 파일이 없음
+    )
     PROVIDER_NOT_AVAILABLE = "PROVIDER_NOT_AVAILABLE"
     PERIOD_INCOMPLETE = "PERIOD_INCOMPLETE"
     PERIOD_START_AFTER_END = "PERIOD_START_AFTER_END"
@@ -39,6 +57,10 @@ ERROR_SPECS: dict[SimulationErrorCode, ErrorSpec] = {
     SimulationErrorCode.INPUT_REQUIRED: ErrorSpec(
         422, "템플릿에 넣을 입력 데이터가 필요합니다. 입력 데이터를 입력해 주세요."
     ),
+    SimulationErrorCode.DUPLICATE_MODEL_SELECTION: ErrorSpec(
+        422,
+        "같은 모델과 Provider 를 같은 설정으로 두 번 고를 수 없습니다. 설정을 다르게 하거나 하나를 빼 주세요.",
+    ),
     SimulationErrorCode.SIMULATION_NOT_FOUND: ErrorSpec(
         404, "해당 비교 실행을 찾을 수 없습니다."
     ),
@@ -56,6 +78,35 @@ ERROR_SPECS: dict[SimulationErrorCode, ErrorSpec] = {
     ),
     SimulationErrorCode.MODEL_NOT_ACTIVE: ErrorSpec(
         422, "사용 중이 아닌 모델은 비교 실행에 쓸 수 없습니다."
+    ),
+    SimulationErrorCode.MODEL_IMAGE_NOT_SUPPORTED: ErrorSpec(
+        422, "이미지를 지원하지 않는 모델이 있습니다. 해당 모델을 빼 주세요."
+    ),
+    SimulationErrorCode.MODEL_IMAGE_OUTPUT_NOT_SUPPORTED: ErrorSpec(
+        422, "이미지를 만들지 못하는 모델이 있습니다. 해당 모델을 빼 주세요."
+    ),
+    SimulationErrorCode.MODEL_PARAMETER_NOT_SUPPORTED: ErrorSpec(
+        422,
+        "모델이 지원하지 않는 설정이 있습니다. 해당 설정을 비우거나 다른 모델을 골라 주세요.",
+    ),
+    SimulationErrorCode.IMAGE_REQUIRED: ErrorSpec(
+        422, "이 시나리오는 이미지가 필요합니다. 이미지를 올려 주세요."
+    ),
+    SimulationErrorCode.IMAGE_NOT_FOUND: ErrorSpec(
+        422, "올리지 않은 이미지가 있습니다. 이미지를 다시 올려 주세요."
+    ),
+    SimulationErrorCode.IMAGE_EMPTY: ErrorSpec(
+        422, "빈 파일은 올릴 수 없습니다. 다른 이미지를 선택해 주세요."
+    ),
+    SimulationErrorCode.IMAGE_TOO_LARGE: ErrorSpec(
+        413,
+        f"이미지는 파일당 {MAX_IMAGE_BYTES // 1024 // 1024}MiB 이하만 올릴 수 있습니다.",
+    ),
+    SimulationErrorCode.IMAGE_TYPE_NOT_SUPPORTED: ErrorSpec(
+        415, "JPG·PNG·WebP 이미지만 올릴 수 있습니다."
+    ),
+    SimulationErrorCode.IMAGE_FILE_NOT_FOUND: ErrorSpec(
+        404, "이미지를 찾을 수 없습니다."
     ),
     SimulationErrorCode.PROVIDER_NOT_AVAILABLE: ErrorSpec(
         422, "선택한 모델에서 사용할 수 없는 Provider 입니다."
@@ -88,6 +139,21 @@ class SimulationErrorResponse(ErrorResponse):
     """
 
     code: SimulationErrorCode
+
+
+class SimulationRequestErrorResponse(ErrorResponse):
+    """422 응답의 문서용 형식. 형식 검증 실패는 공통 코드로, 업무 규칙 위반은 시뮬레이터 코드로 나간다.
+
+    형식 검증(모델 수, 글자 수, 정렬 키 등)은 공통 오류 처리기가 VALIDATION_ERROR 로 돌려준다.
+    """
+
+    code: Literal[ErrorCode.VALIDATION_ERROR] | SimulationErrorCode
+
+
+class OriginNotAllowedResponse(ErrorResponse):
+    """403 응답의 문서용 형식. 상태를 바꾸는 요청의 Origin 이 허용한 화면 주소가 아닐 때다."""
+
+    code: Literal[ErrorCode.ORIGIN_NOT_ALLOWED]
 
 
 def error_body(code: SimulationErrorCode) -> SimulationErrorResponse:

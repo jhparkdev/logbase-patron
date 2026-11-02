@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { formatCount, formatKstDateTime, formatUsd } from "./format";
+import {
+  formatCount,
+  formatKstDateTime,
+  formatUsd,
+  isZeroAmount,
+  unreflectedText,
+} from "./format";
 
 describe("formatKstDateTime", () => {
   test.each([
@@ -38,6 +44,22 @@ describe("formatUsd", () => {
     ["999.995", "summary", "1,000.00"],
     // float로 바꾸면 틀어지는 자릿수도 그대로 다룬다
     ["12345678.123456789012", "perCall", "12,345,678.1235"],
+    // 0이 아닌 금액이 0으로 보이지 않게 유효숫자 2자리까지 늘린다
+    ["0.000001086000000000", "summary", "0.0000011"],
+    ["0.000000528000000000", "perCall", "0.00000053"],
+    ["0.000000000001", "summary", "0.000000000001"],
+    ["0.000000000015", "perCall", "0.000000000015"],
+    // 자릿수 경계: 반올림 전(0으로 보임), 정확히 그 값, 반올림 후
+    ["0.00499", "summary", "0.0050"],
+    ["0.005", "summary", "0.01"],
+    // 저장된 값에 없는 자릿수를 지어내지 않는다
+    ["0.00004", "perCall", "0.00004"],
+    ["0.00005", "perCall", "0.0001"],
+    // 올림이 앞자리로 넘어가도 값은 정확하다
+    ["0.00000996", "summary", "0.0000100"],
+    // 진짜 0은 0으로 둔다
+    ["0.000000000000", "summary", "0.00"],
+    ["0", "perCall", "0.0000"],
   ] as const)("%s (%s) → %s", (amount, precision, expected) => {
     expect(formatUsd(amount, precision)).toBe(expected);
   });
@@ -58,5 +80,25 @@ describe("formatCount", () => {
     [24591, "24,591"],
   ])("%i → %s", (count, expected) => {
     expect(formatCount(count)).toBe(expected);
+  });
+});
+
+describe("isZeroAmount", () => {
+  test.each([
+    ["0", true],
+    ["0.00", true],
+    ["0.000000000000", true],
+    ["0.000000000001", false],
+    ["1", false],
+    ["10.00", false],
+  ])("%s → %s", (amount, expected) => {
+    expect(isZeroAmount(amount)).toBe(expected);
+  });
+});
+
+describe("unreflectedText", () => {
+  test("미확인이 있을 때만 문구를 만든다", () => {
+    expect(unreflectedText(3)).toBe("미확인 3건 미반영");
+    expect(unreflectedText(0)).toBeUndefined();
   });
 });

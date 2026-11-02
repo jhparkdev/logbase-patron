@@ -1,8 +1,9 @@
 import { useFormContext } from "react-hook-form";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
-import { fileKey, imageFilesSchema } from "../lib/images";
+import { fileKey, imageCountMessage, imageFilesSchemaFor } from "../lib/images";
+import type { ImageLimits } from "../lib/limits";
 
-export function useImageSelection() {
+export function useImageSelection(limits: ImageLimits) {
   const { getValues, setValue, setError, clearErrors } = useFormContext<
     SimulatorFormValues,
     unknown,
@@ -18,12 +19,15 @@ export function useImageSelection() {
         ]),
       ).values(),
     ];
-    const result = imageFilesSchema.safeParse(merged);
-    if (!result.success) {
-      setError("files", {
-        type: "imageSelection",
-        message: result.error.issues[0].message,
-      });
+    const result = imageFilesSchemaFor(limits).safeParse(merged);
+    const total = merged.length + getValues("existingAssetIds").length;
+    const message = !result.success
+      ? result.error.issues[0].message
+      : total > limits.maxCount
+        ? imageCountMessage(limits)
+        : undefined;
+    if (message || !result.success) {
+      setError("files", { type: "imageSelection", message });
       return;
     }
     setValue("files", result.data, { shouldDirty: true });
@@ -37,5 +41,13 @@ export function useImageSelection() {
     );
     clearErrors("files");
   };
-  return { selectFiles, removeFile };
+  const removeExisting = (index: number) => {
+    setValue(
+      "existingAssetIds",
+      getValues("existingAssetIds").filter((_, i) => i !== index),
+      { shouldDirty: true },
+    );
+    clearErrors("files");
+  };
+  return { selectFiles, removeFile, removeExisting };
 }

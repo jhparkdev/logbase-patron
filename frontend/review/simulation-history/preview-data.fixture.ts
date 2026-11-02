@@ -4,6 +4,7 @@ import type {
 } from "../../src/features/simulation-history/lib/presentation";
 import type { HistorySearch } from "../../src/features/simulation-history/lib/search";
 import { dbMock } from "../../src/features/simulator/components/dbMock.fixture";
+import { createComparisons } from "../../src/features/simulator/lib/comparisons";
 import { createDefaultValues } from "../../src/features/simulator/lib/form";
 import type { RunView } from "../../src/features/simulator/lib/presentation";
 import { historyInputSnapshots } from "./history-inputs.fixture";
@@ -38,10 +39,16 @@ export const historyRows: HistoryRow[] = dbMock.runs.map((run) => ({
   modelCount: run.modelCount,
   status: run.status,
   cost: {
-    total: run.totalCost,
-    estimated: run.estimatedCost !== null,
+    confirmed: run.confirmedCost,
+    estimated: run.estimatedCost,
     unknownCount: run.unknownCostCount,
-    checking: !!run.status.ongoing,
+    checkStatus: run.status.ongoing
+      ? "확인 중"
+      : run.unknownCostCount > 0
+        ? "미확인 포함"
+        : run.estimatedCost !== null
+          ? "추정 포함"
+          : "확정",
   },
   inactiveModelCount: run.slots.filter((slot) => !choiceFor(slot)?.selectable)
     .length,
@@ -102,7 +109,9 @@ export function rerunSnapshot(key: string) {
     jsonSchema: input.jsonSchema,
     temperature: input.temperature,
     maxTokens: input.maxTokens,
-    selections: run.slots.map((slot) => choiceFor(slot)?.key ?? ""),
+    comparisons: createComparisons(
+      run.slots.map((slot) => choiceFor(slot)?.key ?? ""),
+    ),
   });
 }
 
@@ -141,16 +150,7 @@ export function selectPreviewRows(search: HistorySearch): HistoryRow[] {
         result = a.status.label.localeCompare(b.status.label);
         break;
       case "costStatus":
-        result = String([
-          a.cost.checking,
-          a.cost.estimated,
-          a.cost.unknownCount > 0,
-        ]).localeCompare(
-          String([b.cost.checking, b.cost.estimated, b.cost.unknownCount > 0]),
-        );
-        break;
-      case "totalCost":
-        result = compareCost(a.cost.total, b.cost.total);
+        result = a.cost.checkStatus.localeCompare(b.cost.checkStatus);
         break;
     }
     return (
@@ -158,13 +158,4 @@ export function selectPreviewRows(search: HistorySearch): HistoryRow[] {
       (search.direction === "asc" ? 1 : -1)
     );
   });
-}
-function compareCost(a: string | null, b: string | null): number {
-  if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
-  const [aw, af = ""] = a.split(".");
-  const [bw, bf = ""] = b.split(".");
-  const width = Math.max(af.length, bf.length);
-  const av = BigInt(aw + af.padEnd(width, "0"));
-  const bv = BigInt(bw + bf.padEnd(width, "0"));
-  return av < bv ? -1 : av > bv ? 1 : 0;
 }

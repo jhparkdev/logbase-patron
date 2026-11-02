@@ -36,6 +36,7 @@ export function renderAt(
   path: string,
   { user = TEST_USER }: RenderAtOptions = {},
 ) {
+  // 테스트마다 캐시를 따로 두고, 실패 동작을 기다림 없이 확인하려고 재시도를 끈다.
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -51,4 +52,17 @@ export function renderAt(
     </QueryClientProvider>,
   );
   return router;
+}
+
+type Match = ReturnType<typeof renderAt>["state"]["matches"][number];
+
+/** 지금 띄운 그 화면의 매치. `.search`가 검증을 거쳐 화면이 실제로 쓰는 조회 조건이다. */
+export function routeMatch<TRouteId extends Match["routeId"]>(
+  router: ReturnType<typeof renderAt>,
+  routeId: TRouteId,
+) {
+  return router.state.matches.find(
+    (match): match is Extract<Match, { routeId: TRouteId }> =>
+      match.routeId === routeId,
+  );
 }

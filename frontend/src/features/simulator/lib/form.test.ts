@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest";
+import { createComparisons } from "./comparisons";
 import { createDefaultValues, simulatorFormSchema } from "./form";
 import { IMAGE_LIMITS, TEXT_LIMIT } from "./limits";
 
 const valid = () => ({
   ...createDefaultValues(),
   prompt: "원문을 보존해 주세요. ",
-  selections: ["a", "b"],
+  comparisons: createComparisons(["a", "b"]),
 });
 
 describe("시뮬레이터 입력 경계", () => {
@@ -31,25 +32,37 @@ describe("시뮬레이터 입력 경계", () => {
     expect(
       simulatorFormSchema.safeParse({
         ...valid(),
-        selections: Array.from({ length }, (_, i) => `${i}`),
+        comparisons: createComparisons(
+          Array.from({ length }, (_, i) => `${i}`),
+        ),
       }).success,
     ).toBe(length >= 2 && length <= 4);
   });
-  test("빈 칸과 동일한 비교 대상은 제출하지 않는다", () => {
+  test("빈 모델과 중복된 비교 항목 식별자는 제출하지 않는다", () => {
     expect(
-      simulatorFormSchema.safeParse({ ...valid(), selections: ["a", ""] })
-        .success,
+      simulatorFormSchema.safeParse({
+        ...valid(),
+        comparisons: createComparisons(["a", ""]),
+      }).success,
     ).toBe(false);
     expect(
-      simulatorFormSchema.safeParse({ ...valid(), selections: ["a", "a"] })
-        .success,
+      simulatorFormSchema.safeParse({
+        ...valid(),
+        comparisons: [...createComparisons(["a"]), ...createComparisons(["a"])],
+      }).success,
     ).toBe(false);
   });
   test("빈 고급 설정은 기본값 사용으로 남기고 Prompt 원문을 유지한다", () => {
     const result = simulatorFormSchema.parse(valid());
     expect(result.temperature).toBeUndefined();
     expect(result.maxTokens).toBeUndefined();
+    expect(result.reasoningEffort).toBeUndefined();
     expect(result.prompt).toBe(valid().prompt);
+  });
+  test("공통 effort를 제출값과 복원 입력에 보존한다", () => {
+    const values = { ...valid(), reasoningEffort: "high" };
+    expect(simulatorFormSchema.parse(values).reasoningEffort).toBe("high");
+    expect(createDefaultValues(values).reasoningEffort).toBe("high");
   });
   test.each(["-0.01", "2.01", "NaN"])("Temperature %s 거절", (temperature) => {
     expect(
@@ -69,12 +82,35 @@ describe("시뮬레이터 입력 경계", () => {
       ).toBe(false);
     },
   );
-  test("JSON Schema는 JSON 객체 또는 boolean이며, 비어 있으면 미지정", () => {
-    for (const jsonSchema of ["", "{}", "false"])
+  test.each([
+    ["4095", true],
+    ["4096", true],
+    ["4097", false],
+  ])("출력 토큰 상한 경계 %s", (maxTokens, ok) => {
+    expect(
+      simulatorFormSchema.safeParse({ ...valid(), maxTokens }).success,
+    ).toBe(ok);
+  });
+  test("재실행 이미지와 새 파일을 합쳐 개수 한도를 검사한다", () => {
+    const png = new File(["image"], "image.png", { type: "image/png" });
+    const existingAssetIds = Array(IMAGE_LIMITS.maxCount).fill("asset");
+    expect(
+      simulatorFormSchema.safeParse({ ...valid(), existingAssetIds }).success,
+    ).toBe(true);
+    expect(
+      simulatorFormSchema.safeParse({
+        ...valid(),
+        existingAssetIds,
+        files: [png],
+      }).success,
+    ).toBe(false);
+  });
+  test("JSON Schema는 서버 계약대로 JSON 객체만 받고, 비어 있으면 미지정", () => {
+    for (const jsonSchema of ["", "{}"])
       expect(
         simulatorFormSchema.safeParse({ ...valid(), jsonSchema }).success,
       ).toBe(true);
-    for (const jsonSchema of ["{", "[]", '"text"'])
+    for (const jsonSchema of ["{", "[]", '"text"', "true", "false"])
       expect(
         simulatorFormSchema.safeParse({ ...valid(), jsonSchema }).success,
       ).toBe(false);

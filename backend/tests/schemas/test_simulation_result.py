@@ -47,6 +47,7 @@ def result_body(**overrides: object) -> dict[str, object]:
         "model_display_name_at_run": "Mistral Nemo",
         "model_status_at_run": "ACTIVE",
         "execution_provider": "DeepInfra",
+        "execution_config": {"max_tokens": 4096},
         "actual_provider": "DeepInfra",
         "actual_model": "mistralai/mistral-nemo",
         "status": "SUCCESS",
@@ -60,6 +61,10 @@ def result_body(**overrides: object) -> dict[str, object]:
         "schema_validation_status": "PASSED",
         "missing_required_fields": [],
         "comparability_note": None,
+        "response_text": None,
+        "error_message": None,
+        "output_type": "TEXT",
+        "output_images": [],
     }
     body.update(overrides)
     return body
@@ -80,6 +85,52 @@ def test_summary_total_with_no_matching_calls_stays_null_never_zero() -> None:
     )
 
     assert dumped["estimated_cost_usd"] is None
+
+
+@pytest.mark.parametrize(
+    ("confirmed", "estimated", "total"),
+    [
+        ("0.000123", "0.000002", "0.000125"),
+        ("0.000123", None, "0.000123"),
+        (None, "0.000002", "0.000002"),
+    ],
+)
+def test_total_cost_is_confirmed_plus_estimated(
+    confirmed: str | None, estimated: str | None, total: str
+) -> None:
+    dumped = SimulationSummary(
+        **summary_body(confirmed_cost_usd=confirmed, estimated_cost_usd=estimated)
+    ).model_dump(mode="json")
+
+    assert dumped["total_cost_usd"] == total
+
+
+def test_total_cost_without_any_known_cost_stays_null_never_zero() -> None:
+    # 금액을 아는 호출이 하나도 없으면 총 비용도 모른다. 0 으로 보이면 지출이 없던 것처럼 읽힌다
+    dumped = SimulationSummary(
+        **summary_body(
+            confirmed_cost_usd=None, estimated_cost_usd=None, unknown_cost_count=2
+        )
+    ).model_dump(mode="json")
+
+    assert dumped["total_cost_usd"] is None
+
+
+def test_total_cost_leaves_out_unknown_calls_and_says_so() -> None:
+    # 미확인 호출은 금액에 넣지 않는다. 합계가 일부라는 것은 개수와 확인 상태가 알려 준다
+    dumped = SimulationSummary(
+        **summary_body(confirmed_cost_usd="0.000123", unknown_cost_count=1)
+    ).model_dump(mode="json")
+
+    assert dumped["total_cost_usd"] == "0.000123"
+    assert dumped["unknown_cost_count"] == 1
+    assert dumped["cost_check_status"] == "미확인 포함"
+
+
+def test_total_cost_is_in_the_response_contract() -> None:
+    schema = SimulationSummary.model_json_schema(mode="serialization")
+
+    assert "total_cost_usd" in schema["required"]
 
 
 def test_cost_check_status_values_come_from_the_view() -> None:
@@ -235,9 +286,16 @@ def test_failed_result_keeps_its_error_type() -> None:
     assert result.error_type == "PROVIDER_ERROR"
 
 
-def test_response_text_is_not_part_of_the_result() -> None:
-    # 응답 본문은 길어서 진행 조회에 매번 싣지 않고 원문 조회 API(S-05)로만 준다
-    assert "response_text" not in SimulationModelResult.model_fields
+def test_result_carries_the_response_text() -> None:
+    # 화면이 모델 칸에 답변을 그대로 그린다. 모델 4개 × 최대 토큰이라 매번 실어도 부담이 작다
+    result = SimulationModelResult(**result_body(response_text="답변"))
+
+    assert result.model_dump(mode="json")["response_text"] == "답변"
+
+
+def test_result_without_a_response_is_null() -> None:
+    # 진행 중·실패·취소된 칸은 답변이 없다. 빈 문자열과 구분해 null 로 준다
+    assert SimulationModelResult(**result_body()).response_text is None
 
 
 def test_detail_response_holds_summary_and_results() -> None:
@@ -273,3 +331,19 @@ def test_detail_response_shows_one_result_per_slot() -> None:
         SimulationDetailResponse(
             summary=summary_body(), results=[earlier_attempt, final_attempt]
         )
+
+
+def test_a_slot_result_carries_the_settings_it_was_run_with() -> None:
+    config = {"max_tokens": 512, "temperature": 0.2, "reasoning_effort": "high"}
+
+    result = SimulationModelResult(**result_body(execution_config=config))
+
+    assert result.model_dump(mode="json")["execution_config"] == config
+
+
+def test_a_slot_result_requires_its_settings() -> None:
+    body = result_body()
+    del body["execution_config"]
+
+    with pytest.raises(ValidationError, match="execution_config"):
+        SimulationModelResult(**body)

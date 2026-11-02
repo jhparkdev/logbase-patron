@@ -63,13 +63,16 @@ export function HistoryFilters({
             {...register("to")}
           />
         </label>
-        <HistoryFilterSelect
-          control={formControl}
-          name="scenario"
-          label="시나리오"
-          options={scenarios}
-          className={control}
-        />
+        {/* 고를 시나리오가 없으면 숨긴다. URL에 값이 있으면 지울 수 있게 남긴다 */}
+        {(scenarios.length > 0 || values.scenario) && (
+          <HistoryFilterSelect
+            control={formControl}
+            name="scenario"
+            label="시나리오"
+            options={scenarios}
+            className={control}
+          />
+        )}
         <HistoryFilterSelect
           control={formControl}
           name="model"

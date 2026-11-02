@@ -724,6 +724,7 @@ export const dbMock = {
   choices: [
     {
       key: "1:mock-provider-moonshot",
+      creator: "moonshotai",
       name: "Kimi K3.1 Pro",
       provider: "mock-provider-moonshot",
       selectable: true,
@@ -736,6 +737,7 @@ export const dbMock = {
     },
     {
       key: "2:DekaLLM",
+      creator: "mistralai",
       name: "Mistral Nemo",
       provider: "DekaLLM",
       selectable: true,
@@ -744,6 +746,7 @@ export const dbMock = {
     },
     {
       key: "2:DeepInfra",
+      creator: "mistralai",
       name: "Mistral Nemo",
       provider: "DeepInfra",
       selectable: true,
@@ -752,6 +755,7 @@ export const dbMock = {
     },
     {
       key: "3:mock-provider-google",
+      creator: "google",
       name: "Gemma 3 4B",
       provider: "mock-provider-google",
       selectable: true,
@@ -760,6 +764,7 @@ export const dbMock = {
     },
     {
       key: "4:mock-provider-amazon",
+      creator: "amazon",
       name: "Nova Micro",
       provider: "mock-provider-amazon",
       selectable: false,
@@ -790,9 +795,11 @@ export const dbMock = {
     {
       key: "3",
       name: "데이터 요약 및 구조화",
-      prompt: "다음 데이터를 5줄 이내로 요약하세요.\n{{data}}",
+      prompt:
+        "다음 데이터를 5줄 이내로 요약하고, 지정한 JSON Schema에 맞춰 구조화하세요.\n{{data}}",
       defaults: { maxTokens: 512, temperature: 0.3 },
-      schemaText: "",
+      schemaText:
+        '{"type": "object", "required": ["summary", "key_points"], "properties": {"summary": {"type": "string"}, "key_points": {"type": "array", "items": {"type": "string"}}}}',
       imageRequired: false,
     },
     {

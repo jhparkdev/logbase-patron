@@ -20,11 +20,20 @@ export function ResponseCards({
           key={slot.key}
           className="flex min-w-0 flex-col gap-4 rounded-2xl bg-white p-5"
         >
-          <div>
-            <h3 className="break-words font-semibold">{slot.name}</h3>
-            <p className="mt-1 break-words text-caption text-grey-600">
-              {slot.provider}
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="break-words font-semibold">{slot.name}</h3>
+              <p className="mt-1 break-words text-caption text-grey-600">
+                {slot.provider}
+              </p>
+            </div>
+            {slot.status.ongoing && (
+              <span
+                role="status"
+                aria-label={`${slot.name} 실행 중`}
+                className="size-4 shrink-0 rounded-full border-2 border-grey-200 border-t-brand motion-safe:animate-spin"
+              />
+            )}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <ExecutionStatus status={slot.status} />
@@ -36,6 +45,33 @@ export function ResponseCards({
             <span className="text-grey-600">비용</span>
             <CostValue cost={slot.cost} />
           </div>
+          {slot.statusAtRun && (
+            <p className="text-caption text-grey-600">
+              실행 당시 모델 상태: {slot.statusAtRun}
+            </p>
+          )}
+          {slot.settings && (
+            <div>
+              <p className="mb-1 text-label font-semibold">적용 설정</p>
+              {slot.settings.length ? (
+                <dl className="space-y-1 text-caption text-grey-600">
+                  {slot.settings.map((setting) => (
+                    <div
+                      key={setting.label}
+                      className="flex justify-between gap-3"
+                    >
+                      <dt>{setting.label}</dt>
+                      <dd className="min-w-0 break-words text-right tabular-nums">
+                        {setting.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="text-caption text-grey-600">모델 기본값</p>
+              )}
+            </div>
+          )}
           {(slot.actualModel || slot.actualProvider) && (
             <p className="break-words text-caption text-grey-600">
               실제 처리: {slot.actualModel ?? slot.name} ·{" "}
@@ -51,9 +87,9 @@ export function ResponseCards({
             <p className="mb-2 text-label font-semibold">응답 내용</p>
             <div className="max-h-36 overflow-hidden whitespace-pre-wrap break-words rounded-lg bg-grey-50 p-3 text-body-sm text-grey-700">
               {slot.response === null
-                ? "아직 응답을 받지 못했어요."
+                ? "아직 응답을 받지 못했습니다."
                 : slot.response === ""
-                  ? "빈 응답을 받았어요."
+                  ? "빈 응답을 받았습니다."
                   : slot.response}
             </div>
           </div>

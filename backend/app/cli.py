@@ -6,6 +6,9 @@
     uv --directory backend run python -m app.cli user-create --email admin@example.test --name 관리자 --user-code ADMIN
     uv --directory backend run python -m app.cli user-deactivate --email admin@example.test
     uv --directory backend run python -m app.cli session-cleanup
+    uv --directory backend run python -m app.cli customer-create --customer-code CUST-X --name 고객
+    uv --directory backend run python -m app.cli service-create --service-code SVC-X --name 서비스
+    uv --directory backend run python -m app.cli key-register --display-name "고객 Key" --secret-ref CUSTOMER_API_KEY --customer-code CUST-X --service-code SVC-X --environment PROD
 """
 
 import argparse
@@ -22,11 +25,13 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.config import get_settings
 from app.db import get_engine, get_sessionmaker
+from app.models import KeyEnvironment, ServiceType
 from app.schemas.auth import PASSWORD_MAX_LENGTH
-from app.services import users
+from app.services import usage_catalog, users
 
 SEED_FILE = Path(__file__).resolve().parents[1] / "seed" / "patron_mock_data_v0.6.sql"
 PRODUCTION_ENV = "production"
+CATALOG_COMMANDS = ("customer-create", "service-create", "key-register")
 # 시드가 이미 들어갔는지 알아보는 표식: 시드가 고정 ID로 넣는 첫 mock 고객
 SEED_MARKER_QUERY = text(
     "SELECT EXISTS (SELECT 1 FROM customers WHERE customer_code = 'CUST-A' AND is_mock)"
@@ -90,8 +95,36 @@ def make_parser() -> argparse.ArgumentParser:
     cleanup = commands.add_parser(
         "session-cleanup", help="만료된 로그인 세션을 삭제한다"
     )
+    customer = commands.add_parser("customer-create", help="실제 고객을 등록한다")
+    customer.add_argument("--customer-code", required=True)
+    customer.add_argument("--name", required=True)
+    service = commands.add_parser("service-create", help="실제 서비스를 등록한다")
+    service.add_argument("--service-code", required=True)
+    service.add_argument("--name", required=True)
+    service.add_argument(
+        "--service-type",
+        choices=[item.value for item in ServiceType],
+        default=ServiceType.CUSTOMER_FACING.value,
+    )
+    # --secret 같은 줄임말이 --secret-ref로 해석되면 Key 원문을 넘기는 실수를 부추긴다.
+    key = commands.add_parser(
+        "key-register",
+        help="고객 서비스 전용 Key를 고객·서비스에 연결한다",
+        allow_abbrev=False,
+    )
+    key.add_argument("--display-name", required=True)
+    key.add_argument(
+        "--secret-ref",
+        required=True,
+        help="Key 원문이 든 환경변수 이름. 원문은 입력하지 않는다",
+    )
+    key.add_argument("--customer-code", required=True)
+    key.add_argument("--service-code", required=True)
+    key.add_argument(
+        "--environment", choices=[item.value for item in KeyEnvironment], required=True
+    )
     # 새 관리 명령도 이 목록에 넣어야 운영 확인 옵션을 함께 제공할 수 있다.
-    for command in (seed, create, deactivate, cleanup):
+    for command in (seed, create, deactivate, cleanup, customer, service, key):
         command.add_argument(
             "--confirm-production",
             action="store_true",
@@ -133,6 +166,33 @@ async def run_user_command(args: argparse.Namespace, password: str | None) -> No
             print(f"만료 세션 {count}개 삭제 완료")
 
 
+async def run_catalog_command(args: argparse.Namespace) -> None:
+    async with get_sessionmaker()() as session:
+        if args.command == "customer-create":
+            customer = await usage_catalog.create_customer(
+                session, customer_code=args.customer_code, name=args.name
+            )
+            print(f"고객 등록 완료 (customer_id={customer.customer_id})")
+        elif args.command == "service-create":
+            service = await usage_catalog.create_service(
+                session,
+                service_code=args.service_code,
+                name=args.name,
+                service_type=ServiceType(args.service_type),
+            )
+            print(f"서비스 등록 완료 (service_id={service.service_id})")
+        elif args.command == "key-register":
+            key = await usage_catalog.register_customer_key(
+                session,
+                display_name=args.display_name,
+                secret_ref=args.secret_ref,
+                customer_code=args.customer_code,
+                service_code=args.service_code,
+                environment=KeyEnvironment(args.environment),
+            )
+            print(f"Key 등록 완료 (key_id={key.key_id})")
+
+
 def main(argv: list[str] | None = None) -> int:
     """명령줄 진입점. 성공하면 0, 거부되면 1을 돌려준다."""
     args = make_parser().parse_args(argv)
@@ -145,13 +205,21 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "seed":
             applied = asyncio.run(run_seed(), loop_factory=asyncio.SelectorEventLoop)
             print("seed 적용 완료" if applied else "이미 seed가 적용되어 있어 건너뜀")
+        elif args.command in CATALOG_COMMANDS:
+            asyncio.run(
+                run_catalog_command(args), loop_factory=asyncio.SelectorEventLoop
+            )
         else:
             # 비밀번호는 명령줄 인자 묶음(args)에 넣지 않고 숨김 입력으로만 전달한다.
             password = read_password() if args.command == "user-create" else None
             asyncio.run(
                 run_user_command(args, password), loop_factory=asyncio.SelectorEventLoop
             )
-    except (CommandRefusedError, users.UserCommandError) as error:
+    except (
+        CommandRefusedError,
+        users.UserCommandError,
+        usage_catalog.CatalogCommandError,
+    ) as error:
         print(error, file=sys.stderr)
         return 1
     except GetPassWarning, EOFError, KeyboardInterrupt:

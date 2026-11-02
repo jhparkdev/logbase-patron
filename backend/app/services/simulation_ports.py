@@ -8,7 +8,7 @@ RequestRecorder 의 DB 구현은 simulation_recorders.py 이고 쓰기는 servic
 import asyncio
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Protocol
@@ -19,6 +19,7 @@ from app.models import (
     CostStatus,
     DataSource,
     ErrorType,
+    InputType,
     ModelStatus,
     RequestStatus,
     SimulationStatus,
@@ -26,7 +27,10 @@ from app.models import (
     UsageOrigin,
     ValidationStatus,
 )
+from app.openrouter.image_result import GeneratedImage, ImageCallResult
 from app.openrouter.result import CallResult
+from app.schemas.simulation_output import OutputType
+from app.services.model_parameters import ParameterSupport
 from app.services.simulation_json_check import ValidationErrors
 
 
@@ -67,18 +71,36 @@ class SlotPlan:
     model_id: int
     openrouter_model_id: str
     execution_provider: str
+    # 이 칸에 실제로 적용할 설정(실행 공통 설정과 합친 값). max_tokens 는 항상 있다
+    execution_config: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ImageRef:
+    """올려 둔 이미지 한 장을 가리키는 값. 파일 내용은 저장소에 있고 여기에는 위치와 해시만 있다."""
+
+    asset_id: uuid.UUID
+    storage_path: str
+    mime_type: str
+    sha256: str
 
 
 @dataclass(frozen=True)
 class SimulationJob:
-    """실행할 비교 한 건. 모든 칸에 같은 입력을 보낸다."""
+    """실행할 비교 한 건. 모든 칸에 같은 입력을 보낸다.
+
+    messages 는 DB 에 남는 모양이다. 이미지는 내용이 아니라 참조(asset:<asset_id>)로 들어 있고,
+    모델을 부르기 직전에만 내용(data URL)으로 바꿔 보낸다. 이미지 내용이 DB 에 들어가지 않게 하기 위해서다.
+    """
 
     simulation_id: uuid.UUID
     slots: Sequence[SlotPlan]
-    messages: list[dict[str, str]]
+    messages: list[dict[str, Any]]
     json_schema: dict[str, Any] | None
-    max_tokens: int
     allow_fallbacks: bool
+    images: Sequence[ImageRef] = ()
+    # IMAGE 면 칸마다 이미지 생성(ImageGenerator)을 부르고, 올린 이미지는 참고 이미지로 보낸다
+    output_type: OutputType = OutputType.TEXT
 
 
 @dataclass(frozen=True)
@@ -89,6 +111,7 @@ class ScenarioInfo:
     is_active: bool
     default_json_schema: dict[str, Any] | None
     default_execution_config: Mapping[str, Any]
+    input_type: InputType = InputType.TEXT
 
 
 @dataclass(frozen=True)
@@ -99,6 +122,10 @@ class ModelInfo:
     openrouter_model_id: str
     display_name: str
     status: ModelStatus
+    supports_images: bool = False  # 입력 형식(input_modalities)에 image 가 있다
+    generates_images: bool = False  # 출력 형식(output_modalities)에 image 가 있다
+    # 받을 수 있는 설정. 기본값을 두지 않아 조회하는 쪽이 빠뜨리면 바로 드러난다
+    parameter_support: ParameterSupport = field(kw_only=True)
 
 
 @dataclass(frozen=True)
@@ -166,6 +193,8 @@ class NewResult:
     execution_provider: str
     model_status_at_run: ModelStatus
     model_display_name_at_run: str
+    # 같은 모델을 다른 Provider 로 넣은 칸이면 그 사실을 적는다. 아니면 None
+    comparability_note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -192,7 +221,40 @@ class ModelCaller(Protocol):
         provider_order: list[str],
         allow_fallbacks: bool,
         cancel: asyncio.Event,
+        temperature: float | None = None,
+        reasoning_effort: str | None = None,
     ) -> CallResult: ...
+
+
+class ImageGenerator(Protocol):
+    """openrouter/client.py 의 generate_image 에서 시뮬레이터가 쓰는 인자. 실패해도 예외 없이 결과로 돌려준다."""
+
+    async def __call__(
+        self,
+        *,
+        request_id: uuid.UUID,
+        model_id: str,
+        prompt: str,
+        timeout_seconds: float,
+        input_image_urls: list[str] | None,
+        provider_order: list[str],
+        allow_fallbacks: bool,
+        cancel: asyncio.Event,
+        n: int | None = None,
+        resolution: str | None = None,
+        aspect_ratio: str | None = None,
+        quality: str | None = None,
+    ) -> ImageCallResult: ...
+
+
+class OutputImageStore(Protocol):
+    """이미지 생성 결과를 저장소와 output_assets 에 남긴다. 삭제하거나 덮어쓰지 않는다."""
+
+    async def save(
+        self, request_id: uuid.UUID, images: Sequence[GeneratedImage]
+    ) -> None:
+        """받은 순서대로 저장한다(sort_order 는 0부터). 하나라도 못 쓰면 예외를 던진다."""
+        ...
 
 
 class RequestRecorder(Protocol):
@@ -222,9 +284,18 @@ class RequestRecorder(Protocol):
     async def save_payload(
         self,
         request_id: uuid.UUID,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         response_text: str | None,
     ) -> None: ...
+
+    async def keep_late_result(
+        self,
+        request_id: uuid.UUID,
+        messages: list[dict[str, Any]],
+        record: SlotRecord,
+    ) -> None:
+        """취소로 먼저 끝난 칸에 늦게 온 결과를 비용 대조용으로만 남긴다(J-03). 상태·비용은 그대로다."""
+        ...
 
 
 class SimulationStore(Protocol):
@@ -233,6 +304,12 @@ class SimulationStore(Protocol):
     async def insert_run(self, run: NewRun) -> None: ...
 
     async def insert_result(self, result: NewResult) -> None: ...
+
+    async def insert_run_assets(
+        self, simulation_id: uuid.UUID, asset_ids: Sequence[uuid.UUID]
+    ) -> None:
+        """실행에 쓴 이미지를 순서대로 연결한다(sort_order 는 1부터)."""
+        ...
 
     async def mark_started(self, simulation_id: uuid.UUID, now: datetime) -> None: ...
 
@@ -266,7 +343,23 @@ class SimulationLookup(Protocol):
 
     async def simulation_exists(self, simulation_id: uuid.UUID) -> bool: ...
 
+    async def find_images(
+        self, asset_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, ImageRef]: ...
+
     async def simulator_context(self) -> SimulatorContext: ...
+
+
+class ImageSource(Protocol):
+    """저장된 이미지 내용을 모델에 보낼 모양(data URL)으로 읽어 온다."""
+
+    async def data_url(self, image: ImageRef) -> str: ...
+
+
+class ImageFiles(Protocol):
+    """저장소에 이미지 파일이 실제로 있는지 본다. 접수 때 읽기만 한다."""
+
+    async def exists(self, key: str) -> bool: ...
 
 
 @dataclass(frozen=True)
@@ -276,6 +369,7 @@ class IntakeDeps:
     lookup: SimulationLookup
     recorder: RequestRecorder
     store: SimulationStore
+    image_files: ImageFiles
     now: Callable[[], datetime]
     new_id: Callable[[], uuid.UUID]
 
@@ -286,3 +380,6 @@ class SimulationDeps:
     recorder: RequestRecorder
     store: SimulationStore
     now: Callable[[], datetime]  # 현재 시각은 주입한다
+    images: ImageSource
+    image_generator: ImageGenerator
+    outputs: OutputImageStore

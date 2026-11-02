@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.simulation_deps import get_simulation_manager
 from app.models import RequestStatus
+from app.openrouter.errors import USER_MESSAGES
+from app.openrouter.errors import ErrorType as CallErrorType
 from tests.api.simulation_helpers import (
     CREATE,
     FakeManager,
@@ -21,6 +23,7 @@ from tests.db_helpers import Factory
 from tests.services.simulation_fakes import FakeCaller, failed
 
 R = RequestStatus
+FAILURE_MESSAGE = USER_MESSAGES[CallErrorType.UNKNOWN_ERROR]
 
 
 def detail_url(simulation_id: object) -> str:
@@ -57,7 +60,8 @@ async def test_a_finished_run_shows_the_summary_and_every_slot(
     signed_in: dict[str, Any],
 ) -> None:
     async def fail(kwargs: dict[str, Any]) -> Any:
-        return failed(R.FAILED)
+        # 실제 클라이언트는 실패하면 정해진 사용자 문구를 함께 돌려준다
+        return failed(R.FAILED).model_copy(update={"error_message": FAILURE_MESSAGE})
 
     simulation_id, rows = await run_to_the_end(
         app,
@@ -99,6 +103,7 @@ async def test_a_finished_run_shows_the_summary_and_every_slot(
     assert first["model_display_name_at_run"] == rows[0]["display_name"]
     assert first["model_status_at_run"] == "ACTIVE"
     assert first["execution_provider"] == "DeepInfra"
+    assert first["execution_config"] == {"max_tokens": 4096}
     assert (first["json_parse_status"], first["schema_validation_status"]) == (
         "NOT_APPLICABLE",
         "NOT_APPLICABLE",
@@ -107,6 +112,12 @@ async def test_a_finished_run_shows_the_summary_and_every_slot(
     assert (second["status"], second["error_type"]) == ("FAILED", "UNKNOWN_ERROR")
     assert (second["cost_usd"], second["cost_status"]) == (None, "UNKNOWN")
     assert second["execution_provider"] == "DekaLLM"
+    # 화면은 모델 칸에 응답 원문을 그대로 보여 준다. 실패한 칸은 원문이 없다
+    assert first["response_text"] == "응답"
+    assert second["response_text"] is None
+    # 실패한 칸은 화면에 보여 줄 문구를 함께 준다. 내부 예외 원문이 아니라 정해진 사용자 문구다
+    assert first["error_message"] is None
+    assert second["error_message"] == FAILURE_MESSAGE
 
 
 @pytest.mark.usefixtures("poc_setup", "signed_in")
@@ -125,7 +136,42 @@ async def test_the_summary_total_equals_the_sum_of_the_slots(
         if r["cost_status"] == "CONFIRMED"
     )
     assert Decimal(body["summary"]["confirmed_cost_usd"]) == confirmed
+    assert Decimal(body["summary"]["total_cost_usd"]) == confirmed
     assert body["summary"]["cost_check_status"] == "확정"
+
+
+@pytest.mark.usefixtures("signed_in")
+async def test_the_total_adds_estimated_slots_and_leaves_out_unknown_ones(
+    client: AsyncClient, factory: Factory
+) -> None:
+    run = await factory.simulation_run(status="PARTIAL_SUCCESS")
+    # 추정 비용은 가격 근거가 있어야 기록된다(DB 제약)
+    price_id = (await factory.model_price())["price_id"]
+    slots = [
+        ("CONFIRMED", Decimal("0.000123"), None),
+        ("ESTIMATED", Decimal("0.000002"), price_id),
+        ("UNKNOWN", None, None),
+    ]
+    for slot_no, (cost_status, cost, price) in enumerate(slots, start=1):
+        request = await factory.ai_request(
+            usage_origin="SIMULATION",
+            simulation_id=run["simulation_id"],
+            status="SUCCESS",
+            cost_status=cost_status,
+            cost_usd=cost,
+            price_id=price,
+        )
+        await factory.simulation_result(
+            simulation_id=run["simulation_id"],
+            request_id=request["request_id"],
+            slot_no=slot_no,
+        )
+
+    summary = (await client.get(detail_url(run["simulation_id"]))).json()["summary"]
+
+    assert Decimal(summary["total_cost_usd"]) == Decimal("0.000125")
+    assert summary["unknown_cost_count"] == 1
+    assert summary["cost_check_status"] == "미확인 포함"
 
 
 # --- 진행 중 ---
@@ -148,6 +194,8 @@ async def test_a_run_that_has_not_started_shows_pending_slots_and_no_cost(
         assert (result["cost_usd"], result["cost_status"]) == (None, "UNKNOWN")
         assert result["json_parse_status"] is None
         assert result["actual_provider"] is None
+        # 아직 원문이 저장되지 않은 칸도 오류 없이 null 이다
+        assert result["response_text"] is None
 
 
 @pytest.mark.usefixtures("poc_setup", "signed_in")
@@ -198,3 +246,23 @@ async def test_a_malformed_id_is_a_validation_error(client: AsyncClient) -> None
 
     assert response.status_code == 422
     assert response.json()["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.usefixtures("signed_in")
+async def test_a_late_answer_kept_for_reconciliation_is_not_shown(
+    client: AsyncClient, factory: Factory
+) -> None:
+    # 취소 뒤 도착해 대조용으로만 남긴 원문은 화면의 결과가 아니다(J-03)
+    run = (await factory.simulation_run(status="CANCELLED"))["simulation_id"]
+    request = await factory.ai_request(
+        usage_origin="SIMULATION", simulation_id=run, status="CANCELLED"
+    )
+    await factory.ai_request_payload(
+        request_id=request["request_id"], response_text="늦은 응답"
+    )
+    await factory.simulation_result(simulation_id=run, request_id=request["request_id"])
+
+    body = (await client.get(detail_url(run))).json()
+
+    assert body["results"][0]["status"] == "CANCELLED"
+    assert body["results"][0]["response_text"] is None

@@ -1,131 +1,131 @@
-import { Controller, useFormContext, useWatch } from "react-hook-form";
+import { useEffect, useRef, useState } from "react";
+import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
+import searchIcon from "../../../assets/search.svg";
 import { Button } from "../../../shared/components/ui/Button";
+import {
+  comparisonCounts,
+  createComparison,
+  reconcileComparisons,
+} from "../lib/comparisons";
+import type { ModelFavoritesView } from "../lib/favorites";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
-import { controlClass, MODEL_LIMITS } from "../lib/limits";
+import { MODEL_LIMITS } from "../lib/limits";
 import type { ModelChoice } from "../lib/presentation";
 import { FieldError } from "./InputFields";
+import { ModelComparisonCard } from "./ModelComparisonCard";
+import { ModelPickerDialog } from "./ModelPickerDialog";
 
 export function ModelSelection({
   choices,
   unavailable,
+  favorites,
 }: {
   choices: ModelChoice[];
   unavailable: boolean;
+  favorites?: ModelFavoritesView;
 }) {
   const {
     control,
-    setValue,
+    getValues,
+    trigger: validate,
     formState: { errors },
   } = useFormContext<SimulatorFormValues, unknown, SimulatorDraft>();
-  const selections = useWatch({ control, name: "selections" });
+  const { fields, replace, append, remove } = useFieldArray({
+    control,
+    name: "comparisons",
+  });
+  const comparisons = useWatch({ control, name: "comparisons" });
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (pickerOpen) return () => trigger.current?.focus();
+  }, [pickerOpen]);
+  const apply = (keys: string[]) => {
+    replace(reconcileComparisons(getValues("comparisons"), keys));
+    if (errors.comparisons) void validate("comparisons");
+    setPickerOpen(false);
+  };
+  const duplicate = (index: number) => {
+    const current = getValues("comparisons");
+    const source = current[index];
+    const choice = choices.find((item) => item.key === source?.modelKey);
+    if (
+      !source ||
+      current.length >= MODEL_LIMITS.max ||
+      !choice?.selectable ||
+      !choice.tuningParameters?.length
+    )
+      return;
+    const copy = createComparison(source.modelKey);
+    copy.settings = {
+      ...(source.settings.mode === "custom" ? source.settings : copy.settings),
+      mode: "custom",
+    };
+    append(copy, { shouldFocus: false });
+  };
   return (
     <section className="border-t border-grey-100 pt-5">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         <h3 className="text-label font-semibold">
-          모델 선택{" "}
+          비교 항목{" "}
           <span className="font-normal text-grey-600">
             ({MODEL_LIMITS.min}~{MODEL_LIMITS.max}개)
           </span>
         </h3>
         <Button
+          ref={trigger}
           size="sm"
           variant="secondary"
-          disabled={selections.length >= MODEL_LIMITS.max}
-          onClick={() => setValue("selections", [...selections, ""])}
+          icon={searchIcon}
+          disabled={unavailable}
+          aria-haspopup="dialog"
+          onClick={() => setPickerOpen(true)}
         >
-          모델 추가
+          모델 검색
         </Button>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {selections.map((_, index) => {
-          const selected = choices.find(
-            (item) => item.key === selections[index],
-          );
-          // 칸 번호가 정체성이다. 모든 입력은 RHF로 제어하며 제거 후 순서대로 다시 번호를 붙인다.
-          return (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: 칸 번호가 정체성이고 내부 입력은 모두 제어된다.
-              key={`slot-${index}`}
-              className="rounded-control border border-grey-200 p-3"
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <label
-                  htmlFor={`sim-model-${index}`}
-                  className="text-label font-semibold"
-                >
-                  비교 모델 {index + 1}
-                </label>
-                <button
-                  type="button"
-                  aria-label={`비교 모델 ${index + 1} 제거`}
-                  disabled={selections.length === 1}
-                  onClick={() =>
-                    setValue(
-                      "selections",
-                      selections.filter((_, i) => i !== index),
-                      { shouldDirty: true },
-                    )
-                  }
-                  className="rounded-lg px-2 text-caption text-grey-600 focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-40"
-                >
-                  제거
-                </button>
-              </div>
-              <Controller
-                name={`selections.${index}`}
-                control={control}
-                render={({ field }) => (
-                  <select
-                    {...field}
-                    id={`sim-model-${index}`}
-                    disabled={unavailable}
-                    aria-invalid={!!errors.selections?.[index]}
-                    aria-describedby={`sim-model-${index}-error`}
-                    className={controlClass}
-                  >
-                    <option value="">
-                      {unavailable
-                        ? "모델 목록 준비 중"
-                        : "모델을 선택해 주세요"}
-                    </option>
-                    {choices.map((choice) => (
-                      <option
-                        key={choice.key}
-                        value={choice.key}
-                        disabled={
-                          !choice.selectable ||
-                          selections.some(
-                            (key, i) => i !== index && key === choice.key,
-                          )
-                        }
-                      >
-                        {choice.name} · {choice.provider}
-                        {!choice.selectable
-                          ? ` · ${choice.unavailableReason ?? "선택 불가"}`
-                          : ""}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              />
-              {selected && (
-                <p className="mt-2 text-caption text-grey-600">
-                  Provider: {selected.provider} ·{" "}
-                  {selected.supportsImages ? "텍스트·이미지" : "텍스트"}
-                </p>
+      {comparisons.length === 1 && (
+        <p className="mb-3 text-caption text-grey-600">
+          모델을 추가하거나 ‘다른 설정으로 비교’로 복제하면 비교할 수 있습니다.
+        </p>
+      )}
+      {fields.length ? (
+        <ul aria-label="선택한 비교 모델" className="grid grid-cols-2 gap-3">
+          {fields.map((field, index) => (
+            <ModelComparisonCard
+              key={field.id}
+              index={index}
+              choice={choices.find(
+                (item) => item.key === comparisons[index]?.modelKey,
               )}
-              <FieldError
-                id={`sim-model-${index}-error`}
-                message={errors.selections?.[index]?.message}
-              />
-            </div>
-          );
-        })}
-      </div>
+              count={comparisons.length}
+              onRemove={() => remove(index)}
+              onDuplicate={() => duplicate(index)}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-control border border-dashed border-grey-200 p-5 text-body-sm text-grey-600">
+          모델 검색에서 비교할 모델을 한 번에 선택하시기 바랍니다.
+        </p>
+      )}
       <FieldError
-        id="sim-selections-error"
-        message={errors.selections?.root?.message ?? errors.selections?.message}
+        id="sim-comparisons-error"
+        message={
+          errors.comparisons?.root?.message ?? errors.comparisons?.message
+        }
       />
+      {pickerOpen && (
+        <ModelPickerDialog
+          choices={choices}
+          selections={comparisons.map((item) => item.modelKey)}
+          counts={comparisonCounts(comparisons)}
+          unavailable={unavailable}
+          favorites={favorites}
+          onClose={() => setPickerOpen(false)}
+          onApply={apply}
+        />
+      )}
     </section>
   );
 }

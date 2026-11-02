@@ -39,6 +39,16 @@ class CostSource(StrEnum):
     API_RESPONSE = "API_RESPONSE"
 
 
+def check_cost_matches_status(
+    cost_status: CostStatus, cost_usd: Decimal | None
+) -> None:
+    # 비용 미확인(UNKNOWN)은 금액이 없는 것과 같은 말이다. 0으로 채우지 않는다.
+    if cost_status == CostStatus.UNKNOWN and cost_usd is not None:
+        raise ValueError("비용 상태가 UNKNOWN이면 cost_usd는 비어 있어야 한다")
+    if cost_status == CostStatus.CONFIRMED and cost_usd is None:
+        raise ValueError("비용 상태가 CONFIRMED이면 cost_usd가 있어야 한다")
+
+
 class CallResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -79,9 +89,5 @@ class CallResult(BaseModel):
 
     @model_validator(mode="after")
     def check_cost_matches_status(self) -> Self:
-        # 비용 미확인(UNKNOWN)은 금액이 없는 것과 같은 말이다. 0으로 채우지 않는다.
-        if self.cost_status == CostStatus.UNKNOWN and self.cost_usd is not None:
-            raise ValueError("비용 상태가 UNKNOWN이면 cost_usd는 비어 있어야 한다")
-        if self.cost_status == CostStatus.CONFIRMED and self.cost_usd is None:
-            raise ValueError("비용 상태가 CONFIRMED이면 cost_usd가 있어야 한다")
+        check_cost_matches_status(self.cost_status, self.cost_usd)
         return self

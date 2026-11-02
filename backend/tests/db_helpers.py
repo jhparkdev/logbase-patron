@@ -112,6 +112,17 @@ class Factory:
             "api_keys", {"display_name": f"Key {n}", "environment": "DEV", **values}
         )
 
+    async def command_code_key(self, **values: Any) -> RowMapping:
+        n = self._next()
+        return await self.insert(
+            "command_code_keys",
+            {
+                "member_name": f"구성원 {n}",
+                "secret_ref": f"COMMAND_CODE_KEY_{n}",
+                **values,
+            },
+        )
+
     async def user_session(self, **values: Any) -> RowMapping:
         n = self._next()
         if "user_id" not in values:
@@ -251,6 +262,22 @@ class Factory:
             {
                 "asset_id": uuid.uuid4(),
                 "storage_path": f"uploads/{n}.png",
+                "sha256": "0" * SHA256_HEX_LENGTH,
+                "mime_type": "image/png",
+                "file_size_bytes": 1,
+                **values,
+            },
+        )
+
+    async def output_asset(self, **values: Any) -> RowMapping:
+        if "request_id" not in values:
+            values["request_id"] = (await self.ai_request())["request_id"]
+        output_asset_id = values.setdefault("output_asset_id", uuid.uuid4())
+        return await self.insert(
+            "output_assets",
+            {
+                "sort_order": 0,
+                "storage_path": f"simulator/output/{output_asset_id}.png",
                 "sha256": "0" * SHA256_HEX_LENGTH,
                 "mime_type": "image/png",
                 "file_size_bytes": 1,

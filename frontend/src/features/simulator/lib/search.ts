@@ -4,5 +4,7 @@ import { SORT_KEYS } from "./presentation";
 export const simulatorSearchSchema = z.object({
   sort: z.enum(SORT_KEYS).catch("model"),
   direction: z.enum(["asc", "desc"]).catch("asc"),
-  sourceRun: z.string().trim().min(1).max(128).optional().catch(undefined),
+  // 서버가 UUID만 받으므로 다른 값은 지운다
+  sourceRun: z.guid().optional().catch(undefined),
+  run: z.guid().optional().catch(undefined),
 });

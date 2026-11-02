@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM 모델 전체 (설계서 v0.6, 테이블 22개).
+"""SQLAlchemy ORM 모델 전체 (설계서 v0.6 및 후속 시뮬레이터 설정).
 
 - 테이블·컬럼·제약은 설계 SQL(patron_schema_v0.6)과 같게 만든다. 제약 이름도 설계와 같다.
 - 상태값 목록은 아래 StrEnum에 한 번만 정의하고, CHECK 제약을 그 값으로 만든다.
@@ -435,6 +435,11 @@ class APIKey(Base):
     project_id: Mapped[int | None] = mapped_column(
         BigInteger, fk("projects.project_id")
     )
+    service_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        fk("services.service_id"),
+        comment="이 Key를 쓰는 서비스. 여러 서비스가 함께 쓰는 Key는 NULL",
+    )
     environment: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, server_default=KeyStatus.ACTIVE.value)
     limit_usd: Mapped[Decimal | None] = mapped_column(MONEY)
@@ -444,6 +449,45 @@ class APIKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_mock: Mapped[bool] = is_mock_column()
+    created_at: Mapped[datetime] = created_at_column()
+    updated_at: Mapped[datetime] = updated_at_column()
+
+
+class CommandCodeKey(Base):
+    """구성원별 Command Code Key 매핑. Key 원문은 저장하지 않는다. 삭제하지 않고 is_active=false로 비활성화.
+
+    OpenRouter Key(api_keys)와 달리 고객·프로젝트에 귀속되지 않고 비용 집계에도 들어가지 않아 따로 둔다.
+    """
+
+    __tablename__ = "command_code_keys"
+    __table_args__ = (
+        CheckConstraint(
+            "member_name <> '' AND member_name = btrim(member_name)",
+            name="command_code_keys_member_name_check",
+        ),
+        # Key 원문을 실수로 넣어도 거절되도록 정해진 형식의 이름만 받는다.
+        column_check(
+            "command_code_keys",
+            "secret_ref",
+            "secret_ref ~ '^COMMAND_CODE_KEY_[A-Z0-9_]+$'",
+        ),
+        Index(
+            "uq_command_code_keys_active_member",
+            "member_name",
+            unique=True,
+            postgresql_where=text("is_active"),
+        ),
+        {
+            "comment": "구성원별 Command Code Key 매핑. 원문은 저장하지 않고 참조 이름만 저장"
+        },
+    )
+
+    command_code_key_id: Mapped[int] = bigint_identity_pk()
+    member_name: Mapped[str] = mapped_column(Text)
+    secret_ref: Mapped[str] = mapped_column(
+        Text, unique=True, comment="Key 원문을 찾는 참조 이름. 원문 저장 금지"
+    )
+    is_active: Mapped[bool] = is_active_column()
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
 
@@ -535,6 +579,27 @@ class ModelRegistry(Base):
     created_by: Mapped[int | None] = mapped_column(BigInteger, fk("users.user_id"))
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
+
+
+class UserModelFavorite(Base):
+    """사용자가 직접 등록한 모델·실행 Provider 즐겨찾기. 해제 시 이 행만 삭제한다."""
+
+    __tablename__ = "user_model_favorites"
+    __table_args__ = (
+        CheckConstraint(
+            "execution_provider <> '' AND execution_provider = btrim(execution_provider)",
+            name="ck_user_model_favorites_provider",
+        ),
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, fk("users.user_id"), primary_key=True
+    )
+    model_id: Mapped[int] = mapped_column(
+        BigInteger, fk("models.model_id"), primary_key=True
+    )
+    execution_provider: Mapped[str] = mapped_column(Text, primary_key=True)
+    created_at: Mapped[datetime] = created_at_column()
 
 
 class ModelPrice(Base):
@@ -689,6 +754,10 @@ class SimulationRun(Base):
         column_check("simulation_runs", "model_count", "model_count BETWEEN 2 AND 4"),
         in_check("simulation_runs", "status", SimulationStatus),
         in_check("simulation_runs", "data_source", DataSource),
+        CheckConstraint(
+            "jsonb_typeof(execution_config) = 'object'",
+            name="ck_simulation_runs_execution_config_object",
+        ),
         # 시나리오 실행에만 시나리오를 붙인다.
         CheckConstraint(
             f"(test_type = '{TestType.SCENARIO}' AND scenario_id IS NOT NULL) OR "
@@ -773,6 +842,10 @@ class AIRequest(Base):
         in_check("ai_requests", "cost_status", CostStatus),
         in_check("ai_requests", "cost_source", CostSource),
         in_check("ai_requests", "data_source", DataSource),
+        CheckConstraint(
+            "jsonb_typeof(execution_config) = 'object'",
+            name="ck_ai_requests_execution_config_object",
+        ),
         # 설계서 6.2 "DB가 직접 강제하는 규칙"
         # 1) 귀속 대상은 최대 1개
         CheckConstraint(
@@ -841,6 +914,12 @@ class AIRequest(Base):
         ),
         # simulation_results 복합 외래키의 대상
         UniqueConstraint("simulation_id", "request_id", name="uq_ai_requests_sim_req"),
+        UniqueConstraint(
+            "simulation_id",
+            "request_id",
+            "execution_config_hash",
+            name="uq_ai_requests_sim_req_config",
+        ),
         Index("ix_ai_requests_origin_time", "usage_origin", "requested_at"),
         Index("ix_ai_requests_customer_time", "customer_id", "requested_at"),
         Index("ix_ai_requests_project_time", "project_id", "requested_at"),
@@ -951,6 +1030,12 @@ class AIRequest(Base):
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
 
+    # DB가 계산하므로 기존 호출 생성 코드도 해시를 보내지 않고 계속 사용할 수 있다.
+    execution_config_hash: Mapped[str] = mapped_column(
+        CHAR(SHA256_HEX_LENGTH),
+        Computed("simulation_execution_config_hash(execution_config)", persisted=True),
+    )
+
 
 class AIRequestPayload(Base):
     """6.3 호출 원문 (호출과 1:1). 이미지는 base64 대신 asset_id로 가리킨다."""
@@ -985,6 +1070,35 @@ class InputAsset(Base):
     file_size_bytes: Mapped[int] = mapped_column(BigInteger)
     original_filename: Mapped[str | None] = mapped_column(Text)
     uploaded_by: Mapped[int | None] = mapped_column(BigInteger, fk("users.user_id"))
+    created_at: Mapped[datetime] = created_at_column()
+
+
+class OutputAsset(Base):
+    """이미지 생성 호출이 만든 결과 이미지 참조. 파일은 저장소에 두고 DB에는 경로·해시만 둔다.
+
+    사람이 올린 입력 이미지(InputAsset)와 생기는 경로·검증이 달라 따로 둔다.
+    실행한 사람은 호출(ai_requests.executed_by)에 있다. 삭제하거나 덮어쓰지 않는다.
+    """
+
+    __tablename__ = "output_assets"
+    __table_args__ = (
+        column_check("output_assets", "sort_order", "sort_order >= 0"),
+        column_check("output_assets", "file_size_bytes", "file_size_bytes >= 0"),
+        UniqueConstraint(
+            "request_id", "sort_order", name="uq_output_assets_request_order"
+        ),
+        {"comment": "이미지 생성 결과 참조. 파일은 저장소에 보관, DB에는 경로·해시만"},
+    )
+
+    output_asset_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    request_id: Mapped[uuid.UUID] = mapped_column(Uuid, fk("ai_requests.request_id"))
+    sort_order: Mapped[int] = mapped_column(
+        SmallInteger, comment="한 호출이 돌려준 이미지 순서(0부터)"
+    )
+    storage_path: Mapped[str] = mapped_column(Text)
+    sha256: Mapped[str] = mapped_column(CHAR(SHA256_HEX_LENGTH))
+    mime_type: Mapped[str] = mapped_column(Text)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = created_at_column()
 
 
@@ -1046,6 +1160,18 @@ class SimulationResult(Base):
             name="fk_simulation_results_request",
             ondelete=RESTRICT,
         ),
+        # 호출 설정을 바꿔 결과의 중복 판정과 과거 적용값이 어긋나는 것을 막는다.
+        ForeignKeyConstraint(
+            ["simulation_id", "request_id", "execution_config_hash"],
+            [
+                "ai_requests.simulation_id",
+                "ai_requests.request_id",
+                "ai_requests.execution_config_hash",
+            ],
+            name="fk_simulation_results_request_config",
+            ondelete=RESTRICT,
+            onupdate=RESTRICT,
+        ),
         Index(
             "uq_sim_results_slot",
             "simulation_id",
@@ -1053,12 +1179,13 @@ class SimulationResult(Base):
             unique=True,
             postgresql_where=text("is_final_attempt"),
         ),
-        # 같은 모델은 실행 Provider가 다를 때만 한 실행에 두 번 넣을 수 있음
+        # 같은 모델·Provider도 실제 적용 설정이 다르면 별도 비교 대상으로 허용한다.
         Index(
-            "uq_sim_results_model_provider",
+            "uq_sim_results_model_provider_config",
             "simulation_id",
             "model_id",
             "execution_provider",
+            "execution_config_hash",
             unique=True,
             postgresql_where=text("is_final_attempt"),
         ),
@@ -1081,6 +1208,10 @@ class SimulationResult(Base):
     validation_errors: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     comparability_note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = created_at_column()
+    # BEFORE 트리거가 연결된 호출의 생성 해시를 복사한다. 클라이언트 값은 신뢰하지 않는다.
+    execution_config_hash: Mapped[str] = mapped_column(
+        CHAR(SHA256_HEX_LENGTH), server_default=FetchedValue()
+    )
 
 
 # ===========================================================================

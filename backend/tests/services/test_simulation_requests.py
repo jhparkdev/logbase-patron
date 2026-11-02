@@ -25,6 +25,7 @@ from app.services.simulation_outcome import to_slot_record
 from app.services.simulation_ports import NewRequest, SlotRecord
 from app.services.simulation_requests import (
     fail_unfinished_simulation_request,
+    keep_late_generation_id,
     save_finish_details,
 )
 from tests.db_helpers import T0, Factory
@@ -166,6 +167,44 @@ async def test_details_are_not_written_when_the_status_differs_from_the_record(
 
 
 # --- 재시작 복구 ---
+
+
+async def test_a_late_response_keeps_only_its_generation_id_on_a_cancelled_request(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    # 취소 뒤 도착한 응답은 비용 대조(OpenRouter 조회)에 쓸 호출 ID 만 남긴다(J-03)
+    request_id = await running(factory, db_session)
+    assert await cancel_request(db_session, request_id, END)
+
+    assert await keep_late_generation_id(db_session, request_id, "gen-late")
+
+    row = await saved(db_session, request_id)
+    assert row.external_generation_id == "gen-late"
+    assert (row.status, row.completed_at) == (R.CANCELLED, END)
+    assert (row.cost_status, row.cost_usd) == (CostStatus.UNKNOWN, None)
+
+
+async def test_a_late_response_does_not_overwrite_a_known_generation_id(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    request_id = await running(factory, db_session)
+    assert await cancel_request(db_session, request_id, END)
+    assert await keep_late_generation_id(db_session, request_id, "gen-first")
+
+    await keep_late_generation_id(db_session, request_id, "gen-second")
+
+    assert (await saved(db_session, request_id)).external_generation_id == "gen-first"
+
+
+async def test_a_late_response_is_not_kept_unless_the_request_was_cancelled(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    # 복구 작업이 실패로 닫았거나 아직 진행 중인 호출은 이 경로로 쓰지 않는다
+    request_id = await running(factory, db_session)
+
+    assert not await keep_late_generation_id(db_session, request_id, "gen-late")
+
+    assert (await saved(db_session, request_id)).external_generation_id is None
 
 
 @pytest.mark.parametrize("started", [False, True])

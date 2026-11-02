@@ -12,6 +12,7 @@
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -48,10 +49,25 @@ class SessionRequestRecorder:
     async def save_payload(
         self,
         request_id: uuid.UUID,
-        messages: Sequence[dict[str, str]],
+        messages: Sequence[dict[str, Any]],
         response_text: str | None,
     ) -> None:
         await requests.save_payload(self._session, request_id, messages, response_text)
+
+    async def keep_late_result(
+        self,
+        request_id: uuid.UUID,
+        messages: Sequence[dict[str, Any]],
+        record: SlotRecord,
+    ) -> None:
+        kept = await simulation_requests.keep_late_generation_id(
+            self._session, request_id, record.external_generation_id
+        )
+        # 원문은 종료 결과를 저장한 호출에만 있으므로 취소된 호출에는 아직 없다
+        if kept:
+            await requests.save_payload(
+                self._session, request_id, messages, record.response_text
+            )
 
 
 class ScopedRequestRecorder:
@@ -81,10 +97,21 @@ class ScopedRequestRecorder:
     async def save_payload(
         self,
         request_id: uuid.UUID,
-        messages: Sequence[dict[str, str]],
+        messages: Sequence[dict[str, Any]],
         response_text: str | None,
     ) -> None:
         async with self._sessions.begin() as session:
             await SessionRequestRecorder(session).save_payload(
                 request_id, messages, response_text
+            )
+
+    async def keep_late_result(
+        self,
+        request_id: uuid.UUID,
+        messages: Sequence[dict[str, Any]],
+        record: SlotRecord,
+    ) -> None:
+        async with self._sessions.begin() as session:
+            await SessionRequestRecorder(session).keep_late_result(
+                request_id, messages, record
             )

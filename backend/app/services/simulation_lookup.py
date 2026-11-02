@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     APIKey,
+    InputAsset,
+    InputType,
     KeyStatus,
     ModelRegistry,
     ModelStatus,
@@ -16,7 +18,16 @@ from app.models import (
     SimulationRun,
     TestScenario,
 )
-from app.services.simulation_ports import ModelInfo, ScenarioInfo, SimulatorContext
+from app.services.model_parameters import parameter_support
+from app.services.simulation_ports import (
+    ImageRef,
+    ModelInfo,
+    ScenarioInfo,
+    SimulatorContext,
+)
+
+# OpenRouter 모델 정보에서 이미지를 받거나 만든다는 표시(input_modalities·output_modalities 의 값)
+IMAGE_MODALITY = "image"
 
 # 시뮬레이터 호출을 귀속하는 PoC 프로젝트·서비스·Key. 값은 DB 담당 seed 와 같다.
 # api_keys 에는 코드 칸이 없어서 Key 원문이 든 환경변수 이름(secret_ref)으로 찾는다
@@ -45,6 +56,7 @@ class DbSimulationLookup:
             is_active=scenario.is_active,
             default_json_schema=scenario.default_json_schema,
             default_execution_config=scenario.default_execution_config,
+            input_type=InputType(scenario.input_type),
         )
 
     async def find_models(self, model_ids: Sequence[int]) -> dict[int, ModelInfo]:
@@ -59,8 +71,29 @@ class DbSimulationLookup:
                 openrouter_model_id=model.openrouter_model_id,
                 display_name=model.display_name,
                 status=ModelStatus(model.status),
+                supports_images=IMAGE_MODALITY in model.input_modalities,
+                generates_images=IMAGE_MODALITY in model.output_modalities,
+                parameter_support=parameter_support(model.supported_parameters),
             )
             for model in rows
+        }
+
+    async def find_images(
+        self, asset_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, ImageRef]:
+        if not asset_ids:
+            return {}
+        rows = await self._session.scalars(
+            select(InputAsset).where(InputAsset.asset_id.in_(asset_ids))
+        )
+        return {
+            asset.asset_id: ImageRef(
+                asset_id=asset.asset_id,
+                storage_path=asset.storage_path,
+                mime_type=asset.mime_type,
+                sha256=asset.sha256,
+            )
+            for asset in rows
         }
 
     async def simulation_exists(self, simulation_id: uuid.UUID) -> bool:
