@@ -69,8 +69,11 @@ export const budgetSearchSchema = z
     model: positiveInt,
     /** 상세 패널을 연 프로젝트 번호(projects.project_id). 요약 화면과 전체보기 어디서든 연다. */
     detail: positiveInt,
-    /** "new"면 구독료 등록 패널을 연다. */
-    subscription: z.literal("new").optional().catch(undefined),
+    /** "new"면 구독료 등록 패널, 번호면 그 구독료의 수정 패널을 연다. */
+    subscription: z
+      .union([z.literal("new"), z.number().int().min(1)])
+      .optional()
+      .catch(undefined),
     // 정렬은 표마다 따로 둔다. 같은 표면 요약 화면과 전체보기에서 정렬이 이어진다.
     projectsSort: sortKey("projects"),
     projectsOrder: order,

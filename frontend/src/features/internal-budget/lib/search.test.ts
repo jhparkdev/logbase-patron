@@ -106,7 +106,7 @@ describe("budgetSearchSchema 정렬·전체 목록", () => {
 });
 
 describe("budgetSearchSchema 상세 패널", () => {
-  test("프로젝트 번호는 1 이상의 정수만, 구독료는 new만 받는다", () => {
+  test("패널 번호는 1 이상의 정수만, 구독료는 new나 번호를 받는다", () => {
     expect(parse({ ...PERIOD, detail: 3, subscription: "new" })).toEqual({
       ...PERIOD,
       detail: 3,
@@ -115,7 +115,11 @@ describe("budgetSearchSchema 상세 패널", () => {
     for (const detail of [0, -1, 1.5, "abc"]) {
       expect(parse({ ...PERIOD, detail })).toEqual(PERIOD);
     }
-    expect(parse({ ...PERIOD, subscription: 7 })).toEqual(PERIOD);
+    expect(parse({ ...PERIOD, subscription: 7 })).toEqual({
+      ...PERIOD,
+      subscription: 7,
+    });
+    expect(parse({ ...PERIOD, subscription: "edit" })).toEqual(PERIOD);
   });
 
   test("전체 목록에서도 패널 값을 받는다", () => {

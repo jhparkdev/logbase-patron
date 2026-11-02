@@ -166,6 +166,13 @@ export const PROJECT_DETAIL: Schemas["ProjectUsageDetail"] = {
   subscriptions: [],
 };
 
+export const SUBSCRIPTION_OPTIONS: Schemas["SubscriptionOptions"] = {
+  projects: [
+    { project_id: 1, name: "사내 챗봇 구축" },
+    { project_id: 2, name: "문서 요약" },
+  ],
+};
+
 const SAVED_BUDGET: Schemas["ProjectBudgetRead"] = {
   budget_id: 9,
   project_id: 1,
@@ -185,6 +192,9 @@ const DEFAULT_REPLIES = {
   projects: ok(PROJECTS),
   requests: ok(REQUESTS),
   subscriptions: ok(SUBSCRIPTIONS),
+  subscriptionOptions: ok(SUBSCRIPTION_OPTIONS),
+  subscriptionCreate: { status: 201, body: SUBSCRIPTIONS.items[0] },
+  subscriptionUpdate: ok(SUBSCRIPTIONS.items[0]),
   detail: ok(PROJECT_DETAIL),
   budget: ok(SAVED_BUDGET),
 };
@@ -193,12 +203,22 @@ const DEFAULT_REPLIES = {
 type Replies = Partial<Record<keyof typeof DEFAULT_REPLIES, Reply>>;
 
 const SUBSCRIPTIONS_PATH = "/api/subscriptions";
+const SUBSCRIPTION_PATH = /^\/api\/subscriptions\/\d+$/;
 const PROJECT_DETAIL_PATH = /^projects\/\d+$/;
 const PROJECT_BUDGET_PATH = /^projects\/\d+\/budget$/;
 
-function blockOf(pathname: string): keyof typeof DEFAULT_REPLIES {
+function blockOf(
+  pathname: string,
+  method: string,
+): keyof typeof DEFAULT_REPLIES {
   if (pathname === SUBSCRIPTIONS_PATH) {
-    return "subscriptions";
+    return method === "POST" ? "subscriptionCreate" : "subscriptions";
+  }
+  if (pathname === `${SUBSCRIPTIONS_PATH}/options`) {
+    return "subscriptionOptions";
+  }
+  if (SUBSCRIPTION_PATH.test(pathname)) {
+    return "subscriptionUpdate";
   }
   const last = pathname.slice(BASE.length + 1);
   if (PROJECT_DETAIL_PATH.test(last)) {
@@ -226,7 +246,7 @@ export function stubInternalBudgetApi(initial: Replies = {}) {
       method: request.method,
       body: text === "" ? undefined : JSON.parse(text),
     });
-    const block = blockOf(url.pathname);
+    const block = blockOf(url.pathname, request.method);
     const reply = replies[block] ?? DEFAULT_REPLIES[block];
     return new Response(JSON.stringify(reply.body), {
       status: reply.status,

@@ -3,6 +3,7 @@ import plusIcon from "../../../assets/plus.svg";
 import { Badge } from "../../../shared/components/ui/Badge";
 import { Button } from "../../../shared/components/ui/Button";
 import { Result } from "../../../shared/components/ui/Result";
+import { TextLink } from "../../../shared/components/ui/TextLink";
 import { formatUsd } from "../../../shared/lib/format";
 import { type SubscriptionRow, subscriptionRowsOptions } from "../api/budget";
 import type { ListColumn } from "../lib/list";
@@ -18,7 +19,19 @@ const UNASSIGNED_LABEL = "미배분";
 const route = getRouteApi("/_app/internal-budget");
 
 const COLUMNS: ListColumn<"subscriptions", SubscriptionRow>[] = [
-  { key: "tool", header: "도구명", render: (row) => row.tool_name },
+  {
+    key: "tool",
+    header: "도구명",
+    render: (row) => (
+      <TextLink
+        from="/internal-budget"
+        to="/internal-budget"
+        search={(prev) => ({ ...prev, subscription: row.subscription_id })}
+      >
+        {row.tool_name}
+      </TextLink>
+    ),
+  },
   { key: "month", header: "적용 월", render: (row) => row.applied_month },
   {
     key: "amount",
@@ -66,7 +79,7 @@ export function SubscriptionTable({
     <ListTable
       view="subscriptions"
       title={TITLE}
-      description={onPageChange ? undefined : "최근 적용 월 기준"}
+      description={`${onPageChange ? "" : "최근 적용 월 기준 · "}도구명을 누르면 내용을 고칠 수 있어요.`}
       action={
         <Button
           variant="secondary"
