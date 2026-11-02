@@ -48,6 +48,28 @@ const run = (slots: SlotView[]): RunView => ({
   slots,
 });
 
+test("진행 중인 칸에만 실행 중 표시를 보여 준다", () => {
+  render(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: run([
+          slot({
+            status: { label: "진행 중", tone: "grey", ongoing: true },
+            response: null,
+          }),
+          slot({ key: "slot-2", name: "둘째 모델" }),
+        ]),
+      }}
+    />,
+  );
+  const [first, second] = screen.getAllByRole("article");
+  expect(
+    within(first).getByRole("status", { name: "테스트 모델 실행 중" }),
+  ).toBeDefined();
+  expect(within(second).queryByRole("status")).toBeNull();
+});
+
 test("실행 당시 모델 상태가 있는 칸만 표시한다", () => {
   render(
     <SimulationResults

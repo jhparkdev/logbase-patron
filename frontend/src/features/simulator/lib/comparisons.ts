@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TEMPERATURE } from "./limits";
+import { MAX_TOKENS, TEMPERATURE } from "./limits";
 
 export const comparisonSchema = z.object({
   comparisonId: z.string().min(1),
@@ -20,7 +20,7 @@ export const comparisonSchema = z.object({
           !Number.isFinite(value) ||
           (key === "temperature"
             ? value < TEMPERATURE.min || value > TEMPERATURE.max
-            : !Number.isSafeInteger(value) || value < 1)
+            : !Number.isSafeInteger(value) || value < 1 || value > MAX_TOKENS)
         )
           context.addIssue({
             code: "custom",
@@ -28,7 +28,7 @@ export const comparisonSchema = z.object({
             message:
               key === "temperature"
                 ? `${TEMPERATURE.min}~${TEMPERATURE.max} 사이의 숫자를 입력하시기 바랍니다.`
-                : "1 이상의 정수를 입력하시기 바랍니다.",
+                : `1~${MAX_TOKENS.toLocaleString("ko-KR")} 사이의 정수를 입력하시기 바랍니다.`,
           });
       }
     })

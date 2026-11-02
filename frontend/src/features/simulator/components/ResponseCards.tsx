@@ -20,11 +20,20 @@ export function ResponseCards({
           key={slot.key}
           className="flex min-w-0 flex-col gap-4 rounded-2xl bg-white p-5"
         >
-          <div>
-            <h3 className="break-words font-semibold">{slot.name}</h3>
-            <p className="mt-1 break-words text-caption text-grey-600">
-              {slot.provider}
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="break-words font-semibold">{slot.name}</h3>
+              <p className="mt-1 break-words text-caption text-grey-600">
+                {slot.provider}
+              </p>
+            </div>
+            {slot.status.ongoing && (
+              <span
+                role="status"
+                aria-label={`${slot.name} 실행 중`}
+                className="size-4 shrink-0 rounded-full border-2 border-grey-200 border-t-brand motion-safe:animate-spin"
+              />
+            )}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <ExecutionStatus status={slot.status} />
