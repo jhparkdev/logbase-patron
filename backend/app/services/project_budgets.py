@@ -134,11 +134,19 @@ async def project_budget_rows(
 def sort_rows(
     rows: Sequence[ProjectBudgetRow], sort: ProjectRowSort, descending: bool
 ) -> list[ProjectBudgetRow]:
-    """값이 없는 행(예산 미설정)은 정렬 방향과 관계없이 맨 뒤에 둔다. 같은 값은 프로젝트 이름순이다."""
+    """값이 없는 행(예산 미설정)은 정렬 방향과 관계없이 맨 뒤에 두고 사용액이 큰 순서로 놓는다.
+
+    값이 있는 행의 같은 값은 프로젝트 이름순이다.
+    """
     key = SORT_KEYS[sort]
     by_name = sorted(rows, key=lambda row: (row.project_name, row.project_id))
     present = [row for row in by_name if key(row) is not None]
-    missing = [row for row in by_name if key(row) is None]
+    # 사용액이 같으면 이미 이름순이고, 파이썬 정렬은 같은 값의 순서를 바꾸지 않는다
+    missing = sorted(
+        (row for row in by_name if key(row) is None),
+        key=lambda row: row.used_usd,
+        reverse=True,
+    )
     return sorted(present, key=key, reverse=descending) + missing
 
 
@@ -147,8 +155,9 @@ def page_rows(
 ) -> list[ProjectBudgetRow]:
     descending = query.order == SortOrder.DESC
     if query.preview:
-        # 사용액이 큰 N개를 먼저 고른다. 정렬해도 "상위 N개"의 뜻이 바뀌지 않게 하기 위해서다
-        top = sort_rows(rows, ProjectRowSort.USED, True)[:PROJECT_PREVIEW_ROWS]
+        # 사용률이 높은 N개를 먼저 고른다. 정렬해도 "상위 N개"의 뜻이 바뀌지 않게 하기 위해서다.
+        # 예산이 없는 프로젝트는 사용률이 없어 예산이 있는 프로젝트 뒤에서 사용액 순으로 채워진다
+        top = sort_rows(rows, ProjectRowSort.USAGE, True)[:PROJECT_PREVIEW_ROWS]
         return sort_rows(top, query.sort, descending)
     ordered = sort_rows(rows, query.sort, descending)
     start = (query.page - 1) * query.page_size

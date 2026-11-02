@@ -15,8 +15,14 @@ PROJECTS = "/api/usage/internal/projects"
 OCTOBER = {"month": "2026-10"}
 
 
-async def project_with_usage(factory: Factory, name: str, cost: str) -> int:
+async def project_with_usage(
+    factory: Factory, name: str, cost: str, budget: str | None = None
+) -> int:
     project = await factory.project(name=name)
+    if budget is not None:
+        await factory.budget(
+            project_id=project["project_id"], monthly_amount_usd=Decimal(budget)
+        )
     await internal_call(
         factory, project_id=project["project_id"], cost_usd=Decimal(cost)
     )
@@ -81,7 +87,20 @@ async def test_금액은_문자열이고_작은_값도_지수_표기가_아니�
     assert Decimal(item["used_usd"]) == Decimal("0.00000003")
 
 
-async def test_기본_정렬은_사용액이_큰_순서이다(
+async def test_기본_정렬은_사용률이_높은_순서이고_예산이_없으면_맨_뒤다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    # 사용액은 정상이 더 크지만 예산을 넘긴 프로젝트가 위에 와야 한다.
+    await project_with_usage(factory, "정상", "1000", budget="5000")
+    await project_with_usage(factory, "미설정", "700")
+    await project_with_usage(factory, "초과", "150", budget="100")
+
+    body = (await client.get(PROJECTS, params=OCTOBER)).json()
+
+    assert names(body) == ["초과", "정상", "미설정"]
+
+
+async def test_예산이_없는_프로젝트끼리는_사용액이_큰_순서이다(
     client: AsyncClient, factory: Factory
 ) -> None:
     await project_with_usage(factory, "작음", "1")
@@ -119,7 +138,22 @@ async def test_정렬_기준과_방향을_따른다(
     assert names(body) == expected
 
 
-async def test_미리보기는_사용액_상위_5개만_돌려주고_total은_전체_수이다(
+async def test_미리보기는_사용률_상위_5개만_돌려주고_total은_전체_수이다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    for number in range(1, 7):
+        await project_with_usage(factory, f"p{number}", str(number * 10), "100")
+    # 사용액은 가장 크지만 사용률은 가장 낮다. 미리보기에 들어오면 안 된다.
+    await project_with_usage(factory, "큰 예산", "500", "100000")
+    params = {**OCTOBER, "preview": "true", "sort": "project", "order": "asc"}
+
+    body = (await client.get(PROJECTS, params=params)).json()
+
+    assert names(body) == ["p2", "p3", "p4", "p5", "p6"]
+    assert body["total"] == 7
+
+
+async def test_예산이_없는_프로젝트만_있으면_미리보기는_사용액_상위_5개이다(
     client: AsyncClient, factory: Factory
 ) -> None:
     for number in range(1, 8):
@@ -129,7 +163,6 @@ async def test_미리보기는_사용액_상위_5개만_돌려주고_total은_�
     body = (await client.get(PROJECTS, params=params)).json()
 
     assert names(body) == ["p3", "p4", "p5", "p6", "p7"]
-    assert body["total"] == 7
 
 
 async def test_페이지를_나누어_돌려준다(client: AsyncClient, factory: Factory) -> None:

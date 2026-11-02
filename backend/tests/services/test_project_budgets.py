@@ -131,6 +131,36 @@ def test_같은_값이면_프로젝트_이름순이다() -> None:
     assert ids(sort_rows(rows, ProjectRowSort.BUDGET, False)) == [2, 1]
 
 
+@pytest.mark.parametrize("sort", [ProjectRowSort.BUDGET, ProjectRowSort.USAGE])
+@pytest.mark.parametrize("descending", [False, True])
+def test_예산이_없는_행끼리는_방향과_상관없이_사용액이_높은_순이다(
+    sort: ProjectRowSort, descending: bool
+) -> None:
+    rows = [
+        row(1, "a", None, "10", None, UNSET),
+        row(2, "b", None, "30", None, UNSET),
+        row(3, "c", None, "20", None, UNSET),
+        row(4, "d", "100", "5", "5.00", NORMAL),
+    ]
+
+    assert ids(sort_rows(rows, sort, descending)) == [4, 2, 3, 1]
+
+
+def test_예산이_없고_사용액도_같으면_프로젝트_이름순이다() -> None:
+    rows = [
+        row(1, "beta", None, "10", None, UNSET),
+        row(2, "alpha", None, "10", None, UNSET),
+    ]
+
+    assert ids(sort_rows(rows, ProjectRowSort.USAGE, True)) == [2, 1]
+
+
+def test_기본_정렬은_사용률_내림차순이다() -> None:
+    query = ProjectRowsQuery(month=OCT)
+
+    assert (query.sort, query.order) == (ProjectRowSort.USAGE, SortOrder.DESC)
+
+
 # ---------------------------------------------------------------
 # DB에서 읽기
 # ---------------------------------------------------------------
@@ -280,7 +310,33 @@ async def seven_projects(factory: Factory) -> None:
         )
 
 
-async def test_기본은_사용액이_큰_순서로_페이지를_나눈다(
+async def usage_project(
+    factory: Factory, name: str, *, cost: str, budget: str | None = None
+) -> None:
+    project = await factory.project(name=name)
+    if budget is not None:
+        await factory.budget(
+            project_id=project["project_id"], monthly_amount_usd=Decimal(budget)
+        )
+    await internal_call(
+        factory, project_id=project["project_id"], cost_usd=Decimal(cost)
+    )
+
+
+async def test_기본은_사용률이_높은_순서이고_예산이_없는_프로젝트는_맨_뒤다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    # 사용액은 정상이 더 크지만 예산을 넘긴 프로젝트가 위에 와야 한다.
+    await usage_project(factory, "정상", cost="1000", budget="5000")
+    await usage_project(factory, "미설정", cost="700")
+    await usage_project(factory, "초과", cost="150", budget="100")
+
+    page = await list_project_budgets(db_session, ProjectRowsQuery(month=OCT))
+
+    assert [item.project_name for item in page.items] == ["초과", "정상", "미설정"]
+
+
+async def test_예산이_없으면_사용액이_큰_순서로_페이지를_나눈다(
     db_session: AsyncSession, factory: Factory
 ) -> None:
     await seven_projects(factory)
@@ -318,7 +374,52 @@ async def test_마지막_페이지를_넘으면_빈_목록이고_total은_그대
     assert page.total == 7
 
 
-async def test_미리보기는_사용액_상위_5개를_고른_뒤_그_안에서_정렬한다(
+async def test_미리보기는_사용률_상위_5개를_고른_뒤_그_안에서_정렬한다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    for number in range(1, 7):
+        await usage_project(factory, f"p{number}", cost=str(number * 10), budget="100")
+    # 사용액은 가장 크지만 사용률은 가장 낮다. 미리보기에 들어오면 안 된다.
+    await usage_project(factory, "큰 예산", cost="500", budget="100000")
+    query = ProjectRowsQuery(
+        month=OCT, preview=True, sort=ProjectRowSort.PROJECT, order=SortOrder.ASC
+    )
+
+    page = await list_project_budgets(db_session, query)
+
+    assert [item.project_name for item in page.items] == [
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6",
+    ]
+    assert page.total == 7
+
+
+async def test_예산이_있는_프로젝트가_5개보다_적으면_사용액이_큰_미설정_프로젝트로_채운다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await usage_project(factory, "b1", cost="10", budget="100")
+    await usage_project(factory, "b2", cost="20", budget="100")
+    for number in range(1, 5):
+        await usage_project(factory, f"u{number}", cost=str(number))
+    query = ProjectRowsQuery(
+        month=OCT, preview=True, sort=ProjectRowSort.PROJECT, order=SortOrder.ASC
+    )
+
+    page = await list_project_budgets(db_session, query)
+
+    assert [item.project_name for item in page.items] == [
+        "b1",
+        "b2",
+        "u2",
+        "u3",
+        "u4",
+    ]
+
+
+async def test_예산이_없으면_사용액_상위_5개를_고른_뒤_그_안에서_정렬한다(
     db_session: AsyncSession, factory: Factory
 ) -> None:
     await seven_projects(factory)

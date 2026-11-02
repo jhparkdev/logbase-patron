@@ -29,9 +29,10 @@ class ProjectRowsQuery(BaseModel):
 
     # 예산은 월 단위라 이 달의 예산과 사용액을 비교한다. 형식은 YYYY-MM이다
     month: Month
-    sort: ProjectRowSort = ProjectRowSort.USED
+    # 예산을 넘었거나 넘을 것 같은 프로젝트가 위에 오도록 기본은 사용률이다
+    sort: ProjectRowSort = ProjectRowSort.USAGE
     order: SortOrder = SortOrder.DESC
-    # 요약 화면용 미리보기. 사용액이 큰 N개를 고른 뒤 그 안에서만 정렬하고 페이지는 나누지 않는다
+    # 요약 화면용 미리보기. 사용률이 높은 N개를 고른 뒤 그 안에서만 정렬하고 페이지는 나누지 않는다
     preview: bool = False
     page: int = Field(default=1, ge=1, le=MAX_PAGE)
     page_size: int = Field(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE)
