@@ -83,6 +83,7 @@ async def create_simulation_run(
     session: SessionDep,
     now: NowDep,
     manager: SimulationManagerDep,
+    storage: ImageStorageDep,
 ) -> SimulationAccepted:
     """비교 실행을 접수하고 바로 돌려준다. 모델 호출은 응답 뒤 백그라운드에서 진행한다."""
     job = await create_simulation(
@@ -92,6 +93,7 @@ async def create_simulation_run(
             lookup=DbSimulationLookup(session),
             recorder=SessionRequestRecorder(session),
             store=DbSimulationStore(session),
+            image_files=storage,
             now=lambda: now,
             new_id=uuid.uuid7,
         ),

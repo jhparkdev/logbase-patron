@@ -246,6 +246,28 @@ async def test_an_image_that_was_never_uploaded_is_refused_and_nothing_is_saved(
 
 
 @pytest.mark.usefixtures("poc_setup", "signed_in", "image_storage")
+async def test_an_image_whose_file_is_gone_is_refused_and_no_run_is_made(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    factory: Factory,
+    manager: FakeManager,
+) -> None:
+    # 기록은 남았지만 저장소에서 파일이 사라졌다. 실행을 만들면 모든 칸이 실패로 영구히 남는다
+    models = await image_models(factory, second_supports_images=True)
+    kept = (await upload(client, png())).json()["asset_id"]
+    gone = await factory.input_asset(storage_path="simulator/vanished.png")
+
+    response = await client.post(
+        RUNS, json=create_body(models, asset_ids=[kept, str(gone["asset_id"])])
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "IMAGE_NOT_FOUND"
+    assert manager.jobs == []
+    assert await count(db_session, SimulationRun) == 0
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in", "image_storage")
 async def test_a_model_that_cannot_read_images_is_refused_before_any_cost(
     client: AsyncClient,
     db_session: AsyncSession,
