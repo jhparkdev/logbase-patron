@@ -1,5 +1,9 @@
 import { expect, test } from "vitest";
-import { RERUN_DRAFT, RUN_ID } from "../../../test/simulationHistoryApi";
+import {
+  RERUN_DRAFT,
+  RUN_ID,
+  SCENARIO,
+} from "../../../test/simulationHistoryApi";
 import { rerunRestoreView, toRerunValues } from "./rerun-draft";
 
 const custom = {
@@ -62,14 +66,23 @@ test("Schema와 입력이 없던 실행은 빈 칸으로 되돌리고 이미지�
   ).toMatchObject({ text: "", jsonSchema: "", existingAssetIds: [assetId] });
 });
 
-const ready = { draft: custom, catalogReady: true, error: null };
+const ready = {
+  draft: custom,
+  catalogReady: true,
+  error: null,
+  scenarios: [SCENARIO],
+  scenariosFailed: false,
+};
 
-test("초안과 모델 목록이 모두 있어야 복원한다", () => {
+test("초안과 모델 목록, 시나리오 목록이 모두 있어야 복원한다", () => {
   expect(
     rerunRestoreView({ ...ready, draft: undefined }, RUN_ID, []).kind,
   ).toBe("loading");
   expect(
     rerunRestoreView({ ...ready, catalogReady: false }, RUN_ID, []).kind,
+  ).toBe("loading");
+  expect(
+    rerunRestoreView({ ...ready, scenarios: undefined }, RUN_ID, []).kind,
   ).toBe("loading");
   expect(rerunRestoreView(ready, RUN_ID, [])).toMatchObject({
     kind: "ready",
@@ -77,10 +90,44 @@ test("초안과 모델 목록이 모두 있어야 복원한다", () => {
   });
 });
 
-test("시나리오 실행은 직접 작성으로 바꾸지 않고 복원을 막는다", () => {
+test("시나리오 실행은 실행 유형과 시나리오를 그대로 되돌린다", () => {
+  expect(toRerunValues(RERUN_DRAFT)).toMatchObject({
+    mode: "scenario",
+    scenarioKey: "3",
+    prompt: "과거 Prompt 원문",
+  });
+  expect(toRerunValues(custom)).toMatchObject({
+    mode: "custom",
+    scenarioKey: "",
+  });
+});
+
+test("지금은 비활성인 원본 시나리오도 복원 선택지에 남긴다", () => {
+  const view = rerunRestoreView(
+    {
+      ...ready,
+      draft: RERUN_DRAFT,
+      scenarios: [
+        { ...SCENARIO, is_active: false },
+        { ...SCENARIO, scenario_id: 9, is_active: false },
+      ],
+    },
+    RUN_ID,
+    [],
+  );
+  expect(view).toMatchObject({ kind: "ready", scenarios: [{ key: "3" }] });
+});
+
+test("시나리오 목록을 받지 못하면 시나리오 실행을 직접 작성으로 바꾸지 않고 멈춘다", () => {
+  const failed = { ...ready, scenarios: undefined, scenariosFailed: true };
   expect(
-    rerunRestoreView({ ...ready, draft: RERUN_DRAFT }, RUN_ID, []).kind,
-  ).toBe("scenario");
+    rerunRestoreView({ ...failed, draft: RERUN_DRAFT }, RUN_ID, []).kind,
+  ).toBe("error");
+  // 직접 작성 실행은 시나리오가 필요 없으므로 복원한다
+  expect(rerunRestoreView(failed, RUN_ID, [])).toMatchObject({
+    kind: "ready",
+    scenarios: [],
+  });
 });
 
 test("입력을 구할 수 없는 실행은 복원하지 않는다", () => {

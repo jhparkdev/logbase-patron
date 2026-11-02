@@ -26,10 +26,10 @@ test("URL 조건으로 이력을 조회해 서버가 준 행을 표시한다", a
     "/simulation-history?from=2026-10-01&to=2026-10-30&status=FAILED&model=%222%22&page=2&sort=status&direction=asc",
   );
   expect(await screen.findByRole("button", { name: RUN_ID })).toBeDefined();
-  expect(screen.getByText("PRODUCT_DESCRIPTION")).toBeDefined();
-  expect(
-    within(screen.getAllByRole("row")[1]).getByText("부분 성공"),
-  ).toBeDefined();
+  const row = within(screen.getAllByRole("row")[1]);
+  expect(await row.findByText("데이터 요약")).toBeDefined();
+  expect(screen.queryByText("DATA_SUMMARY")).toBeNull();
+  expect(row.getByText("부분 성공")).toBeDefined();
   expect(screen.getByText("미확인 1건 미반영")).toBeDefined();
   const query = listRequests(requests)[0].searchParams;
   expect(Object.fromEntries(query)).toEqual({
@@ -60,14 +60,42 @@ test("조회 결과 없음과 조회 실패를 구분하고 실패하면 다시 
   ).toBeDefined();
 });
 
-test("모델 필터 선택지를 등록된 모델로 채우고 시나리오 필터는 숨긴다", async () => {
-  stubHistoryApi();
+test("모델·시나리오 필터 선택지를 비활성까지 포함해 채운다", async () => {
+  const { requests } = stubHistoryApi();
   show("/simulation-history");
   const model = await screen.findByRole("combobox", { name: "모델" });
   expect(
     await within(model).findByRole("option", { name: "Mistral Nemo" }),
   ).toBeDefined();
+  const scenario = await screen.findByRole("combobox", { name: "시나리오" });
+  expect(
+    within(scenario).getByRole("option", { name: "데이터 요약" }),
+  ).toBeDefined();
+  const list = requests.find((url) => url.pathname === "/api/scenarios");
+  expect(list?.searchParams.get("include_inactive")).toBe("true");
+});
+
+test("주소의 시나리오 조건으로 이력을 거른다", async () => {
+  const { requests } = stubHistoryApi();
+  show("/simulation-history?scenario=%223%22");
+  const scenario = await screen.findByRole("combobox", { name: "시나리오" });
+  await within(scenario).findByRole("option", { name: "데이터 요약" });
+  await waitFor(() => expect((scenario as HTMLSelectElement).value).toBe("3"));
+  expect(listRequests(requests)[0].searchParams.get("scenario_id")).toBe("3");
+});
+
+test("시나리오 목록을 받지 못해도 이력은 조회하고 시나리오 필터만 숨긴다", async () => {
+  stubHistoryApi({
+    scenarios: { status: 500, body: { code: "INTERNAL", message: "내부" } },
+  });
+  show("/simulation-history");
+  expect(await screen.findByRole("button", { name: RUN_ID })).toBeDefined();
   expect(screen.queryByRole("combobox", { name: "시나리오" })).toBeNull();
+  // 이름을 받지 못해도 내부 코드를 보여 주지 않는다
+  expect(
+    within(screen.getAllByRole("row")[1]).getByText("기본 시나리오"),
+  ).toBeDefined();
+  expect(screen.queryByText("DATA_SUMMARY")).toBeNull();
 });
 
 test("실제 이력 화면의 조회 조건을 바꿔도 스크롤을 초기화하지 않는다", async () => {
@@ -183,7 +211,7 @@ test("주소로 복원한 상세를 닫아도 조회 기간·필터·정렬·선
   );
 });
 
-test("다시 준비하면 원본 ID만 전달하고 시나리오 실행은 복원 완료로 표시하지 않는다", async () => {
+test("다시 준비하면 원본 ID만 전달하고 시나리오 실행도 복원한다", async () => {
   stubHistoryApi();
   const router = show(`/simulation-history?selected=${RUN_ID}&detail=true`);
   fireEvent.click(
@@ -193,16 +221,21 @@ test("다시 준비하면 원본 ID만 전달하고 시나리오 실행은 복�
     expect(router.state.location.search).toMatchObject({ sourceRun: RUN_ID }),
   );
   expect(
-    await screen.findByText("시나리오 실행의 재실행을 준비하고 있습니다"),
+    await screen.findByText("과거 실행 조건을 불러왔습니다"),
   ).toBeDefined();
+  expect((screen.getByLabelText("시나리오") as HTMLSelectElement).value).toBe(
+    "3",
+  );
   expect(router.state.location.href).not.toContain("Prompt");
 });
 
 test("복원할 수 없는 재실행 주소에서 새 조건으로 돌아갈 수 있다", async () => {
-  stubHistoryApi();
+  stubHistoryApi({
+    draft: { status: 404, body: { code: "NOT_FOUND", message: "없음" } },
+  });
   const router = show(`/simulator?sourceRun=${RUN_ID}`);
   expect(
-    await screen.findByText("시나리오 실행의 재실행을 준비하고 있습니다"),
+    await screen.findByText("재실행할 입력을 찾을 수 없습니다"),
   ).toBeDefined();
   expect(screen.queryByLabelText("Prompt")).toBeNull();
   fireEvent.click(screen.getByRole("link", { name: "새 조건으로 준비하기" }));

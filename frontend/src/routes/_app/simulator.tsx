@@ -56,5 +56,11 @@ function SimulatorRoute() {
         page={page}
       />
     );
-  return <SimulatorPage choices={data.choices} {...page} />;
+  return (
+    <SimulatorPage
+      choices={data.choices}
+      scenarios={data.scenarios}
+      {...page}
+    />
+  );
 }

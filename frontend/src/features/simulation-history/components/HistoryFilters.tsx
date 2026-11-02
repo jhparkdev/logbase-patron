@@ -63,7 +63,7 @@ export function HistoryFilters({
             {...register("to")}
           />
         </label>
-        {/* 시나리오 목록 API가 없는 동안에는 숨긴다. URL에 값이 있으면 지울 수 있게 남긴다 */}
+        {/* 고를 시나리오가 없으면 숨긴다. URL에 값이 있으면 지울 수 있게 남긴다 */}
         {(scenarios.length > 0 || values.scenario) && (
           <HistoryFilterSelect
             control={formControl}

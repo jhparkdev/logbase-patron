@@ -5,10 +5,12 @@ import {
   RERUN_DRAFT,
   RUN_DETAIL,
   RUN_ID,
+  SCENARIO,
 } from "../../../test/simulationHistoryApi";
 import {
   historyDetailState,
   isRunOngoing,
+  scenarioNames,
   toHistoryDetail,
   toHistoryRow,
 } from "./view";
@@ -51,7 +53,6 @@ test("실행 상태는 내부 코드 대신 화면 문구와 색으로 바꾼다
   expect(toHistoryRow(HISTORY_ITEM)).toMatchObject({
     key: RUN_ID,
     requestedAt: HISTORY_ITEM.requested_at,
-    scenario: "PRODUCT_DESCRIPTION",
     modelCount: 2,
     status: { label: "부분 성공", tone: "yellow" },
     inactiveModelCount: 1,
@@ -59,6 +60,22 @@ test("실행 상태는 내부 코드 대신 화면 문구와 색으로 바꾼다
   expect(toHistoryRow({ ...HISTORY_ITEM, status: "FAILED" }).status.tone).toBe(
     "red",
   );
+});
+
+test("시나리오 칸은 내부 코드 대신 필터와 같은 이름으로 표시한다", () => {
+  expect(toHistoryRow(HISTORY_ITEM, scenarioNames([SCENARIO])).scenario).toBe(
+    "데이터 요약",
+  );
+});
+
+test("이름을 모르는 시나리오도 내부 코드를 보여 주지 않는다", () => {
+  expect(toHistoryRow(HISTORY_ITEM).scenario).toBe("기본 시나리오");
+  expect(
+    toHistoryRow(
+      { ...HISTORY_ITEM, scenario_code: "UNKNOWN_CODE" },
+      scenarioNames([SCENARIO]),
+    ).scenario,
+  ).toBe("기본 시나리오");
 });
 
 test("직접 작성 실행의 시나리오 칸은 Custom Prompt로 표시한다", () => {
