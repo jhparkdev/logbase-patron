@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.schemas.simulation import ReasoningEffort
+from app.services.model_registry import stored_reasoning_efforts
 
 TEMPERATURE_PARAMETER = "temperature"
 REASONING_PARAMETER = "reasoning"
@@ -30,30 +31,20 @@ def parameter_support(
     supported_parameters: Collection[str],
     openrouter_metadata: Mapping[str, Any] | None = None,
 ) -> ParameterSupport:
-    """OpenRouter 가 알려 준 지원 파라미터와 모델 정보에서 받을 수 있는 설정을 판단한다.
+    """OpenRouter 가 알려 준 지원 파라미터와 등록 때 저장한 모델 정보에서 받을 수 있는 설정을 판단한다.
 
-    강도별 지원 범위는 모델 정보의 reasoning.supported_efforts 에서 읽는다.
-    그 목록이 없거나 아는 값이 하나도 없으면(목록 저장 전에 등록된 모델 등) 모든 값을 받는 것으로 본다.
+    reasoning 이 있으면 저장된 강도 목록(stored_reasoning_efforts)을 쓰고, 저장된 정보가 없으면
+    (목록 저장 전에 등록된 모델 등) 모든 값을 받는 것으로 본다. 모델 응답(model_common)과 같은 규칙이다.
     """
+    stored = stored_reasoning_efforts(openrouter_metadata)
     return ParameterSupport(
         temperature=TEMPERATURE_PARAMETER in supported_parameters,
         reasoning_efforts=(
-            _listed_efforts(openrouter_metadata) or tuple(ReasoningEffort)
+            (tuple(ReasoningEffort) if stored is None else stored)
             if REASONING_PARAMETER in supported_parameters
             else ()
         ),
     )
-
-
-def _listed_efforts(
-    openrouter_metadata: Mapping[str, Any] | None,
-) -> tuple[ReasoningEffort, ...]:
-    # DB 의 JSONB 라 모양을 믿지 않는다. 모르는 강도 값은 보낼 수 없으므로 뺀다
-    reasoning = (openrouter_metadata or {}).get(REASONING_PARAMETER)
-    listed = reasoning.get("supported_efforts") if isinstance(reasoning, dict) else None
-    if not isinstance(listed, list):
-        return ()
-    return tuple(effort for effort in ReasoningEffort if effort.value in listed)
 
 
 def unsupported_parameters(

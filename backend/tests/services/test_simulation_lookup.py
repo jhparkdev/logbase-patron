@@ -225,7 +225,12 @@ async def test_a_model_takes_only_the_efforts_saved_with_it(
     row = await factory.model(
         status="ACTIVE",
         supported_parameters=["reasoning"],
-        openrouter_metadata={"reasoning": {"supported_efforts": ["high", "low"]}},
+        openrouter_metadata={
+            "reasoning": {
+                "mandatory": True,
+                "supported_efforts": ["high", "none", "low"],
+            }
+        },
     )
 
     found = await lookup.find_models([row["model_id"]])
