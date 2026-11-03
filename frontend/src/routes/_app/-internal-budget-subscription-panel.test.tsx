@@ -145,3 +145,15 @@ test("지금 목록에 없는 구독료 번호면 목록에서 열어 달라고 
   ).toBeTruthy();
   expect(within(dialog).queryByRole("button", { name: "저장" })).toBeNull();
 });
+
+test("표의 도구명으로 수정 패널을 열어도 화면을 맨 위로 올리지 않는다", async () => {
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  renderAt(OCTOBER);
+  const table = await screen.findByRole("table", { name: "구독료 관리" });
+  scrollTo.mockClear();
+
+  fireEvent.click(within(table).getByRole("link", { name: "Notion AI" }));
+  await screen.findByRole("dialog", { name: "구독료 수정" });
+
+  expect(scrollTo).not.toHaveBeenCalled();
+});

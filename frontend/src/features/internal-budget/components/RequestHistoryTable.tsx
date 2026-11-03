@@ -35,6 +35,7 @@ const COLUMNS: ListColumn<"requests", InternalRequestRow>[] = [
           from="/internal-budget"
           to="/internal-budget"
           search={(prev) => ({ ...prev, detail: row.project_id ?? undefined })}
+          resetScroll={false}
         >
           {row.project_name}
         </TextLink>

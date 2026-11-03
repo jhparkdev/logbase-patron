@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import { stubInternalBudgetApi } from "../../test/internalBudgetApi";
 import { changePeriod, periodInputs } from "../../test/periodInputs";
@@ -207,4 +207,25 @@ test("구독료 등록을 누르면 등록 패널이 열리고 주소에 남는�
     to: "2026-10-15",
     subscription: "new",
   });
+});
+
+test("프로젝트명이나 구독료 등록으로 패널을 열고 닫아도 화면을 맨 위로 올리지 않는다", async () => {
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  renderAt(`/internal-budget?${PERIOD}`);
+  const table = await screen.findByRole("table", {
+    name: "프로젝트별 예산 현황",
+  });
+  scrollTo.mockClear();
+
+  fireEvent.click(within(table).getAllByRole("link")[0]);
+  await screen.findByRole("dialog");
+  fireEvent.click(screen.getAllByRole("button", { name: "닫기" })[0]);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+  fireEvent.click(screen.getByRole("button", { name: "구독료 등록" }));
+  await screen.findByRole("dialog", { name: "구독료 등록" });
+  fireEvent.click(screen.getAllByRole("button", { name: "닫기" })[0]);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+  expect(scrollTo).not.toHaveBeenCalled();
 });

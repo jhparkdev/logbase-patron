@@ -22,6 +22,7 @@ export function modelColumns(
           from="/models"
           to="/models"
           search={(prev) => ({ ...prev, model: row.model_id })}
+          resetScroll={false}
         >
           {row.display_name}
         </TextLink>
