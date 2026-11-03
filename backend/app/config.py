@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 명령을 저장소 루트와 backend/ 어디서 실행해도 루트의 .env를 읽게 한다.
@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     # OpenRouter Key 원문. 로컬에서는 작업할 때만 넣고 끝나면 지우므로 없어도 앱은 뜬다.
     # 없으면 비교 실행 접수만 거절한다(app/api/simulation_deps.py).
     openrouter_api_key: SecretStr | None = None
+    # 로컬 에이전트 실험은 명시적으로 켠 환경에서만 제공한다.
+    assistant_enabled: bool = False
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "qwen3.5:4b"
+    ollama_context_length: int = Field(default=8192, ge=4096, le=32768)
     # 시뮬레이터 이미지를 두는 로컬 폴더. 개발용이다(Cloud Run 의 디스크는 임시라서 배포에서는
     # GCS 저장소로 바꿀 예정). DB 에는 이 폴더 안의 상대 경로와 해시만 남는다.
     image_storage_dir: Path = DEFAULT_IMAGE_STORAGE_DIR

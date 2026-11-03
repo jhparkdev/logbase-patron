@@ -38,6 +38,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assistant/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Status */
+        get: operations["read_status_api_assistant_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chat */
+        post: operations["chat_api_assistant_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/settings/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Settings */
+        post: operations["validate_settings_api_assistant_settings_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/logout": {
         parameters: {
             query?: never;
@@ -716,6 +767,95 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AssistantChatRequest */
+        AssistantChatRequest: {
+            /** Messages */
+            messages: components["schemas"]["AssistantMessage"][];
+            simulator?: components["schemas"]["SimulatorState"] | null;
+            page_context?: components["schemas"]["AssistantPageContext"] | null;
+        };
+        /** AssistantChatResponse */
+        AssistantChatResponse: {
+            /** Message */
+            message: string;
+            patch?: components["schemas"]["SimulatorPatch"] | null;
+            /** Sources */
+            sources?: components["schemas"]["AssistantSource"][];
+        };
+        /** AssistantMessage */
+        AssistantMessage: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: string;
+        };
+        /**
+         * AssistantPageContext
+         * @description 화면의 적용된 조회 조건만 전달한다. 자유 텍스트나 미저장 입력은 받지 않는다.
+         */
+        AssistantPageContext: {
+            /**
+             * Page
+             * @enum {string}
+             */
+            page: "customer_usage" | "internal_budget" | "models" | "simulator" | "simulation_history";
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Customer Id */
+            customer_id?: number | null;
+            /** Project Id */
+            project_id?: number | null;
+            /** Service Id */
+            service_id?: number | null;
+            /** Model Id */
+            model_id?: number | null;
+            /** Simulation Id */
+            simulation_id?: string | null;
+            /** Section */
+            section?: ("summary" | "requests" | "budgets" | "trend") | null;
+            /** Detail */
+            detail?: boolean | null;
+            budget_status?: components["schemas"]["BudgetStatus"] | null;
+        };
+        /** AssistantSettingsRequest */
+        AssistantSettingsRequest: {
+            simulator: components["schemas"]["SimulatorState"];
+            patch: components["schemas"]["SimulatorPatch"];
+        };
+        /** AssistantSource */
+        AssistantSource: {
+            /** Title */
+            title: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "models" | "history" | "simulation" | "customer_usage" | "internal_usage";
+            /** Simulation Id */
+            simulation_id?: string | null;
+            /** Requested At */
+            requested_at?: string | null;
+            page_context?: components["schemas"]["AssistantPageContext"] | null;
+            /** Page Number */
+            page_number?: number | null;
+            /** Page Size */
+            page_size?: number | null;
+            /** Sort Key */
+            sort_key?: ("requestedAt" | "cost" | "tokens" | "confirmed" | "used" | "usage" | "status") | null;
+            sort_order?: components["schemas"]["SortOrder"] | null;
+        };
+        /** AssistantStatus */
+        AssistantStatus: {
+            /** Enabled */
+            enabled: boolean;
+            /** Model */
+            model: string;
+        };
         /** Body_upload_simulation_image_api_simulations_images_post */
         Body_upload_simulation_image_api_simulations_images_post: {
             /** File */
@@ -2135,6 +2275,44 @@ export interface components {
              */
             readonly total_cost_usd: string | null;
         };
+        /** SimulatorPatch */
+        SimulatorPatch: {
+            /** Prompt Text */
+            prompt_text?: string | null;
+            /** Input Text */
+            input_text?: string | null;
+            /** Json Schema */
+            json_schema?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            execution_config?: components["schemas"]["ExecutionConfig"] | null;
+            /** Models */
+            models?: components["schemas"]["ModelSelectionRequest"][] | null;
+        };
+        /** SimulatorState */
+        SimulatorState: {
+            /**
+             * Prompt Text
+             * @default
+             */
+            prompt_text: string;
+            /** Input Text */
+            input_text?: string | null;
+            /** Json Schema */
+            json_schema?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            execution_config?: components["schemas"]["ExecutionConfig"];
+            /** Models */
+            models?: components["schemas"]["ModelSelectionRequest"][];
+            /** Scenario Id */
+            scenario_id?: number | null;
+            /**
+             * Has Images
+             * @default false
+             */
+            has_images: boolean;
+        };
         /**
          * SortDirection
          * @enum {string}
@@ -2435,6 +2613,215 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_status_api_assistant_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantStatus"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    chat_api_assistant_chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistantChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantChatResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    validate_settings_api_assistant_settings_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistantSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulatorPatch"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3526,6 +3913,7 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 sort?: components["schemas"]["CustomerRowSort"];
+                budget_status?: components["schemas"]["BudgetStatus"] | null;
             };
             header?: never;
             path?: never;
@@ -3914,6 +4302,7 @@ export interface operations {
                 month: string;
                 project_id?: number | null;
                 model_id?: number | null;
+                budget_status?: components["schemas"]["BudgetStatus"] | null;
                 sort?: components["schemas"]["ProjectRowSort"];
                 order?: components["schemas"]["SortOrder"];
                 preview?: boolean;

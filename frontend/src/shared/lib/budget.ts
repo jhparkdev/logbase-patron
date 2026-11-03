@@ -51,6 +51,11 @@ const BUDGET_STATUS_BADGE = {
   UNSET: { label: "미설정", tone: "grey" },
 } as const;
 
+export const budgetStatusSchema = z.custom<Schemas["BudgetStatus"]>(
+  (value) =>
+    typeof value === "string" && Object.hasOwn(BUDGET_STATUS_BADGE, value),
+);
+
 export function budgetStatusBadge(status: Schemas["BudgetStatus"]) {
   return BUDGET_STATUS_BADGE[status];
 }

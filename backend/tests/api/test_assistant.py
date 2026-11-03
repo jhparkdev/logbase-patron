@@ -1,0 +1,307 @@
+from datetime import timedelta
+
+import pytest
+from fastapi import FastAPI
+from httpx import AsyncClient
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app import security
+from app.api.assistant import get_assistant_caller
+from app.api.model_deps import get_endpoint_catalog
+from app.config import get_settings
+from app.models import AIRequest, SimulationRun, User
+from app.openrouter.lookup_result import EndpointInfo
+from app.services.assistant_ollama import OllamaMessage
+from tests.api.model_helpers import FakeEndpointCatalog
+from tests.db_helpers import T0, Factory
+
+
+class Caller:
+    def __init__(self, messages: list[OllamaMessage]) -> None:
+        self.messages = messages
+        self.calls = 0
+
+    async def chat(self, messages: list[dict], tools: list[dict]) -> OllamaMessage:
+        self.calls += 1
+        return self.messages.pop(0)
+
+
+async def test_history_answer_returns_a_verified_run_detail_source(
+    app: FastAPI, client: AsyncClient, factory: Factory
+) -> None:
+    await authenticate(client, factory)
+    run = await factory.simulation_run(requested_at=T0)
+    run_id = str(run["simulation_id"])
+    app.dependency_overrides[get_assistant_caller] = lambda: Caller(
+        [
+            OllamaMessage(
+                tool_calls=[{"function": {"name": "list_simulations", "arguments": {}}}]
+            ),
+            OllamaMessage(content=f"최근 실행은 {run_id}예요."),
+        ]
+    )
+    result = await client.post(
+        "/api/assistant/chat",
+        json={"messages": [{"role": "user", "content": "최근 실행 정보"}]},
+    )
+    assert result.status_code == 200
+    assert result.json()["sources"] == [
+        {
+            "title": "실행 상세",
+            "kind": "simulation",
+            "simulation_id": run_id,
+            "requested_at": "2026-10-01T00:00:00Z",
+        }
+    ]
+
+
+async def test_customer_usage_uses_real_session_and_the_applied_page_filters(
+    app: FastAPI, client: AsyncClient, factory: Factory, db_session: AsyncSession
+) -> None:
+    await authenticate(client, factory)
+    customer = await factory.customer(name="조회 고객 A")
+    service = await factory.service(service_type="CUSTOMER_FACING")
+    await factory.ai_request(
+        usage_origin="CUSTOMER_SERVICE",
+        customer_id=customer["customer_id"],
+        service_id=service["service_id"],
+        requested_at=T0,
+    )
+    app.dependency_overrides[get_assistant_caller] = lambda: Caller(
+        [
+            OllamaMessage(
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "get_customer_usage",
+                            "arguments": {"section": "summary"},
+                        }
+                    }
+                ]
+            ),
+            OllamaMessage(content="선택한 고객의 조회 결과예요."),
+        ]
+    )
+    body = {
+        "messages": [{"role": "user", "content": "선택한 고객의 비용을 알려줘"}],
+        "page_context": {
+            "page": "customer_usage",
+            "customer_id": customer["customer_id"],
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-31",
+        },
+    }
+    result = await client.post("/api/assistant/chat", json=body)
+    assert result.status_code == 200
+    source = result.json()["sources"][0]
+    assert source["kind"] == "customer_usage"
+    assert source["page_context"]["customer_id"] == customer["customer_id"]
+    assert source["page_context"]["start_date"] == "2026-10-01"
+    assert await db_session.scalar(select(func.count()).select_from(AIRequest)) == 1
+    assert await db_session.scalar(select(func.count()).select_from(SimulationRun)) == 0
+
+
+async def test_customer_request_cannot_use_a_model_requested_simulation_tool(
+    app: FastAPI, client: AsyncClient, factory: Factory
+) -> None:
+    await authenticate(client, factory)
+    caller = Caller(
+        [
+            OllamaMessage(
+                tool_calls=[{"function": {"name": "list_simulations", "arguments": {}}}]
+            )
+        ]
+    )
+    app.dependency_overrides[get_assistant_caller] = lambda: caller
+    result = await client.post(
+        "/api/assistant/chat",
+        json={
+            "messages": [{"role": "user", "content": "가상고객A의 최근 호출 시각"}],
+            "page_context": {"page": "simulation_history"},
+        },
+    )
+    assert result.status_code == 200
+    assert not result.json().get("sources")
+    assert "다른 범위" in result.json()["message"]
+    assert caller.calls == 1
+
+
+async def authenticate(client: AsyncClient, factory: Factory, **values: object) -> None:
+    token = security.new_session_token()
+    user = await factory.user()
+    await factory.user_session(
+        user_id=user["user_id"],
+        token_hash=security.hash_session_token(token),
+        created_at=T0,
+        expires_at=T0 + timedelta(hours=1),
+        **values,
+    )
+    client.cookies.set("patron_session", token)
+
+
+async def test_status_and_chat_require_real_session(
+    app: FastAPI, client: AsyncClient
+) -> None:
+    caller = Caller([])
+    app.dependency_overrides[get_assistant_caller] = lambda: caller
+    assert (await client.get("/api/assistant/status")).status_code == 401
+    assert (
+        await client.post(
+            "/api/assistant/chat",
+            json={"messages": [{"role": "user", "content": "hi"}]},
+        )
+    ).status_code == 401
+    assert caller.calls == 0
+
+
+async def test_deactivated_user_cannot_reuse_agent_session(
+    client: AsyncClient, factory: Factory, db_session: AsyncSession
+) -> None:
+    await authenticate(client, factory)
+    assert (await client.get("/api/assistant/status")).status_code == 200
+    await db_session.execute(update(User).values(is_active=False))
+    assert (await client.get("/api/assistant/status")).status_code == 401
+
+
+async def test_settings_revalidation_checks_provider_support_and_preserves_omitted_fields(
+    app: FastAPI, client: AsyncClient, factory: Factory
+) -> None:
+    await authenticate(client, factory)
+    settings = app.dependency_overrides[get_settings]().model_copy(
+        update={"assistant_enabled": True}
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    models = [
+        await factory.model(
+            status="ACTIVE", supported_parameters=["temperature", "max_tokens"]
+        )
+        for _ in range(2)
+    ]
+    app.dependency_overrides[get_endpoint_catalog] = lambda: FakeEndpointCatalog(
+        [EndpointInfo(provider_name="Test", supported_parameters=["max_tokens"])]
+    )
+    body = {
+        "simulator": {
+            "models": [
+                {"model_id": model["model_id"], "execution_provider": "Test"}
+                for model in models
+            ]
+        },
+        "patch": {"execution_config": {"temperature": 0.3}},
+    }
+    assert (
+        await client.post("/api/assistant/settings/validate", json=body)
+    ).status_code == 422
+    body["patch"] = {"execution_config": {"max_tokens": 512}}
+    response = await client.post("/api/assistant/settings/validate", json=body)
+    assert response.status_code == 200
+    assert response.json() == {"execution_config": {"max_tokens": 512}}
+
+
+async def test_disabled_assistant_never_calls_ollama(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await authenticate(client, factory)
+    response = await client.get("/api/assistant/status")
+    assert response.status_code == 200
+    assert response.json()["enabled"] is False
+    response = await client.post(
+        "/api/assistant/chat", json={"messages": [{"role": "user", "content": "hi"}]}
+    )
+    assert response.status_code == 503
+
+
+async def test_validated_patch_does_not_create_execution_records(
+    app: FastAPI, client: AsyncClient, factory: Factory, db_session: AsyncSession
+) -> None:
+    await authenticate(client, factory)
+    caller = Caller(
+        [
+            OllamaMessage(
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "prepare_simulator_settings",
+                            "arguments": {"execution_config": {"max_tokens": 2048}},
+                        }
+                    }
+                ]
+            ),
+            OllamaMessage(content="최대 출력 토큰 설정을 준비했어요."),
+        ]
+    )
+    app.dependency_overrides[get_assistant_caller] = lambda: caller
+    response = await client.post(
+        "/api/assistant/chat",
+        json={
+            "messages": [{"role": "user", "content": "토큰만 바꿔줘"}],
+            "simulator": {
+                "prompt_text": "keep",
+                "execution_config": {"temperature": 0.3},
+            },
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["patch"]["execution_config"]["max_tokens"] == 2048
+    assert "prompt_text" not in response.json()["patch"]
+    assert "temperature" not in response.json()["patch"]["execution_config"]
+    assert await db_session.scalar(select(func.count()).select_from(SimulationRun)) == 0
+    assert await db_session.scalar(select(func.count()).select_from(AIRequest)) == 0
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"execution_config": {"max_tokens": 99999}},
+        {"models": [{"model_id": 9999, "execution_provider": "invented"}]},
+        {"execution_config": {"reasoning_effort": "high"}},
+    ],
+)
+async def test_rejected_settings_do_not_escape_as_patch(
+    app: FastAPI, client: AsyncClient, factory: Factory, bad: dict
+) -> None:
+    await authenticate(client, factory)
+    models = [
+        await factory.model(
+            status="ACTIVE", supported_parameters=["max_tokens", "temperature"]
+        )
+        for _ in range(2)
+    ]
+    app.dependency_overrides[get_endpoint_catalog] = lambda: FakeEndpointCatalog(
+        [
+            EndpointInfo(
+                provider_name="Test", supported_parameters=["max_tokens", "temperature"]
+            )
+        ]
+    )
+    caller = Caller(
+        [
+            OllamaMessage(
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "prepare_simulator_settings",
+                            "arguments": bad,
+                        }
+                    }
+                ]
+            ),
+            OllamaMessage(content="설정을 적용할 수 없어요."),
+        ]
+    )
+    app.dependency_overrides[get_assistant_caller] = lambda: caller
+    response = await client.post(
+        "/api/assistant/chat",
+        json={
+            "messages": [{"role": "user", "content": "설정"}],
+            "simulator": {
+                "models": [
+                    {"model_id": model["model_id"], "execution_provider": "Test"}
+                    for model in models
+                ]
+            },
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["patch"] is None
