@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
+from pydantic_settings.exceptions import SettingsError
 
 from app.config import Settings
 
@@ -25,6 +26,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     monkeypatch.delenv("SESSION_COOKIE_SECURE", raising=False)
     monkeypatch.delenv("ALLOWED_ORIGIN", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("COMMAND_CODE_API_KEYS", raising=False)
     return monkeypatch
 
 
@@ -154,3 +156,70 @@ def test_database_password_is_hidden_in_repr(clean_env: pytest.MonkeyPatch) -> N
 
     assert "dev-secret" not in repr(settings)
     assert "dev-secret" not in str(settings)
+
+
+COMMAND_CODE_KEYS_JSON = (
+    '{"COMMAND_CODE_KEY_HONG": "cc-hong-test-only", "COMMAND_CODE_KEY_KIM": "cc-kim"}'
+)
+
+
+def test_command_code_api_keys_default_to_empty(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """Key를 하나도 넣지 않아도 앱은 뜬다. 그때는 모든 구성원이 Key 없음으로 보인다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.delenv("COMMAND_CODE_API_KEYS", raising=False)
+
+    assert Settings(_env_file=None).command_code_api_keys == {}
+
+
+def test_reads_command_code_api_keys_from_one_json_variable(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """환경변수 하나(JSON)에 구성원 Key 이름 → Key 원문을 여러 개 담는다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", COMMAND_CODE_KEYS_JSON)
+
+    keys = Settings(_env_file=None).command_code_api_keys
+
+    assert set(keys) == {"COMMAND_CODE_KEY_HONG", "COMMAND_CODE_KEY_KIM"}
+    assert keys["COMMAND_CODE_KEY_HONG"].get_secret_value() == "cc-hong-test-only"
+
+
+def test_command_code_api_keys_are_hidden_in_repr(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """설정 객체를 출력하거나 로그에 남겨도 Command Code Key가 보이지 않는다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", COMMAND_CODE_KEYS_JSON)
+
+    settings = Settings(_env_file=None)
+
+    assert "cc-hong-test-only" not in repr(settings)
+    assert "cc-hong-test-only" not in str(settings)
+
+
+def test_reads_command_code_api_keys_from_env_file(
+    clean_env: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """로컬에서는 .env의 한 줄로 넣는다."""
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        f"DATABASE_URL={DEV_URL}\nCOMMAND_CODE_API_KEYS={COMMAND_CODE_KEYS_JSON}\n",
+        encoding="utf-8",
+    )
+
+    keys = Settings(_env_file=env_file).command_code_api_keys
+
+    assert keys["COMMAND_CODE_KEY_KIM"].get_secret_value() == "cc-kim"
+
+
+def test_broken_command_code_api_keys_json_stops_startup(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """JSON이 깨졌는데 조용히 빈 값으로 넘어가면 원인을 찾기 어려워 시작할 때 멈춘다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", "{not json")
+
+    with pytest.raises(SettingsError):
+        Settings(_env_file=None)
