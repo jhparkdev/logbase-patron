@@ -47,6 +47,7 @@ async def list_execution_providers(
                 execution_provider=endpoint.provider_name,
                 status=endpoint.status,
                 uptime_last_1d=endpoint.uptime_last_1d,
+                supported_parameters=endpoint.supported_parameters,
             )
             for endpoint in endpoints
         ]
