@@ -181,6 +181,28 @@ export const PROJECT_CREATED: Schemas["ProjectRead"] = {
   project_type: "INTERNAL_DEV",
 };
 
+export const MEMBER_USAGE: Schemas["CommandCodeUsageList"] = {
+  items: [
+    {
+      member_name: "홍길동",
+      status: "OK",
+      used_credits: "27.6518301021",
+      request_count: 2379,
+      input_tokens: 816632167,
+      output_tokens: 1987270,
+      remaining_credits: "62.3745912155",
+      period_start: "2026-10-20T02:04:33Z",
+      period_end: "2026-11-20T02:04:33Z",
+      fetched_at: "2026-11-03T01:00:00Z",
+    },
+    {
+      member_name: "김철수",
+      status: "KEY_MISSING",
+      fetched_at: "2026-11-03T01:00:00Z",
+    },
+  ],
+};
+
 const SAVED_BUDGET: Schemas["ProjectBudgetRead"] = {
   budget_id: 9,
   project_id: 1,
@@ -207,6 +229,7 @@ const DEFAULT_REPLIES = {
   detail: ok(PROJECT_DETAIL),
   budget: ok(SAVED_BUDGET),
   projectCreate: { status: 201, body: PROJECT_CREATED },
+  commandCode: ok(MEMBER_USAGE),
 };
 
 /** 경로 끝부분별 응답을 바꾼다. 예: { summary: { status: 500, body: {} } } */
@@ -240,6 +263,9 @@ function blockOf(
   }
   if (PROJECT_BUDGET_PATH.test(last)) {
     return "budget";
+  }
+  if (last === "command-code") {
+    return "commandCode";
   }
   if (last in DEFAULT_REPLIES) {
     return last as keyof typeof DEFAULT_REPLIES;

@@ -14,6 +14,7 @@ export type ProjectBudgetRow = components["schemas"]["ProjectBudgetRow"];
 export type InternalRequestRow = components["schemas"]["InternalRequestRow"];
 export type SubscriptionRow = components["schemas"]["SubscriptionRow"];
 export type SubscriptionProject = components["schemas"]["SubscriptionProject"];
+export type MemberUsage = components["schemas"]["CommandCodeMemberUsage"];
 type ProjectRead = components["schemas"]["ProjectRead"];
 type BudgetSave = components["schemas"]["ProjectBudgetSave"];
 type SubscriptionCreate = components["schemas"]["SubscriptionCreate"];
@@ -37,6 +38,15 @@ export const subscriptionOptionsQuery = queryOptions({
   queryKey: [ROOT_KEY, "subscription-options"],
   queryFn: async () => unwrap(await api.GET("/api/subscriptions/options")),
   staleTime: OPTIONS_STALE_TIME_MS,
+  retry: false,
+});
+
+/** 구성원별 Command Code 사용량. 결제 기간 기준이라 조회 조건을 받지 않는다. */
+export const commandCodeUsageQuery = queryOptions({
+  queryKey: [ROOT_KEY, "command-code"],
+  queryFn: async () =>
+    unwrap(await api.GET("/api/usage/internal/command-code")),
+  staleTime: USAGE_STALE_TIME_MS,
   retry: false,
 });
 

@@ -23,3 +23,17 @@ export function subscriptionStatusBadge(
 ) {
   return SUBSCRIPTION_STATUS_BADGE[status];
 }
+
+const MEMBER_STATUS_LABEL = {
+  KEY_MISSING: "Key 없음",
+  KEY_EXPIRED: "Key 만료",
+  KEY_INVALID: "Key 오류",
+  FETCH_FAILED: "조회 실패",
+} as const;
+
+/** 사용량을 읽지 못한 구성원의 이유 배지 글자. */
+export function memberStatusLabel(
+  status: Exclude<components["schemas"]["CommandCodeStatus"], "OK">,
+) {
+  return MEMBER_STATUS_LABEL[status];
+}

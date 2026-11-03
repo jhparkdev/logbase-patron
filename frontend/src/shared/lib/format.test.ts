@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   formatCount,
+  formatKstDate,
   formatKstDateTime,
   formatUsd,
   isZeroAmount,
@@ -26,6 +27,22 @@ describe("formatKstDateTime", () => {
 
   test("시각으로 읽을 수 없는 값은 거절한다", () => {
     expect(() => formatKstDateTime("어제")).toThrow();
+  });
+});
+
+describe("formatKstDate", () => {
+  test.each([
+    ["2026-10-20T02:04:33Z", "2026-10-20"],
+    // KST 날짜 경계: UTC 15:00이 KST 다음 날
+    ["2026-10-28T14:59:59Z", "2026-10-28"],
+    ["2026-10-28T15:00:00Z", "2026-10-29"],
+    ["2026-12-31T15:00:00Z", "2027-01-01"],
+  ])("%s → %s", (utc, kst) => {
+    expect(formatKstDate(utc)).toBe(kst);
+  });
+
+  test("시각으로 읽을 수 없는 값은 거절한다", () => {
+    expect(() => formatKstDate("어제")).toThrow();
   });
 });
 
