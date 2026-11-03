@@ -42,6 +42,28 @@ def parameter_support(supported_parameters: Collection[str]) -> ParameterSupport
     )
 
 
+def narrow_to_provider(
+    support: ParameterSupport, provider_parameters: Collection[str] | None
+) -> ParameterSupport:
+    """모델이 받는 설정 중 고른 서버 업체도 받는 것만 남긴다.
+
+    업체가 temperature 나 reasoning 을 받지 않으면 OpenRouter 가 오류 없이 그 값을 버리므로
+    접수에서 미리 걸러야 한다. 업체 목록을 읽지 못하면 OpenRouter 가 빈 목록을 주므로,
+    None 과 빈 목록은 모두 모름으로 보고 모델 단위 판단을 그대로 쓴다.
+    """
+    if not provider_parameters:
+        return support
+    return ParameterSupport(
+        temperature=support.temperature
+        and TEMPERATURE_PARAMETER in provider_parameters,
+        reasoning_efforts=(
+            support.reasoning_efforts
+            if REASONING_PARAMETER in provider_parameters
+            else ()
+        ),
+    )
+
+
 def unsupported_parameters(
     support: ParameterSupport, config: Mapping[str, Any]
 ) -> list[str]:
