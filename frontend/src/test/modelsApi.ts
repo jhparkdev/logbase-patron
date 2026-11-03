@@ -157,6 +157,37 @@ export const NO_NEW_MODELS: Schemas["OpenRouterNewModelsResponse"] = {
   items: [],
 };
 
+/** 업체 둘이 순위에 있고 하나는 가동률이 낮아 빠진 응답 */
+export const RANKING: Schemas["ProviderRankingResponse"] = {
+  items: [
+    {
+      execution_provider: "DeepInfra",
+      expected_cost_usd: "0.0021",
+      input_price_per_token: "0.0000005",
+      output_price_per_token: "0.000002",
+      cache_read_price_per_token: "0.0000001",
+      cache_write_price_per_token: null,
+      supports_caching: true,
+    },
+    {
+      execution_provider: "Parasail",
+      expected_cost_usd: "0.0035",
+      input_price_per_token: "0.000001",
+      output_price_per_token: "0.000003",
+      cache_read_price_per_token: null,
+      cache_write_price_per_token: null,
+      supports_caching: false,
+    },
+  ],
+  excluded: [{ execution_provider: "Io Net", reason: "LOW_UPTIME" }],
+};
+
+/** 비교할 업체가 없는 응답. 상세 패널의 다른 시험에서는 이 값이 기본이다 */
+export const NO_RANKING: Schemas["ProviderRankingResponse"] = {
+  items: [],
+  excluded: [],
+};
+
 export const PROVIDERS: Schemas["ProviderListResponse"] = {
   items: [
     { provider: "openai", model_count: 3 },
@@ -174,11 +205,13 @@ type Replies = {
   status?: Reply;
   openrouter?: Reply;
   newModels?: Reply;
+  ranking?: Reply;
   register?: Reply;
 };
 
 const DETAIL_PATH = /\/api\/models\/\d+$/;
 const TEST_PATH = /\/api\/models\/\d+\/test$/;
+const RANKING_PATH = /\/api\/models\/\d+\/execution-providers\/ranking$/;
 const STATUS_PATH = /\/api\/models\/\d+\/status$/;
 
 function replyFor(request: Request, replies: Replies): Reply {
@@ -192,6 +225,9 @@ function replyFor(request: Request, replies: Replies): Reply {
   }
   if (pathname === "/api/models/openrouter") {
     return replies.openrouter ?? { status: 200, body: OPENROUTER };
+  }
+  if (RANKING_PATH.test(pathname)) {
+    return replies.ranking ?? { status: 200, body: NO_RANKING };
   }
   if (url.endsWith("/api/models/providers")) {
     return replies.providers ?? { status: 200, body: PROVIDERS };

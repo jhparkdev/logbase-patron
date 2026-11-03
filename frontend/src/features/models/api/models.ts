@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { api, unwrap } from "../../../shared/api/client";
 import type { components } from "../../../shared/api/schema";
 import { PAGE_SIZE } from "../../../shared/lib/pagination";
+import { RANKING_INPUT_TOKENS, RANKING_OUTPUT_TOKENS } from "../lib/ranking";
 import { type ModelsSearch, modelListQuery } from "../lib/search";
 
 /** 목록 한 줄. 백엔드 ModelRead 계약 그대로 */
@@ -149,6 +150,31 @@ export const newOpenRouterModelsQuery = queryOptions({
   staleTime: NEW_MODELS_STALE_TIME_MS,
   retry: false,
 });
+
+/** 업체는 자주 바뀌지 않으므로 서버의 10분 보관에 맞춰 화면에서도 잠깐 캐시 */
+const RANKING_STALE_TIME_MS = 5 * 60_000;
+
+/** 모델의 서버 업체를 예상 총비용이 싼 순서로 받음. cacheHitRatio는 0~1 비율 문자열 */
+export function providerRankingQuery(modelId: number, cacheHitRatio: string) {
+  return queryOptions({
+    queryKey: [ROOT_KEY, "ranking", modelId, cacheHitRatio],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/models/{model_id}/execution-providers/ranking", {
+          params: {
+            path: { model_id: modelId },
+            query: {
+              input_tokens: RANKING_INPUT_TOKENS,
+              output_tokens: RANKING_OUTPUT_TOKENS,
+              cache_hit_ratio: cacheHitRatio,
+            },
+          },
+        }),
+      ),
+    staleTime: RANKING_STALE_TIME_MS,
+    retry: false,
+  });
+}
 
 /** 신규 등록. 응답은 TESTING 상태로 만들어진 모델의 상세 */
 export async function registerModel(body: ModelRegistration) {
