@@ -5,11 +5,12 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from fastapi import status
+from fastapi import FastAPI, status
 from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.models import ChangeLog
+from app.schemas.models import MAX_MODEL_ID
 from tests.db_helpers import Factory
 
 BASE = "/api/subscriptions"
@@ -281,13 +282,21 @@ async def test_선택_목록은_사용_중인_프로젝트를_이름순으로_�
 # 등록
 # ---------------------------------------------------------------
 def create_body(**values: Any) -> dict[str, Any]:
+    """등록 본문. project_id 1은 형식 검증용 값이라, 실제로 저장하는 시험은 body_with_project를 쓴다."""
     return {
         "subscription_reference": "CommandCode_team1",
         "tool_name": "Command Code",
         "applied_month": "2026-10",
         "amount_usd": "20.5",
+        "project_id": 1,
         **values,
     }
+
+
+async def body_with_project(factory: Factory, **values: Any) -> dict[str, Any]:
+    """저장할 수 있는 등록 본문. 프로젝트를 하나 만들어 그 번호를 넣는다."""
+    project = await factory.project(name="기본 프로젝트")
+    return create_body(project_id=project["project_id"], **values)
 
 
 def without(name: str) -> dict[str, Any]:
@@ -322,16 +331,18 @@ async def test_등록하면_201과_만들어진_행을_돌려주고_목록에도
     assert Decimal(listed[0]["amount_usd"]) == Decimal("20.5")
 
 
-async def test_프로젝트와_종류와_메모는_보내지_않아도_된다(
+async def test_종류와_메모는_보내지_않아도_된다(
     client: AsyncClient, factory: Factory
 ) -> None:
     await factory.user()
 
-    response = await client.post(BASE, json=create_body())
+    body = await body_with_project(factory)
+
+    response = await client.post(BASE, json=body)
 
     assert response.status_code == status.HTTP_201_CREATED
     item = response.json()
-    assert item["project_id"] is None
+    assert item["project_id"] == body["project_id"]
     assert item["subscription_type"] is None
     assert item["note"] is None
 
@@ -340,7 +351,9 @@ async def test_앞뒤_공백은_지우고_저장한다(
     client: AsyncClient, factory: Factory
 ) -> None:
     await factory.user()
-    body = create_body(subscription_reference="  CommandCode_team1 ", tool_name=" CC ")
+    body = await body_with_project(
+        factory, subscription_reference="  CommandCode_team1 ", tool_name=" CC "
+    )
 
     item = (await client.post(BASE, json=body)).json()
 
@@ -354,7 +367,7 @@ async def test_등록은_첫_사용자_계정과_이력을_남긴다(
     # 로그인 검사를 뒤로 미룬 팀 결정에 따라 시뮬레이터와 같은 임시 실행자를 쓴다
     user = await factory.user()
 
-    created = (await client.post(BASE, json=create_body())).json()
+    created = (await client.post(BASE, json=await body_with_project(factory))).json()
 
     log = await factory.session.scalar(
         select(ChangeLog).where(
@@ -371,9 +384,10 @@ async def test_같은_식별값과_같은_달이면_409와_문구를_돌려준�
     client: AsyncClient, factory: Factory
 ) -> None:
     await factory.user()
-    await client.post(BASE, json=create_body())
+    body = await body_with_project(factory)
+    await client.post(BASE, json=body)
 
-    response = await client.post(BASE, json=create_body(amount_usd="99"))
+    response = await client.post(BASE, json={**body, "amount_usd": "99"})
 
     assert response.status_code == status.HTTP_409_CONFLICT
     assert response.json()["code"] == "SUBSCRIPTION_DUPLICATE"
@@ -386,9 +400,10 @@ async def test_같은_식별값이어도_다른_달이면_등록된다(
     client: AsyncClient, factory: Factory
 ) -> None:
     await factory.user()
-    await client.post(BASE, json=create_body(applied_month="2026-09"))
+    body = await body_with_project(factory)
+    await client.post(BASE, json={**body, "applied_month": "2026-09"})
 
-    response = await client.post(BASE, json=create_body(applied_month="2026-10"))
+    response = await client.post(BASE, json={**body, "applied_month": "2026-10"})
 
     assert response.status_code == status.HTTP_201_CREATED
 
@@ -408,10 +423,66 @@ async def test_없는_프로젝트로_등록하면_422이다(
 async def test_금액_0은_등록할_수_있다(client: AsyncClient, factory: Factory) -> None:
     await factory.user()
 
-    response = await client.post(BASE, json=create_body(amount_usd="0"))
+    body = await body_with_project(factory, amount_usd="0")
+
+    response = await client.post(BASE, json=body)
 
     assert response.status_code == status.HTTP_201_CREATED
     assert Decimal(response.json()["amount_usd"]) == 0
+
+
+async def test_상태를_보내면_그_상태로_등록한다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.user()
+
+    body = await body_with_project(factory, status="CANCELLED")
+
+    response = await client.post(BASE, json=body)
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.json()["status"] == "CANCELLED"
+    listed = (await client.get(BASE, params=OCTOBER)).json()["items"]
+    assert [item["status"] for item in listed] == ["CANCELLED"]
+
+
+async def test_상태를_진행_중으로_보내도_등록된다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.user()
+
+    body = await body_with_project(factory, status="ACTIVE")
+
+    response = await client.post(BASE, json=body)
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.json()["status"] == "ACTIVE"
+
+
+def test_OpenAPI에서_등록_본문의_프로젝트는_필수이다(app: FastAPI) -> None:
+    schema = app.openapi()["components"]["schemas"]["SubscriptionCreate"]
+
+    assert "project_id" in schema["required"]
+
+
+def test_OpenAPI에서_수정_본문의_프로젝트는_선택이고_null을_받지_않는다(
+    app: FastAPI,
+) -> None:
+    schema = app.openapi()["components"]["schemas"]["SubscriptionUpdate"]
+    project = schema["properties"]["project_id"]
+
+    assert "project_id" not in schema.get("required", [])
+    assert "anyOf" not in project
+    assert project["type"] == "integer"
+    assert "default" not in project
+
+
+def test_OpenAPI에서_등록_본문의_상태는_필수가_아니다(app: FastAPI) -> None:
+    schema = app.openapi()["components"]["schemas"]["SubscriptionCreate"]
+
+    assert "status" not in schema.get("required", [])
+    # default가 있으면 생성된 프론트엔드 타입에서 필수 항목이 된다
+    assert "default" not in schema["properties"]["status"]
 
 
 @pytest.mark.parametrize(
@@ -421,6 +492,8 @@ async def test_금액_0은_등록할_수_있다(client: AsyncClient, factory: Fa
         without("tool_name"),
         without("applied_month"),
         without("amount_usd"),
+        without("project_id"),
+        create_body(project_id=None),
         create_body(subscription_reference=""),
         create_body(subscription_reference="   "),
         create_body(subscription_reference="x" * 101),
@@ -437,13 +510,17 @@ async def test_금액_0은_등록할_수_있다(client: AsyncClient, factory: Fa
         create_body(amount_usd=None),
         create_body(project_id=0),
         create_body(note="x" * 501),
-        create_body(status="CANCELLED"),
+        create_body(status="UNKNOWN"),
+        create_body(status="cancelled"),
+        create_body(status=None),
     ],
     ids=[
         "식별값 없음",
         "도구 이름 없음",
         "적용 월 없음",
         "금액 없음",
+        "프로젝트 없음",
+        "프로젝트 null",
         "빈 식별값",
         "공백뿐인 식별값",
         "식별값이 너무 김",
@@ -460,7 +537,9 @@ async def test_금액_0은_등록할_수_있다(client: AsyncClient, factory: Fa
         "금액 null",
         "프로젝트 ID 0",
         "메모가 너무 김",
-        "상태는 보낼 수 없음",
+        "모르는 상태",
+        "소문자 상태",
+        "상태 null",
     ],
 )
 async def test_잘못된_등록_본문은_422이다(
@@ -485,6 +564,61 @@ async def test_허용하지_않는_Origin의_등록은_거절한다(
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json()["code"] == "ORIGIN_NOT_ALLOWED"
+
+
+# ---------------------------------------------------------------
+# 단건 조회
+# ---------------------------------------------------------------
+async def test_번호로_한_건을_돌려준다(client: AsyncClient, factory: Factory) -> None:
+    project = await factory.project(name="알파")
+    created = await factory.subscription_cost(
+        applied_month=date(2025, 1, 1),
+        tool_name="도구",
+        project_id=project["project_id"],
+    )
+
+    response = await client.get(f"{BASE}/{created['subscription_id']}")
+
+    assert response.status_code == status.HTTP_200_OK
+    item = response.json()
+    assert item["subscription_id"] == created["subscription_id"]
+    assert (item["tool_name"], item["project_name"]) == ("도구", "알파")
+    assert item["applied_month"] == "2025-01"
+
+
+async def test_목록에_없는_기간의_구독료도_번호로_조회된다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    created = await factory.subscription_cost(applied_month=date(2025, 1, 1))
+
+    listed = (await client.get(BASE)).json()["items"]
+    response = await client.get(f"{BASE}/{created['subscription_id']}")
+
+    assert listed == []
+    assert response.status_code == status.HTTP_200_OK
+
+
+async def test_없는_번호의_조회는_404이다(client: AsyncClient) -> None:
+    response = await client.get(f"{BASE}/987654")
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["code"] == "NOT_FOUND"
+
+
+@pytest.mark.parametrize("subscription_id", ["0", "-1", "abc", str(MAX_MODEL_ID + 1)])
+async def test_잘못된_번호의_조회는_422이다(
+    client: AsyncClient, subscription_id: str
+) -> None:
+    response = await client.get(f"{BASE}/{subscription_id}")
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+
+async def test_options는_번호로_해석되지_않는다(client: AsyncClient) -> None:
+    response = await client.get(f"{BASE}/options")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert "projects" in response.json()
 
 
 # ---------------------------------------------------------------
@@ -536,20 +670,37 @@ async def test_보낸_항목만_바뀌고_나머지는_그대로이다(
     assert item["status"] == "ACTIVE"
 
 
-async def test_project_id를_null로_보내면_미배분이_된다(
+async def test_project_id를_null로_보내면_거절하고_프로젝트는_그대로이다(
     client: AsyncClient, factory: Factory
 ) -> None:
     await factory.user()
     project = await factory.project()
     created = await factory.subscription_cost(project_id=project["project_id"])
+    url = f"{BASE}/{created['subscription_id']}"
+
+    response = await client.patch(url, json={"project_id": None})
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()["code"] == "VALIDATION_ERROR"
+    assert (await client.get(url)).json()["project_id"] == project["project_id"]
+
+
+async def test_다른_프로젝트로_바꾸는_수정은_된다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.user()
+    first = await factory.project(name="하나")
+    second = await factory.project(name="둘")
+    created = await factory.subscription_cost(project_id=first["project_id"])
 
     response = await client.patch(
-        f"{BASE}/{created['subscription_id']}", json={"project_id": None}
+        f"{BASE}/{created['subscription_id']}",
+        json={"project_id": second["project_id"]},
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json()["project_id"] is None
-    assert response.json()["project_name"] is None
+    assert response.json()["project_id"] == second["project_id"]
+    assert response.json()["project_name"] == "둘"
 
 
 async def test_수정은_첫_사용자_계정과_이력을_남긴다(
@@ -613,6 +764,7 @@ async def test_없는_프로젝트로_바꾸면_422이고_아무것도_바뀌지
         {"amount_usd": None},
         {"status": "UNKNOWN"},
         {"status": None},
+        {"project_id": None},
         {"project_id": 0},
         {"note": "x" * 501},
         {"tool_name": "바꿀 수 없음"},
@@ -627,6 +779,7 @@ async def test_없는_프로젝트로_바꾸면_422이고_아무것도_바뀌지
         "금액 null",
         "없는 상태",
         "상태 null",
+        "프로젝트 null",
         "프로젝트 ID 0",
         "메모가 너무 김",
         "수정할 수 없는 필드",

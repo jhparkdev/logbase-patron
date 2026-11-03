@@ -7,6 +7,9 @@ type ConnectionTestStatus = components["schemas"]["ConnectionTestStatus"];
 type ProviderRead = components["schemas"]["ProviderRead"];
 type ConnectionTestResult = components["schemas"]["ConnectionTestResult"];
 
+/** "YYYY-MM-DD"의 글자 수 */
+const DATE_LENGTH = 10;
+
 const STATUS_BADGES = {
   TESTING: { tone: "blue", label: "검증 중" },
   ACTIVE: { tone: "green", label: "사용 중" },
@@ -161,4 +164,11 @@ const NONE_LABEL = "없음";
 /** 시각이 없으면 빈칸 대신 없음, 있으면 KST */
 export function timeOrNone(utc: string | null): string {
   return utc === null ? NONE_LABEL : formatKstDateTime(utc);
+}
+
+/** OpenRouter에 올라온 날. 모르면 null(보여 주지 않음) */
+export function releasedLabel(createdAt: string | null): string | null {
+  return createdAt === null
+    ? null
+    : `${formatKstDateTime(createdAt).slice(0, DATE_LENGTH)} 출시`;
 }

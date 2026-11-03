@@ -1179,6 +1179,24 @@
             }
           },
           {
+            "name": "new_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 365,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "New Days"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -1210,6 +1228,75 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OpenRouterModelListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          }
+        }
+      }
+    },
+    "/api/models/openrouter/new": {
+      "get": {
+        "tags": [
+          "models",
+          "models"
+        ],
+        "summary": "List New Openrouter Models",
+        "description": "최근에 OpenRouter에 올라왔고 아직 등록하지 않은 모델. 모델 관리 화면의 신규 모델 알림에 쓴다.",
+        "operationId": "list_new_openrouter_models_api_models_openrouter_new_get",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 5,
+              "title": "Days"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 5,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenRouterNewModelsResponse"
                 }
               }
             }
@@ -3169,6 +3256,28 @@
         }
       }
     },
+    "/api/usage/internal/command-code": {
+      "get": {
+        "tags": [
+          "internal-budget"
+        ],
+        "summary": "Get Command Code Usage",
+        "description": "결제 기간 기준의 구성원별 사용량. 조회 기간을 받지 않고 비용 합계에도 더하지 않는다.",
+        "operationId": "get_command_code_usage_api_usage_internal_command_code_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandCodeUsageList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/subscriptions": {
       "get": {
         "tags": [
@@ -3377,6 +3486,58 @@
       }
     },
     "/api/subscriptions/{subscription_id}": {
+      "get": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Read Subscription",
+        "operationId": "read_subscription_api_subscriptions__subscription_id__get",
+        "parameters": [
+          {
+            "name": "subscription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Subscription Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionRow"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
       "patch": {
         "tags": [
           "subscriptions"
@@ -3436,6 +3597,57 @@
               }
             },
             "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Create Project",
+        "operationId": "create_project_api_projects_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRead"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDuplicateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -3613,6 +3825,137 @@
           "ALREADY_TERMINAL"
         ],
         "title": "CancelDecision"
+      },
+      "CommandCodeMemberUsage": {
+        "properties": {
+          "member_name": {
+            "type": "string",
+            "title": "Member Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommandCodeStatus"
+          },
+          "used_credits": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Credits"
+          },
+          "request_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Count"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "remaining_credits": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Credits"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "member_name",
+          "status",
+          "fetched_at"
+        ],
+        "title": "CommandCodeMemberUsage",
+        "description": "구성원 한 명의 결제 기간 사용량. status가 OK가 아니면 값은 모두 null이다(0이 아니다)."
+      },
+      "CommandCodeStatus": {
+        "type": "string",
+        "enum": [
+          "OK",
+          "KEY_MISSING",
+          "KEY_EXPIRED",
+          "KEY_INVALID",
+          "FETCH_FAILED"
+        ],
+        "title": "CommandCodeStatus",
+        "description": "구성원 한 줄을 읽은 결과. 프론트엔드는 OK가 아니면 \"불러오지 못함\"으로 보여 준다."
+      },
+      "CommandCodeUsageList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CommandCodeMemberUsage"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "CommandCodeUsageList"
       },
       "ConnectionTestRequest": {
         "properties": {
@@ -5673,6 +6016,18 @@
           "registered": {
             "type": "boolean",
             "title": "Registered"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
           }
         },
         "type": "object",
@@ -5687,9 +6042,125 @@
           "output_price_per_token",
           "supports_json_schema",
           "supports_tools",
-          "registered"
+          "registered",
+          "created_at"
         ],
         "title": "OpenRouterModelRead"
+      },
+      "OpenRouterNewModelRead": {
+        "properties": {
+          "openrouter_model_id": {
+            "type": "string",
+            "title": "Openrouter Model Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Modalities"
+          },
+          "output_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Modalities"
+          },
+          "context_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Length"
+          },
+          "input_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Price Per Token"
+          },
+          "output_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Price Per Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "openrouter_model_id",
+          "name",
+          "provider",
+          "created_at",
+          "input_modalities",
+          "output_modalities",
+          "context_length",
+          "input_price_per_token",
+          "output_price_per_token"
+        ],
+        "title": "OpenRouterNewModelRead",
+        "description": "아직 등록하지 않은 새 모델 한 건. 등록 여부는 항상 \"아니오\"라 담지 않는다."
+      },
+      "OpenRouterNewModelsResponse": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OpenRouterNewModelRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "total",
+          "items"
+        ],
+        "title": "OpenRouterNewModelsResponse"
       },
       "OriginNotAllowedResponse": {
         "properties": {
@@ -6135,6 +6606,98 @@
         "title": "ProjectBudgetUsage",
         "description": "그 달의 프로젝트 예산 현황. 사용액에는 이 프로젝트에 귀속된 구독료가 들어간다."
       },
+      "ProjectCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "project_type": {
+            "$ref": "#/components/schemas/ProjectType",
+            "default": "INTERNAL_DEV"
+          },
+          "project_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1,
+                "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ProjectCreate",
+        "description": "프로젝트 등록. 이름이 같은 사용 중 프로젝트가 있으면 만들지 않는다(띄어쓰기·대소문자 무시)."
+      },
+      "ProjectDuplicateResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ProjectErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "existing": {
+            "$ref": "#/components/schemas/ProjectRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "existing"
+        ],
+        "title": "ProjectDuplicateResponse",
+        "description": "409 본문. 화면이 새로 만들지 않고 기존 프로젝트를 바로 고를 수 있게 기존 행을 함께 준다."
+      },
+      "ProjectErrorCode": {
+        "type": "string",
+        "enum": [
+          "PROJECT_DUPLICATE"
+        ],
+        "title": "ProjectErrorCode",
+        "description": "프론트엔드는 이 값으로 상황별로 화면을 나눈다."
+      },
+      "ProjectRead": {
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id"
+          },
+          "project_code": {
+            "type": "string",
+            "title": "Project Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "project_type": {
+            "$ref": "#/components/schemas/ProjectType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_code",
+          "name",
+          "project_type"
+        ],
+        "title": "ProjectRead"
+      },
       "ProjectRowSort": {
         "type": "string",
         "enum": [
@@ -6229,6 +6792,16 @@
           "status"
         ],
         "title": "ProjectSubscription"
+      },
+      "ProjectType": {
+        "type": "string",
+        "enum": [
+          "INTERNAL_DEV",
+          "CUSTOMER_PROJECT",
+          "POC",
+          "TEST"
+        ],
+        "title": "ProjectType"
       },
       "ProjectUsageDetail": {
         "properties": {
@@ -6682,7 +7255,14 @@
             "title": "Json Schema"
           },
           "execution_config": {
-            "$ref": "#/components/schemas/ExecutionConfig"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "routing_policy": {
             "$ref": "#/components/schemas/RoutingPolicy"
@@ -7591,17 +8171,13 @@
             "lt": "10000000000"
           },
           "project_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 9.223372036854776e+18,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
             "title": "Project Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
           },
           "note": {
             "anyOf": [
@@ -7622,7 +8198,8 @@
           "subscription_reference",
           "tool_name",
           "applied_month",
-          "amount_usd"
+          "amount_usd",
+          "project_id"
         ],
         "title": "SubscriptionCreate",
         "description": "구독료 등록. 같은 subscription_reference와 applied_month는 한 번만 등록할 수 있다."
@@ -7848,16 +8425,9 @@
             "title": "Amount Usd"
           },
           "project_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 9.223372036854776e+18,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
             "title": "Project Id"
           },
           "status": {
@@ -7886,7 +8456,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "SubscriptionUpdate",
-        "description": "보낸 항목만 바꾼다. project_id와 note는 null을 보내면 값이 지워진다."
+        "description": "보낸 항목만 바꾼다. note는 null을 보내면 값이 지워지고, 금액·프로젝트·상태는 비울 수 없다."
       },
       "TestType": {
         "type": "string",

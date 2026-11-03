@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 from enum import StrEnum
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 from pydantic import (
     BaseModel,
@@ -26,7 +26,7 @@ AMOUNT_LIMIT = Decimal(10**10)
 NOTE_MAX_LENGTH = 500
 SHORT_TEXT_MAX_LENGTH = 100
 # 비워 두면 안 되는 항목. null을 보내면 값이 지워지는 항목(project_id, note)과 구분한다
-REQUIRED_FIELDS = ("amount_usd", "status")
+REQUIRED_FIELDS = ("amount_usd", "status", "project_id")
 
 SubscriptionAmount = Annotated[
     Decimal,
@@ -97,24 +97,50 @@ class SubscriptionOptions(BaseModel):
     projects: list[SubscriptionProject]
 
 
+def _status_is_optional(schema: dict[str, Any]) -> None:
+    """OpenAPI에서 status의 default를 뺀다.
+
+    default가 있으면 생성된 프론트엔드 타입에서 필수 항목이 되어, 상태를 보내지 않는 등록 폼이
+    타입 검사에서 실패한다. 서버는 보내지 않으면 진행 중으로 저장하므로 선택 항목이 맞다.
+    """
+    schema["properties"]["status"].pop("default", None)
+
+
+def _project_cannot_be_cleared(schema: dict[str, Any]) -> None:
+    """OpenAPI에서 수정 본문의 project_id를 null을 받지 않는 선택 항목으로 보이게 한다.
+
+    프로젝트는 다른 프로젝트로 바꿀 수만 있고 비울 수 없다. null 선택지를 그대로 두면 생성된
+    프론트엔드 타입이 null을 보낼 수 있는 것처럼 보인다.
+    """
+    prop = schema["properties"]["project_id"]
+    options = prop.pop("anyOf", [])
+    prop.update(next(option for option in options if option.get("type") != "null"))
+    prop.pop("default", None)
+
+
 class SubscriptionCreate(BaseModel):
     """구독료 등록. 같은 subscription_reference와 applied_month는 한 번만 등록할 수 있다."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_status_is_optional)
 
     subscription_reference: ShortText
     tool_name: ShortText
     subscription_type: ShortText | None = None
     applied_month: Month
     amount_usd: SubscriptionAmount
-    project_id: ProjectId | None = None  # 없으면 미배분
+    # 프로젝트는 반드시 정한다. 귀속이 불분명한 구독료는 "공통(내부)" 프로젝트에 등록한다
+    project_id: ProjectId
+    # 이미 해지된 구독을 뒤늦게 기록할 때 쓴다. 보내지 않으면 진행 중이고, null은 받지 않는다
+    status: SubscriptionStatus = SubscriptionStatus.ACTIVE
     note: Note | None = None
 
 
 class SubscriptionUpdate(BaseModel):
-    """보낸 항목만 바꾼다. project_id와 note는 null을 보내면 값이 지워진다."""
+    """보낸 항목만 바꾼다. note는 null을 보내면 값이 지워지고, 금액·프로젝트·상태는 비울 수 없다."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid", json_schema_extra=_project_cannot_be_cleared
+    )
 
     amount_usd: SubscriptionAmount | None = None
     project_id: ProjectId | None = None

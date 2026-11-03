@@ -17,7 +17,6 @@ import sys
 import warnings
 from datetime import UTC, datetime
 from getpass import GetPassWarning, getpass
-from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -25,21 +24,40 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.config import get_settings
 from app.db import get_engine, get_sessionmaker
+from app.mock_data.sql import SEED_FILE
 from app.models import KeyEnvironment, ServiceType
 from app.schemas.auth import PASSWORD_MAX_LENGTH
-from app.services import usage_catalog, users
+from app.services import command_code_keys, usage_catalog, users
 
-SEED_FILE = Path(__file__).resolve().parents[1] / "seed" / "patron_mock_data_v0.6.sql"
 PRODUCTION_ENV = "production"
-CATALOG_COMMANDS = ("customer-create", "service-create", "key-register")
-# 시드가 이미 들어갔는지 알아보는 표식: 시드가 고정 ID로 넣는 첫 mock 고객
+CATALOG_COMMANDS = (
+    "customer-create",
+    "service-create",
+    "key-register",
+    "command-code-key-register",
+)
+# 시드가 이미 들어갔는지 알아보는 표식: 시드가 고정 ID로 넣는 첫 mock 고객(app/mock_data/organizations.py)
 SEED_MARKER_QUERY = text(
+    "SELECT EXISTS (SELECT 1 FROM customers WHERE customer_code = 'CUST-001' AND is_mock)"
+)
+# 이전(v0.6) seed의 첫 mock 고객. 남아 있으면 고정 ID가 겹치므로 새 seed를 넣지 않는다.
+LEGACY_SEED_MARKER_QUERY = text(
     "SELECT EXISTS (SELECT 1 FROM customers WHERE customer_code = 'CUST-A' AND is_mock)"
 )
 
 
 class CommandRefusedError(Exception):
     """운영 환경에서 확인 옵션 없이 관리 명령을 실행하려 할 때 발생한다."""
+
+
+class LegacySeedError(Exception):
+    """이전 mock 데이터가 남아 있어 새 seed를 겹쳐 넣지 않을 때 발생한다."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "이전(v0.6) mock 데이터가 남아 있어 새 seed를 넣지 않았습니다. "
+            "로컬 개발 DB를 초기화한 뒤(마이그레이션 → seed) 다시 실행하세요."
+        )
 
 
 def ensure_command_allowed(
@@ -60,6 +78,8 @@ async def apply_seed(connection: AsyncConnection) -> bool:
     """
     if await connection.scalar(SEED_MARKER_QUERY):
         return False
+    if await connection.scalar(LEGACY_SEED_MARKER_QUERY):
+        raise LegacySeedError
     # 시드 SQL에는 ':', '%' 같은 문자가 들어 있다. SQLAlchemy를 거치면 파라미터 자리표시자로
     # 해석되므로, 같은 연결(같은 트랜잭션)의 psycopg 커서로 파라미터 없이 그대로 실행한다.
     raw_connection = await connection.get_raw_connection()
@@ -123,8 +143,29 @@ def make_parser() -> argparse.ArgumentParser:
     key.add_argument(
         "--environment", choices=[item.value for item in KeyEnvironment], required=True
     )
+    # 원문 대신 환경변수 이름만 받는다. 줄임말 해석 때문에 원문이 넘어가지 않게 한다.
+    member_key = commands.add_parser(
+        "command-code-key-register",
+        help="구성원의 Command Code Key 환경변수 이름을 등록한다",
+        allow_abbrev=False,
+    )
+    member_key.add_argument("--member-name", required=True)
+    member_key.add_argument(
+        "--secret-ref",
+        required=True,
+        help="Key 원문이 든 환경변수 이름(COMMAND_CODE_KEY_...). 원문은 입력하지 않는다",
+    )
     # 새 관리 명령도 이 목록에 넣어야 운영 확인 옵션을 함께 제공할 수 있다.
-    for command in (seed, create, deactivate, cleanup, customer, service, key):
+    for command in (
+        seed,
+        create,
+        deactivate,
+        cleanup,
+        customer,
+        service,
+        key,
+        member_key,
+    ):
         command.add_argument(
             "--confirm-production",
             action="store_true",
@@ -191,6 +232,11 @@ async def run_catalog_command(args: argparse.Namespace) -> None:
                 environment=KeyEnvironment(args.environment),
             )
             print(f"Key 등록 완료 (key_id={key.key_id})")
+        elif args.command == "command-code-key-register":
+            member = await command_code_keys.register_member(
+                session, member_name=args.member_name, secret_ref=args.secret_ref
+            )
+            print(f"구성원 등록 완료 (id={member.command_code_key_id})")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -217,6 +263,7 @@ def main(argv: list[str] | None = None) -> int:
             )
     except (
         CommandRefusedError,
+        LegacySeedError,
         users.UserCommandError,
         usage_catalog.CatalogCommandError,
     ) as error:

@@ -534,3 +534,32 @@ def test_추론_항목이_아예_없으면_정보_없음이다() -> None:
 
     assert models is not None
     assert models[0].reasoning is None
+
+
+# ---------------------------------------------------------------
+# 모델의 출시 시각(created)
+# ---------------------------------------------------------------
+def created_of(raw: Any) -> datetime | None:
+    models = parse_models({"data": [{"id": "a/b", "created": raw}]})
+    assert models is not None
+    return models[0].created_at
+
+
+def test_출시_시각은_초_단위_숫자를_UTC_시각으로_읽는다() -> None:
+    assert created_of(1_700_000_000) == datetime(2023, 11, 14, 22, 13, 20, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["1700000000", None, True, 0, -5, 10**30, Decimal("1.5")],
+    ids=["문자열", "null", "불리언", "0", "음수", "너무 큰 값", "소수"],
+)
+def test_출시_시각이_초_단위_숫자가_아니면_정보_없음이다(raw: Any) -> None:
+    assert created_of(raw) is None
+
+
+def test_출시_시각이_아예_없으면_정보_없음이다() -> None:
+    models = parse_models({"data": [{"id": "a/b"}]})
+
+    assert models is not None
+    assert models[0].created_at is None

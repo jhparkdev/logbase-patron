@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Button } from "../../../shared/components/ui/Button";
 import { DataBlock } from "../../../shared/components/ui/DataBlock";
 import { Pagination } from "../../../shared/components/ui/Pagination";
 import { Result } from "../../../shared/components/ui/Result";
@@ -15,6 +16,10 @@ type OpenRouterSearchProps = {
   /** 고른 모델의 Model ID */
   selectedId: string | undefined;
   onSelect: (model: OpenRouterModel) => void;
+  /** 있으면 이 일수 안에 올라온 새 모델만 보여 줌 */
+  newDays?: number;
+  /** 새 모델만 보다가 전체 모델 보기로 바꿈 */
+  onShowAll: () => void;
 };
 
 type SearchState = { q?: string; page: number };
@@ -23,11 +28,24 @@ type SearchState = { q?: string; page: number };
 export function OpenRouterSearch({
   selectedId,
   onSelect,
+  newDays,
+  onShowAll,
 }: OpenRouterSearchProps) {
   const [search, setSearch] = useState<SearchState>({ page: 1 });
+  const query = { ...search, newDays };
   return (
     <section className="flex flex-col gap-2.5">
       <h3 className="font-bold">1. OpenRouter 모델 찾기</h3>
+      {newDays !== undefined && (
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-yellow-50 px-4 py-3">
+          <p className="text-body-sm text-grey-700">
+            최근 {newDays}일 안에 올라온 새 모델만 보고 있어요.
+          </p>
+          <Button variant="secondary" size="sm" onClick={onShowAll}>
+            전체 모델 보기
+          </Button>
+        </div>
+      )}
       <SearchField
         label="OpenRouter 모델 검색"
         placeholder="모델명 또는 Model ID로 검색하세요"
@@ -41,10 +59,10 @@ export function OpenRouterSearch({
       <DataBlock
         fallback={<ResultsSkeleton />}
         errorTitle="OpenRouter 모델 목록을 불러오지 못했어요"
-        resetKey={JSON.stringify(openRouterModelsQuery(search).queryKey)}
+        resetKey={JSON.stringify(openRouterModelsQuery(query).queryKey)}
       >
         <Results
-          search={search}
+          search={query}
           selectedId={selectedId}
           onSelect={onSelect}
           onPageChange={(page) => setSearch({ ...search, page })}
@@ -66,8 +84,8 @@ function ResultsSkeleton() {
   );
 }
 
-type ResultsProps = OpenRouterSearchProps & {
-  search: SearchState;
+type ResultsProps = Pick<OpenRouterSearchProps, "selectedId" | "onSelect"> & {
+  search: SearchState & { newDays?: number };
   onPageChange: (page: number) => void;
 };
 

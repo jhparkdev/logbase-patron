@@ -1,5 +1,9 @@
 import { useId } from "react";
 import type { components } from "../../../shared/api/schema";
+import {
+  BAR_FILL_CLASS,
+  barFillStyle,
+} from "../../../shared/components/ui/UsageBar";
 import { serviceBudgetShare } from "../../../shared/lib/budget";
 import {
   formatCount,
@@ -52,9 +56,8 @@ export function CustomerServiceList({ services }: { services: Service[] }) {
                   className="h-1.5 rounded-full bg-grey-100"
                 >
                   <div
-                    className="h-full rounded-full bg-brand"
-                    // 너비는 서버가 준 비중에서 정해지므로 inline style로 둔다.
-                    style={{ width: `${share.width}%` }}
+                    className={`h-full rounded-full bg-brand ${BAR_FILL_CLASS}`}
+                    style={barFillStyle(share.width)}
                   />
                 </div>
               )}

@@ -8,6 +8,10 @@ type SidePanelProps = {
   children: ReactNode;
 };
 
+// 열릴 때 오른쪽에서 미끄러져 들어오고 배경이 서서히 어두워진다. 규격은 docs/design/tokens.md "모션"
+const OPEN_MOTION_CLASS =
+  "motion-safe:transition-[translate] motion-safe:duration-250 motion-safe:ease-out motion-safe:starting:open:translate-x-full motion-safe:backdrop:transition-colors motion-safe:backdrop:duration-250 motion-safe:starting:open:backdrop:bg-grey-900/0";
+
 /**
  * 화면 오른쪽에서 열리는 상세 패널. 열려 있는 동안 뒤 화면은 누를 수 없고,
  * 키보드 포커스는 패널 안에 머문다(브라우저 기본 모달 dialog).
@@ -28,7 +32,7 @@ export function SidePanel({ title, onClose, children }: SidePanelProps) {
         event.preventDefault();
         onClose();
       }}
-      className="my-0 mr-0 ml-auto h-dvh max-h-none w-130 max-w-full bg-white text-grey-900 backdrop:bg-grey-900/50"
+      className={`my-0 mr-0 ml-auto h-dvh max-h-none w-130 max-w-full bg-white text-grey-900 backdrop:bg-grey-900/50 ${OPEN_MOTION_CLASS}`}
     >
       <div className="flex h-full flex-col">
         <header className="flex items-center justify-between gap-4 border-b border-grey-100 px-6 py-5">

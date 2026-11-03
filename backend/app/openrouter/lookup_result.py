@@ -48,6 +48,8 @@ class ModelInfo(BaseModel):
     supported_parameters: list[str]
     context_length: int | None = None
     expiration_date: date | None = None
+    # OpenRouter에 올라온 시각(UTC). 주지 않거나 읽을 수 없으면 None이다
+    created_at: datetime | None = None
     # reasoning 항목이 없거나 모양이 틀리면 None이다(정보 없음)
     reasoning: ReasoningInfo | None = None
 

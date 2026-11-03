@@ -149,6 +149,19 @@ async def list_subscriptions(
     )
 
 
+async def get_subscription(
+    session: AsyncSession, subscription_id: int
+) -> SubscriptionRow | None:
+    """번호로 구독료 한 건을 읽는다. 기간과 상관없이 찾고, 없으면 None이다."""
+    result = await session.execute(
+        select(SubscriptionCost, Project.name)
+        .outerjoin(Project, Project.project_id == SubscriptionCost.project_id)
+        .where(SubscriptionCost.subscription_id == subscription_id)
+    )
+    row = result.one_or_none()
+    return None if row is None else _row(row[0], row[1])
+
+
 async def list_project_options(session: AsyncSession) -> list[SubscriptionProject]:
     """구독료를 배분할 수 있는 프로젝트. 사용 중인 프로젝트만 이름순으로 준다."""
     result = await session.execute(
@@ -185,7 +198,7 @@ async def _project_name(session: AsyncSession, project_id: int | None) -> str | 
 async def create_subscription(
     session: AsyncSession, values: Mapping[str, Any], user_id: int
 ) -> SubscriptionRow:
-    """구독료를 진행 중(ACTIVE) 상태로 등록한다. values는 SubscriptionCreate의 필드와 같다."""
+    """구독료를 등록한다. 상태를 주지 않으면 진행 중(ACTIVE)이다. values는 SubscriptionCreate의 필드와 같다."""
     if values["project_id"] is not None:
         await _require_project(session, values["project_id"])
     duplicate = await session.scalar(
@@ -197,9 +210,10 @@ async def create_subscription(
     if duplicate is not None:
         raise SubscriptionDuplicateError
     columns = {column: values[name] for name, column in CREATE_COLUMNS.items()}
+    status = SubscriptionStatus(values.get("status", SubscriptionStatus.ACTIVE)).value
     subscription = SubscriptionCost(
         **columns,
-        status=SubscriptionStatus.ACTIVE.value,
+        status=status,
         created_by=user_id,
         updated_by=user_id,
     )
@@ -210,16 +224,18 @@ async def create_subscription(
         # 위의 중복 확인과 저장 사이에 같은 구독이 먼저 들어간 경우다. 다른 제약은 입력 검증이 막는다
         await session.rollback()
         raise SubscriptionDuplicateError from error
+    changes = {
+        column: {"old": None, "new": _loggable(value)}
+        for column, value in columns.items()
+        if value is not None
+    }
+    changes["status"] = {"old": None, "new": status}
     session.add(
         ChangeLog(
             entity_type=ENTITY_TYPE,
             entity_id=str(subscription.subscription_id),
             action=ChangeAction.CREATE.value,
-            changes={
-                column: {"old": None, "new": _loggable(value)}
-                for column, value in columns.items()
-                if value is not None
-            },
+            changes=changes,
             reason=CREATE_REASON,
             changed_by=user_id,
         )
