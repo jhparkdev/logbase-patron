@@ -2048,7 +2048,7 @@ export interface components {
             json_schema?: {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
-            execution_config?: components["schemas"]["ExecutionConfig"];
+            execution_config?: components["schemas"]["ExecutionConfig"] | null;
             routing_policy?: components["schemas"]["RoutingPolicy"];
             /** Models */
             models: components["schemas"]["ModelSelectionRequest"][];
