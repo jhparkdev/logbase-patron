@@ -89,6 +89,9 @@ test("서버가 중복이라고 거절하면 그 이유를 폼 위에 보여 주
   renderAt(`${OCTOBER}&subscription=new`);
 
   const dialog = await screen.findByRole("dialog", { name: "구독료 등록" });
+  const project =
+    within(dialog).getByLabelText<HTMLSelectElement>("귀속 프로젝트");
+  await waitFor(() => expect(project.disabled).toBe(false));
   fireEvent.change(within(dialog).getByLabelText("구독 식별값"), {
     target: { value: "command-code-team" },
   });
@@ -98,6 +101,7 @@ test("서버가 중복이라고 거절하면 그 이유를 폼 위에 보여 주
   fireEvent.change(within(dialog).getByLabelText("금액 (USD)"), {
     target: { value: "100" },
   });
+  fireEvent.change(project, { target: { value: "1" } });
   fireEvent.click(within(dialog).getByRole("button", { name: "등록" }));
 
   expect((await within(dialog).findByRole("alert")).textContent).toBe(

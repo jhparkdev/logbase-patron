@@ -3,6 +3,7 @@ import { SUBSCRIPTIONS } from "../../../test/internalBudgetApi";
 import { schemaErrors } from "../../../test/schemaErrors";
 import {
   subscriptionCreateBody,
+  subscriptionCreateSchema,
   subscriptionFormSchema,
   subscriptionFormValues,
   subscriptionUpdateBody,
@@ -14,7 +15,7 @@ const VALID = {
   type: "",
   month: "2026-10",
   amount: "600",
-  project: "",
+  project: "2",
   status: "ACTIVE",
   note: "",
 };
@@ -44,6 +45,19 @@ describe("subscriptionFormSchema", () => {
     });
   });
 
+  test("등록은 귀속 프로젝트를 고르지 않으면 알려 준다", () => {
+    expect(schemaErrors(subscriptionCreateSchema, VALID)).toEqual({});
+    expect(
+      schemaErrors(subscriptionCreateSchema, { ...VALID, project: "" }),
+    ).toEqual({ project: "귀속 프로젝트를 골라 주세요." });
+  });
+
+  test("수정은 프로젝트가 비어 있어도 통과한다. 옛 미배분 구독료의 다른 칸을 고칠 수 있어야 한다", () => {
+    expect(
+      schemaErrors(subscriptionFormSchema, { ...VALID, project: "" }),
+    ).toEqual({});
+  });
+
   test("음수 금액은 거절한다", () => {
     expect(
       schemaErrors(subscriptionFormSchema, { ...VALID, amount: "-10" }),
@@ -52,7 +66,7 @@ describe("subscriptionFormSchema", () => {
 });
 
 describe("등록·수정 요청 본문", () => {
-  test("등록은 빈 구독 종류·프로젝트·메모를 null로 보내고 상태는 보내지 않는다", () => {
+  test("등록은 빈 구독 종류·메모를 null로 보내고 프로젝트는 번호로 보내며 상태는 보내지 않는다", () => {
     expect(subscriptionCreateBody(subscriptionFormSchema.parse(VALID))).toEqual(
       {
         subscription_reference: "chatgpt-team",
@@ -60,14 +74,14 @@ describe("등록·수정 요청 본문", () => {
         subscription_type: null,
         applied_month: "2026-10",
         amount_usd: "600",
-        project_id: null,
+        project_id: 2,
         note: null,
       },
     );
   });
 
   test("수정은 바꾼 칸만 보낸다. 바꿀 수 있는 칸은 금액·프로젝트·상태·메모다", () => {
-    const before = subscriptionFormSchema.parse(VALID);
+    const before = subscriptionFormSchema.parse({ ...VALID, project: "1" });
     expect(
       subscriptionUpdateBody(before, {
         ...before,
@@ -87,15 +101,18 @@ describe("등록·수정 요청 본문", () => {
     ).toEqual({ amount_usd: "700" });
   });
 
-  test("수정에서 프로젝트·메모를 비우면 null로 보내 지운다", () => {
-    const before = subscriptionFormSchema.parse({
-      ...VALID,
-      project: "2",
-      note: "메모",
+  test("수정에서 메모를 비우면 null로 보내 지운다", () => {
+    const before = subscriptionFormSchema.parse({ ...VALID, note: "메모" });
+    expect(subscriptionUpdateBody(before, { ...before, note: "" })).toEqual({
+      note: null,
     });
+  });
+
+  test("수정에서 프로젝트를 바꾸지 않으면 보내지 않는다. 비어 있던 옛 구독료도 null을 보내지 않는다", () => {
+    const before = subscriptionFormSchema.parse({ ...VALID, project: "" });
     expect(
-      subscriptionUpdateBody(before, { ...before, project: "", note: "" }),
-    ).toEqual({ project_id: null, note: null });
+      subscriptionUpdateBody(before, { ...before, status: "CANCELLED" }),
+    ).toEqual({ status: "CANCELLED" });
   });
 });
 
