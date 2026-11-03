@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import {
   FIELD_INPUT_CLASS,
   FIELD_TEXTAREA_CLASS,
@@ -7,7 +7,6 @@ import {
   FormField,
   FormHint,
 } from "../../../shared/components/ui/PanelForm";
-import { Select } from "../../../shared/components/ui/Select";
 import type { SubscriptionProject } from "../api/budget";
 import {
   emptySubscription,
@@ -18,10 +17,8 @@ import {
 } from "../lib/forms";
 import { SubscriptionFixedFields } from "./SubscriptionFixedFields";
 import { SubscriptionNewFields } from "./SubscriptionNewFields";
+import { SubscriptionProjectField } from "./SubscriptionProjectField";
 import { SubscriptionStatusField } from "./SubscriptionStatusField";
-
-/** 아직 프로젝트를 고르지 않은 상태를 보여 주는 안내 항목. 고르면 제출되지 않는다. */
-const PLACEHOLDER_OPTION = { value: "", label: "프로젝트를 골라 주세요" };
 
 /** 등록·수정이 함께 받는 props. 패널이 저장 상태와 선택지를 채운다. */
 export type SubscriptionFormCommonProps = {
@@ -76,9 +73,6 @@ export function SubscriptionForm({
     reValidateMode: "onSubmit",
   });
 
-  // 프로젝트가 이미 있는 구독료는 비울 수 없으므로 안내 항목을 두지 않는다
-  const withPlaceholder = editing === undefined || editing.project === "";
-
   return (
     <form
       noValidate
@@ -108,33 +102,12 @@ export function SubscriptionForm({
           />
         )}
       </FormField>
-      <Controller
+      <SubscriptionProjectField
         control={control}
-        name="project"
-        render={({ field, fieldState }) => (
-          <div className="flex flex-col gap-1.5">
-            <Select
-              label="귀속 프로젝트"
-              labelPosition="top"
-              value={field.value}
-              options={[
-                ...(withPlaceholder ? [PLACEHOLDER_OPTION] : []),
-                ...(projects ?? []).map((project) => ({
-                  value: String(project.project_id),
-                  label: project.name,
-                })),
-              ]}
-              onChange={field.onChange}
-              disabled={projects === undefined}
-              className="w-full"
-            />
-            {fieldState.error && (
-              <p className="text-label font-medium text-red-600">
-                {fieldState.error.message}
-              </p>
-            )}
-          </div>
-        )}
+        register={register}
+        errors={errors}
+        projects={projects}
+        withPlaceholder={editing === undefined || editing.project === ""}
       />
       {editing && <SubscriptionStatusField field={register("status")} />}
       <FormField label="메모 (선택)">

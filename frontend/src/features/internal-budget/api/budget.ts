@@ -14,6 +14,8 @@ export type ProjectBudgetRow = components["schemas"]["ProjectBudgetRow"];
 export type InternalRequestRow = components["schemas"]["InternalRequestRow"];
 export type SubscriptionRow = components["schemas"]["SubscriptionRow"];
 export type SubscriptionProject = components["schemas"]["SubscriptionProject"];
+export type MemberUsage = components["schemas"]["CommandCodeMemberUsage"];
+type ProjectRead = components["schemas"]["ProjectRead"];
 type BudgetSave = components["schemas"]["ProjectBudgetSave"];
 type SubscriptionCreate = components["schemas"]["SubscriptionCreate"];
 type SubscriptionUpdate = components["schemas"]["SubscriptionUpdate"];
@@ -36,6 +38,15 @@ export const subscriptionOptionsQuery = queryOptions({
   queryKey: [ROOT_KEY, "subscription-options"],
   queryFn: async () => unwrap(await api.GET("/api/subscriptions/options")),
   staleTime: OPTIONS_STALE_TIME_MS,
+  retry: false,
+});
+
+/** 구성원별 Command Code 사용량. 결제 기간 기준이라 조회 조건을 받지 않는다. */
+export const commandCodeUsageQuery = queryOptions({
+  queryKey: [ROOT_KEY, "command-code"],
+  queryFn: async () =>
+    unwrap(await api.GET("/api/usage/internal/command-code")),
+  staleTime: USAGE_STALE_TIME_MS,
   retry: false,
 });
 
@@ -118,9 +129,25 @@ export async function saveProjectBudget(projectId: number, body: BudgetSave) {
   );
 }
 
-/** 구독료를 등록·수정한 뒤 다시 불러올 키. 구독료 표와 요약(월 구독료·총 관리 비용)이 바뀐다. */
+/** 수정 패널이 채울 구독료 한 건. 주소만으로 열어도 목록과 상관없이 불러온다. */
+export function subscriptionDetailQuery(subscriptionId: number) {
+  return queryOptions({
+    queryKey: [ROOT_KEY, "subscription", subscriptionId],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/subscriptions/{subscription_id}", {
+          params: { path: { subscription_id: subscriptionId } },
+        }),
+      ),
+    staleTime: USAGE_STALE_TIME_MS,
+    retry: false,
+  });
+}
+
+/** 구독료를 등록·수정한 뒤 다시 불러올 키. 구독료 표, 수정한 한 건, 요약(월 구독료·총 관리 비용)이 바뀐다. */
 export const SUBSCRIPTION_AFFECTED_KEYS = [
   [ROOT_KEY, "subscriptions"],
+  [ROOT_KEY, "subscription"],
   [ROOT_KEY, "summary"],
 ];
 
@@ -138,4 +165,25 @@ export async function updateSubscription(
       body,
     }),
   );
+}
+
+/** 새 프로젝트가 생기면 다시 불러올 선택지. 조회 조건과 구독료 폼의 프로젝트 목록이 바뀐다. */
+export const PROJECT_OPTION_KEYS = [
+  [ROOT_KEY, "options"],
+  [ROOT_KEY, "subscription-options"],
+];
+
+/**
+ * 프로젝트를 이름으로 등록한다. 종류는 화면에서 고르지 않아 서버 기본값과 같은 내부 개발로 보낸다.
+ * 같은 이름이 이미 있으면(409) 서버가 기존 프로젝트를 함께 주므로 그것을 돌려준다. 화면 사용자는 이름만
+ * 적으므로 중복을 오류로 보여 주는 대신 있는 프로젝트에 귀속한다.
+ */
+export async function createProject(name: string): Promise<ProjectRead> {
+  const result = await api.POST("/api/projects", {
+    body: { name, project_type: "INTERNAL_DEV" },
+  });
+  if (result.error !== undefined && "existing" in result.error) {
+    return result.error.existing;
+  }
+  return unwrap(result);
 }

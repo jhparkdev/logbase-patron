@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useDeferredValue } from "react";
 import {
+  commandCodeUsageQuery,
   internalSummaryQuery,
   projectRowsOptions,
   requestRowsOptions,
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/_app/internal-budget")({
     }
     if (deps.view === undefined) {
       void queryClient.prefetchQuery(internalSummaryQuery(deps));
+      void queryClient.prefetchQuery(commandCodeUsageQuery);
     }
   },
   component: InternalBudgetPage,
@@ -113,7 +115,6 @@ function InternalBudgetPage() {
       {search.subscription !== undefined && (
         <SubscriptionPanel
           subscription={search.subscription}
-          search={shown}
           month={month}
           onClose={closePanel}
         />

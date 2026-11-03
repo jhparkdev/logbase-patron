@@ -53,7 +53,12 @@ test("등록 폼의 프로젝트 칸은 처음에 고르지 않은 상태이고 
   expect(project.value).toBe("");
   expect(
     Array.from(project.options).map((option) => option.textContent),
-  ).toEqual(["프로젝트를 골라 주세요", "사내 챗봇 구축", "문서 요약"]);
+  ).toEqual([
+    "프로젝트를 골라 주세요",
+    "사내 챗봇 구축",
+    "문서 요약",
+    "새 프로젝트 추가…",
+  ]);
   expect(screen.queryByText("미배분")).toBeNull();
 });
 
@@ -93,9 +98,54 @@ test("등록 폼을 채우면 입력한 값으로 등록을 요청한다", async
       month: "2026-10",
       amount: "300",
       project: "2",
+      newProjectName: "",
       status: "ACTIVE",
       note: "",
     }),
+  );
+});
+
+test("귀속 프로젝트에서 새 프로젝트 추가를 고르면 이름 칸이 나오고, 비워 두면 알려 준다", async () => {
+  const onSubmit = vi.fn();
+  render(
+    <SubscriptionForm
+      defaultMonth="2026-10"
+      projects={PROJECTS}
+      onSubmit={onSubmit}
+      onClose={vi.fn()}
+    />,
+  );
+
+  expect(screen.queryByLabelText("새 프로젝트 이름")).toBeNull();
+  fireEvent.change(screen.getByLabelText("귀속 프로젝트"), {
+    target: { value: "new" },
+  });
+  fireEvent.change(screen.getByLabelText("구독 식별값"), {
+    target: { value: "claude-team" },
+  });
+  fireEvent.change(screen.getByLabelText("도구명"), {
+    target: { value: "Claude Team" },
+  });
+  fireEvent.change(screen.getByLabelText("금액 (USD)"), {
+    target: { value: "300" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "등록" }));
+  expect(
+    await screen.findByText("새 프로젝트 이름을 입력해 주세요."),
+  ).toBeTruthy();
+  expect(onSubmit).not.toHaveBeenCalled();
+
+  fireEvent.change(screen.getByLabelText("새 프로젝트 이름"), {
+    target: { value: "신규 프로젝트" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "등록" }));
+  await waitFor(() =>
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project: "new",
+        newProjectName: "신규 프로젝트",
+      }),
+    ),
   );
 });
 
@@ -145,6 +195,7 @@ test("프로젝트가 있는 구독료의 수정 폼에는 비울 수 있는 항
   expect(Array.from(project.options).map((option) => option.value)).toEqual([
     "1",
     "2",
+    "new",
   ]);
 });
 

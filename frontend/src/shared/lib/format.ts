@@ -9,16 +9,26 @@ const KST_PARTS = new Intl.DateTimeFormat("ko-KR", {
   hourCycle: "h23",
 });
 
-/** 서버가 준 UTC 시각을 KST "YYYY-MM-DD HH:mm:ss"로 표시한다. */
-export function formatKstDateTime(utc: string): string {
+function kstParts(utc: string) {
   const date = new Date(utc);
   if (Number.isNaN(date.getTime())) {
     throw new Error("시각으로 읽을 수 없는 값입니다.");
   }
-  const part = Object.fromEntries(
+  return Object.fromEntries(
     KST_PARTS.formatToParts(date).map(({ type, value }) => [type, value]),
   );
+}
+
+/** 서버가 준 UTC 시각을 KST "YYYY-MM-DD HH:mm:ss"로 표시한다. */
+export function formatKstDateTime(utc: string): string {
+  const part = kstParts(utc);
   return `${part.year}-${part.month}-${part.day} ${part.hour}:${part.minute}:${part.second}`;
+}
+
+/** 서버가 준 UTC 시각을 KST 날짜 "YYYY-MM-DD"로 표시한다. 결제 기간처럼 날짜만 보여 줄 때 쓴다. */
+export function formatKstDate(utc: string): string {
+  const part = kstParts(utc);
+  return `${part.year}-${part.month}-${part.day}`;
 }
 
 const GROUPING = new Intl.NumberFormat("ko-KR");
