@@ -185,6 +185,7 @@ class BudgetUsage(BaseModel):
     remaining_usd: Decimal | None
     unknown_cost_count: int  # 사용액에 반영되지 않은 호출 수
     status: BudgetStatus
+    warning_threshold_pct: Decimal  # 상태 판단에 쓰는 WARNING 기준 사용률
 
 
 class CustomerUsageRow(BaseModel):
@@ -243,6 +244,7 @@ class CustomerServiceUsage(BaseModel):
     call_count: int
     confirmed_cost_usd: Decimal
     estimated_cost_usd: Decimal
+    total_cost_usd: Decimal  # 확정 + 추정. 미확인은 금액을 모르므로 건수로만 센다
     unknown_cost_count: int
     budget_share_pct: Decimal | None  # 예산이 없으면 null
 

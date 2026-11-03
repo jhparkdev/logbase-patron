@@ -17,7 +17,7 @@ from app.schemas.project_detail import (
     ProjectSubscription,
     ProjectUsageDetail,
 )
-from app.services.budget_policy import evaluate_budget, share_of_budget
+from app.services.budget_policy import WARNING_PCT, evaluate_budget, share_of_budget
 from app.services.internal_usage import api_conditions, cost_measures
 from app.services.project_budgets import budget_conditions, month_period
 
@@ -52,6 +52,7 @@ def _budget_usage(
         remaining_usd=evaluation.remaining_usd,
         unknown_cost_count=unknown_count,
         status=evaluation.status,
+        warning_threshold_pct=WARNING_PCT,
     )
 
 
