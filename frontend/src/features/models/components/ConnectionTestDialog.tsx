@@ -8,7 +8,7 @@ import {
   FormField,
   FormHint,
 } from "../../../shared/components/ui/PanelForm";
-import type { ModelRow } from "../api/models";
+import type { ConnectionTestResult, ModelRow } from "../api/models";
 import { useRunConnectionTest } from "../hooks/useRunConnectionTest";
 import {
   MAX_TEST_PROMPT_LENGTH,
@@ -24,6 +24,8 @@ const RUN_FAILED_MESSAGE = "테스트를 실행하지 못했어요. 다시 시�
 type ConnectionTestDialogProps = {
   model: Pick<ModelRow, "model_id" | "display_name">;
   onClose: () => void;
+  /** 결과를 창 밖(패널)에서도 보여 줄 때. 창을 닫을지는 받는 쪽이 정함 */
+  onResult?: (result: ConnectionTestResult) => void;
 };
 
 /**
@@ -33,6 +35,7 @@ type ConnectionTestDialogProps = {
 export function ConnectionTestDialog({
   model,
   onClose,
+  onResult,
 }: ConnectionTestDialogProps) {
   const run = useRunConnectionTest(model.model_id);
   const formId = useId();
@@ -70,7 +73,9 @@ export function ConnectionTestDialog({
         <form
           id={formId}
           noValidate
-          onSubmit={handleSubmit((values) => run.mutate(values.prompt))}
+          onSubmit={handleSubmit((values) =>
+            run.mutate(values.prompt, { onSuccess: onResult }),
+          )}
           className="flex flex-col gap-4"
         >
           <p>{model.display_name}에 AI 호출을 한 번 보내 연결을 확인해요.</p>

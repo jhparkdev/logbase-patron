@@ -18,6 +18,21 @@ export function summaryTrend(changePct: string | null) {
   };
 }
 
+/** OpenRouter 모델 ID("openai/gpt-4o")를 연하게 보여 줄 제공사와 굵게 보여 줄 이름으로 나눈다. */
+export function modelName(modelId: string): {
+  provider?: string;
+  name: string;
+} {
+  const slash = modelId.indexOf("/");
+  if (slash === -1) {
+    return { name: modelId };
+  }
+  return {
+    provider: modelId.slice(0, slash),
+    name: modelId.slice(slash + 1),
+  };
+}
+
 export function trendDayLabel(date: string): string {
   return date.slice(5);
 }

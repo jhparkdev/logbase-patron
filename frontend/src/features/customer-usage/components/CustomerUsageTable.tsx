@@ -44,6 +44,7 @@ const COLUMNS: Column<CustomerUsageRow>[] = [
           from="/customer-usage"
           to="/customer-usage"
           search={(prev) => ({ ...prev, detail: row.customer_id ?? undefined })}
+          resetScroll={false}
         >
           {row.customer_name}
         </TextLink>

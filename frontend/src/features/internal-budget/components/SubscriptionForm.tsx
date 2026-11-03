@@ -104,7 +104,7 @@ export function SubscriptionForm({
         render={({ field }) => (
           <Select
             label="귀속 프로젝트"
-            showLabel
+            labelPosition="top"
             value={field.value}
             options={[
               UNASSIGNED_OPTION,

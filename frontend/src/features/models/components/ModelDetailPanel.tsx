@@ -9,10 +9,10 @@ import { ModelDetailContent, SECTION_TITLES } from "./ModelDetailContent";
 
 // 섹션별 로딩 자리의 높이는 실제 내용에 맞춤
 const SKELETON_SECTIONS = [
-  { title: SECTION_TITLES.basic, height: "h-40" },
-  { title: SECTION_TITLES.price, height: "h-20" },
-  { title: SECTION_TITLES.test, height: "h-14" },
-  { title: SECTION_TITLES.status, height: "h-20" },
+  { title: SECTION_TITLES.basic, height: "h-80" },
+  { title: SECTION_TITLES.price, height: "h-24" },
+  { title: SECTION_TITLES.test, height: "h-48" },
+  { title: SECTION_TITLES.status, height: "h-40" },
 ] as const;
 
 type ModelDetailPanelProps = { modelId: number; onClose: () => void };

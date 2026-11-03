@@ -13,10 +13,11 @@ import { SectionCard } from "../../../shared/components/ui/SectionCard";
 import { TableSkeleton } from "../../../shared/components/ui/TableSkeleton";
 import { TextLink } from "../../../shared/components/ui/TextLink";
 import { formatCount, formatKstDateTime } from "../../../shared/lib/format";
-import { costView } from "../../../shared/lib/request";
+import { costView, executionStatus } from "../../../shared/lib/request";
 import { type CustomerRequestRow, requestRowsOptions } from "../api/usage";
 import { usePageChange, useRequestSort } from "../hooks/useUsageList";
 import type { CustomerUsageSearch } from "../lib/search";
+import { modelName } from "../lib/view";
 import { ViewAllLink } from "./ViewAllLink";
 
 const TITLE = "상세 API 호출 내역";
@@ -27,6 +28,14 @@ const LOADING_ROWS = 5;
 const UNCLASSIFIED_LABEL = "미분류";
 /** 작업 유형이나 토큰 수를 알 수 없을 때. 비용 미확인과 달리 금액이 아니다. */
 const NO_VALUE = "–";
+
+/** 실패·Timeout 호출은 행 바탕을 연하게 물들여 훑어볼 때 먼저 보이게 한다. */
+const ROW_TINT_CLASS: Partial<
+  Record<ReturnType<typeof executionStatus>["tone"], string>
+> = {
+  red: "bg-red-50/60",
+  yellow: "bg-yellow-50/60",
+};
 
 const COLUMNS: Column<CustomerRequestRow>[] = [
   {
@@ -47,6 +56,7 @@ const COLUMNS: Column<CustomerRequestRow>[] = [
           from="/customer-usage"
           to="/customer-usage"
           search={(prev) => ({ ...prev, detail: row.customer_id ?? undefined })}
+          resetScroll={false}
         >
           {row.customer_name}
         </TextLink>
@@ -62,7 +72,15 @@ const COLUMNS: Column<CustomerRequestRow>[] = [
     key: "model",
     header: "모델",
     sortable: true,
-    render: (row) => row.model,
+    render: (row) => {
+      const { provider, name } = modelName(row.model);
+      return (
+        <>
+          {provider && <span className="text-grey-500">{provider}/</span>}
+          <span className="font-semibold">{name}</span>
+        </>
+      );
+    },
   },
   {
     key: "taskType",
@@ -144,6 +162,9 @@ function RequestRows({
         columns={COLUMNS}
         rows={data.items}
         rowKey={(row) => row.request_id}
+        rowClassName={(row) =>
+          ROW_TINT_CLASS[executionStatus(row.status).tone] ?? ""
+        }
         sort={sort}
         onSortChange={onSortChange}
         empty={

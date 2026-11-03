@@ -206,7 +206,7 @@ test("주소로 복원한 상세를 닫아도 조회 기간·필터·정렬·선
       detail: false,
     }),
   );
-  expect((screen.getByLabelText("조회 시작일") as HTMLInputElement).value).toBe(
+  expect((screen.getByLabelText("시작일") as HTMLInputElement).value).toBe(
     "2026-10-01",
   );
 });

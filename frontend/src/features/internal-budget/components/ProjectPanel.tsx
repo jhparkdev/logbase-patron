@@ -23,16 +23,15 @@ export function ProjectPanel({ projectId, month, onClose }: ProjectPanelProps) {
       onClose={onClose}
     >
       {detail.isPending && (
-        // 사용 요약(칸 3개 + 한 줄)과 같은 배치로 둔다.
-        <section className="flex flex-col gap-3">
-          <h3 className="font-bold">{month} 사용 요약</h3>
+        // 요약 카드와 칸 3개와 같은 배치로 둔다.
+        <div className="flex flex-col gap-6">
+          <Skeleton className="h-64 rounded-2xl" />
           <div className="grid grid-cols-3 gap-2">
             <Skeleton className="h-16" />
             <Skeleton className="h-16" />
             <Skeleton className="h-16" />
           </div>
-          <Skeleton className="h-5 w-2/3" />
-        </section>
+        </div>
       )}
       {detail.isError && (
         <DetailError error={detail.error} onRetry={() => detail.refetch()} />

@@ -56,7 +56,10 @@ function ModelsPage() {
         <ModelDetailPanel
           modelId={search.model}
           onClose={() =>
-            navigate({ search: (prev) => ({ ...prev, model: undefined }) })
+            navigate({
+              search: (prev) => ({ ...prev, model: undefined }),
+              resetScroll: false,
+            })
           }
         />
       )}

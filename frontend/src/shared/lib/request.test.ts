@@ -23,13 +23,13 @@ describe("costView", () => {
 
 describe("executionStatus", () => {
   test.each([
-    ["PENDING", "대기"],
-    ["RUNNING", "실행 중"],
-    ["SUCCESS", "성공"],
-    ["FAILED", "실패"],
-    ["TIMEOUT", "Timeout"],
-    ["CANCELLED", "취소"],
-  ] as const)("%s는 %s로 보여 준다", (status, label) => {
-    expect(executionStatus(status).label).toBe(label);
+    ["PENDING", "대기", "grey"],
+    ["RUNNING", "실행 중", "grey"],
+    ["SUCCESS", "성공", "green"],
+    ["FAILED", "실패", "red"],
+    ["TIMEOUT", "Timeout", "yellow"],
+    ["CANCELLED", "취소", "grey"],
+  ] as const)("%s는 %s로, %s 색으로 보여 준다", (status, label, tone) => {
+    expect(executionStatus(status)).toEqual({ label, tone });
   });
 });
