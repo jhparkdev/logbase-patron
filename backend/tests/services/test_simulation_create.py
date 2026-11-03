@@ -1,6 +1,7 @@
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -13,7 +14,9 @@ from app.models import (
     UsageOrigin,
 )
 from app.models import TestType as RunType
+from app.openrouter.lookup_result import EndpointInfo
 from app.schemas.simulation import SimulationCreateRequest
+from app.services.auto_provider import AutoProviderUnavailableError
 from app.services.model_parameters import (
     ModelParameterUnsupportedError,
     ParameterSupport,
@@ -803,4 +806,76 @@ async def test_an_image_whose_file_is_gone_is_refused_before_a_run_exists() -> N
         )
 
     assert error.value.asset_ids == [BACK]
+    assert intake.nothing_was_saved()
+
+
+# --- 가장 싼 업체 자동 ---
+def endpoint(name: str, prompt: str, completion: str) -> EndpointInfo:
+    return EndpointInfo(
+        provider_name=name,
+        status=0,
+        pricing={"prompt": Decimal(prompt), "completion": Decimal(completion)},
+    )
+
+
+CHEAP = endpoint("CheapHost", "0.000001", "0.000002")
+PRICEY = endpoint("PriceyHost", "0.00001", "0.00002")
+AUTO = "AUTO_CHEAPEST"
+
+
+async def test_an_auto_slot_is_saved_with_the_real_cheapest_provider_name() -> None:
+    intake = Intake()
+    intake.providers.endpoints_by_model["vendor/model-1"] = [PRICEY, CHEAP]
+    request = custom_request(models=[selection(1, AUTO), selection(2, "DekaLLM")])
+
+    job = await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert [s.execution_provider for s in job.slots] == ["CheapHost", "DekaLLM"]
+    # DB 에 가는 값에는 AUTO_CHEAPEST 가 없다
+    assert [r.requested_provider for r in intake.recorder.created] == [
+        "CheapHost",
+        "DekaLLM",
+    ]
+    assert [r.execution_provider for r in intake.store.results] == [
+        "CheapHost",
+        "DekaLLM",
+    ]
+
+
+async def test_an_auto_slot_is_checked_against_the_chosen_providers_settings() -> None:
+    intake = Intake()
+    intake.providers.endpoints_by_model["vendor/model-1"] = [CHEAP]
+    intake.providers.by_model["vendor/model-1"] = {
+        "CheapHost": ["max_tokens", "reasoning"]
+    }
+    request = custom_request(
+        execution_config={"max_tokens": 300, "temperature": 0.5},
+        models=[selection(1, AUTO), selection(2)],
+    )
+
+    job = await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    # 뽑힌 업체가 받지 못하는 공통 설정은 그 칸에서만 빠진다
+    assert job.slots[0].execution_config == {"max_tokens": 300}
+
+
+async def test_the_run_is_rejected_and_nothing_is_saved_without_prices() -> None:
+    intake = Intake()
+    request = custom_request(models=[selection(1, AUTO), selection(2)])
+
+    with pytest.raises(AutoProviderUnavailableError) as error:
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert error.value.model_ids == [1]
+    assert intake.nothing_was_saved()
+
+
+async def test_two_auto_slots_of_one_model_are_a_duplicate_selection() -> None:
+    intake = Intake()
+    intake.providers.endpoints_by_model["vendor/model-1"] = [CHEAP]
+    request = custom_request(models=[selection(1, AUTO), selection(1, AUTO)])
+
+    with pytest.raises(DuplicateModelSelectionError):
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
     assert intake.nothing_was_saved()

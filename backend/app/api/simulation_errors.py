@@ -18,6 +18,7 @@ from app.schemas.simulation_error import (
     error_body,
     period_error_code,
 )
+from app.services.auto_provider import AutoProviderUnavailableError
 from app.services.model_parameters import ModelParameterUnsupportedError
 from app.services.simulation_cancel_service import (
     SimulationNotFoundError,
@@ -58,6 +59,7 @@ _CODE_OF_ERROR: dict[type[Exception], SimulationErrorCode] = {
     ModelImageUnsupportedError: C.MODEL_IMAGE_NOT_SUPPORTED,
     ModelImageOutputUnsupportedError: C.MODEL_IMAGE_OUTPUT_NOT_SUPPORTED,
     ModelParameterUnsupportedError: C.MODEL_PARAMETER_NOT_SUPPORTED,
+    AutoProviderUnavailableError: C.AUTO_PROVIDER_UNAVAILABLE,
     ImageRequiredError: C.IMAGE_REQUIRED,
     ImageNotFoundError: C.IMAGE_NOT_FOUND,
     EmptyImageError: C.IMAGE_EMPTY,

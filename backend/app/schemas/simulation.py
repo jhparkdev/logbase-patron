@@ -91,14 +91,22 @@ class ExecutionConfig(BaseModel):
     reasoning_effort: ReasoningEffort | None = None
 
 
+class AutoProvider(StrEnum):
+    """업체 이름 대신 쓰는 선택 값. 접수할 때 실제 업체 이름으로 바뀌며 저장되지는 않는다."""
+
+    AUTO_CHEAPEST = "AUTO_CHEAPEST"  # 예상 총비용이 가장 싼 서버 업체
+
+
 class ModelSelectionRequest(BaseModel):
     """비교 실행에서 고른 모델 한 칸. 필드 이름은 simulation_results 컬럼과 같다."""
 
     model_id: int  # models 표의 model_id
-    # 실행 Provider. 자동 라우팅이 없으므로 서버 업체가 하나뿐인 모델도 반드시 적는다
-    execution_provider: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1)
-    ]
+    # 실행 Provider. 서버 업체가 하나뿐인 모델도 반드시 적는다. AUTO_CHEAPEST 이면 접수 때
+    # 가장 싼 업체로 정해서 저장하므로 DB 에는 실제 업체 이름만 남는다
+    execution_provider: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+        | AutoProvider
+    )
     # 이 칸에만 적용할 설정. 정하지 않은 항목은 실행 공통 설정을 따르고,
     # 공통 설정이 꺼져 있으면 모델 기본값을 쓴다
     execution_config: ExecutionConfig = Field(default_factory=ExecutionConfig)
