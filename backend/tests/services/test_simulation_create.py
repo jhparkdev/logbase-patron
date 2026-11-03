@@ -39,6 +39,7 @@ from tests.services.simulation_fakes import (
     FULL_PARAMETER_SUPPORT,
     FakeImageFiles,
     FakeLookup,
+    FakeProviderParameters,
     FakeRecorder,
     FakeStore,
 )
@@ -59,12 +60,14 @@ class Intake:
         self.recorder = FakeRecorder()
         self.store = FakeStore(self.recorder)
         self.image_files = FakeImageFiles()
+        self.providers = FakeProviderParameters()
         self._next = iter(range(1, 100))
         self.deps = IntakeDeps(
             lookup=self.lookup,
             recorder=self.recorder,
             store=self.store,
             image_files=self.image_files,
+            providers=self.providers,
             now=lambda: NOW,
             new_id=lambda: uuid.UUID(int=next(self._next)),
         )
@@ -614,6 +617,86 @@ async def test_every_slot_with_a_bad_value_is_reported_at_once() -> None:
         await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
 
     assert error.value.model_ids == [1, 2]
+
+
+# --- 서버 업체가 지원하지 않는 설정 ---
+def provider_lacks_temperature(intake: Intake) -> None:
+    """모델 1의 DekaLLM 만 temperature 를 받지 못한다. DeepInfra 는 둘 다 받는다."""
+    intake.providers.by_model["vendor/model-1"] = {
+        "DeepInfra": ["max_tokens", "temperature", "reasoning"],
+        "DekaLLM": ["max_tokens", "reasoning"],
+    }
+
+
+async def test_a_run_setting_is_left_out_only_of_the_provider_that_cannot_take_it() -> (
+    None
+):
+    intake = Intake()
+    provider_lacks_temperature(intake)
+    request = custom_request(
+        execution_config={"max_tokens": 300, "temperature": 0.5},
+        models=[selection(1), selection(1, "DekaLLM")],
+    )
+
+    job = await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    first, second = [slot.execution_config for slot in job.slots]
+    assert first == {"max_tokens": 300, "temperature": 0.5}
+    assert second == {"max_tokens": 300}
+    assert [r.execution_config for r in intake.recorder.created] == [first, second]
+
+
+async def test_a_value_typed_into_a_provider_that_cannot_take_it_is_rejected() -> None:
+    intake = Intake()
+    provider_lacks_temperature(intake)
+    request = custom_request(
+        models=[selection(1), tuned(1, "DekaLLM", temperature=0.2)]
+    )
+
+    with pytest.raises(ModelParameterUnsupportedError) as error:
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert error.value.model_ids == [1]
+    assert error.value.parameters == ["temperature"]
+    assert intake.nothing_was_saved()
+
+
+async def test_each_model_is_asked_for_its_providers_once() -> None:
+    intake = Intake()
+    request = custom_request(
+        models=[selection(1), selection(1, "DekaLLM"), selection(2)]
+    )
+
+    await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert intake.providers.asked == ["vendor/model-1", "vendor/model-2"]
+
+
+async def test_unreadable_providers_fall_back_to_the_model_check() -> None:
+    # 업체 목록을 못 읽었다고 접수를 막지 않는다. 모델이 받는 설정은 그대로 보낸다
+    intake = Intake()
+    request = custom_request(
+        models=[tuned(1, temperature=0.2), tuned(2, "DekaLLM", reasoning_effort="low")]
+    )
+
+    job = await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert [slot.execution_config for slot in job.slots] == [
+        {"max_tokens": DEFAULT_MAX_TOKENS, "temperature": 0.2},
+        {"max_tokens": DEFAULT_MAX_TOKENS, "reasoning_effort": "low"},
+    ]
+
+
+async def test_a_provider_missing_from_the_list_falls_back_to_the_model_check() -> None:
+    intake = Intake()
+    provider_lacks_temperature(intake)
+    request = custom_request(
+        models=[tuned(1, "Parasail", temperature=0.2), selection(2)]
+    )
+
+    job = await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert job.slots[0].execution_config["temperature"] == 0.2
 
 
 FRONT, BACK = uuid.UUID(int=31), uuid.UUID(int=32)
