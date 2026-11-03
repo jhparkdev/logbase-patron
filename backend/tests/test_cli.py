@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import cli
 from app.models import APIKey, User, UserSession
 from app.services import usage_catalog
+from app.services.provider_price_sync import SyncSummary
 from tests.db_helpers import Factory
 
 # 데이터 요약 시나리오에 구조화 조건을 더한 시각(KST 2026-11-02 17:00)
@@ -558,3 +559,45 @@ async def test_catalog_command_runner_registers_rows_and_reports_ids(
     assert key is not None
     assert key.secret_ref == "CUSTOMER_API_KEY"
     assert key.service_id is not None
+
+
+# --- provider-prices-sync ---
+PRICE_SYNC_ARGS = ["provider-prices-sync"]
+PRICE_SYNC_SUMMARY = SyncSummary(
+    models=3, failed_models=1, added=4, changed=2, unchanged=5, skipped_providers=1
+)
+
+
+@pytest.fixture
+def price_syncs(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    calls: list[str] = []
+
+    async def fake_run_price_sync() -> SyncSummary:
+        calls.append("run")
+        return PRICE_SYNC_SUMMARY
+
+    monkeypatch.setattr(cli, "run_price_sync", fake_run_price_sync)
+    monkeypatch.setattr(cli, "current_app_env", lambda: "development")
+    return calls
+
+
+def test_price_sync_reports_what_it_did(
+    price_syncs: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cli.main(PRICE_SYNC_ARGS) == 0
+
+    assert price_syncs == ["run"]
+    output = capsys.readouterr().out
+    for expected in ("모델 3개", "추가 4", "변경 2", "그대로 5", "받지 못한 모델 1"):
+        assert expected in output
+
+
+def test_price_sync_requires_production_confirmation_before_db(
+    monkeypatch: pytest.MonkeyPatch, price_syncs: list[str]
+) -> None:
+    monkeypatch.setattr(cli, "current_app_env", lambda: "production")
+
+    assert cli.main(PRICE_SYNC_ARGS) == 1
+    assert price_syncs == []
+    assert cli.main([*PRICE_SYNC_ARGS, "--confirm-production"]) == 0
+    assert price_syncs == ["run"]
