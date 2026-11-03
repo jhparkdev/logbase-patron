@@ -180,6 +180,63 @@ async def test_모델이_받을_수_있는_온도와_추론_강도를_돌려준�
         assert item["reasoning_efforts"] == efforts
 
 
+ALL_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+
+def stored(efforts: list[str] | None, mandatory: bool = False) -> dict[str, Any]:
+    return {"reasoning": {"mandatory": mandatory, "supported_efforts": efforts}}
+
+
+@pytest.mark.parametrize(
+    ("metadata", "efforts"),
+    [
+        (
+            stored(["high", "medium", "low", "minimal"]),
+            ["minimal", "low", "medium", "high"],
+        ),
+        (stored(None), ALL_EFFORTS),
+        (stored(None, mandatory=True), ALL_EFFORTS[1:]),
+        (stored([]), []),
+        (None, ALL_EFFORTS),
+    ],
+    ids=[
+        "일부 강도",
+        "모든 강도",
+        "필수 모델은 none 제외",
+        "강도 선택 없음",
+        "저장된 정보 없음",
+    ],
+)
+async def test_저장된_강도_정보가_있으면_모델별_추론_강도를_돌려준다(
+    client: AsyncClient,
+    factory: Factory,
+    metadata: dict[str, Any] | None,
+    efforts: list[str],
+) -> None:
+    created = await factory.model(
+        supported_parameters=["reasoning"], openrouter_metadata=metadata
+    )
+
+    listed = (await client.get(MODELS)).json()["items"][0]
+    detail = (await client.get(f"{MODELS}/{created['model_id']}")).json()
+
+    for item in (listed, detail):
+        assert item["reasoning_efforts"] == efforts
+
+
+async def test_추론을_받지_않는_모델은_저장된_강도가_있어도_빈_목록이다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(
+        supported_parameters=["temperature"],
+        openrouter_metadata=stored(["high"]),
+    )
+
+    item = (await client.get(MODELS)).json()["items"][0]
+
+    assert item["reasoning_efforts"] == []
+
+
 async def test_가격이_없는_모델은_current_price가_null이다(
     client: AsyncClient, factory: Factory
 ) -> None:
