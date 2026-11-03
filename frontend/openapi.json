@@ -1179,6 +1179,24 @@
             }
           },
           {
+            "name": "new_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 365,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "New Days"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -1255,7 +1273,7 @@
               "type": "integer",
               "maximum": 365,
               "minimum": 1,
-              "default": 30,
+              "default": 5,
               "title": "Days"
             }
           },
@@ -5998,6 +6016,18 @@
           "registered": {
             "type": "boolean",
             "title": "Registered"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
           }
         },
         "type": "object",
@@ -6012,7 +6042,8 @@
           "output_price_per_token",
           "supports_json_schema",
           "supports_tools",
-          "registered"
+          "registered",
+          "created_at"
         ],
         "title": "OpenRouterModelRead"
       },

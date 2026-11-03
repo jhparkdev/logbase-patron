@@ -1569,6 +1569,8 @@ export interface components {
             supports_tools: boolean;
             /** Registered */
             registered: boolean;
+            /** Created At */
+            created_at: string | null;
         };
         /**
          * OpenRouterNewModelRead
@@ -3269,6 +3271,7 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                new_days?: number | null;
                 page?: number;
                 page_size?: number;
             };
