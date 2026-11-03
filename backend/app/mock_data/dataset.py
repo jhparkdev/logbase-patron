@@ -50,7 +50,6 @@ def build_dataset() -> dict[str, list[Row]]:
         "users": members.user_rows(),
         "services": organizations.service_rows(),
         "api_keys": _with_last_used(keys.api_key_rows(), requests),
-        "command_code_keys": member_settings.command_code_key_rows(),
         "models": model_catalog.model_rows(snapshot),
         "user_model_favorites": member_settings.favorite_rows(),
         "model_prices": model_catalog.model_price_rows(snapshot),

@@ -1,9 +1,12 @@
-"""구성원 설정: 시뮬레이터 모델 즐겨찾기와 구성원별 Command Code Key 참조 이름."""
+"""구성원 설정: 시뮬레이터 모델 즐겨찾기.
+
+구성원별 Command Code Key는 실제 Key로 외부 사용량을 조회하므로 seed에 넣지 않는다.
+실제 구성원은 `app.cli command-code-key-register`로 등록한다.
+"""
 
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.mock_data.members import USERS
 from app.mock_data.period import kst
 from app.mock_data.routes import model_id
 from app.mock_data.rows import Row
@@ -29,9 +32,6 @@ FAVORITES = (
     _Favorite(5, "google/gemini-3.8-flash", "Google AI Studio", kst(9, 8, 16)),
     _Favorite(5, "anthropic/claude-haiku-5.5", "Anthropic", kst(10, 14, 9, 30)),
 )
-# 키를 새로 발급받아 이전 참조를 비활성화한 구성원과 그 시각
-ROTATED_KEYS = {3: kst(10, 10, 11)}
-KEYS_ISSUED_AT = kst(8, 3, 10)
 
 
 def favorite_rows() -> list[Row]:
@@ -44,35 +44,3 @@ def favorite_rows() -> list[Row]:
         }
         for f in FAVORITES
     ]
-
-
-def _secret_ref(user_code: str, version: int = 1) -> str:
-    base = f"COMMAND_CODE_KEY_{user_code.replace('-', '_')}"
-    return base if version == 1 else f"{base}_V{version}"
-
-
-def command_code_key_rows() -> list[Row]:
-    rows: list[Row] = []
-    for user in USERS:
-        rotated_at = ROTATED_KEYS.get(user.user_id)
-        closed_at = rotated_at or user.deactivated_at
-        rows.append(
-            {
-                "member_name": user.name,
-                "secret_ref": _secret_ref(user.user_code),
-                "is_active": closed_at is None,
-                "created_at": KEYS_ISSUED_AT,
-                "updated_at": closed_at or KEYS_ISSUED_AT,
-            }
-        )
-        if rotated_at is not None:
-            rows.append(
-                {
-                    "member_name": user.name,
-                    "secret_ref": _secret_ref(user.user_code, version=2),
-                    "is_active": True,
-                    "created_at": rotated_at,
-                    "updated_at": rotated_at,
-                }
-            )
-    return [{"command_code_key_id": n, **row} for n, row in enumerate(rows, start=1)]

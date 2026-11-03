@@ -32,7 +32,7 @@ EXPECTED_ROWS = {
     "users": 6,
     "services": 5,
     "api_keys": 17,
-    "command_code_keys": 7,
+    "command_code_keys": 0,
     "user_sessions": 0,
     "models": 15,
     "user_model_favorites": 10,

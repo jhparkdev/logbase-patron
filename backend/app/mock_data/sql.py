@@ -27,7 +27,6 @@ TABLE_ORDER = (
     "users",
     "services",
     "api_keys",
-    "command_code_keys",
     "models",
     "user_model_favorites",
     "model_prices",

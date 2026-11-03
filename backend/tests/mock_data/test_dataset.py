@@ -19,6 +19,13 @@ def test_every_seed_table_is_built_in_insert_order(data: dict) -> None:
     assert data["ai_requests"] and data["simulation_runs"] and data["budgets"]
 
 
+def test_command_code_keys_are_left_for_real_members(data: dict) -> None:
+    # 구성원별 Command Code Key는 환경변수의 실제 Key로 외부 사용량을 조회한다.
+    # 가상 구성원을 넣으면 화면에 "불러오지 못함" 줄만 생기므로, CLI 등록(command-code-key-register)에 맡긴다.
+    assert "command_code_keys" not in data
+    assert "command_code_keys" not in sql.TABLE_ORDER
+
+
 def test_rows_use_only_real_columns_and_skip_generated_ones(data: dict) -> None:
     for table, rows in data.items():
         columns = TABLES[table].c
