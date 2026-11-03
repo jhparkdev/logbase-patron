@@ -9,8 +9,8 @@
   --text-*: initial;
 
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic",
-    system-ui, sans-serif;
+    "Inter", "Noto Sans KR", -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 
   /* TDS 타이포그래피 표에서 데스크톱에 쓰는 크기 */
   --text-title: 26px;
@@ -125,7 +125,11 @@
 }
 
 @layer base {
+  /*
+   * 한글은 단어 중간에서 끊지 않는다. 칸보다 긴 단어만 넘치지 않게 끊는다.
+   * 짧은 글은 줄 길이를 고르게 나눈다. 원문 줄바꿈을 그대로 보여 주는 곳은 text-wrap으로 되돌린다.
+   */
   body {
-    @apply bg-surface text-body text-grey-900;
+    @apply bg-surface text-body text-grey-900 break-keep break-words text-balance;
   }
 }

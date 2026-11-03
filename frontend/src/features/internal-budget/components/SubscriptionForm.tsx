@@ -13,14 +13,15 @@ import {
   emptySubscription,
   type SubscriptionFormInput,
   type SubscriptionFormValues,
+  subscriptionCreateSchema,
   subscriptionFormSchema,
 } from "../lib/forms";
 import { SubscriptionFixedFields } from "./SubscriptionFixedFields";
 import { SubscriptionNewFields } from "./SubscriptionNewFields";
 import { SubscriptionStatusField } from "./SubscriptionStatusField";
 
-/** 귀속 프로젝트를 고르지 않은 구독료 */
-const UNASSIGNED_OPTION = { value: "", label: "미배분" };
+/** 아직 프로젝트를 고르지 않은 상태를 보여 주는 안내 항목. 고르면 제출되지 않는다. */
+const PLACEHOLDER_OPTION = { value: "", label: "프로젝트를 골라 주세요" };
 
 /** 등록·수정이 함께 받는 props. 패널이 저장 상태와 선택지를 채운다. */
 export type SubscriptionFormCommonProps = {
@@ -48,7 +49,11 @@ type SubscriptionFormProps = SubscriptionFormCommonProps &
       }
   );
 
-/** 구독료 등록·수정 폼. 제출할 때만 검증한다. 상태는 수정에서만 바꾼다. */
+/**
+ * 구독료 등록·수정 폼. 제출할 때만 검증한다. 상태는 수정에서만 바꾼다.
+ * 등록은 귀속 프로젝트를 반드시 골라야 한다. 수정은 프로젝트를 비울 수 없고,
+ * 옛 미배분 구독료(프로젝트가 비어 있음)만 그대로 두고 다른 칸을 저장할 수 있다.
+ */
 export function SubscriptionForm({
   projects,
   submitting = false,
@@ -65,9 +70,14 @@ export function SubscriptionForm({
     formState: { errors },
   } = useForm<SubscriptionFormInput, unknown, SubscriptionFormValues>({
     defaultValues: editing ?? emptySubscription(defaultMonth),
-    resolver: zodResolver(subscriptionFormSchema),
+    resolver: zodResolver(
+      editing ? subscriptionFormSchema : subscriptionCreateSchema,
+    ),
     reValidateMode: "onSubmit",
   });
+
+  // 프로젝트가 이미 있는 구독료는 비울 수 없으므로 안내 항목을 두지 않는다
+  const withPlaceholder = editing === undefined || editing.project === "";
 
   return (
     <form
@@ -101,22 +111,29 @@ export function SubscriptionForm({
       <Controller
         control={control}
         name="project"
-        render={({ field }) => (
-          <Select
-            label="귀속 프로젝트"
-            showLabel
-            value={field.value}
-            options={[
-              UNASSIGNED_OPTION,
-              ...(projects ?? []).map((project) => ({
-                value: String(project.project_id),
-                label: project.name,
-              })),
-            ]}
-            onChange={field.onChange}
-            disabled={projects === undefined}
-            className="w-full"
-          />
+        render={({ field, fieldState }) => (
+          <div className="flex flex-col gap-1.5">
+            <Select
+              label="귀속 프로젝트"
+              labelPosition="top"
+              value={field.value}
+              options={[
+                ...(withPlaceholder ? [PLACEHOLDER_OPTION] : []),
+                ...(projects ?? []).map((project) => ({
+                  value: String(project.project_id),
+                  label: project.name,
+                })),
+              ]}
+              onChange={field.onChange}
+              disabled={projects === undefined}
+              className="w-full"
+            />
+            {fieldState.error && (
+              <p className="text-label font-medium text-red-600">
+                {fieldState.error.message}
+              </p>
+            )}
+          </div>
         )}
       />
       {editing && <SubscriptionStatusField field={register("status")} />}

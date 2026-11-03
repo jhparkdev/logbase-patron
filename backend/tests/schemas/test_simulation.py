@@ -129,6 +129,8 @@ def test_minimal_custom_request_gets_safe_defaults() -> None:
     assert request.scenario_id is None
     assert request.input_text is None
     assert request.json_schema is None
+    # 보내지 않으면 공통 설정을 쓰는 것으로 본다(빈 공통 설정)
+    assert request.execution_config is not None
     assert request.execution_config.model_dump(exclude_none=True) == {}
     # 비교 실행은 Fallback 을 끄는 것이 기본이다 (기준서 7.3 Benchmark 원칙)
     assert request.routing_policy.model_dump() == {"allow_fallbacks": False}
@@ -259,6 +261,12 @@ def execution_config_of(config: dict[str, object]) -> dict[str, object]:
     """요청에 담긴 실행 설정이 저장될 때의 모양. 보내지 않은 항목은 들어가지 않는다."""
     request = SimulationCreateRequest(**create_body(execution_config=config))
     return request.execution_config.model_dump(exclude_none=True)
+
+
+def test_null_execution_config_means_common_settings_are_off() -> None:
+    request = SimulationCreateRequest(**create_body(execution_config=None))
+
+    assert request.execution_config is None
 
 
 def test_execution_config_accepts_the_scenario_defaults_shape() -> None:

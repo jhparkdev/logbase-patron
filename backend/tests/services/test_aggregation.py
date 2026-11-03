@@ -1,4 +1,7 @@
-"""P-01 집계 테스트. 경계값은 만든 행으로, 합계는 Mock 기대값(Mock_예상합계값_v0.6)으로 검증한다."""
+"""P-01 집계 테스트. 경계값은 만든 행으로, 합계는 seed 기대값으로 검증한다.
+
+seed 기대값은 집계 코드를 거치지 않고 생성기(app.mock_data)가 만든 행을 직접 더해 구했다.
+"""
 
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -127,12 +130,12 @@ async def test_summary_matches_the_mock_totals_for_october(
 ) -> None:
     summary = await aggregation.summarize(db_session, OCTOBER_FILTER)
 
-    assert summary.call_count == 415
-    assert summary.success_count == 380
-    assert six_places(summary.confirmed_cost_usd) == Decimal("2.412117")
-    assert six_places(summary.estimated_cost_usd) == Decimal("0.044372")
-    assert summary.unknown_cost_count == 35
-    assert summary.input_tokens + summary.output_tokens == 1_196_551
+    assert summary.call_count == 1461
+    assert summary.success_count == 1416
+    assert six_places(summary.confirmed_cost_usd) == Decimal("6.997544")
+    assert six_places(summary.estimated_cost_usd) == Decimal("0.070391")
+    assert summary.unknown_cost_count == 42
+    assert summary.input_tokens + summary.output_tokens == 5_184_779
 
 
 @pytest.mark.usefixtures("seeded")
@@ -154,9 +157,12 @@ async def test_customer_rows_match_the_mock_totals_by_customer(
 
     by_name = {name: (t[0], six_places(t[1]), t[2]) for name, t in totals.items()}
     assert by_name == {
-        "가상고객A (패션 쇼핑몰)": (281, Decimal("2.269524"), 25),
-        "가상고객B (가전 유통)": (132, Decimal("0.186856"), 10),
-        None: (2, Decimal("0.000108"), 0),
+        "로웰린 스튜디오": (623, Decimal("4.193431"), 20),
+        "에이븐전자몰": (313, Decimal("0.259847"), 8),
+        "뮤렌 코스메틱": (322, Decimal("2.383118"), 7),
+        "솔레담 푸드": (137, Decimal("0.028476"), 7),
+        "모뉴하우스": (54, Decimal("0.043043"), 0),
+        None: (12, Decimal("0.160021"), 0),
     }
 
 
@@ -166,18 +172,26 @@ async def test_customer_budgets_match_the_mock_budget_table(
 ) -> None:
     over = await aggregation.customer_detail(db_session, 1, OCTOBER_1ST)
     normal = await aggregation.customer_detail(db_session, 2, OCTOBER_1ST)
+    warning = await aggregation.customer_detail(db_session, 3, OCTOBER_1ST)
+    unset = await aggregation.customer_detail(db_session, 5, OCTOBER_1ST)
 
     assert over is not None
     assert normal is not None
+    assert warning is not None
+    assert unset is not None
     assert over.budget.status == BudgetStatus.OVER
-    assert one_place(over.budget.usage_pct) == Decimal("115.2")
-    assert one_place(over.budget.confirmed_usage_pct) == Decimal("113.0")
-    assert six_places(over.budget.remaining_usd) == Decimal("-0.299524")
-    assert over.budget.unknown_cost_count == 25
+    assert one_place(over.budget.usage_pct) == Decimal("110.4")
+    assert one_place(over.budget.confirmed_usage_pct) == Decimal("108.8")
+    assert six_places(over.budget.remaining_usd) == Decimal("-0.393431")
+    assert over.budget.unknown_cost_count == 20
     assert normal.budget.status == BudgetStatus.NORMAL
-    assert one_place(normal.budget.usage_pct) == Decimal("55.0")
-    assert one_place(normal.budget.confirmed_usage_pct) == Decimal("54.9")
-    assert normal.budget.unknown_cost_count == 10
+    assert one_place(normal.budget.usage_pct) == Decimal("52.0")
+    assert one_place(normal.budget.confirmed_usage_pct) == Decimal("51.7")
+    assert normal.budget.unknown_cost_count == 8
+    assert warning.budget.status == BudgetStatus.WARNING
+    assert one_place(warning.budget.usage_pct) == Decimal("88.3")
+    assert six_places(warning.budget.remaining_usd) == Decimal("0.316882")
+    assert unset.budget.status == BudgetStatus.UNSET
 
 
 @pytest.mark.usefixtures("seeded")
@@ -187,8 +201,8 @@ async def test_customer_budget_for_september_uses_only_september_usage(
     detail = await aggregation.customer_detail(db_session, 1, date(2026, 9, 1))
 
     assert detail is not None
-    assert six_places(detail.budget.used_usd) == Decimal("0.498354")
-    assert one_place(detail.budget.usage_pct) == Decimal("25.3")
+    assert six_places(detail.budget.used_usd) == Decimal("2.904613")
+    assert one_place(detail.budget.usage_pct) == Decimal("76.4")
 
 
 @pytest.mark.usefixtures("seeded")

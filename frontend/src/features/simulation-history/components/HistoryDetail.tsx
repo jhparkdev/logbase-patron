@@ -67,19 +67,19 @@ export function HistoryDetail({
               <dl className="space-y-4 text-body-sm">
                 <div>
                   <dt className="font-semibold">Prompt</dt>
-                  <dd className="mt-1 whitespace-pre-wrap break-words">
+                  <dd className="mt-1 whitespace-pre-wrap text-wrap">
                     {detail.input.prompt || "미기록"}
                   </dd>
                 </div>
                 <div>
                   <dt className="font-semibold">입력 텍스트</dt>
-                  <dd className="mt-1 whitespace-pre-wrap break-words">
+                  <dd className="mt-1 whitespace-pre-wrap text-wrap">
                     {detail.input.text || "미사용"}
                   </dd>
                 </div>
                 <div>
                   <dt className="font-semibold">JSON Schema</dt>
-                  <dd className="mt-1 whitespace-pre-wrap break-words">
+                  <dd className="mt-1 whitespace-pre-wrap text-wrap">
                     {detail.input.schema || "미사용"}
                   </dd>
                 </div>
@@ -108,7 +108,7 @@ export function HistoryDetail({
               {detail.settings.map((setting) => (
                 <div key={setting.label}>
                   <dt className="text-grey-600">{setting.label}</dt>
-                  <dd className="mt-1 whitespace-pre-wrap break-words tabular-nums">
+                  <dd className="mt-1 whitespace-pre-wrap text-wrap tabular-nums">
                     {setting.value}
                   </dd>
                 </div>

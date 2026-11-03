@@ -8,7 +8,7 @@ import pytest
 from app import security
 from tests.db_helpers import T0
 
-# seed(patron_mock_data_v0.6.sql)의 admin1 해시와 개발용 비밀번호
+# seed(app/mock_data/members.py의 DEV_PASSWORD_HASH)의 관리자 해시와 개발용 비밀번호
 SEED_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$gaRyHd/7tmr/juCD6muBAg$HsHckDxel4IYHkYqpMinwJOmBAhInt2fQM+WEI7bexg"
 SEED_PASSWORD = "patron-dev-1234"
 LOWER_HEX_SHA256 = re.compile(r"^[0-9a-f]{64}$")

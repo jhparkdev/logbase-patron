@@ -8,10 +8,12 @@ from fastapi import Depends, FastAPI
 from app.api import (
     assistant,
     auth,
+    command_code,
     health,
     internal_budget,
     model_favorites,
     models,
+    projects,
     simulation_scenarios,
     simulations,
     subscriptions,
@@ -34,7 +36,9 @@ PROTECTED_ROUTERS = (
     usage.router,
     model_favorites.router,
     internal_budget.router,
+    command_code.router,
     subscriptions.router,
+    projects.router,
     simulation_scenarios.router,
 )
 

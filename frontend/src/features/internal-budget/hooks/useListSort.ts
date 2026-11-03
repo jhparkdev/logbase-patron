@@ -19,6 +19,7 @@ export function useListSort(view: BudgetListView): SortControls {
           ...listSortParams(view, nextSort(sort, key)),
           page: undefined,
         }),
+        resetScroll: false,
       }),
   };
 }

@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   useEffect,
   useId,
@@ -11,11 +11,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "../../../shared/components/ui/Button";
 import { useAssistantBridge } from "../../../shared/lib/assistant";
-import {
-  assistantStatusOptions,
-  logoutAssistant,
-  sessionOptions,
-} from "../api/assistant";
+import { assistantStatusOptions, sessionOptions } from "../api/assistant";
 import { useAssistantChat } from "../hooks/useAssistantChat";
 import {
   type AssistantPageContext,
@@ -36,8 +32,14 @@ const emptySnapshot = () => null;
 
 export function AssistantWidget({
   pageContext,
+  onLogout,
+  logoutPending,
+  logoutError,
 }: {
   pageContext?: AssistantPageContext;
+  onLogout: () => void;
+  logoutPending: boolean;
+  logoutError?: string;
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
@@ -48,7 +50,6 @@ export function AssistantWidget({
     bridge?.subscribe ?? noopSubscribe,
     bridge?.getSnapshot ?? emptySnapshot,
   );
-  const queryClient = useQueryClient();
   const session = useQuery({ ...sessionOptions, enabled: open });
   const status = useQuery({
     ...assistantStatusOptions,
@@ -61,17 +62,6 @@ export function AssistantWidget({
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: { message: "" },
-  });
-  const logout = useMutation({
-    mutationFn: logoutAssistant,
-    retry: false,
-    onSuccess: async () => {
-      chat.clear();
-      form.reset();
-      await queryClient.cancelQueries();
-      queryClient.clear();
-      queryClient.setQueryData(sessionOptions.queryKey, null);
-    },
   });
   useEffect(() => {
     if (open) heading.current?.focus();
@@ -129,8 +119,8 @@ export function AssistantWidget({
                   <Button
                     variant="secondary"
                     size="sm"
-                    disabled={chat.busy || logout.isPending}
-                    onClick={() => logout.mutate()}
+                    disabled={chat.busy || logoutPending}
+                    onClick={onLogout}
                   >
                     로그아웃
                   </Button>
@@ -207,9 +197,9 @@ export function AssistantWidget({
                   AI 도우미가 비활성화되어 있어요. 관리자에게 문의해 주세요.
                 </p>
               )}
-              {(chat.error || logout.isError) && (
+              {(chat.error || logoutError) && (
                 <p role="alert" className="px-5 py-2 text-body-sm text-red-600">
-                  {chat.error || "로그아웃하지 못했어요. 다시 시도해 주세요."}
+                  {chat.error || logoutError}
                 </p>
               )}
               <form

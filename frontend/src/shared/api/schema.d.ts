@@ -694,6 +694,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/usage/internal/command-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Command Code Usage
+         * @description 결제 기간 기준의 구성원별 사용량. 조회 기간을 받지 않고 비용 합계에도 더하지 않는다.
+         */
+        get: operations["get_command_code_usage_api_usage_internal_command_code_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/subscriptions": {
         parameters: {
             query?: never;
@@ -736,7 +756,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Read Subscription */
+        get: operations["read_subscription_api_subscriptions__subscription_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -744,6 +765,23 @@ export interface paths {
         head?: never;
         /** Update Subscription */
         patch: operations["update_subscription_api_subscriptions__subscription_id__patch"];
+        trace?: never;
+    };
+    "/api/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Project */
+        post: operations["create_project_api_projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/scenarios": {
@@ -896,6 +934,45 @@ export interface components {
          * @enum {string}
          */
         CancelDecision: "CANCEL" | "ALREADY_CANCELLED" | "ALREADY_TERMINAL";
+        /**
+         * CommandCodeMemberUsage
+         * @description 구성원 한 명의 결제 기간 사용량. status가 OK가 아니면 값은 모두 null이다(0이 아니다).
+         */
+        CommandCodeMemberUsage: {
+            /** Member Name */
+            member_name: string;
+            status: components["schemas"]["CommandCodeStatus"];
+            /** Used Credits */
+            used_credits?: string | null;
+            /** Request Count */
+            request_count?: number | null;
+            /** Input Tokens */
+            input_tokens?: number | null;
+            /** Output Tokens */
+            output_tokens?: number | null;
+            /** Remaining Credits */
+            remaining_credits?: string | null;
+            /** Period Start */
+            period_start?: string | null;
+            /** Period End */
+            period_end?: string | null;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+        };
+        /**
+         * CommandCodeStatus
+         * @description 구성원 한 줄을 읽은 결과. 프론트엔드는 OK가 아니면 "불러오지 못함"으로 보여 준다.
+         * @enum {string}
+         */
+        CommandCodeStatus: "OK" | "KEY_MISSING" | "KEY_EXPIRED" | "KEY_INVALID" | "FETCH_FAILED";
+        /** CommandCodeUsageList */
+        CommandCodeUsageList: {
+            /** Items */
+            items: components["schemas"]["CommandCodeMemberUsage"][];
+        };
         /**
          * ConnectionTestRequest
          * @description POST /api/models/{model_id}/test의 본문. 문장을 비우면 서버의 기본 문장을 쓴다.
@@ -1766,6 +1843,44 @@ export interface components {
             warning_threshold_pct: string;
         };
         /**
+         * ProjectCreate
+         * @description 프로젝트 등록. 이름이 같은 사용 중 프로젝트가 있으면 만들지 않는다(띄어쓰기·대소문자 무시).
+         */
+        ProjectCreate: {
+            /** Name */
+            name: string;
+            /** @default INTERNAL_DEV */
+            project_type: components["schemas"]["ProjectType"];
+            /** Project Code */
+            project_code?: string | null;
+        };
+        /**
+         * ProjectDuplicateResponse
+         * @description 409 본문. 화면이 새로 만들지 않고 기존 프로젝트를 바로 고를 수 있게 기존 행을 함께 준다.
+         */
+        ProjectDuplicateResponse: {
+            code: components["schemas"]["ProjectErrorCode"];
+            /** Message */
+            message: string;
+            existing: components["schemas"]["ProjectRead"];
+        };
+        /**
+         * ProjectErrorCode
+         * @description 프론트엔드는 이 값으로 상황별로 화면을 나눈다.
+         * @enum {string}
+         */
+        ProjectErrorCode: "PROJECT_DUPLICATE";
+        /** ProjectRead */
+        ProjectRead: {
+            /** Project Id */
+            project_id: number;
+            /** Project Code */
+            project_code: string;
+            /** Name */
+            name: string;
+            project_type: components["schemas"]["ProjectType"];
+        };
+        /**
          * ProjectRowSort
          * @description 프로젝트 표를 정렬할 수 있는 값. 이름은 화면 URL의 정렬 값과 같다.
          * @enum {string}
@@ -1803,6 +1918,11 @@ export interface components {
             amount_usd: string;
             status: components["schemas"]["SubscriptionStatus"];
         };
+        /**
+         * ProjectType
+         * @enum {string}
+         */
+        ProjectType: "INTERNAL_DEV" | "CUSTOMER_PROJECT" | "POC" | "TEST";
         /** ProjectUsageDetail */
         ProjectUsageDetail: {
             /** Project Id */
@@ -2010,7 +2130,7 @@ export interface components {
             json_schema?: {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
-            execution_config?: components["schemas"]["ExecutionConfig"];
+            execution_config?: components["schemas"]["ExecutionConfig"] | null;
             routing_policy?: components["schemas"]["RoutingPolicy"];
             /** Models */
             models: components["schemas"]["ModelSelectionRequest"][];
@@ -2339,7 +2459,8 @@ export interface components {
             /** Amount Usd */
             amount_usd: number | string;
             /** Project Id */
-            project_id?: number | null;
+            project_id: number;
+            status?: components["schemas"]["SubscriptionStatus"];
             /** Note */
             note?: string | null;
         };
@@ -2416,13 +2537,13 @@ export interface components {
         SubscriptionStatus: "ACTIVE" | "CANCELLED";
         /**
          * SubscriptionUpdate
-         * @description 보낸 항목만 바꾼다. project_id와 note는 null을 보내면 값이 지워진다.
+         * @description 보낸 항목만 바꾼다. note는 null을 보내면 값이 지워지고, 금액·프로젝트·상태는 비울 수 없다.
          */
         SubscriptionUpdate: {
             /** Amount Usd */
             amount_usd?: (number | string) | null;
             /** Project Id */
-            project_id?: number | null;
+            project_id?: number;
             status?: components["schemas"]["SubscriptionStatus"] | null;
             /** Note */
             note?: string | null;
@@ -4430,6 +4551,26 @@ export interface operations {
             };
         };
     };
+    get_command_code_usage_api_usage_internal_command_code_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandCodeUsageList"];
+                };
+            };
+        };
+    };
     read_subscriptions_api_subscriptions_get: {
         parameters: {
             query?: {
@@ -4530,6 +4671,46 @@ export interface operations {
             };
         };
     };
+    read_subscription_api_subscriptions__subscription_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                subscription_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionRow"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     update_subscription_api_subscriptions__subscription_id__patch: {
         parameters: {
             query?: never;
@@ -4561,6 +4742,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_project_api_projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDuplicateResponse"];
                 };
             };
             /** @description Unprocessable Content */

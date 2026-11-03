@@ -20,9 +20,7 @@ export function SummarySkeleton() {
             <Skeleton className="size-full" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <p className="text-label font-medium break-keep text-grey-600">
-              {card.label}
-            </p>
+            <p className="text-label font-medium text-grey-600">{card.label}</p>
             <Skeleton className="h-9 w-2/3" />
             {card.trend && <Skeleton className="h-5 w-1/2" />}
           </div>

@@ -24,6 +24,7 @@ const COLUMNS: ListColumn<"projects", ProjectBudgetRow>[] = [
         from="/internal-budget"
         to="/internal-budget"
         search={(prev) => ({ ...prev, detail: row.project_id })}
+        resetScroll={false}
       >
         {row.project_name}
       </TextLink>

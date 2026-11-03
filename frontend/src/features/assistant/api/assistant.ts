@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { ApiError, api, toApiError, unwrap } from "../../../shared/api/client";
+import { ApiError, api, unwrap } from "../../../shared/api/client";
 import type { components } from "../../../shared/api/schema";
 
 type Schemas = components["schemas"];
@@ -26,12 +26,6 @@ export const assistantStatusOptions = queryOptions({
 
 export async function loginAssistant(body: Schemas["LoginRequest"]) {
   return unwrap(await api.POST("/api/auth/login", { body }));
-}
-
-export async function logoutAssistant() {
-  const result = await api.POST("/api/auth/logout");
-  if (!result.response.ok)
-    throw toApiError(result.response.status, result.error);
 }
 
 export async function chatAssistant(

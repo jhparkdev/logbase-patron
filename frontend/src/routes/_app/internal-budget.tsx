@@ -62,6 +62,7 @@ function InternalBudgetPage() {
         detail: undefined,
         subscription: undefined,
       }),
+      resetScroll: false,
     });
 
   return (

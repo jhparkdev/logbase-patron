@@ -570,18 +570,33 @@ test("a patch prepared on another screen is revalidated against P04 before apply
   ).toBe(true);
 });
 
-test("logout clears the conversation and later reopen requires login", async () => {
-  stub(async () =>
-    response({ message: "로그아웃 후 사라질 대화", sources: [] }),
-  );
-  renderAt("/simulator");
-  await openChat();
-  await send();
-  await screen.findByText("로그아웃 후 사라질 대화");
-  fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
-  await screen.findByLabelText("비밀번호");
-  expect(screen.queryByText("로그아웃 후 사라질 대화")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "채팅창 닫기" }));
-  fireEvent.click(screen.getByRole("button", { name: "AI 도우미 열기" }));
-  expect(await screen.findByLabelText("비밀번호")).toBeTruthy();
-});
+test.each(["header", "assistant"])(
+  "%s logout clears the conversation and leaves the protected app",
+  async (control) => {
+    stub(async () =>
+      response({ message: "로그아웃 후 사라질 대화", sources: [] }),
+    );
+    const router = renderAt("/simulator");
+    await openChat();
+    await send();
+    await screen.findByText("로그아웃 후 사라질 대화");
+    const button =
+      control === "assistant"
+        ? within(screen.getByRole("dialog", { name: "AI 도우미" })).getByRole(
+            "button",
+            { name: "로그아웃" },
+          )
+        : screen.getByTitle("로그아웃");
+    fireEvent.click(button);
+    await screen.findByRole("heading", { level: 1, name: "로그인" });
+    expect(router.state.location.pathname).toBe("/login");
+    expect(router.state.location.search).toEqual({});
+    expect(screen.queryByText("로그아웃 후 사라질 대화")).toBeNull();
+    expect(screen.queryByRole("button", { name: "AI 도우미 열기" })).toBeNull();
+    await waitFor(() =>
+      expect(
+        router.options.context.queryClient.getQueryCache().getAll(),
+      ).toEqual([]),
+    );
+  },
+);

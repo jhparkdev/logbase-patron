@@ -17,6 +17,7 @@ from app.services.subscriptions import (
     SubscriptionNotFoundError,
     SubscriptionProjectNotFoundError,
     create_subscription,
+    get_subscription,
     list_project_options,
     list_subscriptions,
     update_subscription,
@@ -294,6 +295,31 @@ async def test_같은_기간의_목록_금액_합계가_요약의_구독료_합�
 
 
 # ---------------------------------------------------------------
+# 단건 조회
+# ---------------------------------------------------------------
+async def test_번호로_한_건을_프로젝트_이름과_함께_돌려준다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    project = await factory.project(name="알파")
+    created = await factory.subscription_cost(
+        applied_month=SEPTEMBER,
+        tool_name="도구",
+        project_id=project["project_id"],
+        status="CANCELLED",
+    )
+
+    row = await get_subscription(db_session, created["subscription_id"])
+
+    assert row is not None
+    assert (row.tool_name, row.project_name) == ("도구", "알파")
+    assert (row.applied_month, row.status) == (SEPTEMBER, SubscriptionStatus.CANCELLED)
+
+
+async def test_없는_번호는_None이다(db_session: AsyncSession) -> None:
+    assert await get_subscription(db_session, 987654) is None
+
+
+# ---------------------------------------------------------------
 # 프로젝트 선택 목록
 # ---------------------------------------------------------------
 async def test_선택_목록은_사용_중인_프로젝트만_이름순으로_돌려준다(
@@ -345,6 +371,30 @@ async def test_등록하면_진행_중_상태로_저장하고_생성_이력을_�
     }
     assert logs[0].changes["applied_month"] == {"old": None, "new": "2026-10-01"}
     assert Decimal(logs[0].changes["amount"]["new"]) == Decimal(20)
+
+
+async def test_상태를_주면_그_상태로_저장하고_이력에_상태도_남긴다(
+    db_session: AsyncSession, user_id: int
+) -> None:
+    row = await create_subscription(
+        db_session, new_values(status=SubscriptionStatus.CANCELLED), user_id
+    )
+
+    assert row.status == SubscriptionStatus.CANCELLED
+    stored = (await stored_of(db_session))[0]
+    assert stored.status == "CANCELLED"
+    logs = await logs_of(db_session, row.subscription_id)
+    assert logs[0].changes["status"] == {"old": None, "new": "CANCELLED"}
+
+
+async def test_상태를_주지_않으면_진행_중으로_저장하고_이력에_남긴다(
+    db_session: AsyncSession, user_id: int
+) -> None:
+    row = await create_subscription(db_session, new_values(), user_id)
+
+    assert row.status == SubscriptionStatus.ACTIVE
+    logs = await logs_of(db_session, row.subscription_id)
+    assert logs[0].changes["status"] == {"old": None, "new": "ACTIVE"}
 
 
 async def test_프로젝트를_정하지_않으면_미배분으로_저장한다(

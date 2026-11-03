@@ -156,6 +156,16 @@ def test_settings_that_are_not_sent_are_not_recorded() -> None:
     }
 
 
+@pytest.mark.parametrize("defaults", [None, {"temperature": 0.7, "max_tokens": 1024}])
+def test_with_common_settings_off_only_the_max_tokens_default_is_sent(
+    defaults: dict[str, object] | None,
+) -> None:
+    # 공통 설정을 끄면 시나리오 기본값도 쓰지 않는다. 칸에서 정하지 않은 항목은 모델 기본값에 맡긴다
+    assert resolve_execution_config(None, defaults) == {
+        "max_tokens": DEFAULT_MAX_TOKENS
+    }
+
+
 def test_reasoning_effort_is_kept_only_when_someone_set_it() -> None:
     assert "reasoning_effort" not in resolve_execution_config({}, None)
     assert resolve_execution_config({"reasoning_effort": "low"}, None) == {

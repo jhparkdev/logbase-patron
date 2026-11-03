@@ -30,3 +30,20 @@ test("예산이 없으면 0%가 아니라 막대 없이 안내 문구를 보여 
   expect(screen.queryByRole("meter")).toBeNull();
   expect(container.textContent).toBe("예산을 정하면 사용률이 보여요");
 });
+
+test("주의 기준을 받으면 막대 위 그 위치에 기준선을 둔다", () => {
+  const { container } = render(
+    <UsageBar usage={{ status: "normal", percent: 30 }} warningAt={80} />,
+  );
+
+  const mark = container.querySelector<HTMLElement>("[data-mark='warning']");
+  expect(mark?.style.left).toBe("80%");
+});
+
+test("예산이 없으면 주의 기준을 받아도 기준선을 두지 않는다", () => {
+  const { container } = render(
+    <UsageBar usage={{ status: "unset" }} warningAt={80} />,
+  );
+
+  expect(container.querySelector("[data-mark='warning']")).toBeNull();
+});

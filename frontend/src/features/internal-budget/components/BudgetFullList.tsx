@@ -22,7 +22,7 @@ export function BudgetFullList({
 }: BudgetFullListProps) {
   const navigate = route.useNavigate();
   const onPageChange = (page: number) =>
-    navigate({ search: (prev) => ({ ...prev, page }) });
+    navigate({ search: (prev) => ({ ...prev, page }), resetScroll: false });
 
   return (
     <>
