@@ -7949,16 +7949,9 @@
             "lt": "10000000000"
           },
           "project_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 9.223372036854776e+18,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
             "title": "Project Id"
           },
           "status": {
@@ -7983,7 +7976,8 @@
           "subscription_reference",
           "tool_name",
           "applied_month",
-          "amount_usd"
+          "amount_usd",
+          "project_id"
         ],
         "title": "SubscriptionCreate",
         "description": "구독료 등록. 같은 subscription_reference와 applied_month는 한 번만 등록할 수 있다."
@@ -8209,16 +8203,9 @@
             "title": "Amount Usd"
           },
           "project_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 9.223372036854776e+18,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
             "title": "Project Id"
           },
           "status": {
@@ -8247,7 +8234,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "SubscriptionUpdate",
-        "description": "보낸 항목만 바꾼다. project_id와 note는 null을 보내면 값이 지워진다."
+        "description": "보낸 항목만 바꾼다. note는 null을 보내면 값이 지워지고, 금액·프로젝트·상태는 비울 수 없다."
       },
       "TestType": {
         "type": "string",
