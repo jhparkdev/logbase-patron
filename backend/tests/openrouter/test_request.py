@@ -126,3 +126,65 @@ def test_온도와_추론_설정만으로는_require_parameters를_켜지_않는
     )
 
     assert "require_parameters" not in body["provider"]
+
+
+def test_캐시_설정을_정하지_않으면_본문에_cache_control이_없다() -> None:
+    body = build_request_body(model_id=MODEL_ID, messages=MESSAGES, max_tokens=100)
+
+    assert "cache_control" not in body
+
+
+def test_캐시_설정을_정하면_요청_최상위에_cache_control을_담는다() -> None:
+    body = build_request_body(
+        model_id=MODEL_ID,
+        messages=MESSAGES,
+        max_tokens=100,
+        cache_control={"type": "ephemeral"},
+    )
+
+    assert body["cache_control"] == {"type": "ephemeral"}
+
+
+def test_캐시_설정을_넣어도_다른_항목은_그대로이다() -> None:
+    plain = build_request_body(
+        model_id=MODEL_ID, messages=MESSAGES, max_tokens=100, provider_order=["A"]
+    )
+    cached = build_request_body(
+        model_id=MODEL_ID,
+        messages=MESSAGES,
+        max_tokens=100,
+        provider_order=["A"],
+        cache_control={"type": "ephemeral"},
+    )
+
+    assert {
+        key: value for key, value in cached.items() if key != "cache_control"
+    } == plain
+
+
+def test_캐시_설정은_받은_값을_복사해_담아_밖에서_바꿔도_영향이_없다() -> None:
+    control = {"type": "ephemeral"}
+    body = build_request_body(
+        model_id=MODEL_ID, messages=MESSAGES, max_tokens=100, cache_control=control
+    )
+
+    control["type"] = "changed"
+
+    assert body["cache_control"] == {"type": "ephemeral"}
+
+
+def test_업체_순서와_캐시_설정을_함께_보낼_수_있다() -> None:
+    body = build_request_body(
+        model_id=MODEL_ID,
+        messages=MESSAGES,
+        max_tokens=100,
+        provider_order=["Cheap", "Pricey"],
+        allow_fallbacks=True,
+        cache_control={"type": "ephemeral"},
+    )
+
+    assert body["provider"] == {
+        "allow_fallbacks": True,
+        "order": ["Cheap", "Pricey"],
+    }
+    assert body["cache_control"] == {"type": "ephemeral"}

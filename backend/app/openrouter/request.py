@@ -16,6 +16,7 @@ def build_request_body(
     stream: bool = False,
     temperature: float | None = None,
     reasoning_effort: str | None = None,
+    cache_control: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     # 업체 자동 전환은 기본으로 끈다. 비교 조건이 바뀌지 않게 하기 위해서다.
     provider: dict[str, Any] = {"allow_fallbacks": allow_fallbacks}
@@ -37,6 +38,9 @@ def build_request_body(
         body["temperature"] = temperature
     if reasoning_effort is not None:
         body["reasoning"] = {"effort": reasoning_effort}
+    # 캐시를 켜야 하는 모델에만 호출하는 쪽이 넣는다(services/cache_policy). 받은 값은 복사해 담는다
+    if cache_control is not None:
+        body["cache_control"] = dict(cache_control)
 
     if json_schema is not None:
         body["response_format"] = {
