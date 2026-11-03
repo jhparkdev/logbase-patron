@@ -6,6 +6,7 @@ import {
   providerOptions,
   STATUS_OPTIONS,
   statusBadge,
+  statusChangeErrorMessage,
   statusNotices,
   statusSegments,
   testCostView,
@@ -148,4 +149,21 @@ test("상태 안내는 누를 수 있는 칸마다 그 칸을 누르면 무슨 �
     "사용 중",
     "사용 중단",
   ]);
+});
+
+test("성공한 테스트가 없다는 거절은 시간 조건 없이 다음에 할 일로 바꿔 알리고, 다른 거절은 서버 문구를 쓴다", () => {
+  expect(
+    statusChangeErrorMessage(
+      "TEST_NOT_PASSED",
+      "24시간 안에 성공한 연결 테스트가 없어 바꿀 수 없습니다.",
+    ),
+  ).toBe(
+    "성공한 연결 테스트가 있어야 사용 시작할 수 있어요. 연결 테스트를 먼저 실행해 주세요.",
+  );
+  expect(
+    statusChangeErrorMessage(
+      "INVALID_STATUS_TRANSITION",
+      "현재 상태에서는 선택한 상태로 바꿀 수 없습니다.",
+    ),
+  ).toBe("현재 상태에서는 선택한 상태로 바꿀 수 없습니다.");
 });

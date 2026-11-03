@@ -1,9 +1,14 @@
+import { ApiError } from "../../../shared/api/client";
 import { Button } from "../../../shared/components/ui/Button";
 import { Dialog } from "../../../shared/components/ui/Dialog";
 import { FormHint } from "../../../shared/components/ui/PanelForm";
 import type { ModelDetail } from "../api/models";
 import { useChangeModelStatus } from "../hooks/useChangeModelStatus";
-import { type ChangeableStatus, statusChangeText } from "../lib/view";
+import {
+  type ChangeableStatus,
+  statusChangeErrorMessage,
+  statusChangeText,
+} from "../lib/view";
 import { FormError } from "./FormError";
 
 const CHANGE_FAILED_MESSAGE = "상태를 바꾸지 못했어요. 다시 시도해 주세요.";
@@ -43,7 +48,18 @@ export function StatusChangeDialog({
         </p>
         <FormHint>{text.hint}</FormHint>
         {change.isError && (
-          <FormError error={change.error} fallback={CHANGE_FAILED_MESSAGE} />
+          <FormError
+            error={change.error}
+            fallback={CHANGE_FAILED_MESSAGE}
+            message={
+              change.error instanceof ApiError
+                ? statusChangeErrorMessage(
+                    change.error.code,
+                    change.error.message,
+                  )
+                : undefined
+            }
+          />
         )}
       </div>
     </Dialog>

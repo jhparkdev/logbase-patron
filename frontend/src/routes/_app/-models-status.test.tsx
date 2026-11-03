@@ -113,7 +113,7 @@ test("확인하면 상태를 바꾸고, 창을 닫고, 응답으로 선택 칸�
   await waitFor(() => expect(listRequests()).toBe(before + 1));
 });
 
-test("서버가 거절하면 서버 문구를 창 안에 보여 주고 선택 칸은 그대로다", async () => {
+test("성공한 테스트가 없어 거절되면 시간 조건 없는 우리 문구를 창 안에 보여 주고 선택 칸은 그대로다", async () => {
   stubModelsApi({
     detail: { status: 200, body: UNPRICED_DETAIL },
     status: {
@@ -131,7 +131,7 @@ test("서버가 거절하면 서버 문구를 창 안에 보여 주고 선택 �
   fireEvent.click(dialog.getByRole("button", { name: "사용 시작" }));
 
   expect((await dialog.findByRole("alert")).textContent).toBe(
-    "24시간 안에 성공한 연결 테스트가 없어 바꿀 수 없습니다.",
+    "성공한 연결 테스트가 있어야 사용 시작할 수 있어요. 연결 테스트를 먼저 실행해 주세요.",
   );
   expect(
     panel.getByRole("button", { name: "검증 중", pressed: true }),
