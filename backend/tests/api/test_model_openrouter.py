@@ -72,6 +72,7 @@ async def test_모델_한_건의_필드를_돌려준다(
         "supports_json_schema": True,
         "supports_tools": True,
         "registered": False,
+        "created_at": None,
     }
 
 

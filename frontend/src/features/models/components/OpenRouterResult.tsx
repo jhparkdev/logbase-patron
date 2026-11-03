@@ -2,7 +2,7 @@ import { Badge } from "../../../shared/components/ui/Badge";
 import { formatCount } from "../../../shared/lib/format";
 import type { OpenRouterModel } from "../api/models";
 import { formatPricePerMillion } from "../lib/price";
-import { modalitiesFlow } from "../lib/view";
+import { modalitiesFlow, releasedLabel } from "../lib/view";
 
 const UNKNOWN_LABEL = "미확인";
 
@@ -20,6 +20,7 @@ export function OpenRouterResult({
 }: OpenRouterResultProps) {
   const inputPrice = model.input_price_per_token;
   const outputPrice = model.output_price_per_token;
+  const released = releasedLabel(model.created_at);
   return (
     <label
       className={`flex gap-3 rounded-xl border p-3 ${
@@ -45,6 +46,7 @@ export function OpenRouterResult({
             {model.openrouter_model_id}
           </span>
           <span className="ml-auto flex shrink-0 items-center gap-2 text-label">
+            {released && <span className="tabular-nums">{released}</span>}
             {model.provider}
             {model.registered && <Badge tone="grey">이미 등록됨</Badge>}
           </span>

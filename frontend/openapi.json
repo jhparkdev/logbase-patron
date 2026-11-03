@@ -1179,6 +1179,24 @@
             }
           },
           {
+            "name": "new_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 365,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "New Days"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -1210,6 +1228,75 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OpenRouterModelListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          }
+        }
+      }
+    },
+    "/api/models/openrouter/new": {
+      "get": {
+        "tags": [
+          "models",
+          "models"
+        ],
+        "summary": "List New Openrouter Models",
+        "description": "최근에 OpenRouter에 올라왔고 아직 등록하지 않은 모델. 모델 관리 화면의 신규 모델 알림에 쓴다.",
+        "operationId": "list_new_openrouter_models_api_models_openrouter_new_get",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 5,
+              "title": "Days"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 5,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenRouterNewModelsResponse"
                 }
               }
             }
@@ -5929,6 +6016,18 @@
           "registered": {
             "type": "boolean",
             "title": "Registered"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
           }
         },
         "type": "object",
@@ -5943,9 +6042,125 @@
           "output_price_per_token",
           "supports_json_schema",
           "supports_tools",
-          "registered"
+          "registered",
+          "created_at"
         ],
         "title": "OpenRouterModelRead"
+      },
+      "OpenRouterNewModelRead": {
+        "properties": {
+          "openrouter_model_id": {
+            "type": "string",
+            "title": "Openrouter Model Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Modalities"
+          },
+          "output_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Modalities"
+          },
+          "context_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Length"
+          },
+          "input_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Price Per Token"
+          },
+          "output_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Price Per Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "openrouter_model_id",
+          "name",
+          "provider",
+          "created_at",
+          "input_modalities",
+          "output_modalities",
+          "context_length",
+          "input_price_per_token",
+          "output_price_per_token"
+        ],
+        "title": "OpenRouterNewModelRead",
+        "description": "아직 등록하지 않은 새 모델 한 건. 등록 여부는 항상 \"아니오\"라 담지 않는다."
+      },
+      "OpenRouterNewModelsResponse": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OpenRouterNewModelRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "total",
+          "items"
+        ],
+        "title": "OpenRouterNewModelsResponse"
       },
       "OriginNotAllowedResponse": {
         "properties": {

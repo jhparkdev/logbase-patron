@@ -308,6 +308,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/openrouter/new": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List New Openrouter Models
+         * @description 최근에 OpenRouter에 올라왔고 아직 등록하지 않은 모델. 모델 관리 화면의 신규 모델 알림에 쓴다.
+         */
+        get: operations["list_new_openrouter_models_api_models_openrouter_new_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{model_id}/execution-providers": {
         parameters: {
             query?: never;
@@ -1549,6 +1569,44 @@ export interface components {
             supports_tools: boolean;
             /** Registered */
             registered: boolean;
+            /** Created At */
+            created_at: string | null;
+        };
+        /**
+         * OpenRouterNewModelRead
+         * @description 아직 등록하지 않은 새 모델 한 건. 등록 여부는 항상 "아니오"라 담지 않는다.
+         */
+        OpenRouterNewModelRead: {
+            /** Openrouter Model Id */
+            openrouter_model_id: string;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Input Modalities */
+            input_modalities: string[];
+            /** Output Modalities */
+            output_modalities: string[];
+            /** Context Length */
+            context_length: number | null;
+            /** Input Price Per Token */
+            input_price_per_token: string | null;
+            /** Output Price Per Token */
+            output_price_per_token: string | null;
+        };
+        /** OpenRouterNewModelsResponse */
+        OpenRouterNewModelsResponse: {
+            /** Days */
+            days: number;
+            /** Total */
+            total: number;
+            /** Items */
+            items: components["schemas"]["OpenRouterNewModelRead"][];
         };
         /**
          * OriginNotAllowedResponse
@@ -1990,7 +2048,7 @@ export interface components {
             json_schema?: {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
-            execution_config?: components["schemas"]["ExecutionConfig"];
+            execution_config?: components["schemas"]["ExecutionConfig"] | null;
             routing_policy?: components["schemas"]["RoutingPolicy"];
             /** Models */
             models: components["schemas"]["ModelSelectionRequest"][];
@@ -3213,6 +3271,7 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                new_days?: number | null;
                 page?: number;
                 page_size?: number;
             };
@@ -3229,6 +3288,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpenRouterModelListResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelErrorResponse"];
+                };
+            };
+        };
+    };
+    list_new_openrouter_models_api_models_openrouter_new_get: {
+        parameters: {
+            query?: {
+                days?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenRouterNewModelsResponse"];
                 };
             };
             /** @description Unprocessable Content */

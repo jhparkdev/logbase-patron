@@ -3,7 +3,7 @@
 외부에서 온 값이라 모양을 믿지 않는다. 구조가 틀리면 None을 돌려준다.
 """
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -68,6 +68,16 @@ def _parse_datetime(raw: Any) -> datetime | None:
         return None
 
 
+def _parse_unix_time(raw: Any) -> datetime | None:
+    # OpenRouter는 모델의 created를 초 단위 정수로 준다. 그 밖의 모양이나 범위를 벗어난 값은 정보 없음이다
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
+        return None
+    try:
+        return datetime.fromtimestamp(raw, UTC)
+    except OverflowError, OSError, ValueError:
+        return None
+
+
 def _str_list(raw: Any) -> list[str]:
     if not isinstance(raw, list):
         return []
@@ -117,6 +127,7 @@ def parse_models(body: dict[str, Any]) -> list[ModelInfo] | None:
                 supported_parameters=_str_list(item.get("supported_parameters")),
                 context_length=get_int(item, "context_length"),
                 expiration_date=_parse_date(item.get("expiration_date")),
+                created_at=_parse_unix_time(item.get("created")),
                 reasoning=_parse_reasoning(item),
             )
         )
