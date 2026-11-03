@@ -11,6 +11,7 @@ from app.api import (
     internal_budget,
     model_favorites,
     models,
+    projects,
     simulation_scenarios,
     simulations,
     subscriptions,
@@ -33,6 +34,7 @@ PROTECTED_ROUTERS = (
     model_favorites.router,
     internal_budget.router,
     subscriptions.router,
+    projects.router,
     simulation_scenarios.router,
 )
 
