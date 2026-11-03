@@ -11,6 +11,7 @@ from app.openrouter.lookup_parsing import (
     parse_keys,
     parse_models,
 )
+from app.openrouter.lookup_result import ReasoningInfo
 
 
 # ---------------------------------------------------------------
@@ -425,3 +426,66 @@ def test_업체가_하나도_없어도_정상_응답이면_빈_목록이다() ->
 )
 def test_업체_목록의_모양이_틀리면_None이다(body: dict[str, Any]) -> None:
     assert parse_endpoints(body) is None
+
+
+# ---------------------------------------------------------------
+# 모델의 추론 강도
+# ---------------------------------------------------------------
+def reasoning_of(raw: Any) -> ReasoningInfo | None:
+    models = parse_models({"data": [{"id": "a/b", "reasoning": raw}]})
+    assert models is not None
+    return models[0].reasoning
+
+
+def test_추론_항목에서_필수_여부와_고를_수_있는_강도를_꺼낸다() -> None:
+    raw = {
+        "mandatory": True,
+        "supported_efforts": ["high", "medium"],
+        "default_effort": "medium",
+    }
+
+    expected = ReasoningInfo(mandatory=True, supported_efforts=["high", "medium"])
+    assert reasoning_of(raw) == expected
+
+
+def test_강도_목록이_없으면_강도를_고를_수_없는_모델이다() -> None:
+    expected = ReasoningInfo(mandatory=False, supported_efforts=[])
+
+    assert reasoning_of({"mandatory": False}) == expected
+
+
+def test_강도_목록이_null이면_모든_강도를_받는다() -> None:
+    expected = ReasoningInfo(mandatory=False, supported_efforts=None)
+
+    assert reasoning_of({"supported_efforts": None}) == expected
+
+
+@pytest.mark.parametrize("mandatory", ["yes", 1, None])
+def test_필수_여부가_불리언이_아니면_필수가_아닌_것으로_본다(mandatory: Any) -> None:
+    info = reasoning_of({"mandatory": mandatory, "supported_efforts": []})
+
+    assert info is not None
+    assert info.mandatory is False
+
+
+def test_강도_목록의_문자열이_아닌_항목은_버린다() -> None:
+    info = reasoning_of({"supported_efforts": ["high", 5, None]})
+
+    assert info is not None
+    assert info.supported_efforts == ["high"]
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["문자열", 5, [], None, {"supported_efforts": "high"}, {"supported_efforts": 5}],
+    ids=["문자열", "숫자", "목록", "null", "강도가 문자열", "강도가 숫자"],
+)
+def test_추론_항목의_모양이_틀리면_정보_없음이다(raw: Any) -> None:
+    assert reasoning_of(raw) is None
+
+
+def test_추론_항목이_아예_없으면_정보_없음이다() -> None:
+    models = parse_models({"data": [{"id": "a/b"}]})
+
+    assert models is not None
+    assert models[0].reasoning is None
