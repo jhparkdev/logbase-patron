@@ -47,6 +47,9 @@ test("상세 패널은 서버가 준 주의 기준을 막대 기준선과 글자
   const panel = await screen.findByRole("dialog", { name: "A기업" });
   expect(within(panel).getByText("주의 기준 80%")).toBeTruthy();
   expect(panel.querySelector("[data-mark='warning']")).toBeTruthy();
+  expect(
+    within(panel).getByText(/사용률이 80% 이상이면 주의, 100% 이상이면 초과/),
+  ).toBeTruthy();
 });
 
 test("서비스별 사용액은 서버가 준 합계를 추정 포함 표시와 함께 보여 주고 화면에서 더하지 않는다", async () => {

@@ -10,6 +10,7 @@ import { TextLink } from "../../../shared/components/ui/TextLink";
 import { amountForInput } from "../../../shared/lib/budget";
 import { customerDetailQuery } from "../api/usage";
 import { useSaveCustomerBudget } from "../hooks/useSaveCustomerBudget";
+import { budgetFormHint } from "../lib/panel";
 import { CustomerServiceList } from "./CustomerServiceList";
 import { CustomerUsageSummary } from "./CustomerUsageSummary";
 
@@ -114,6 +115,7 @@ function PanelContent({
           submitting={save.isPending}
           onSubmit={(values) => save.mutate(values)}
           onClose={onClose}
+          hint={budgetFormHint(detail.budget)}
         />
       </section>
     </div>

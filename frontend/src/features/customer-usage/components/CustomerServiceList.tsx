@@ -1,11 +1,12 @@
 import { useId } from "react";
 import type { components } from "../../../shared/api/schema";
+import { serviceBudgetShare } from "../../../shared/lib/budget";
 import {
   formatCount,
   formatUsd,
   isZeroAmount,
 } from "../../../shared/lib/format";
-import { serviceBudgetShare, serviceTotal } from "../lib/panel";
+import { serviceTotal } from "../lib/panel";
 
 type Service = components["schemas"]["CustomerServiceUsage"];
 

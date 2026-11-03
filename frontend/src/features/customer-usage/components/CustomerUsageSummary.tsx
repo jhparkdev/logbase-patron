@@ -2,14 +2,18 @@ import type { ReactNode } from "react";
 import type { components } from "../../../shared/api/schema";
 import { Badge } from "../../../shared/components/ui/Badge";
 import { UsageBar } from "../../../shared/components/ui/UsageBar";
-import { budgetStatusBadge, usageView } from "../../../shared/lib/budget";
+import {
+  budgetStatusBadge,
+  remainingBudget,
+  usageView,
+} from "../../../shared/lib/budget";
 import {
   formatCount,
   formatUsd,
   isZeroAmount,
   unreflectedText,
 } from "../../../shared/lib/format";
-import { remainingBudget, warningMark } from "../lib/panel";
+import { warningMark } from "../lib/panel";
 
 type Detail = components["schemas"]["CustomerUsageDetail"];
 
