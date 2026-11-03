@@ -113,7 +113,6 @@ function InternalBudgetPage() {
       {search.subscription !== undefined && (
         <SubscriptionPanel
           subscription={search.subscription}
-          search={shown}
           month={month}
           onClose={closePanel}
         />

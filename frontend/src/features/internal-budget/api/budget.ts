@@ -118,9 +118,25 @@ export async function saveProjectBudget(projectId: number, body: BudgetSave) {
   );
 }
 
-/** 구독료를 등록·수정한 뒤 다시 불러올 키. 구독료 표와 요약(월 구독료·총 관리 비용)이 바뀐다. */
+/** 수정 패널이 채울 구독료 한 건. 주소만으로 열어도 목록과 상관없이 불러온다. */
+export function subscriptionDetailQuery(subscriptionId: number) {
+  return queryOptions({
+    queryKey: [ROOT_KEY, "subscription", subscriptionId],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/subscriptions/{subscription_id}", {
+          params: { path: { subscription_id: subscriptionId } },
+        }),
+      ),
+    staleTime: USAGE_STALE_TIME_MS,
+    retry: false,
+  });
+}
+
+/** 구독료를 등록·수정한 뒤 다시 불러올 키. 구독료 표, 수정한 한 건, 요약(월 구독료·총 관리 비용)이 바뀐다. */
 export const SUBSCRIPTION_AFFECTED_KEYS = [
   [ROOT_KEY, "subscriptions"],
+  [ROOT_KEY, "subscription"],
   [ROOT_KEY, "summary"],
 ];
 

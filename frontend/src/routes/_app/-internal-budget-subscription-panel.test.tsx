@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
-import { stubInternalBudgetApi } from "../../test/internalBudgetApi";
+import {
+  SUBSCRIPTIONS,
+  stubInternalBudgetApi,
+} from "../../test/internalBudgetApi";
 import { renderAt, routeMatch } from "../../test/renderAt";
 
 const ROUTE_ID = "/_app/internal-budget";
@@ -106,7 +109,7 @@ test("서버가 중복이라고 거절하면 그 이유를 폼 위에 보여 주
   expect(screen.getByRole("dialog", { name: "구독료 등록" })).toBeTruthy();
 });
 
-test("표의 도구명을 누르면 수정 패널이 열리고, 저장하면 바꾼 칸만 보낸다", async () => {
+test("표의 도구명을 누르면 그 구독료를 단건 조회해 수정 패널에 채우고, 저장하면 바꾼 칸만 보낸다", async () => {
   const { requests } = stubInternalBudgetApi();
   const router = renderAt(OCTOBER);
 
@@ -115,7 +118,8 @@ test("표의 도구명을 누르면 수정 패널이 열리고, 저장하면 바
 
   const dialog = await screen.findByRole("dialog", { name: "구독료 수정" });
   expect(routeMatch(router, ROUTE_ID)?.search.subscription).toBe(2);
-  expect(within(dialog).getByText("notion-ai")).toBeTruthy();
+  expect(await within(dialog).findByText("notion-ai")).toBeTruthy();
+  expect(countOf(requests, "/api/subscriptions/2")).toBe(1);
   expect(
     within(dialog).getByLabelText<HTMLInputElement>("금액 (USD)").value,
   ).toBe("20");
@@ -136,14 +140,65 @@ test("표의 도구명을 누르면 수정 패널이 열리고, 저장하면 바
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 });
 
-test("지금 목록에 없는 구독료 번호면 목록에서 열어 달라고 알린다", async () => {
+test("저장한 뒤 같은 구독료를 다시 열면 새로 불러온 값을 보여 준다", async () => {
+  const { replies } = stubInternalBudgetApi();
+  renderAt(OCTOBER);
+
+  const table = await screen.findByRole("table", { name: "구독료 관리" });
+  fireEvent.click(within(table).getByRole("link", { name: "Notion AI" }));
+  const dialog = await screen.findByRole("dialog", { name: "구독료 수정" });
+  fireEvent.change(await within(dialog).findByLabelText("금액 (USD)"), {
+    target: { value: "25" },
+  });
+  replies.subscription = {
+    status: 200,
+    body: { ...SUBSCRIPTIONS.items[1], amount_usd: "25.0000" },
+  };
+  fireEvent.click(within(dialog).getByRole("button", { name: "저장" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+  fireEvent.click(within(table).getByRole("link", { name: "Notion AI" }));
+  const reopened = await screen.findByRole("dialog", { name: "구독료 수정" });
+  await waitFor(() =>
+    expect(
+      within(reopened).getByLabelText<HTMLInputElement>("금액 (USD)").value,
+    ).toBe("25"),
+  );
+});
+
+test("없는 구독료 번호로 열면 찾을 수 없다고 알리고 저장 버튼을 두지 않는다", async () => {
+  stubInternalBudgetApi({
+    subscription: {
+      status: 404,
+      body: { code: "NOT_FOUND", message: "구독료를 찾을 수 없습니다." },
+    },
+  });
   renderAt(`${OCTOBER}&subscription=99`);
 
   const dialog = await screen.findByRole("dialog", { name: "구독료 수정" });
   expect(
-    await within(dialog).findByText("이 구독료는 지금 목록에 없어요"),
+    await within(dialog).findByText("구독료를 찾을 수 없어요"),
   ).toBeTruthy();
   expect(within(dialog).queryByRole("button", { name: "저장" })).toBeNull();
+  expect(
+    within(dialog).queryByRole("button", { name: "다시 시도" }),
+  ).toBeNull();
+});
+
+test("단건 조회가 실패하면 다시 시도 버튼으로 다시 불러온다", async () => {
+  const { replies } = stubInternalBudgetApi({
+    subscription: { status: 500, body: {} },
+  });
+  renderAt(`${OCTOBER}&subscription=2`);
+
+  const dialog = await screen.findByRole("dialog", { name: "구독료 수정" });
+  expect(
+    await within(dialog).findByText("구독료를 불러오지 못했어요"),
+  ).toBeTruthy();
+  delete replies.subscription;
+  fireEvent.click(within(dialog).getByRole("button", { name: "다시 시도" }));
+
+  expect(await within(dialog).findByText("notion-ai")).toBeTruthy();
 });
 
 test("표의 도구명으로 수정 패널을 열어도 화면을 맨 위로 올리지 않는다", async () => {

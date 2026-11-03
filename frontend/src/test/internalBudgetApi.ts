@@ -195,6 +195,7 @@ const DEFAULT_REPLIES = {
   subscriptions: ok(SUBSCRIPTIONS),
   subscriptionOptions: ok(SUBSCRIPTION_OPTIONS),
   subscriptionCreate: { status: 201, body: SUBSCRIPTIONS.items[0] },
+  subscription: ok(SUBSCRIPTIONS.items[1]),
   subscriptionUpdate: ok(SUBSCRIPTIONS.items[0]),
   detail: ok(PROJECT_DETAIL),
   budget: ok(SAVED_BUDGET),
@@ -219,7 +220,7 @@ function blockOf(
     return "subscriptionOptions";
   }
   if (SUBSCRIPTION_PATH.test(pathname)) {
-    return "subscriptionUpdate";
+    return method === "GET" ? "subscription" : "subscriptionUpdate";
   }
   const last = pathname.slice(BASE.length + 1);
   if (PROJECT_DETAIL_PATH.test(last)) {
