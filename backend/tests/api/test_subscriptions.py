@@ -10,6 +10,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.models import ChangeLog
+from app.schemas.models import MAX_MODEL_ID
 from tests.db_helpers import Factory
 
 BASE = "/api/subscriptions"
@@ -414,6 +415,30 @@ async def test_금액_0은_등록할_수_있다(client: AsyncClient, factory: Fa
     assert Decimal(response.json()["amount_usd"]) == 0
 
 
+async def test_상태를_보내면_그_상태로_등록한다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.user()
+
+    response = await client.post(BASE, json=create_body(status="CANCELLED"))
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.json()["status"] == "CANCELLED"
+    listed = (await client.get(BASE, params=OCTOBER)).json()["items"]
+    assert [item["status"] for item in listed] == ["CANCELLED"]
+
+
+async def test_상태를_진행_중으로_보내도_등록된다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.user()
+
+    response = await client.post(BASE, json=create_body(status="ACTIVE"))
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.json()["status"] == "ACTIVE"
+
+
 @pytest.mark.parametrize(
     "body",
     [
@@ -437,7 +462,9 @@ async def test_금액_0은_등록할_수_있다(client: AsyncClient, factory: Fa
         create_body(amount_usd=None),
         create_body(project_id=0),
         create_body(note="x" * 501),
-        create_body(status="CANCELLED"),
+        create_body(status="UNKNOWN"),
+        create_body(status="cancelled"),
+        create_body(status=None),
     ],
     ids=[
         "식별값 없음",
@@ -460,7 +487,9 @@ async def test_금액_0은_등록할_수_있다(client: AsyncClient, factory: Fa
         "금액 null",
         "프로젝트 ID 0",
         "메모가 너무 김",
-        "상태는 보낼 수 없음",
+        "모르는 상태",
+        "소문자 상태",
+        "상태 null",
     ],
 )
 async def test_잘못된_등록_본문은_422이다(
@@ -485,6 +514,61 @@ async def test_허용하지_않는_Origin의_등록은_거절한다(
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json()["code"] == "ORIGIN_NOT_ALLOWED"
+
+
+# ---------------------------------------------------------------
+# 단건 조회
+# ---------------------------------------------------------------
+async def test_번호로_한_건을_돌려준다(client: AsyncClient, factory: Factory) -> None:
+    project = await factory.project(name="알파")
+    created = await factory.subscription_cost(
+        applied_month=date(2025, 1, 1),
+        tool_name="도구",
+        project_id=project["project_id"],
+    )
+
+    response = await client.get(f"{BASE}/{created['subscription_id']}")
+
+    assert response.status_code == status.HTTP_200_OK
+    item = response.json()
+    assert item["subscription_id"] == created["subscription_id"]
+    assert (item["tool_name"], item["project_name"]) == ("도구", "알파")
+    assert item["applied_month"] == "2025-01"
+
+
+async def test_목록에_없는_기간의_구독료도_번호로_조회된다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    created = await factory.subscription_cost(applied_month=date(2025, 1, 1))
+
+    listed = (await client.get(BASE)).json()["items"]
+    response = await client.get(f"{BASE}/{created['subscription_id']}")
+
+    assert listed == []
+    assert response.status_code == status.HTTP_200_OK
+
+
+async def test_없는_번호의_조회는_404이다(client: AsyncClient) -> None:
+    response = await client.get(f"{BASE}/987654")
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["code"] == "NOT_FOUND"
+
+
+@pytest.mark.parametrize("subscription_id", ["0", "-1", "abc", str(MAX_MODEL_ID + 1)])
+async def test_잘못된_번호의_조회는_422이다(
+    client: AsyncClient, subscription_id: str
+) -> None:
+    response = await client.get(f"{BASE}/{subscription_id}")
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+
+async def test_options는_번호로_해석되지_않는다(client: AsyncClient) -> None:
+    response = await client.get(f"{BASE}/options")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert "projects" in response.json()
 
 
 # ---------------------------------------------------------------

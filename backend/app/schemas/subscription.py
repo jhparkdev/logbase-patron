@@ -108,6 +108,8 @@ class SubscriptionCreate(BaseModel):
     applied_month: Month
     amount_usd: SubscriptionAmount
     project_id: ProjectId | None = None  # 없으면 미배분
+    # 이미 해지된 구독을 뒤늦게 기록할 때 쓴다. 보내지 않으면 진행 중이다
+    status: SubscriptionStatus = SubscriptionStatus.ACTIVE
     note: Note | None = None
 
 
