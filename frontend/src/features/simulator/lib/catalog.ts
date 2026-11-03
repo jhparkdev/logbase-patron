@@ -15,6 +15,8 @@ type Model = Pick<
   | "supports_json_schema"
 >;
 
+const AUTO_CHEAPEST: Schemas["AutoProvider"] = "AUTO_CHEAPEST";
+const AUTO_CHEAPEST_LABEL = "가장 싼 업체 자동";
 const IMAGE_MODALITY = "image";
 const STRUCTURED_OUTPUT_PARAMETER = "response_format";
 const KEY_SEPARATOR = ":";
@@ -78,7 +80,7 @@ function tuningParameters(model: Model): TuningParameter[] {
   ];
 }
 
-/** 모델 하나를 서버 업체마다 고를 수 있는 항목으로 나눈다. 업체를 모르면 고를 수 없는 한 행으로 남긴다. */
+/** 모델 하나를 서버 업체마다 고를 수 있는 항목으로 나누고 "가장 싼 업체 자동"을 끝에 더한다. 업체를 모르면 고를 수 없는 한 행으로 남긴다. */
 export function toModelChoices(
   model: Model,
   state: { providers: readonly string[] } | { failed: true },
@@ -105,10 +107,19 @@ export function toModelChoices(
         unavailableReason: "서버 업체를 확인할 수 없습니다",
       },
     ];
-  return providers.map((provider) => ({
-    ...base,
-    key: choiceKey(model.model_id, provider),
-    provider,
-    selectable: true,
-  }));
+  return [
+    ...providers.map((provider) => ({
+      ...base,
+      key: choiceKey(model.model_id, provider),
+      provider,
+      selectable: true,
+    })),
+    // 서버가 접수할 때 가장 싼 업체로 정하고, 저장하는 값은 실제 업체 이름이다
+    {
+      ...base,
+      key: choiceKey(model.model_id, AUTO_CHEAPEST),
+      provider: AUTO_CHEAPEST_LABEL,
+      selectable: true,
+    },
+  ];
 }

@@ -9,6 +9,7 @@ test("모델 하나를 서버 업체마다 고를 수 있는 항목으로 나눈
   expect(choices.map((choice) => choice.key)).toEqual([
     "3:DeepInfra",
     "3:Io Net",
+    "3:AUTO_CHEAPEST",
   ]);
   expect(choices[0]).toMatchObject({
     name: "GPT-4o mini",
@@ -99,3 +100,28 @@ test.each(["", "abc", "3:", ":DeepInfra", "a:DeepInfra"])(
     expect(parseChoiceKey(key)).toBeUndefined();
   },
 );
+
+test("서버 업체를 알면 맨 끝에 가장 싼 업체 자동 항목을 더한다", () => {
+  const choices = toModelChoices(MODEL_ROW, { providers: ["DeepInfra"] });
+  const auto = choices[choices.length - 1];
+  expect(auto).toMatchObject({
+    key: choiceKey(MODEL_ROW.model_id, "AUTO_CHEAPEST"),
+    provider: "가장 싼 업체 자동",
+    name: "GPT-4o mini",
+    selectable: true,
+  });
+  expect(auto.tuningParameters).toEqual(choices[0].tuningParameters);
+  expect(parseChoiceKey(auto.key)).toEqual({
+    model_id: MODEL_ROW.model_id,
+    execution_provider: "AUTO_CHEAPEST",
+  });
+});
+
+test("서버 업체를 모르면 자동 항목도 만들지 않는다", () => {
+  const failed = toModelChoices(MODEL_ROW, { failed: true });
+  const empty = toModelChoices(MODEL_ROW, { providers: [] });
+  for (const choices of [failed, empty]) {
+    expect(choices).toHaveLength(1);
+    expect(choices[0].selectable).toBe(false);
+  }
+});
