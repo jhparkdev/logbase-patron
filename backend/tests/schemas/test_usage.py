@@ -10,15 +10,23 @@ from pydantic import ValidationError
 from app.models import CostStatus, RequestStatus
 from app.schemas.usage import (
     MAX_PAGE_SIZE,
+    BudgetUsage,
+    CustomerBudgetRead,
     CustomerBudgetSave,
     CustomerMonthQuery,
     CustomerRequestRow,
     CustomerRowSort,
     CustomerRowsQuery,
+    CustomerServiceUsage,
+    CustomerUsageDetail,
+    CustomerUsageRow,
     RequestRowSort,
     RequestRowsQuery,
     UsageFilterQuery,
+    UsageSummary,
+    UsageTrendPoint,
 )
+from app.services.budget_policy import BudgetStatus
 
 
 def budget_input(**values: Any) -> dict[str, Any]:
@@ -98,6 +106,119 @@ def test_money_is_serialized_as_a_string_and_unknown_cost_stays_null() -> None:
 
     priced = row.model_copy(update={"cost_usd": Decimal("0.0200")})
     assert priced.model_dump(mode="json")["cost_usd"] == "0.0200"
+
+
+@pytest.mark.parametrize(
+    ("stored", "sent"),
+    [
+        # DB NUMERIC(30,18)의 0원(청구 없음)은 Decimal('0E-18')로 읽힌다
+        ("0E-18", "0.000000000000000000"),
+        # 0.000001 미만도 str(Decimal)은 지수로 쓴다
+        ("6.43000000000E-7", "0.000000643000000000"),
+        ("0.031524000000000000", "0.031524000000000000"),
+    ],
+)
+def test_call_cost_is_sent_in_plain_notation_without_rounding(
+    stored: str, sent: str
+) -> None:
+    row = CustomerRequestRow(
+        request_id="00000000-0000-0000-0000-000000000001",
+        requested_at="2026-10-01T00:00:00Z",
+        customer_id=1,
+        customer_name="고객",
+        service_id=1,
+        service_name="서비스",
+        model="vendor/model",
+        task_id=None,
+        task_type=None,
+        task_type_label=None,
+        tokens=10,
+        cost_usd=Decimal(stored),
+        cost_status=CostStatus.CONFIRMED,
+        status=RequestStatus.FAILED,
+        error_type=None,
+    )
+
+    dumped = row.model_dump(mode="json")["cost_usd"]
+
+    assert dumped == sent
+    assert Decimal(dumped) == Decimal(stored)
+
+
+def _budget(zero: Decimal) -> BudgetUsage:
+    return BudgetUsage(
+        month=date(2026, 10, 1),
+        monthly_amount_usd=zero,
+        effective_from_month=date(2026, 10, 1),
+        used_usd=zero,
+        usage_pct=zero,
+        confirmed_usage_pct=zero,
+        remaining_usd=zero,
+        unknown_cost_count=0,
+        status=BudgetStatus.NORMAL,
+        warning_threshold_pct=zero,
+    )
+
+
+def test_no_amount_or_rate_in_the_responses_is_sent_in_exponent_notation() -> None:
+    zero = Decimal("0E-18")
+    counts = {"task_count": 0, "call_count": 0, "unknown_cost_count": 0}
+    costs = {"confirmed_cost_usd": zero, "estimated_cost_usd": zero}
+    service = CustomerServiceUsage(
+        service_id=1,
+        service_name="서비스",
+        total_cost_usd=zero,
+        budget_share_pct=zero,
+        **counts,
+        **costs,
+    )
+    responses = [
+        UsageSummary(
+            comparison_start_date=date(2026, 9, 1),
+            comparison_end_date=date(2026, 9, 30),
+            success_count=0,
+            failed_count=0,
+            timeout_count=0,
+            input_tokens=0,
+            output_tokens=0,
+            task_change_pct=zero,
+            call_change_pct=zero,
+            confirmed_cost_change_pct=zero,
+            estimated_cost_change_pct=zero,
+            **counts,
+            **costs,
+        ),
+        UsageTrendPoint(date=date(2026, 10, 1), **counts, **costs),
+        CustomerUsageRow(
+            customer_id=1,
+            customer_name="고객",
+            service_id=1,
+            service_name="서비스",
+            budget=_budget(zero),
+            **counts,
+            **costs,
+        ),
+        CustomerUsageDetail(
+            customer_id=1,
+            customer_name="고객",
+            month=date(2026, 10, 1),
+            budget=_budget(zero),
+            services=[service],
+            **counts,
+            **costs,
+        ),
+        CustomerBudgetRead(
+            budget_id=1,
+            customer_id=1,
+            monthly_amount_usd=zero,
+            effective_from_month=date(2026, 10, 1),
+            effective_to_month=None,
+        ),
+    ]
+
+    for response in responses:
+        text = response.model_dump_json()
+        assert "E-" not in text and "E+" not in text, type(response).__name__
 
 
 def test_unknown_query_names_are_rejected() -> None:
