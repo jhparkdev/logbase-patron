@@ -15,7 +15,9 @@ const TEST_MAX_WORKERS = 4;
 export default defineConfig({
   plugins: [
     // TanStack Router 문서: 라우터 플러그인은 @vitejs/plugin-react보다 먼저 와야 한다.
-    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    // 코드 분할은 빌드에서만 켠다. 테스트에서 켜면 화면 컴포넌트가 첫 렌더링 때 동적 import로 불려와
+    // 테스트 파일마다 첫 테스트가 그 변환·로딩 시간을 화면 대기 시간 안에서 치르고, 느린 CI에서 대기를 넘긴다.
+    tanstackRouter({ target: "react", autoCodeSplitting: !process.env.VITEST }),
     react(),
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
