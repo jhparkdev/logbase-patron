@@ -25,5 +25,6 @@ export function useModelSort() {
 /** 페이지 이동. 주소에 저장 */
 export function useModelPageChange() {
   const navigate = route.useNavigate();
-  return (page: number) => navigate({ search: (prev) => ({ ...prev, page }) });
+  return (page: number) =>
+    navigate({ search: (prev) => ({ ...prev, page }), resetScroll: false });
 }
