@@ -1,6 +1,10 @@
 import type { components } from "../../../shared/api/schema";
 import { Badge } from "../../../shared/components/ui/Badge";
 import {
+  BAR_FILL_CLASS,
+  barFillStyle,
+} from "../../../shared/components/ui/UsageBar";
+import {
   budgetStatusBadge,
   remainingBudget,
   usageView,
@@ -78,9 +82,8 @@ export function ProjectUsageSummary({
             {segments.map((segment) => (
               <div
                 key={segment.key}
-                className={SEGMENT_CLASS[segment.key]}
-                // 너비는 서버가 준 금액에서 정해지므로 inline style로 둔다.
-                style={{ width: `${segment.width}%` }}
+                className={`${SEGMENT_CLASS[segment.key]} ${BAR_FILL_CLASS}`}
+                style={barFillStyle(segment.width)}
               />
             ))}
           </div>
