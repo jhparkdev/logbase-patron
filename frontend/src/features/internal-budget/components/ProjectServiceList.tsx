@@ -42,7 +42,7 @@ export function ProjectServiceList({ services }: { services: Service[] }) {
           return (
             <li
               key={service.service_id}
-              className="grid grid-cols-[7rem_1fr_auto_3rem] items-center gap-x-3 gap-y-1 text-body-sm"
+              className="grid grid-cols-[minmax(7rem,11rem)_1fr_auto_3rem] items-center gap-x-3 gap-y-1 text-body-sm"
             >
               <span
                 className="truncate font-medium"
