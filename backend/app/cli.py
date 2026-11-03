@@ -17,7 +17,6 @@ import sys
 import warnings
 from datetime import UTC, datetime
 from getpass import GetPassWarning, getpass
-from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -25,11 +24,11 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.config import get_settings
 from app.db import get_engine, get_sessionmaker
+from app.mock_data.sql import SEED_FILE
 from app.models import KeyEnvironment, ServiceType
 from app.schemas.auth import PASSWORD_MAX_LENGTH
 from app.services import command_code_keys, usage_catalog, users
 
-SEED_FILE = Path(__file__).resolve().parents[1] / "seed" / "patron_mock_data_v0.6.sql"
 PRODUCTION_ENV = "production"
 CATALOG_COMMANDS = (
     "customer-create",
@@ -37,14 +36,28 @@ CATALOG_COMMANDS = (
     "key-register",
     "command-code-key-register",
 )
-# 시드가 이미 들어갔는지 알아보는 표식: 시드가 고정 ID로 넣는 첫 mock 고객
+# 시드가 이미 들어갔는지 알아보는 표식: 시드가 고정 ID로 넣는 첫 mock 고객(app/mock_data/organizations.py)
 SEED_MARKER_QUERY = text(
+    "SELECT EXISTS (SELECT 1 FROM customers WHERE customer_code = 'CUST-001' AND is_mock)"
+)
+# 이전(v0.6) seed의 첫 mock 고객. 남아 있으면 고정 ID가 겹치므로 새 seed를 넣지 않는다.
+LEGACY_SEED_MARKER_QUERY = text(
     "SELECT EXISTS (SELECT 1 FROM customers WHERE customer_code = 'CUST-A' AND is_mock)"
 )
 
 
 class CommandRefusedError(Exception):
     """운영 환경에서 확인 옵션 없이 관리 명령을 실행하려 할 때 발생한다."""
+
+
+class LegacySeedError(Exception):
+    """이전 mock 데이터가 남아 있어 새 seed를 겹쳐 넣지 않을 때 발생한다."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "이전(v0.6) mock 데이터가 남아 있어 새 seed를 넣지 않았습니다. "
+            "로컬 개발 DB를 초기화한 뒤(마이그레이션 → seed) 다시 실행하세요."
+        )
 
 
 def ensure_command_allowed(
@@ -65,6 +78,8 @@ async def apply_seed(connection: AsyncConnection) -> bool:
     """
     if await connection.scalar(SEED_MARKER_QUERY):
         return False
+    if await connection.scalar(LEGACY_SEED_MARKER_QUERY):
+        raise LegacySeedError
     # 시드 SQL에는 ':', '%' 같은 문자가 들어 있다. SQLAlchemy를 거치면 파라미터 자리표시자로
     # 해석되므로, 같은 연결(같은 트랜잭션)의 psycopg 커서로 파라미터 없이 그대로 실행한다.
     raw_connection = await connection.get_raw_connection()
@@ -248,6 +263,7 @@ def main(argv: list[str] | None = None) -> int:
             )
     except (
         CommandRefusedError,
+        LegacySeedError,
         users.UserCommandError,
         usage_catalog.CatalogCommandError,
     ) as error:
