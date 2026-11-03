@@ -12,7 +12,7 @@ export function TableSkeleton({ rows }: { rows: number }) {
       {rowKeys.map((key) => (
         <div
           key={key}
-          className="flex h-12 items-center border-t border-grey-100 px-4"
+          className="flex h-12 items-center border-t border-grey-100 px-6"
         >
           <Skeleton className="h-4 flex-1" />
         </div>

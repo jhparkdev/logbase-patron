@@ -10,15 +10,16 @@ import {
 } from "./HistoryValues";
 
 const columns = [
-  ["requestedAt", "실행 시각", "w-28"],
-  ["id", "Simulation ID", "w-36"],
-  ["scenario", "시나리오", "w-30"],
-  ["modelCount", "모델 수", "w-22"],
-  ["status", "실행 상태", "w-26"],
-  ["costStatus", "비용 상태", "w-40"],
-  ["totalCost", "총 비용 (USD)", "w-32"],
+  ["requestedAt", "실행 시각", "w-32"],
+  ["id", "Simulation ID", "w-38"],
+  ["scenario", "시나리오", "w-32"],
+  ["modelCount", "모델 수", "w-24"],
+  ["status", "실행 상태", "w-28"],
+  ["costStatus", "비용 상태", "w-42"],
+  ["totalCost", "총 비용 (USD)", "w-34"],
 ] as const;
-const cell = "h-20 border-b border-grey-100 px-3 py-3 text-body-sm";
+const cell =
+  "h-20 border-b border-grey-100 px-4 py-3 text-body-sm first:pl-6 last:pr-6";
 export function HistoryTable({
   rows,
   search,
@@ -32,7 +33,7 @@ export function HistoryTable({
     onSearch({ ...search, selected: key, detail: true });
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[60rem] table-fixed">
+      <table className="w-full min-w-[65rem] table-fixed">
         <caption className="sr-only">
           시뮬레이션 실행 이력. 정렬과 페이지 처리는 서버에서 수행해요.
         </caption>
@@ -40,7 +41,7 @@ export function HistoryTable({
           {columns.map(([key, , width]) => (
             <col key={key} className={width} />
           ))}
-          <col className="w-26" />
+          <col className="w-30" />
         </colgroup>
         <thead className="bg-grey-50">
           <tr>
@@ -57,7 +58,7 @@ export function HistoryTable({
                         : "descending"
                       : "none"
                 }
-                className={`whitespace-nowrap px-3 py-3 text-label font-medium text-grey-600 ${key === "modelCount" || key === "totalCost" ? "text-right" : "text-left"}`}
+                className={`whitespace-nowrap px-4 py-3 text-label font-medium text-grey-600 first:pl-6 ${key === "modelCount" || key === "totalCost" ? "text-right" : "text-left"}`}
               >
                 {key === "totalCost" ? (
                   label
@@ -110,7 +111,7 @@ export function HistoryTable({
                 </button>
               </td>
               <td className={cell}>
-                <span className="line-clamp-2 break-words" title={row.scenario}>
+                <span className="line-clamp-2" title={row.scenario}>
                   {row.scenario}
                 </span>
               </td>

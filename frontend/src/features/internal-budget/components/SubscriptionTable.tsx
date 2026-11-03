@@ -27,6 +27,7 @@ const COLUMNS: ListColumn<"subscriptions", SubscriptionRow>[] = [
         from="/internal-budget"
         to="/internal-budget"
         search={(prev) => ({ ...prev, subscription: row.subscription_id })}
+        resetScroll={false}
       >
         {row.tool_name}
       </TextLink>
@@ -86,7 +87,10 @@ export function SubscriptionTable({
           size="sm"
           icon={plusIcon}
           onClick={() =>
-            navigate({ search: (prev) => ({ ...prev, subscription: "new" }) })
+            navigate({
+              search: (prev) => ({ ...prev, subscription: "new" }),
+              resetScroll: false,
+            })
           }
         >
           구독료 등록
