@@ -69,14 +69,7 @@ def entity_id(
 ) -> int | None:
     all_request = rf"(?:전체|모든)\s*{label}|{label}.*조건.*해제"
     if re.search(all_request, text):
-        if (
-            explicit_id is not None
-            or name is not None
-            and _normalize(name) not in {"전체", "all", f"전체{label}"}
-        ):
-            raise UsageQueryError(
-                f"전체 {label} 조회 요청과 특정 대상 조건이 달라요. 다시 요청해 주세요."
-            )
+        # 사용자가 명시적으로 해제한 조건은 모델이 이전 화면의 ID를 반복해도 되살리지 않는다.
         return None
     for index in range(len(previous) - 1, -1, -1):
         if re.search(all_request, previous[index]):

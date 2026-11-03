@@ -17,6 +17,47 @@ def test_customer_calls_cannot_be_replaced_by_simulations_even_on_p05() -> None:
     assert scope.requires_lookup
 
 
+def test_named_real_api_calls_on_p05_use_customer_lookup() -> None:
+    scope = request_scope(
+        request(
+            "로웰린 스튜디오의 2026년 10월 가장 최근 실제 API 호출 시각",
+            "simulation_history",
+        )
+    )
+    assert scope.allowed_tools == {"get_customer_usage"}
+    assert scope.requires_lookup
+    assert request_scope(request("내부 프로젝트의 실제 API 호출")).allowed_tools == {
+        "get_internal_usage"
+    }
+
+
+def test_settings_and_simulation_results_require_verified_tools() -> None:
+    setup = request_scope(request("공통 최대 출력 토큰만 2048로 바꿔줘", "simulator"))
+    assert setup.requires_lookup
+    assert setup.required_tool == "prepare_simulator_settings"
+    detail = request_scope(
+        request("이 실행 ID의 결과: 00000000-0000-4000-8000-000000000001")
+    )
+    assert detail.requires_lookup
+    assert detail.required_tool == "get_simulation"
+
+
+def test_model_queries_and_follow_up_settings_require_their_own_tools() -> None:
+    for question in (
+        "현재 선택할 수 있는 모델과 서버 업체를 알려줘",
+        "등록된 모델 목록을 알려줘",
+    ):
+        models = request_scope(request(question, "customer_usage"))
+        assert models.requires_lookup
+        assert models.required_tool == "find_models"
+    follow_up = AssistantChatRequest(
+        messages=[{"role": "user", "content": "이번에는 1024로 바꿔줘"}],
+        simulator={},
+        page_context=AssistantPageContext(page="simulator"),
+    )
+    assert request_scope(follow_up).required_tool == "prepare_simulator_settings"
+
+
 def test_current_page_resolves_implicit_customer_and_internal_queries() -> None:
     assert request_scope(
         request("현재 조건의 비용을 정리해줘", "customer_usage")

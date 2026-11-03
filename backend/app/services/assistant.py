@@ -10,6 +10,7 @@ from app.schemas.assistant import (
     AssistantSource,
     SimulatorPatch,
 )
+from app.services.assistant_answers import verified_answer
 from app.services.assistant_ollama import AssistantUnavailableError, OllamaMessage
 from app.services.assistant_scope import request_scope
 from app.services.assistant_tools import tool_definitions
@@ -129,6 +130,8 @@ async def answer(
     prompt = base_prompt + (
         f"\n오늘(한국시간): {kst_today(now).isoformat()}." if now else ""
     )
+    if scope.requires_lookup:
+        prompt += f"\n이 요청의 필수 도구는 {scope.required_tool}이다. 답변 전에 반드시 네이티브 tool_call로 실행한다. 호출을 설명하는 글이나 코드는 실행이 아니다."
     messages: list[dict[str, Any]] = [{"role": "system", "content": prompt}]
     if request.page_context:
         messages.append(
@@ -153,31 +156,53 @@ async def answer(
     tools = tool_definitions(scope.allowed_tools)
     calls = 0
     reminded = False
+    preparation_checked = False
+    verified_message: str | None = None
+    required_kinds = {
+        "get_customer_usage": {"customer_usage"},
+        "get_internal_usage": {"internal_usage"},
+        "get_simulation": {"simulation"},
+        "list_simulations": {"history", "simulation"},
+        "find_models": {"models"},
+    }.get(scope.required_tool, set())
     for round_number in range(MAX_ROUNDS):
         reply = await caller.chat(messages, tools)
         if not reply.tool_calls:
             if len(reply.content) > 3000:
                 raise AssistantUnavailableError
-            if scope.requires_lookup and not any(
-                source.kind in {"customer_usage", "internal_usage"}
-                for source in executor.sources
+            has_evidence = (
+                preparation_checked or executor.patch is not None
+                if scope.required_tool == "prepare_simulator_settings"
+                else any(source.kind in required_kinds for source in executor.sources)
+            )
+            if (
+                scope.requires_lookup
+                and not has_evidence
+                and not executor.failure_message
             ):
                 if not reminded and round_number < MAX_ROUNDS - 1:
                     reminded = True
                     messages.append(
                         {
                             "role": "system",
-                            "content": "아직 조회 결과가 없다. 먼저 제공된 사용량 도구를 네이티브 tool_call로 호출하라. 현재 화면에서 선택한 대상이면 이름·ID 인자는 생략해도 서버가 적용한다. 사용자가 별도 기간을 말하지 않으면 period=screen이다. 조회 후에만 결과를 답하라.",
+                            "content": f"아직 {scope.required_tool} 도구의 검증된 결과가 없다. 먼저 이 도구를 네이티브 tool_call로 호출하라. 사용자가 전체 고객·전체 프로젝트를 명시하면 해당 이름·ID 인자는 생략한다. 화면 선택 대상도 이름·ID를 생략해도 서버가 적용한다. 기간을 말하지 않으면 period=screen이다. 도구 실행 후에만 답하라.",
                         }
                     )
                     continue
                 return AssistantChatResponse(
-                    message="요청한 사용량·비용을 실제 조회한 결과가 없어 답변을 확정할 수 없어요. 대상 이름과 조회 기간을 지정해 다시 요청해 주세요."
+                    message=(
+                        "요청한 설정을 실제로 준비한 결과가 없어 변경하지 않았어요. 변경할 항목과 값을 지정해 다시 요청해 주세요."
+                        if scope.required_tool == "prepare_simulator_settings"
+                        else "요청한 정보를 실제 조회한 결과가 없어 답변을 확정할 수 없어요. 대상 이름과 조회 기간을 지정해 다시 요청해 주세요."
+                    )
                 )
+            final_message = (
+                executor.failure_message or verified_message or reply.content
+            )
             return AssistantChatResponse(
-                message=executor.failure_message or reply.content,
+                message=final_message,
                 patch=executor.patch,
-                sources=response_sources(executor.sources, reply.content),
+                sources=response_sources(executor.sources, final_message),
             )
         calls += len(reply.tool_calls)
         if calls > MAX_TOOL_CALLS:
@@ -197,6 +222,18 @@ async def answer(
                     patch=None,
                     sources=response_sources(executor.sources, ""),
                 )
+            if call.function.name == "prepare_simulator_settings":
+                preparation_checked = bool(
+                    result.get("prepared") or result.get("unchanged")
+                )
+                if preparation_checked:
+                    verified_message = (
+                        "요청한 설정이 이미 같아요."
+                        if result.get("unchanged")
+                        else "요청한 설정을 준비했어요. 비교 실행은 시작하지 않았어요."
+                    )
+            else:
+                verified_message = verified_answer(call.function.name, result)
             messages.append(
                 {
                     "role": "tool",

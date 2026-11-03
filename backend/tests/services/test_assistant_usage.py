@@ -9,11 +9,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import AIRequest
 from app.schemas.assistant import AssistantPageContext
 from app.schemas.assistant_usage import CustomerUsageToolQuery, InternalUsageToolQuery
-from app.services.assistant_usage import AssistantUsage, UsageQueryError, usage_period
+from app.schemas.usage import UsageOption
+from app.services.assistant_usage import (
+    AssistantUsage,
+    UsageQueryError,
+    entity_id,
+    usage_period,
+)
 from tests.db_helpers import Factory
 from tests.internal_budget_helpers import internal_call
 
 NOW = datetime(2026, 11, 3, tzinfo=UTC)
+
+
+def test_explicit_all_customers_clears_stale_model_arguments_only_for_that_filter() -> (
+    None
+):
+    options = [UsageOption(id=1, name="로웰린 스튜디오")]
+    assert (
+        entity_id(options, 1, "로웰린 스튜디오", 1, "고객", "10월 전체 고객 비용")
+        is None
+    )
+    assert entity_id(options, None, None, 1, "모델", "10월 전체 고객 비용") == 1
 
 
 @pytest.mark.parametrize(
@@ -138,8 +155,8 @@ async def test_user_named_customer_is_respected_even_if_model_omits_or_changes_i
     tool = AssistantUsage(db_session, NOW, context, "전체 고객의 비용을 알려줘")
     _, source = await tool.customer(CustomerUsageToolQuery())
     assert source.page_context.customer_id is None
-    with pytest.raises(UsageQueryError):
-        await tool.customer(CustomerUsageToolQuery(customer_name="가상고객A"))
+    _, source = await tool.customer(CustomerUsageToolQuery(customer_name="가상고객A"))
+    assert source.page_context.customer_id is None
 
 
 async def test_budget_overrun_request_is_filtered_even_if_model_omits_status(

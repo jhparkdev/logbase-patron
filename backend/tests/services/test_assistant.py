@@ -64,6 +64,147 @@ async def test_financial_answer_cannot_claim_to_have_looked_up_data_without_a_so
     assert "실제 조회" in result.message
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "공통 최대 출력 토큰만 2048로 바꿔줘",
+        "공통 최대 출력 토큰을 99999로 바꿔줘",
+        "이 실행 ID의 결과와 비용 상태: 00000000-0000-4000-8000-000000000001",
+    ],
+)
+async def test_missing_native_tools_cannot_claim_a_change_or_execution_result(
+    question: str,
+) -> None:
+    caller = FakeCaller([OllamaMessage(content="변경 완료. 총 비용 1200원.")] * 2)
+    result = await answer(
+        AssistantChatRequest(messages=[{"role": "user", "content": question}]),
+        caller,
+        FakeTools(),
+    )
+    assert result.patch is None
+    assert not result.sources
+    assert "1200" not in result.message
+    assert "변경 완료" not in result.message
+    assert len(caller.requests) == 2
+
+
+async def test_a_successful_preparation_is_evidence_after_one_native_tool_reminder() -> (
+    None
+):
+    caller = FakeCaller(
+        [
+            OllamaMessage(content="변경했습니다."),
+            OllamaMessage(
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "prepare_simulator_settings",
+                            "arguments": {"execution_config": {"max_tokens": 2048}},
+                        }
+                    }
+                ]
+            ),
+            OllamaMessage(content="설정을 준비했어요."),
+        ]
+    )
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "토큰만 2048로 바꿔줘"}]
+        ),
+        caller,
+        FakeTools(),
+    )
+    assert result.patch.execution_config.max_tokens == 2048
+    assert len(caller.requests) == 3
+
+
+async def test_verified_internal_totals_replace_a_model_invented_fee() -> None:
+    class InternalTools(FakeTools):
+        async def execute(self, name: str, arguments: dict) -> dict:
+            self.sources.append(
+                AssistantSource(title="내부 비용", kind="internal_usage")
+            )
+            return {
+                "section": "summary",
+                "conditions": {},
+                "matched_entities": {},
+                "data": {
+                    "api_confirmed_usd": "1.89",
+                    "api_estimated_usd": "0",
+                    "subscription_usd": "30",
+                    "total_managed_usd": "31.89",
+                    "unknown_cost_count": 8,
+                },
+            }
+
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "내부 관리 비용과 구독료"}]
+        ),
+        FakeCaller(
+            [
+                OllamaMessage(
+                    tool_calls=[
+                        {"function": {"name": "get_internal_usage", "arguments": {}}}
+                    ]
+                ),
+                OllamaMessage(content="관리 비용 2.00달러, 합계 100달러예요."),
+            ]
+        ),
+        InternalTools(),
+    )
+    assert "관리 비용(추정 포함): 31.89 USD" in result.message
+    assert "2.00" not in result.message
+    assert "100달러" not in result.message
+
+
+async def test_sources_follow_the_verified_visible_history_instead_of_discarded_model_text() -> (
+    None
+):
+    class HistoryTools(FakeTools):
+        async def execute(self, name: str, arguments: dict) -> dict:
+            items = []
+            for index, requested_at in enumerate(
+                ["2026-10-29T04:35:00Z", "2026-10-28T07:05:00Z"]
+            ):
+                self.sources.append(
+                    AssistantSource(
+                        title="실행 상세",
+                        kind="simulation",
+                        simulation_id=f"00000000-0000-4000-8000-{index:012d}",
+                        requested_at=requested_at,
+                    )
+                )
+                items.append(
+                    {
+                        "status": "SUCCESS",
+                        "requested_at": requested_at,
+                        "total_cost_usd": "0.1",
+                        "cost_check_status": "확정",
+                    }
+                )
+            return {"items": items, "total": 2}
+
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "최근 시뮬레이션 이력"}]
+        ),
+        FakeCaller(
+            [
+                OllamaMessage(
+                    tool_calls=[
+                        {"function": {"name": "list_simulations", "arguments": {}}}
+                    ]
+                ),
+                OllamaMessage(content="최근 요청은 2026-10-29T04:35:00Z예요."),
+            ]
+        ),
+        HistoryTools(),
+    )
+    assert "2026-10-28T07:05:00Z" in result.message
+    assert len(result.sources) == 2
+
+
 async def test_financial_lookup_gets_one_bounded_reminder_without_reusing_unverified_claims() -> (
     None
 ):

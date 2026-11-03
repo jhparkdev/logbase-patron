@@ -28,6 +28,7 @@ class RequestScope:
     allowed_tools: frozenset[str]
     requires_lookup: bool = False
     clarification: str | None = None
+    required_tool: str | None = None
 
 
 def _explicit(text: str) -> str | None:
@@ -53,9 +54,33 @@ def request_scope(request: AssistantChatRequest) -> RequestScope:
             frozenset(),
             clarification="현재 도우미는 사용량·비용·예산 조회를 지원해요. 예산이나 구독료를 바꾸려면 해당 화면에서 값을 확인하고 직접 저장해 주세요.",
         )
-    if SETUP.search(text) and not re.search(r"사용량|예산|지출", text):
-        return RequestScope(BASE_TOOLS)
+    changing = bool(
+        re.search(r"바꿔|변경|설정|해제|선택해|지정해", text)
+    ) and not HELP.search(text)
+    model_lookup = (
+        bool(re.search(r"모델|업체", text))
+        and bool(re.search(r"알려|보여|조회|목록|추천|지원", text))
+        and not re.search(r"사용량|예산|지출|호출", text)
+    )
+    if (
+        SETUP.search(text) or changing and request.simulator is not None
+    ) and not re.search(r"사용량|예산|지출", text):
+        return RequestScope(
+            BASE_TOOLS,
+            requires_lookup=bool(changing or model_lookup),
+            required_tool="prepare_simulator_settings"
+            if changing
+            else "find_models"
+            if model_lookup
+            else None,
+        )
+    if model_lookup:
+        return RequestScope(
+            BASE_TOOLS, requires_lookup=True, required_tool="find_models"
+        )
     domain = _explicit(text)
+    if domain is None and re.search(r"실제\s*(?:API|호출)", text, re.IGNORECASE):
+        domain = "customer"
     if domain == "mixed":
         return RequestScope(
             frozenset(),
@@ -86,6 +111,22 @@ def request_scope(request: AssistantChatRequest) -> RequestScope:
                 or INTERNAL.search(text)
                 or re.search(r"요약|정리|현황|금액|총액|건수", text)
             ),
+            required_tool=name,
+        )
+    if (
+        domain == "simulation"
+        and not HELP.search(text)
+        and re.search(r"이력|결과|요약|정리|시각|최근|비용|상태|실행\s*ID", text)
+    ):
+        detail = bool(
+            re.search(
+                r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", text, re.IGNORECASE
+            )
+        )
+        return RequestScope(
+            BASE_TOOLS,
+            requires_lookup=True,
+            required_tool="get_simulation" if detail else "list_simulations",
         )
     if (
         domain is None
