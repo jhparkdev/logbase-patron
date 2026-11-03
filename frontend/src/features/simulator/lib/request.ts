@@ -57,5 +57,6 @@ export function toCreateRequest(
       };
     }),
     asset_ids: [...draft.existingAssetIds, ...uploadedAssetIds],
+    output_type: "TEXT",
   };
 }
