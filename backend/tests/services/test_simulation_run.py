@@ -245,7 +245,7 @@ async def test_a_slot_cancelled_before_it_starts_is_never_called() -> None:
 async def test_a_response_that_arrives_after_cancel_does_not_change_the_cancelled_slot() -> (
     None
 ):
-    # 종료된 호출의 상태는 바꾸지 않는다. 늦게 온 결과는 저장하지 않는다
+    # 종료된 호출의 상태는 바꾸지 않는다. 늦게 온 결과는 비용 대조용으로만 남긴다(J-03)
     gate = asyncio.Event()
     started = asyncio.Event()
     h = Harness(count=2)
@@ -264,8 +264,10 @@ async def test_a_response_that_arrives_after_cancel_does_not_change_the_cancelle
 
     assert await asyncio.wait_for(task, timeout=1) == S.PARTIAL_SUCCESS
     assert h.recorder.statuses[h.request_id(1)] == R.CANCELLED
-    assert h.request_id(1) not in h.recorder.payloads
+    assert h.request_id(1) not in h.recorder.records
     assert h.request_id(1) not in h.store.validations
+    late = h.recorder.late[h.request_id(1)]
+    assert (late.external_generation_id, late.response_text) == ("gen", "늦은 응답")
 
 
 # --- 하트비트와 끝나지 않은 실행 ---
@@ -414,3 +416,33 @@ async def test_cancel_reaches_the_real_openrouter_client() -> None:
         CostStatus.UNKNOWN,
         None,
     )
+
+
+async def test_each_slot_is_called_with_its_own_settings() -> None:
+    h = Harness(count=2)
+    h.slots[0].execution_config.update(
+        {"temperature": 0.2, "reasoning_effort": "high", "max_tokens": 100}
+    )
+    h.slots[1].execution_config.update({"max_tokens": 900})
+
+    await run_simulation(h.job, h.deps)
+
+    calls = {call["model_id"]: call for call in h.caller.calls}
+    first, second = calls[h.model(1)], calls[h.model(2)]
+    assert (first["max_tokens"], first["temperature"], first["reasoning_effort"]) == (
+        100,
+        0.2,
+        "high",
+    )
+    assert second["max_tokens"] == 900
+
+
+async def test_settings_nobody_set_are_not_passed_to_call_model_at_all() -> None:
+    # 값이 없을 때는 인자를 보내지 않아 모델 기본값에 맡기고, 아직 새 인자를 모르는 call_model 도 깨지지 않는다
+    h = Harness(count=2)
+
+    await run_simulation(h.job, h.deps)
+
+    for call in h.caller.calls:
+        assert "temperature" not in call
+        assert "reasoning_effort" not in call

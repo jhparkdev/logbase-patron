@@ -6,10 +6,12 @@ from app.models import (
 )  # 이름이 Test 로 시작하면 pytest 가 테스트로 오해한다
 from app.schemas.simulation import (
     MAX_TEMPERATURE,
+    MAX_TEXT_LENGTH,
     MAX_TOKENS_LIMIT,
     MIN_TEMPERATURE,
     ModelSelectionRequest,
     ModelSelections,
+    ReasoningEffort,
     SimulationCreateRequest,
 )
 
@@ -37,7 +39,12 @@ def selection(model_id: int, provider: str = PROVIDER_A) -> dict[str, object]:
 def test_selection_has_model_id_and_provider() -> None:
     chosen = ModelSelectionRequest(model_id=GPT, execution_provider=PROVIDER_A)
 
-    assert chosen.model_dump() == {"model_id": GPT, "execution_provider": PROVIDER_A}
+    # 칸에서 설정을 정하지 않았으면 실행 공통 설정을 쓴다는 뜻으로 비워 둔다
+    assert chosen.model_dump(exclude_none=True) == {
+        "model_id": GPT,
+        "execution_provider": PROVIDER_A,
+        "execution_config": {},
+    }
 
 
 def test_provider_is_required() -> None:
@@ -80,11 +87,11 @@ def test_same_model_with_a_different_provider_is_allowed() -> None:
     assert len(Request(models=models).models) == 2
 
 
-def test_same_model_with_the_same_provider_is_rejected() -> None:
-    models = [selection(GPT, PROVIDER_A), selection(CLAUDE), selection(GPT, PROVIDER_A)]
+def test_same_model_with_the_same_provider_passes_the_schema() -> None:
+    # 설정까지 같은지는 실행 공통 설정·시나리오 기본값과 합친 뒤에야 알 수 있어 접수 서비스가 판단한다
+    models = [selection(GPT, PROVIDER_A), selection(GPT, PROVIDER_A)]
 
-    with pytest.raises(ValidationError, match="중복"):
-        Request(models=models)
+    assert len(Request(models=models).models) == 2
 
 
 def test_different_models_with_the_same_provider_are_allowed() -> None:
@@ -165,6 +172,43 @@ def test_blank_prompt_is_rejected(prompt: str) -> None:
         SimulationCreateRequest(**create_body(prompt_text=prompt))
 
 
+def test_text_limit_is_two_thousand_characters() -> None:
+    assert MAX_TEXT_LENGTH == 2_000
+
+
+@pytest.mark.parametrize("field", ["prompt_text", "input_text"])
+@pytest.mark.parametrize(
+    ("length", "accepted"),
+    [
+        (MAX_TEXT_LENGTH - 1, True),
+        (MAX_TEXT_LENGTH, True),
+        (MAX_TEXT_LENGTH + 1, False),
+    ],
+    ids=["just-under", "exactly", "just-over"],
+)
+def test_prompt_and_input_text_are_limited(
+    field: str, length: int, accepted: bool
+) -> None:
+    # 화면과 같은 한도를 서버 계약에 둔다. 한글도 한 글자로 센다
+    body = create_body(**{field: "가" * length})
+
+    if accepted:
+        assert len(getattr(SimulationCreateRequest(**body), field)) == length
+    else:
+        with pytest.raises(ValidationError):
+            SimulationCreateRequest(**body)
+
+
+def test_openapi_carries_the_text_limit() -> None:
+    properties = SimulationCreateRequest.model_json_schema()["properties"]
+
+    assert properties["prompt_text"]["maxLength"] == MAX_TEXT_LENGTH
+    input_text = next(
+        option for option in properties["input_text"]["anyOf"] if "type" in option
+    )
+    assert input_text["maxLength"] == MAX_TEXT_LENGTH
+
+
 def test_prompt_is_kept_exactly_as_typed() -> None:
     # simulation_runs.prompt_text 는 실행 당시 원문이라 앞뒤 공백·줄바꿈을 다듬지 않는다
     prompt = "  첫 줄\n둘째 줄\n"
@@ -174,11 +218,9 @@ def test_prompt_is_kept_exactly_as_typed() -> None:
     )
 
 
-def test_model_selection_rules_apply_to_the_whole_request() -> None:
+def test_model_count_rule_applies_to_the_whole_request() -> None:
     with pytest.raises(ValidationError):
         SimulationCreateRequest(**create_body(models=[selection(GPT)]))
-    with pytest.raises(ValidationError, match="중복"):
-        SimulationCreateRequest(**create_body(models=[selection(GPT), selection(GPT)]))
 
 
 # 비용 귀속·상태·계산값은 서버가 정한다. 클라이언트가 보내면 조용히 무시하지 않고 거절한다
@@ -331,3 +373,110 @@ def test_openapi_lists_test_type_values_and_forbids_extra_fields() -> None:
     assert schema["properties"]["test_type"]["$ref"].endswith("TestType")
     assert schema["$defs"]["TestType"]["enum"] == ["SCENARIO", "CUSTOM"]
     assert schema["additionalProperties"] is False
+
+
+# --- 모델별 실행 설정 ---
+def slot_config_of(config: dict[str, object]) -> dict[str, object]:
+    chosen = ModelSelectionRequest(
+        model_id=GPT, execution_provider=PROVIDER_A, execution_config=config
+    )
+    return chosen.execution_config.model_dump(exclude_none=True)
+
+
+def test_a_slot_can_set_effort_temperature_and_max_tokens() -> None:
+    config = {"reasoning_effort": "high", "temperature": 0.2, "max_tokens": 2048}
+
+    assert slot_config_of(config) == config
+
+
+def test_the_run_level_config_accepts_reasoning_effort_too() -> None:
+    assert execution_config_of({"reasoning_effort": "low"}) == {
+        "reasoning_effort": "low"
+    }
+
+
+@pytest.mark.parametrize(
+    "effort", ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+)
+def test_documented_reasoning_efforts_are_accepted(effort: str) -> None:
+    assert slot_config_of({"reasoning_effort": effort}) == {"reasoning_effort": effort}
+
+
+@pytest.mark.parametrize("effort", ["", "HIGH", "extreme", 3, True])
+def test_other_reasoning_efforts_are_rejected(effort: object) -> None:
+    with pytest.raises(ValidationError):
+        slot_config_of({"reasoning_effort": effort})
+
+
+def test_slot_settings_have_the_same_ranges_as_the_run_settings() -> None:
+    with pytest.raises(ValidationError):
+        slot_config_of({"temperature": MAX_TEMPERATURE + 0.01})
+    with pytest.raises(ValidationError):
+        slot_config_of({"max_tokens": MAX_TOKENS_LIMIT + 1})
+
+
+def test_a_slot_rejects_keys_outside_the_allow_list() -> None:
+    with pytest.raises(ValidationError):
+        slot_config_of({"provider": {"order": ["x"]}})
+
+
+def test_openapi_lists_the_reasoning_effort_values() -> None:
+    # 허용 값은 OpenAPI enum 으로 프론트엔드에 전달한다
+    schema = SimulationCreateRequest.model_json_schema()["$defs"]["ExecutionConfig"]
+    options = schema["properties"]["reasoning_effort"]["anyOf"][0]
+    effort_enum = schema_ref(options)
+
+    assert effort_enum["enum"] == list(ReasoningEffort)
+
+
+def schema_ref(options: dict[str, object]) -> dict[str, object]:
+    name = str(options["$ref"]).rsplit("/", 1)[-1]
+    defs = SimulationCreateRequest.model_json_schema()["$defs"]
+    return defs[name]
+
+
+# --- 이미지(asset_ids) ---
+
+
+def create_with_assets(count: int) -> dict[str, object]:
+    return {
+        "test_type": "CUSTOM",
+        "prompt_text": "이 사진을 설명해 주세요",
+        "models": [selection(GPT), selection(CLAUDE)],
+        "asset_ids": [f"0192a3c4-0000-7000-8000-{n:012d}" for n in range(count)],
+    }
+
+
+def test_a_run_without_images_has_an_empty_list() -> None:
+    body = create_with_assets(0)
+    del body["asset_ids"]
+
+    assert SimulationCreateRequest(**body).asset_ids == []  # type: ignore[arg-type]
+
+
+# 이미지 수 경계: 바로 전, 정확히 그 값, 바로 후
+@pytest.mark.parametrize("count", [3, 4])
+def test_up_to_the_image_limit_is_accepted(count: int) -> None:
+    request = SimulationCreateRequest(**create_with_assets(count))  # type: ignore[arg-type]
+
+    assert len(request.asset_ids) == count
+
+
+def test_one_image_over_the_limit_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        SimulationCreateRequest(**create_with_assets(5))  # type: ignore[arg-type]
+
+
+def test_the_same_image_twice_is_rejected() -> None:
+    body = create_with_assets(1)
+    body["asset_ids"] = [body["asset_ids"][0]] * 2  # type: ignore[index]
+
+    with pytest.raises(ValidationError, match="두 번"):
+        SimulationCreateRequest(**body)  # type: ignore[arg-type]
+
+
+def test_the_image_limit_reaches_the_screen_through_openapi() -> None:
+    # 화면이 숫자를 따로 정하지 않고 계약에서 읽을 수 있어야 한다
+    schema = SimulationCreateRequest.model_json_schema()
+
+    assert schema["properties"]["asset_ids"]["maxItems"] == 4

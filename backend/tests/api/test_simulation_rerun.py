@@ -9,12 +9,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SimulationRun
+from app.services.image_storage import LocalImageStorage
 from tests.api.simulation_helpers import CREATE, FakeManager, create_body
 from tests.db_helpers import Factory
+from tests.image_samples import png
 
 SCHEMA = {"type": "object", "required": ["title"]}
 # 초안에서 화면 안내에만 쓰고 새 실행 요청에는 싣지 않는 값과 모델 칸의 현재 상태
-GUIDANCE_FIELDS = {"rerunnable", "blocked_reason"}
+GUIDANCE_FIELDS = {"rerunnable", "blocked_reason", "images"}
 CURRENT_MODEL_FIELDS = {"current_display_name", "current_status", "selectable"}
 
 
@@ -147,18 +149,133 @@ async def test_only_the_final_attempt_of_each_slot_is_offered(
     assert [m["model_id"] for m in draft["models"]] == [m["model_id"] for m in final]
 
 
-@pytest.mark.usefixtures("signed_in")
-async def test_a_run_with_attached_images_is_offered_but_blocked(
-    client: AsyncClient, factory: Factory
-) -> None:
+async def run_with_images(
+    factory: Factory, *paths: str, filenames: list[str | None] | None = None
+) -> tuple[Any, list[str]]:
     run = await factory.simulation_run()
     simulation_id = run["simulation_id"]
     for slot_no in (1, 2):
         await factory.simulation_result(simulation_id=simulation_id, slot_no=slot_no)
-    await factory.simulation_run_asset(simulation_id=simulation_id)
+    asset_ids = []
+    names = filenames or [None] * len(paths)
+    for order, (path, name) in enumerate(zip(paths, names, strict=True), start=1):
+        asset = await factory.input_asset(storage_path=path, original_filename=name)
+        await factory.simulation_run_asset(
+            simulation_id=simulation_id, asset_id=asset["asset_id"], sort_order=order
+        )
+        asset_ids.append(str(asset["asset_id"]))
+    return simulation_id, asset_ids
+
+
+@pytest.mark.usefixtures("signed_in")
+async def test_a_run_whose_image_files_remain_is_offered_with_its_images_in_order(
+    client: AsyncClient, factory: Factory, image_storage: LocalImageStorage
+) -> None:
+    await image_storage.write("simulator/first.png", png())
+    await image_storage.write("simulator/second.png", png())
+    simulation_id, asset_ids = await run_with_images(
+        factory, "simulator/first.png", "simulator/second.png"
+    )
+
+    draft = (await client.get(draft_url(simulation_id))).json()
+
+    assert (draft["rerunnable"], draft["blocked_reason"]) == (True, None)
+    assert draft["asset_ids"] == asset_ids
+
+
+@pytest.mark.usefixtures("signed_in")
+async def test_the_draft_names_each_image_it_was_run_with(
+    client: AsyncClient, factory: Factory, image_storage: LocalImageStorage
+) -> None:
+    # 상세·재실행 화면이 "이미지 1" 대신 올린 파일 이름을 보여 주게 한다
+    await image_storage.write("simulator/front.png", png())
+    await image_storage.write("simulator/unnamed.png", png())
+    simulation_id, asset_ids = await run_with_images(
+        factory,
+        "simulator/front.png",
+        "simulator/unnamed.png",
+        filenames=["앞면.png", None],
+    )
+
+    draft = (await client.get(draft_url(simulation_id))).json()
+
+    assert draft["images"] == [
+        {
+            "asset_id": asset_ids[0],
+            "mime_type": "image/png",
+            "file_size_bytes": 1,
+            "original_filename": "앞면.png",
+        },
+        {
+            "asset_id": asset_ids[1],
+            "mime_type": "image/png",
+            "file_size_bytes": 1,
+            "original_filename": None,
+        },
+    ]
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in", "manager")
+async def test_a_text_only_run_has_no_images(
+    client: AsyncClient, models: list[int]
+) -> None:
+    simulation_id = await past_run_id(client, models)
+
+    draft = (await client.get(draft_url(simulation_id))).json()
+
+    assert (draft["asset_ids"], draft["images"]) == ([], [])
+
+
+@pytest.mark.usefixtures("signed_in", "image_storage")
+async def test_a_run_whose_image_file_is_gone_is_offered_but_blocked(
+    client: AsyncClient, factory: Factory
+) -> None:
+    simulation_id, asset_ids = await run_with_images(factory, "simulator/vanished.png")
 
     response = await client.get(draft_url(simulation_id))
 
     assert response.status_code == 200
     draft = response.json()
     assert (draft["rerunnable"], draft["blocked_reason"]) == (False, "INPUT_MISSING")
+    assert draft["asset_ids"] == asset_ids
+
+
+@pytest.mark.usefixtures("signed_in", "image_storage")
+async def test_an_old_record_with_an_absolute_path_is_blocked_not_a_server_error(
+    client: AsyncClient, factory: Factory
+) -> None:
+    # 옛 seed 의 경로(/data/assets/...)는 이 저장소의 키가 아니다. 오류가 아니라 "복원 불가"로 답한다
+    simulation_id, _ = await run_with_images(factory, "/data/assets/2026/10/x.jpg")
+
+    draft = (await client.get(draft_url(simulation_id))).json()
+
+    assert (draft["rerunnable"], draft["blocked_reason"]) == (False, "INPUT_MISSING")
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in", "manager")
+async def test_a_run_with_per_model_settings_can_be_rerun_as_it_was(
+    client: AsyncClient, models: list[int]
+) -> None:
+    body = create_body(
+        models,
+        models=[
+            {
+                "model_id": models[0],
+                "execution_provider": "DeepInfra",
+                "execution_config": {"reasoning_effort": effort, "temperature": 0.2},
+            }
+            for effort in ("low", "high")
+        ],
+    )
+    created = await client.post(CREATE, json=body)
+    assert created.status_code == 202, created.text
+
+    draft = (await client.get(draft_url(created.json()["simulation_id"]))).json()
+
+    assert [m["execution_config"] for m in draft["models"]] == [
+        {"max_tokens": 4096, "temperature": 0.2, "reasoning_effort": effort}
+        for effort in ("low", "high")
+    ]
+    # 화면은 초안을 그대로 새 실행으로 보내므로 설정까지 같은 두 칸이 중복으로 걸리지 않아야 한다
+    again = await client.post(CREATE, json=as_new_request(draft))
+    assert again.status_code == 202, again.text

@@ -1,66 +1,115 @@
 import { getRouteApi } from "@tanstack/react-router";
 import plusIcon from "../../../assets/plus.svg";
+import { Badge } from "../../../shared/components/ui/Badge";
 import { Button } from "../../../shared/components/ui/Button";
 import { Result } from "../../../shared/components/ui/Result";
-import { SectionCard } from "../../../shared/components/ui/SectionCard";
-import { useListSort } from "../hooks/useListSort";
-import type { ListColumn, PagingControls } from "../lib/list";
+import { TextLink } from "../../../shared/components/ui/TextLink";
+import { formatUsd } from "../../../shared/lib/format";
+import { type SubscriptionRow, subscriptionRowsOptions } from "../api/budget";
+import type { ListColumn } from "../lib/list";
+import type { BudgetSearch } from "../lib/search";
+import { subscriptionStatusBadge } from "../lib/view";
+import { ListTable } from "./ListTable";
 import { MemberUsageSection } from "./MemberUsageSection";
-import { PendingTable } from "./PendingTable";
-import { ViewAllLink } from "./ViewAllLink";
 
 const TITLE = "구독료 관리";
+/** 귀속 프로젝트가 없는 구독료 */
+const UNASSIGNED_LABEL = "미배분";
 
 const route = getRouteApi("/_app/internal-budget");
 
-const COLUMNS: ListColumn<"subscriptions">[] = [
-  { key: "tool", header: "도구명" },
-  { key: "month", header: "적용 월" },
-  { key: "amount", header: "금액 (USD)", align: "right" },
-  { key: "project", header: "귀속 프로젝트" },
-  { key: "status", header: "상태" },
+const COLUMNS: ListColumn<"subscriptions", SubscriptionRow>[] = [
+  {
+    key: "tool",
+    header: "도구명",
+    render: (row) => (
+      <TextLink
+        from="/internal-budget"
+        to="/internal-budget"
+        search={(prev) => ({ ...prev, subscription: row.subscription_id })}
+        resetScroll={false}
+      >
+        {row.tool_name}
+      </TextLink>
+    ),
+  },
+  { key: "month", header: "적용 월", render: (row) => row.applied_month },
+  {
+    key: "amount",
+    header: "금액 (USD)",
+    align: "right",
+    render: (row) => formatUsd(row.amount_usd, "summary"),
+  },
+  {
+    key: "project",
+    header: "귀속 프로젝트",
+    render: (row) =>
+      row.project_id === null ? (
+        <span className="text-grey-600">{UNASSIGNED_LABEL}</span>
+      ) : (
+        row.project_name
+      ),
+  },
+  {
+    key: "status",
+    header: "상태",
+    render: (row) => {
+      const badge = subscriptionStatusBadge(row.status);
+      return <Badge tone={badge.tone}>{badge.label}</Badge>;
+    },
+  },
 ];
 
+type SubscriptionTableProps = {
+  search: BudgetSearch;
+  refreshing: boolean;
+  onPageChange?: (page: number) => void;
+};
+
 /**
- * 월 구독료 목록. 요약 화면에서는 아래에 구성원별 Command Code 사용량을 함께 보여 주고,
- * paging이 있으면 구독료 전체보기만 보여 준다. 등록 버튼은 주소에 남겨 등록 패널을 연다.
+ * 조회 기간이 걸치는 달의 월 구독료. 요약 화면에서는 최근 적용 월 N건과 구성원별 Command Code 사용량을
+ * 함께 보여 준다. 등록 버튼은 주소에 남겨 등록 패널을 연다.
  */
-export function SubscriptionTable({ paging }: { paging?: PagingControls }) {
+export function SubscriptionTable({
+  search,
+  refreshing,
+  onPageChange,
+}: SubscriptionTableProps) {
   const navigate = route.useNavigate();
-  const sorting = useListSort("subscriptions");
   return (
-    <SectionCard
+    <ListTable
+      view="subscriptions"
       title={TITLE}
-      description="도구명을 누르면 내용을 고칠 수 있어요."
+      description={`${onPageChange ? "" : "최근 적용 월 기준 · "}도구명을 누르면 내용을 고칠 수 있어요.`}
       action={
-        <div className="flex items-center gap-4">
-          {!paging && <ViewAllLink view="subscriptions" title={TITLE} />}
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={plusIcon}
-            onClick={() =>
-              navigate({ search: (prev) => ({ ...prev, subscription: "new" }) })
-            }
-          >
-            구독료 등록
-          </Button>
-        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={plusIcon}
+          onClick={() =>
+            navigate({
+              search: (prev) => ({ ...prev, subscription: "new" }),
+              resetScroll: false,
+            })
+          }
+        >
+          구독료 등록
+        </Button>
       }
+      errorTitle="구독료 관리를 불러오지 못했어요"
+      query={subscriptionRowsOptions(search)}
+      columns={COLUMNS}
+      rowKey={(row) => String(row.subscription_id)}
+      empty={
+        <Result
+          title="등록된 구독료가 없어요"
+          description="구독료를 등록하면 월 구독료와 총 관리 비용에 반영돼요."
+        />
+      }
+      refreshing={refreshing}
+      onPageChange={onPageChange}
     >
-      <PendingTable
-        caption={TITLE}
-        columns={COLUMNS}
-        empty={
-          <Result
-            title="등록된 구독료가 없어요"
-            description="구독료를 등록하면 월 구독료와 총 관리 비용에 반영돼요."
-          />
-        }
-        sorting={sorting}
-        paging={paging}
-      />
-      {!paging && <MemberUsageSection />}
-    </SectionCard>
+      <MemberUsageSection />
+    </ListTable>
   );
 }

@@ -55,7 +55,12 @@ from app.schemas.usage import (
     UsageTrend,
     UsageTrendPoint,
 )
-from app.services.budget_policy import BudgetStatus, evaluate_budget, share_of_budget
+from app.services.budget_policy import (
+    WARNING_PCT,
+    BudgetStatus,
+    evaluate_budget,
+    share_of_budget,
+)
 from app.services.simulation_period import DateRange, utc_bounds
 
 # 요약 화면의 미리보기 건수
@@ -329,6 +334,7 @@ def _budget_usage(month: date, budget: Budget | None, usage: Any | None) -> Budg
         remaining_usd=evaluation.remaining_usd,
         unknown_cost_count=usage.unknown_cost_count if usage is not None else 0,
         status=evaluation.status,
+        warning_threshold_pct=WARNING_PCT,
     )
 
 
@@ -567,19 +573,21 @@ async def customer_detail(
         unknown_cost_count=totals.unknown_cost_count,
         budget=budget,
         services=[
-            CustomerServiceUsage(
-                service_id=row.service_id,
-                service_name=row.service_name,
-                task_count=row.task_count,
-                call_count=row.call_count,
-                confirmed_cost_usd=row.confirmed_cost_usd,
-                estimated_cost_usd=row.estimated_cost_usd,
-                unknown_cost_count=row.unknown_cost_count,
-                budget_share_pct=share_of_budget(
-                    row.confirmed_cost_usd + row.estimated_cost_usd,
-                    budget.monthly_amount_usd,
-                ),
-            )
-            for row in service_rows
+            _service_usage(row, budget.monthly_amount_usd) for row in service_rows
         ],
+    )
+
+
+def _service_usage(row: Any, monthly_amount: Decimal | None) -> CustomerServiceUsage:
+    total = row.confirmed_cost_usd + row.estimated_cost_usd
+    return CustomerServiceUsage(
+        service_id=row.service_id,
+        service_name=row.service_name,
+        task_count=row.task_count,
+        call_count=row.call_count,
+        confirmed_cost_usd=row.confirmed_cost_usd,
+        estimated_cost_usd=row.estimated_cost_usd,
+        total_cost_usd=total,
+        unknown_cost_count=row.unknown_cost_count,
+        budget_share_pct=share_of_budget(total, monthly_amount),
     )

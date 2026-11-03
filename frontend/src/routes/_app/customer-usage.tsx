@@ -8,21 +8,21 @@ import {
 } from "../../features/customer-usage/api/usage";
 import { CustomerPanel } from "../../features/customer-usage/components/CustomerPanel";
 import { CustomerUsageTable } from "../../features/customer-usage/components/CustomerUsageTable";
-import { DataBlock } from "../../features/customer-usage/components/DataBlock";
 import { RequestTable } from "../../features/customer-usage/components/RequestTable";
 import { SummaryCards } from "../../features/customer-usage/components/SummaryCards";
 import { SummarySkeleton } from "../../features/customer-usage/components/SummarySkeleton";
 import { UsageFilters } from "../../features/customer-usage/components/UsageFilters";
 import { UsageFullList } from "../../features/customer-usage/components/UsageFullList";
 import { UsageTrendCard } from "../../features/customer-usage/components/UsageTrendCard";
-import { budgetMonthOf } from "../../features/customer-usage/lib/budget";
 import {
   customerUsageSearchSchema,
   filterFormValues,
   filterSearchParams,
 } from "../../features/customer-usage/lib/search";
+import { DataBlock } from "../../shared/components/ui/DataBlock";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 import { RefreshingBar } from "../../shared/components/ui/RefreshingBar";
+import { budgetMonthOf } from "../../shared/lib/budget";
 
 export const Route = createFileRoute("/_app/customer-usage")({
   validateSearch: customerUsageSearchSchema,
@@ -101,7 +101,10 @@ function CustomerUsagePage() {
           customerId={detail}
           budgetMonth={budgetMonth}
           onClose={() =>
-            navigate({ search: (prev) => ({ ...prev, detail: undefined }) })
+            navigate({
+              search: (prev) => ({ ...prev, detail: undefined }),
+              resetScroll: false,
+            })
           }
         />
       )}

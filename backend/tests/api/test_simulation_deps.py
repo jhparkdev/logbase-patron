@@ -3,7 +3,7 @@
 import pytest
 from pydantic import SecretStr
 
-from app.api.simulation_deps import get_model_caller
+from app.api.simulation_deps import get_model_caller, get_openrouter_client
 from app.openrouter.client import OpenRouterClient
 
 # 테스트용 가짜 Key. 오류나 출력에 드러나는지 찾을 표식으로 쓴다
@@ -34,3 +34,16 @@ def test_key_is_not_exposed_in_caller_repr() -> None:
 
     assert FAKE_KEY not in repr(caller)
     assert FAKE_KEY not in str(caller)
+
+
+def test_text_and_image_calls_share_one_real_client() -> None:
+    # 연결(httpx 클라이언트)과 Key 를 한 곳에서만 들고 있게 한다
+    client = get_openrouter_client(SecretStr(FAKE_KEY))
+
+    assert isinstance(client, OpenRouterClient)
+    assert client.generate_image.__func__ is OpenRouterClient.generate_image
+
+
+def test_image_calls_also_refuse_to_run_without_key() -> None:
+    with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
+        get_openrouter_client(None)

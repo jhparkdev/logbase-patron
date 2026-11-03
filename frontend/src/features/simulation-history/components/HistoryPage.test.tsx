@@ -40,6 +40,7 @@ beforeAll(() => {
     this.removeAttribute("open");
   };
 });
+const RUN_UUID = "01a1611f-3e80-73c5-a130-3efa5a1f75de";
 const search = historySearchSchema.parse({
   from: "2026-10-01",
   to: "2026-10-30",
@@ -49,8 +50,13 @@ const row: HistoryRow = {
   requestedAt: "2026-10-22T01:00:00Z",
   scenario: "기존 시나리오",
   modelCount: 3,
-  status: { label: "일부 성공", tone: "yellow" },
-  cost: { total: "0.125", estimated: true, unknownCount: 1, checking: false },
+  status: { label: "부분 성공", tone: "yellow" },
+  cost: {
+    confirmed: null,
+    estimated: "0.125",
+    unknownCount: 1,
+    checkStatus: "미확인 포함",
+  },
   inactiveModelCount: 1,
 };
 const detail: HistoryDetailView = {
@@ -128,7 +134,7 @@ test("두 번째 페이지에서 조회하면 첫 페이지로 돌아간다", as
 test("필터는 조회할 때 제출하고 역전된 날짜를 입력하면 URL 변경을 막는다", async () => {
   const onSearch = vi.fn();
   render(<HistoryPage search={search} onSearch={onSearch} />);
-  fireEvent.change(screen.getByLabelText("조회 시작일"), {
+  fireEvent.change(screen.getByLabelText("시작일"), {
     target: { value: "2026-10-31" },
   });
   expect(onSearch).not.toHaveBeenCalled();
@@ -137,24 +143,64 @@ test("필터는 조회할 때 제출하고 역전된 날짜를 입력하면 URL 
     await screen.findByText("시작일은 종료일보다 늦을 수 없어요."),
   ).toBeDefined();
   expect(onSearch).not.toHaveBeenCalled();
-  fireEvent.change(screen.getByLabelText("조회 시작일"), {
+  fireEvent.change(screen.getByLabelText("시작일"), {
     target: { value: "2026-10-01" },
   });
   fireEvent.change(screen.getByLabelText("Simulation ID"), {
-    target: { value: " run-1 " },
+    target: { value: ` ${RUN_UUID} ` },
   });
   fireEvent.click(screen.getByRole("button", { name: "조회" }));
   await waitFor(() =>
     expect(onSearch).toHaveBeenCalledWith(
       expect.objectContaining({
-        simulationId: "run-1",
+        simulationId: RUN_UUID,
         selected: undefined,
         detail: false,
       }),
     ),
   );
 });
-test("서버가 준 순서를 유지하며 모든 데이터 열의 정렬 요청을 전달한다", () => {
+test("기간과 실행 ID가 모두 틀리면 두 오류를 함께 보여 주고 각 칸에 연결한다", async () => {
+  render(<HistoryPage search={search} onSearch={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("시작일"), {
+    target: { value: "2099-12-31" },
+  });
+  fireEvent.change(screen.getByLabelText("Simulation ID"), {
+    target: { value: "run-1" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "조회" }));
+
+  const describedText = (label: string) => {
+    const id = screen.getByLabelText(label).getAttribute("aria-describedby");
+    return id && document.getElementById(id)?.textContent;
+  };
+  await waitFor(() =>
+    expect(describedText("시작일")).toBe("시작일은 종료일보다 늦을 수 없어요."),
+  );
+  expect(describedText("Simulation ID")).toBe("실행 ID 형식을 확인해 주세요.");
+});
+
+test("UUID가 아닌 실행 ID는 조회하지 않고 고칠 수 있게 안내한다", async () => {
+  const onSearch = vi.fn();
+  render(<HistoryPage search={search} onSearch={onSearch} />);
+  fireEvent.change(screen.getByLabelText("Simulation ID"), {
+    target: { value: "run-1" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "조회" }));
+  expect(
+    await screen.findByText("실행 ID 형식을 확인해 주세요."),
+  ).toBeDefined();
+  expect(onSearch).not.toHaveBeenCalled();
+});
+test("시나리오 선택지가 없으면 시나리오 필터를 숨기고, URL에 값이 있으면 지울 수 있게 남긴다", () => {
+  const page = render(<HistoryPage search={search} onSearch={vi.fn()} />);
+  expect(screen.queryByRole("combobox", { name: "시나리오" })).toBeNull();
+  page.rerender(
+    <HistoryPage search={{ ...search, scenario: "3" }} onSearch={vi.fn()} />,
+  );
+  expect(screen.getByRole("combobox", { name: "시나리오" })).toBeDefined();
+});
+test("서버가 준 순서를 유지하며 서버가 지원하는 열의 정렬 요청을 전달한다", () => {
   const onSearch = vi.fn();
   render(
     <HistoryPage
@@ -179,14 +225,19 @@ test("서버가 준 순서를 유지하며 모든 데이터 열의 정렬 요청
     "모델 수",
     "실행 상태",
     "비용 상태",
-    "총 비용 (USD)",
   ]) {
     fireEvent.click(screen.getByRole("button", { name: `${label} 정렬` }));
   }
-  expect(onSearch).toHaveBeenCalledTimes(7);
+  expect(onSearch).toHaveBeenCalledTimes(6);
   expect(onSearch).toHaveBeenLastCalledWith(
-    expect.objectContaining({ sort: "totalCost", direction: "asc" }),
+    expect.objectContaining({ sort: "costStatus", direction: "asc" }),
   );
+  expect(
+    screen.getByRole("columnheader", { name: "총 비용 (USD)" }),
+  ).toBeDefined();
+  expect(
+    screen.queryByRole("button", { name: "총 비용 (USD) 정렬" }),
+  ).toBeNull();
   expect(within(rows[1]).getByText("추정 포함")).toBeDefined();
   expect(within(rows[1]).getByText("미확인 1건 미반영")).toBeDefined();
 });
@@ -197,14 +248,14 @@ test("시나리오·모델·상태의 복합 선택을 조회 조건으로 전�
       search={search}
       onSearch={onSearch}
       scenarios={[{ key: "3", name: "데이터 요약" }]}
-      models={[{ key: "a:p", name: "모델 A" }]}
+      models={[{ key: "7", name: "모델 A" }]}
     />,
   );
   fireEvent.change(screen.getByRole("combobox", { name: "시나리오" }), {
     target: { value: "3" },
   });
   fireEvent.change(screen.getByRole("combobox", { name: "모델" }), {
-    target: { value: "a:p" },
+    target: { value: "7" },
   });
   fireEvent.change(screen.getByRole("combobox", { name: "실행 상태" }), {
     target: { value: "SUCCESS" },
@@ -214,7 +265,7 @@ test("시나리오·모델·상태의 복합 선택을 조회 조건으로 전�
     expect(onSearch).toHaveBeenCalledWith(
       expect.objectContaining({
         scenario: "3",
-        model: "a:p",
+        model: "7",
         status: "SUCCESS",
       }),
     ),

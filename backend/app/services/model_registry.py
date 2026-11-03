@@ -5,8 +5,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 from app.models import ModelStatus
+from app.openrouter.lookup_result import ReasoningInfo
+from app.schemas.simulation import ReasoningEffort
 
 # OpenRouter 가격 항목 이름 -> 우리 가격 칸
 PROMPT_KEY = "prompt"
@@ -14,7 +17,11 @@ COMPLETION_KEY = "completion"
 CACHE_READ_KEY = "input_cache_read"
 CACHE_WRITE_KEY = "input_cache_write"
 
+# ModelRegistry.openrouter_metadata에서 추론 정보를 담는 키
+REASONING_KEY = "reasoning"
+
 RESPONSE_FORMAT_PARAMETER = "response_format"
+TOOLS_PARAMETER = "tools"
 
 # ACTIVE로 바꾸는 시점에 이 시간 안에 성공한 연결 테스트가 있어야 한다.
 ACTIVATION_TEST_WINDOW = timedelta(hours=24)
@@ -89,6 +96,45 @@ def supports_json_schema(supported_parameters: Collection[str]) -> bool:
     return RESPONSE_FORMAT_PARAMETER in supported_parameters
 
 
+def supports_tools(supported_parameters: Collection[str]) -> bool:
+    """함수 호출(tools)을 지원하는지. tool_choice만 있는 경우는 지원으로 보지 않는다."""
+    return TOOLS_PARAMETER in supported_parameters
+
+
+def build_metadata(reasoning: ReasoningInfo | None) -> dict[str, Any] | None:
+    """등록할 때 openrouter_metadata에 저장할 값. 저장할 정보가 없으면 None이다."""
+    if reasoning is None:
+        return None
+    return {
+        REASONING_KEY: {
+            "mandatory": reasoning.mandatory,
+            "supported_efforts": reasoning.supported_efforts,
+        }
+    }
+
+
+def stored_reasoning_efforts(
+    metadata: Mapping[str, Any] | None,
+) -> tuple[ReasoningEffort, ...] | None:
+    """저장된 정보에서 모델이 받는 추론 강도를 읽는다. 순서는 ReasoningEffort의 순서로 고정한다.
+
+    저장된 정보가 없거나 모양이 틀리면 None이다. 그때는 부르는 쪽이 이전 방식(reasoning 설정이
+    있으면 모든 강도 허용)을 쓴다. 추론이 필수인 모델에는 none을 받지 않는다(OpenRouter가 400을 낸다).
+    """
+    reasoning = metadata.get(REASONING_KEY) if isinstance(metadata, Mapping) else None
+    if not isinstance(reasoning, Mapping) or "supported_efforts" not in reasoning:
+        return None
+    listed = reasoning["supported_efforts"]
+    if listed is not None and not isinstance(listed, list):
+        return None
+    efforts = [
+        effort for effort in ReasoningEffort if listed is None or effort.value in listed
+    ]
+    if reasoning.get("mandatory") is True:
+        efforts = [effort for effort in efforts if effort != ReasoningEffort.NONE]
+    return tuple(efforts)
+
+
 def provider_from_model_id(openrouter_model_id: str) -> str | None:
     """모델 ID의 '/' 앞부분을 모델 제공사로 쓴다 (안). '/'가 없으면 None."""
     provider, separator, _ = openrouter_model_id.partition("/")
@@ -100,11 +146,11 @@ def provider_from_model_id(openrouter_model_id: str) -> str | None:
 def snapshot_from_pricing(pricing: Mapping[str, Decimal]) -> PriceSnapshot | None:
     """OpenRouter 가격 항목에서 우리가 저장하는 단가를 꺼낸다.
 
-    입력 또는 출력 단가가 없으면 가격 미확인이라 None이다.
+    입력 또는 출력 단가가 없거나 음수이면 가격 미확인이라 None이다. 0은 무료로 본다.
     """
     prompt = pricing.get(PROMPT_KEY)
     completion = pricing.get(COMPLETION_KEY)
-    if prompt is None or completion is None:
+    if prompt is None or completion is None or prompt < 0 or completion < 0:
         return None
     return PriceSnapshot(
         input_price_per_token=prompt,

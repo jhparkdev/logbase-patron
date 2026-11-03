@@ -5,11 +5,13 @@ from typing import Any
 import pytest
 
 from app.openrouter.lookup_parsing import (
+    parse_endpoints,
     parse_generation,
     parse_key_usage,
     parse_keys,
     parse_models,
 )
+from app.openrouter.lookup_result import ReasoningInfo
 
 
 # ---------------------------------------------------------------
@@ -326,3 +328,209 @@ def test_Key_목록에서_모양이_다른_항목은_건너뛴다() -> None:
 @pytest.mark.parametrize("body", [{}, {"data": "문자열"}, {"data": {"hash": "h"}}])
 def test_Key_목록의_data가_목록이_아니면_None이다(body: dict[str, Any]) -> None:
     assert parse_keys(body) is None
+
+
+# ---------------------------------------------------------------
+# 모델 하나의 서버 업체 목록
+# ---------------------------------------------------------------
+def endpoint(name: str | None, **fields: Any) -> dict[str, Any]:
+    return {"provider_name": name, "status": 0, "uptime_last_1d": 99.5, **fields}
+
+
+def test_업체_목록에서_이름_상태_가동률을_꺼낸다() -> None:
+    body = {
+        "data": {
+            "id": "a/b",
+            "endpoints": [
+                endpoint("Io Net", uptime_last_1d=99.51388888888889),
+                endpoint("DekaLLM", status=-1, uptime_last_1d=None),
+            ],
+        }
+    }
+
+    endpoints = parse_endpoints(body)
+
+    assert endpoints is not None
+    assert [item.provider_name for item in endpoints] == ["Io Net", "DekaLLM"]
+    assert [item.status for item in endpoints] == [0, -1]
+    assert endpoints[0].uptime_last_1d == Decimal("99.51388888888889")
+    assert endpoints[1].uptime_last_1d is None
+
+
+def test_같은_이름의_업체는_처음_것_하나만_남긴다() -> None:
+    body = {
+        "data": {
+            "endpoints": [
+                endpoint("DeepInfra", status=0),
+                endpoint("DeepInfra", status=-1),
+                endpoint("Parasail"),
+            ]
+        }
+    }
+
+    endpoints = parse_endpoints(body)
+
+    assert endpoints is not None
+    assert [(item.provider_name, item.status) for item in endpoints] == [
+        ("DeepInfra", 0),
+        ("Parasail", 0),
+    ]
+
+
+def test_업체_목록에서_이름이_없거나_모양이_다른_항목은_건너뛴다() -> None:
+    body = {
+        "data": {
+            "endpoints": [
+                "문자열",
+                endpoint(None),
+                endpoint(""),
+                endpoint(5),
+                {"status": 0},
+                endpoint("DekaLLM"),
+            ]
+        }
+    }
+
+    endpoints = parse_endpoints(body)
+
+    assert endpoints is not None
+    assert [item.provider_name for item in endpoints] == ["DekaLLM"]
+
+
+def test_상태와_가동률의_모양이_다르면_None으로_둔다() -> None:
+    item = endpoint("DekaLLM", status="정상", uptime_last_1d="높음")
+
+    endpoints = parse_endpoints({"data": {"endpoints": [item]}})
+
+    assert endpoints is not None
+    assert endpoints[0].status is None
+    assert endpoints[0].uptime_last_1d is None
+
+
+def test_업체가_하나도_없어도_정상_응답이면_빈_목록이다() -> None:
+    endpoints = parse_endpoints({"data": {"endpoints": []}})
+
+    assert endpoints == []
+
+
+def test_업체가_받는_설정_목록을_꺼낸다() -> None:
+    item = endpoint("Io Net", supported_parameters=["max_tokens", "temperature"])
+
+    endpoints = parse_endpoints({"data": {"endpoints": [item]}})
+
+    assert endpoints is not None
+    assert endpoints[0].supported_parameters == ["max_tokens", "temperature"]
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        {"provider_name": "DekaLLM"},
+        {"provider_name": "DekaLLM", "supported_parameters": None},
+        {"provider_name": "DekaLLM", "supported_parameters": "temperature"},
+        {"provider_name": "DekaLLM", "supported_parameters": 5},
+    ],
+    ids=["항목 없음", "null", "문자열", "숫자"],
+)
+def test_설정_목록이_없거나_모양이_다르면_빈_목록이다(item: dict[str, Any]) -> None:
+    endpoints = parse_endpoints({"data": {"endpoints": [item]}})
+
+    assert endpoints is not None
+    assert endpoints[0].supported_parameters == []
+
+
+def test_설정_목록의_문자열이_아닌_항목은_버린다() -> None:
+    item = endpoint("DekaLLM", supported_parameters=["max_tokens", 5, None])
+
+    endpoints = parse_endpoints({"data": {"endpoints": [item]}})
+
+    assert endpoints is not None
+    assert endpoints[0].supported_parameters == ["max_tokens"]
+
+
+def test_같은_이름의_업체는_처음_것의_설정_목록을_남긴다() -> None:
+    first = endpoint("DeepInfra", supported_parameters=["max_tokens"])
+    second = endpoint("DeepInfra", supported_parameters=["temperature"])
+
+    endpoints = parse_endpoints({"data": {"endpoints": [first, second]}})
+
+    assert endpoints is not None
+    assert [item.supported_parameters for item in endpoints] == [["max_tokens"]]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"data": "문자열"},
+        {"data": []},
+        {"data": {}},
+        {"data": {"endpoints": "문자열"}},
+        {"data": {"endpoints": {"provider_name": "DekaLLM"}}},
+    ],
+)
+def test_업체_목록의_모양이_틀리면_None이다(body: dict[str, Any]) -> None:
+    assert parse_endpoints(body) is None
+
+
+# ---------------------------------------------------------------
+# 모델의 추론 강도
+# ---------------------------------------------------------------
+def reasoning_of(raw: Any) -> ReasoningInfo | None:
+    models = parse_models({"data": [{"id": "a/b", "reasoning": raw}]})
+    assert models is not None
+    return models[0].reasoning
+
+
+def test_추론_항목에서_필수_여부와_고를_수_있는_강도를_꺼낸다() -> None:
+    raw = {
+        "mandatory": True,
+        "supported_efforts": ["high", "medium"],
+        "default_effort": "medium",
+    }
+
+    expected = ReasoningInfo(mandatory=True, supported_efforts=["high", "medium"])
+    assert reasoning_of(raw) == expected
+
+
+def test_강도_목록이_없으면_강도를_고를_수_없는_모델이다() -> None:
+    expected = ReasoningInfo(mandatory=False, supported_efforts=[])
+
+    assert reasoning_of({"mandatory": False}) == expected
+
+
+def test_강도_목록이_null이면_모든_강도를_받는다() -> None:
+    expected = ReasoningInfo(mandatory=False, supported_efforts=None)
+
+    assert reasoning_of({"supported_efforts": None}) == expected
+
+
+@pytest.mark.parametrize("mandatory", ["yes", 1, None])
+def test_필수_여부가_불리언이_아니면_필수가_아닌_것으로_본다(mandatory: Any) -> None:
+    info = reasoning_of({"mandatory": mandatory, "supported_efforts": []})
+
+    assert info is not None
+    assert info.mandatory is False
+
+
+def test_강도_목록의_문자열이_아닌_항목은_버린다() -> None:
+    info = reasoning_of({"supported_efforts": ["high", 5, None]})
+
+    assert info is not None
+    assert info.supported_efforts == ["high"]
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["문자열", 5, [], None, {"supported_efforts": "high"}, {"supported_efforts": 5}],
+    ids=["문자열", "숫자", "목록", "null", "강도가 문자열", "강도가 숫자"],
+)
+def test_추론_항목의_모양이_틀리면_정보_없음이다(raw: Any) -> None:
+    assert reasoning_of(raw) is None
+
+
+def test_추론_항목이_아예_없으면_정보_없음이다() -> None:
+    models = parse_models({"data": [{"id": "a/b"}]})
+
+    assert models is not None
+    assert models[0].reasoning is None

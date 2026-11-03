@@ -7,11 +7,14 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
-from sqlalchemy import exists, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    AIRequest,
+    InputAsset,
     ModelRegistry,
     ModelStatus,
     SimulationResult,
@@ -25,6 +28,9 @@ from app.schemas.simulation_history import (
     RerunRoutingPolicy,
     SimulationRerunDraft,
 )
+from app.schemas.simulation_image import ImageAssetRead
+from app.services.image_storage import ImageStorage
+from app.services.simulation_output_config import split_stored_config
 from app.services.simulation_validation import is_model_selectable
 
 
@@ -34,18 +40,27 @@ class PastSlot:
 
     model_id: int
     execution_provider: str
+    execution_config: dict[str, Any]  # 이 칸에 실제로 적용했던 설정
     current_display_name: str
     current_status: ModelStatus
 
 
 def build_rerun_draft(
-    run: SimulationRun, slots: Sequence[PastSlot], *, has_input_assets: bool
+    run: SimulationRun,
+    slots: Sequence[PastSlot],
+    *,
+    images: Sequence[ImageAssetRead] = (),
+    assets_available: bool = True,
 ) -> SimulationRerunDraft:
-    """과거 실행 행과 칸들로 초안을 만든다. slots 는 칸 번호 순서여야 한다.
+    """과거 실행 행과 칸들로 초안을 만든다. slots 는 칸 번호 순서, images 는 올린 순서여야 한다.
 
-    첨부 이미지가 있던 실행은 막는다. 새 실행 요청에는 이미지 칸이 없어 같은 입력으로 돌릴 수 없다.
+    이미지 파일을 더는 구할 수 없으면 막는다. 같은 입력이 아닌 채로 돌리면 비교가 달라지기 때문이다.
     """
-    blocked = RerunBlockReason.INPUT_MISSING if has_input_assets else None
+    blocked = (
+        RerunBlockReason.INPUT_MISSING if images and not assets_available else None
+    )
+    # 기록된 설정을 요청 모양으로 나눈다. 이미지 옵션은 실행에 한 번만 있고 칸마다 같다
+    output_type, text_config, image_config = split_stored_config(run.execution_config)
     return SimulationRerunDraft(
         rerun_of_simulation_id=run.simulation_id,
         test_type=run.test_type,
@@ -53,7 +68,7 @@ def build_rerun_draft(
         prompt_text=run.prompt_text,
         input_text=run.input_text,
         json_schema=run.json_schema,
-        execution_config=run.execution_config,
+        execution_config=text_config,
         routing_policy=RerunRoutingPolicy(
             # 값이 없던 기록은 새 실행의 기본값으로 읽는다
             allow_fallbacks=run.routing_policy.get(
@@ -61,6 +76,10 @@ def build_rerun_draft(
             )
         ),
         models=[_to_rerun_model(slot) for slot in slots],
+        asset_ids=[image.asset_id for image in images],
+        images=list(images),
+        output_type=output_type,
+        image_config=image_config,
         rerunnable=blocked is None,
         blocked_reason=blocked,
     )
@@ -70,6 +89,7 @@ def _to_rerun_model(slot: PastSlot) -> RerunModel:
     return RerunModel(
         model_id=slot.model_id,
         execution_provider=slot.execution_provider,
+        execution_config=split_stored_config(slot.execution_config)[1],
         current_display_name=slot.current_display_name,
         current_status=slot.current_status,
         selectable=is_model_selectable(slot.current_status),
@@ -77,20 +97,46 @@ def _to_rerun_model(slot: PastSlot) -> RerunModel:
 
 
 async def get_rerun_draft(
-    session: AsyncSession, simulation_id: uuid.UUID
+    session: AsyncSession, simulation_id: uuid.UUID, storage: ImageStorage
 ) -> SimulationRerunDraft | None:
     """재실행 초안. 없는 실행이면 None."""
     run = await session.get(SimulationRun, simulation_id)
     if run is None:
         return None
-    has_input_assets = await session.scalar(
-        select(exists().where(SimulationRunAsset.simulation_id == simulation_id))
-    )
+    assets = await _past_assets(session, simulation_id)
     return build_rerun_draft(
         run,
         await _past_slots(session, simulation_id),
-        has_input_assets=bool(has_input_assets),
+        images=[image for image, _ in assets],
+        assets_available=all([await storage.exists(path) for _, path in assets]),
     )
+
+
+async def _past_assets(
+    session: AsyncSession, simulation_id: uuid.UUID
+) -> list[tuple[ImageAssetRead, str]]:
+    """과거 실행에 쓴 이미지와 그 저장 경로. 올린 순서다."""
+    rows = await session.scalars(
+        select(InputAsset)
+        .join(
+            SimulationRunAsset,
+            SimulationRunAsset.asset_id == InputAsset.asset_id,
+        )
+        .where(SimulationRunAsset.simulation_id == simulation_id)
+        .order_by(SimulationRunAsset.sort_order)
+    )
+    return [
+        (
+            ImageAssetRead(
+                asset_id=asset.asset_id,
+                mime_type=asset.mime_type,
+                file_size_bytes=asset.file_size_bytes,
+                original_filename=asset.original_filename,
+            ),
+            asset.storage_path,
+        )
+        for asset in rows
+    ]
 
 
 async def _past_slots(
@@ -100,10 +146,12 @@ async def _past_slots(
         select(
             SimulationResult.model_id,
             SimulationResult.execution_provider,
+            AIRequest.execution_config,
             ModelRegistry.display_name,
             ModelRegistry.status,
         )
         .join(ModelRegistry, ModelRegistry.model_id == SimulationResult.model_id)
+        .join(AIRequest, AIRequest.request_id == SimulationResult.request_id)
         .where(
             SimulationResult.simulation_id == simulation_id,
             SimulationResult.is_final_attempt,
@@ -114,8 +162,9 @@ async def _past_slots(
         PastSlot(
             model_id=model_id,
             execution_provider=provider,
+            execution_config=config,
             current_display_name=name,
             current_status=ModelStatus(status),
         )
-        for model_id, provider, name, status in rows
+        for model_id, provider, config, name, status in rows
     ]

@@ -22,14 +22,23 @@ from app.openrouter.errors import (
     get_failed_routing_step,
 )
 from app.openrouter.failures import build_cancelled_result, build_failure_result
+from app.openrouter.image_parsing import (
+    build_image_cancelled_result,
+    build_image_failure_result,
+    build_image_result,
+)
+from app.openrouter.image_request import build_image_request_body
+from app.openrouter.image_result import ImageCallResult
 from app.openrouter.json_access import get_str
 from app.openrouter.lookup_parsing import (
+    parse_endpoints,
     parse_generation,
     parse_key_usage,
     parse_keys,
     parse_models,
 )
 from app.openrouter.lookup_result import (
+    EndpointInfo,
     GenerationInfo,
     KeyInfo,
     KeyUsage,
@@ -56,6 +65,7 @@ from app.openrouter.streaming import (
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 CHAT_COMPLETIONS_URL = f"{OPENROUTER_BASE_URL}/chat/completions"
+IMAGES_URL = f"{OPENROUTER_BASE_URL}/images"
 
 # 비용이 없는 조회는 네트워크 오류일 때만 다시 보낸다.
 # 횟수와 간격은 아직 정해지지 않아(U-08) 임시 값이다.
@@ -202,10 +212,76 @@ class OpenRouterClient:
         )
         return result
 
+    async def generate_image(
+        self,
+        *,
+        request_id: UUID,
+        model_id: str,
+        prompt: str,
+        timeout_seconds: float,
+        input_image_urls: list[str] | None = None,
+        n: int | None = None,
+        resolution: str | None = None,
+        aspect_ratio: str | None = None,
+        quality: str | None = None,
+        provider_order: list[str] | None = None,
+        allow_fallbacks: bool = False,
+        cancel: asyncio.Event | None = None,
+    ) -> ImageCallResult:
+        """이미지 생성 모델을 호출하고 결과를 돌려준다. 실패해도 예외를 던지지 않는다.
+
+        input_image_urls는 참고 이미지(data URL 등)다. n, resolution, aspect_ratio,
+        quality는 값을 주었을 때만 요청에 넣고, 값의 범위는 호출하는 쪽이 검증한다.
+        cancel 신호가 켜지면 호출을 멈추고 CANCELLED 결과를 돌려준다.
+        스트리밍(부분 이미지)은 지원하지 않는다.
+        """
+        started_at = self._clock()
+        request_body = build_image_request_body(
+            model_id=model_id,
+            prompt=prompt,
+            input_image_urls=input_image_urls,
+            n=n,
+            resolution=resolution,
+            aspect_ratio=aspect_ratio,
+            quality=quality,
+            provider_order=provider_order,
+            allow_fallbacks=allow_fallbacks,
+        )
+
+        if cancel is not None and cancel.is_set():
+            result = build_image_cancelled_result(
+                requested_model=model_id,
+                started_at=started_at,
+                finished_at=self._clock(),
+            )
+        else:
+            result = await self._send_image(
+                request_body, model_id, timeout_seconds, cancel, started_at
+            )
+
+        # 로그에는 호출 ID와 결과 상태만 남긴다. Key, Prompt, 이미지는 쓰지 않는다.
+        logger.info(
+            "openrouter image call finished request_id=%s status=%s http_status=%s",
+            request_id,
+            result.status,
+            result.http_status,
+        )
+        return result
+
     async def list_models(self) -> LookupResult[list[ModelInfo]]:
         """모델 목록과 가격을 가져온다. 공개 엔드포인트라 Key를 보내지 않는다."""
         fetched = await self._get_json("/models", token=None)
         return _convert(fetched, parse_models)
+
+    async def get_model_endpoints(
+        self, model_id: str
+    ) -> LookupResult[list[EndpointInfo]]:
+        """모델 하나를 처리하는 서버 업체 목록을 가져온다. 공개 엔드포인트라 Key를 보내지 않는다.
+
+        모델이 없으면 404이고, 결과의 http_status로 알 수 있다.
+        """
+        fetched = await self._get_json(f"/models/{model_id}/endpoints", token=None)
+        return _convert(fetched, parse_endpoints)
 
     async def get_generation(self, generation_id: str) -> LookupResult[GenerationInfo]:
         """호출 하나의 실제 비용을 조회한다. 비용 대조에 쓴다."""
@@ -303,7 +379,9 @@ class OpenRouterClient:
     ) -> CallResult:
         # 비용이 드는 호출이라 실패해도 자동으로 다시 보내지 않는다.
         try:
-            response = await self._post(request_body, timeout_seconds, cancel)
+            response = await self._post(
+                CHAT_COMPLETIONS_URL, request_body, timeout_seconds, cancel
+            )
         except httpx.TimeoutException:
             return self._failure(
                 CallStatus.TIMEOUT, ErrorType.TIMEOUT_ERROR, model_id, started_at
@@ -321,6 +399,46 @@ class OpenRouterClient:
             generation_id_from_headers(response.headers),
             model_id,
             started_at,
+        )
+
+    async def _send_image(
+        self,
+        request_body: dict[str, Any],
+        model_id: str,
+        timeout_seconds: float,
+        cancel: asyncio.Event | None,
+        started_at: datetime,
+    ) -> ImageCallResult:
+        # 이미지 생성도 비용이 드는 호출이라 실패해도 자동으로 다시 보내지 않는다.
+        try:
+            response = await self._post(
+                IMAGES_URL, request_body, timeout_seconds, cancel
+            )
+        except httpx.TimeoutException:
+            status, error_type = CallStatus.TIMEOUT, ErrorType.TIMEOUT_ERROR
+        except httpx.RequestError:
+            status, error_type = CallStatus.FAILED, ErrorType.NETWORK_ERROR
+        else:
+            if response is None:
+                return build_image_cancelled_result(
+                    requested_model=model_id,
+                    started_at=started_at,
+                    finished_at=self._clock(),
+                )
+            return build_image_result(
+                status_code=response.status_code,
+                body=_read_json(response),
+                requested_model=model_id,
+                started_at=started_at,
+                finished_at=self._clock(),
+                generation_id=generation_id_from_headers(response.headers),
+            )
+        return build_image_failure_result(
+            status=status,
+            error_type=error_type,
+            requested_model=model_id,
+            started_at=started_at,
+            finished_at=self._clock(),
         )
 
     async def _send_stream(
@@ -421,13 +539,14 @@ class OpenRouterClient:
 
     async def _post(
         self,
+        url: str,
         request_body: dict[str, Any],
         timeout_seconds: float,
         cancel: asyncio.Event | None,
     ) -> httpx.Response | None:
         """요청을 보낸다. 보내는 도중 취소 신호가 켜지면 연결을 끊고 None을 돌려준다."""
         work = self._http_client.post(
-            CHAT_COMPLETIONS_URL,
+            url,
             json=request_body,
             headers={"Authorization": f"Bearer {self._api_key}"},
             timeout=timeout_seconds,

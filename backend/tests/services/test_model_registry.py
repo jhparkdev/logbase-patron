@@ -4,16 +4,21 @@ from decimal import Decimal
 import pytest
 
 from app.models import ModelStatus
+from app.openrouter.lookup_result import ReasoningInfo
+from app.schemas.simulation import ReasoningEffort
 from app.services.model_registry import (
     AvailabilityStatus,
     PriceSnapshot,
     StatusChangeError,
+    build_metadata,
     check_status_change,
     judge_availability,
     price_changed,
     provider_from_model_id,
     snapshot_from_pricing,
+    stored_reasoning_efforts,
     supports_json_schema,
+    supports_tools,
 )
 
 TESTING = ModelStatus.TESTING
@@ -146,6 +151,20 @@ def test_response_format이_있으면_JSON_Schema를_지원한다(
 
 
 @pytest.mark.parametrize(
+    ("parameters", "expected"),
+    [
+        (["temperature", "tools"], True),
+        ([], False),
+        (["temperature", "tool_choice"], False),
+    ],
+)
+def test_tools가_있으면_함수_호출을_지원한다(
+    parameters: list[str], expected: bool
+) -> None:
+    assert supports_tools(parameters) is expected
+
+
+@pytest.mark.parametrize(
     ("model_id", "expected"),
     [
         ("mistralai/mistral-nemo", "mistralai"),
@@ -206,6 +225,24 @@ def test_입력_또는_출력_단가가_없으면_가격_미확인이다(
     assert snapshot_from_pricing(pricing) is None
 
 
+@pytest.mark.parametrize(
+    "pricing",
+    [
+        {"prompt": Decimal(-1), "completion": Decimal("0.2")},
+        {"prompt": Decimal("0.1"), "completion": Decimal(-1)},
+    ],
+)
+def test_단가가_음수이면_가격_미확인이다(pricing: dict[str, Decimal]) -> None:
+    assert snapshot_from_pricing(pricing) is None
+
+
+def test_단가가_0이면_무료로_보고_가격은_확인된_것이다() -> None:
+    snapshot = snapshot_from_pricing({"prompt": Decimal(0), "completion": Decimal(0)})
+
+    assert snapshot is not None
+    assert snapshot.input_price_per_token == 0
+
+
 def snapshot(input_price: str, output_price: str) -> PriceSnapshot:
     return PriceSnapshot(
         input_price_per_token=Decimal(input_price),
@@ -241,3 +278,72 @@ def test_캐시_단가가_생기면_바뀐_것이다() -> None:
     )
 
     assert price_changed(old, new) is True
+
+
+# ---------------------------------------------------------------
+# 모델별 추론 강도 (등록할 때 저장한 정보)
+# ---------------------------------------------------------------
+EFFORT = ReasoningEffort
+
+
+def stored(efforts: list[str] | None, mandatory: bool = False) -> dict[str, object]:
+    return {"reasoning": {"mandatory": mandatory, "supported_efforts": efforts}}
+
+
+def test_추론_정보가_없으면_저장할_메타데이터도_없다() -> None:
+    assert build_metadata(None) is None
+
+
+def test_추론_정보를_메타데이터로_만든다() -> None:
+    reasoning = ReasoningInfo(mandatory=True, supported_efforts=["high", "low"])
+
+    assert build_metadata(reasoning) == stored(["high", "low"], mandatory=True)
+
+
+def test_모든_강도를_받는_모델은_강도_목록이_null로_저장된다() -> None:
+    reasoning = ReasoningInfo(mandatory=False, supported_efforts=None)
+
+    assert build_metadata(reasoning) == stored(None)
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        None,
+        {},
+        {"reasoning": "문자열"},
+        {"reasoning": {"mandatory": False}},
+        {"reasoning": {"supported_efforts": "high"}},
+    ],
+    ids=["저장 안 함", "빈 값", "모양이 다름", "강도 목록 없음", "강도가 문자열"],
+)
+def test_저장된_정보가_없거나_모양이_틀리면_None이다(
+    metadata: dict[str, object] | None,
+) -> None:
+    assert stored_reasoning_efforts(metadata) is None
+
+
+def test_저장된_강도를_고정된_순서로_돌려준다() -> None:
+    efforts = stored_reasoning_efforts(stored(["high", "minimal", "medium", "low"]))
+
+    assert efforts == (EFFORT.MINIMAL, EFFORT.LOW, EFFORT.MEDIUM, EFFORT.HIGH)
+
+
+def test_모르는_강도는_버린다() -> None:
+    assert stored_reasoning_efforts(stored(["high", "turbo"])) == (EFFORT.HIGH,)
+
+
+def test_강도_목록이_null이면_모든_강도를_받는다() -> None:
+    assert stored_reasoning_efforts(stored(None)) == tuple(EFFORT)
+
+
+def test_강도를_고를_수_없는_모델은_빈_튜플이다() -> None:
+    assert stored_reasoning_efforts(stored([])) == ()
+
+
+def test_추론이_필수인_모델에는_none을_허용하지_않는다() -> None:
+    listed = stored_reasoning_efforts(stored(["none", "low"], mandatory=True))
+    all_efforts = stored_reasoning_efforts(stored(None, mandatory=True))
+
+    assert listed == (EFFORT.LOW,)
+    assert all_efforts == tuple(effort for effort in EFFORT if effort != EFFORT.NONE)

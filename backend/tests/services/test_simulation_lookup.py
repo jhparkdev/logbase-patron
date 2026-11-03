@@ -3,7 +3,8 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import ModelStatus
+from app.models import InputType, ModelStatus
+from app.schemas.simulation import ReasoningEffort
 from app.services.simulation_lookup import (
     SIMULATOR_KEY_SECRET_REF,
     SIMULATOR_PROJECT_CODE,
@@ -11,6 +12,7 @@ from app.services.simulation_lookup import (
     DbSimulationLookup,
     SimulatorContextMissingError,
 )
+from app.services.simulation_ports import ImageRef
 from tests.db_helpers import Factory
 
 
@@ -142,3 +144,126 @@ async def test_missing_poc_setup_is_an_error_not_a_guess(
     # 귀속 대상을 모르면 임의로 붙이지 않는다. 실행을 받지 않는다
     with pytest.raises(SimulatorContextMissingError):
         await lookup.simulator_context()
+
+
+# --- 이미지 ---
+
+
+async def test_scenario_input_type_is_read(
+    factory: Factory, lookup: DbSimulationLookup
+) -> None:
+    row = await factory.scenario(input_type="TEXT_IMAGE")
+
+    scenario = await lookup.find_scenario(row["scenario_id"])
+
+    assert scenario is not None
+    assert scenario.input_type == InputType.TEXT_IMAGE
+
+
+@pytest.mark.parametrize(
+    ("modalities", "supports"),
+    [(["text", "image"], True), (["text"], False), ([], False)],
+)
+async def test_a_model_supports_images_when_its_input_modalities_say_so(
+    factory: Factory,
+    lookup: DbSimulationLookup,
+    modalities: list[str],
+    supports: bool,
+) -> None:
+    row = await factory.model(status="ACTIVE", input_modalities=modalities)
+
+    found = await lookup.find_models([row["model_id"]])
+
+    assert found[row["model_id"]].supports_images is supports
+
+
+@pytest.mark.parametrize(
+    ("modalities", "generates"),
+    [(["image"], True), (["text", "image"], True), (["text"], False), ([], False)],
+)
+async def test_a_model_makes_images_when_its_output_modalities_say_so(
+    factory: Factory,
+    lookup: DbSimulationLookup,
+    modalities: list[str],
+    generates: bool,
+) -> None:
+    row = await factory.model(status="ACTIVE", output_modalities=modalities)
+
+    found = await lookup.find_models([row["model_id"]])
+
+    assert found[row["model_id"]].generates_images is generates
+
+
+@pytest.mark.parametrize(
+    ("parameters", "temperature", "has_efforts"),
+    [
+        (["temperature", "reasoning"], True, True),
+        (["temperature"], True, False),
+        (["reasoning"], False, True),
+        ([], False, False),
+    ],
+)
+async def test_a_model_carries_what_settings_it_can_take(
+    factory: Factory,
+    lookup: DbSimulationLookup,
+    parameters: list[str],
+    temperature: bool,
+    has_efforts: bool,
+) -> None:
+    row = await factory.model(status="ACTIVE", supported_parameters=parameters)
+
+    found = await lookup.find_models([row["model_id"]])
+
+    support = found[row["model_id"]].parameter_support
+    assert support.temperature is temperature
+    assert bool(support.reasoning_efforts) is has_efforts
+
+
+async def test_a_model_takes_only_the_efforts_saved_with_it(
+    factory: Factory, lookup: DbSimulationLookup
+) -> None:
+    row = await factory.model(
+        status="ACTIVE",
+        supported_parameters=["reasoning"],
+        openrouter_metadata={
+            "reasoning": {
+                "mandatory": True,
+                "supported_efforts": ["high", "none", "low"],
+            }
+        },
+    )
+
+    found = await lookup.find_models([row["model_id"]])
+
+    support = found[row["model_id"]].parameter_support
+    assert support.reasoning_efforts == (ReasoningEffort.LOW, ReasoningEffort.HIGH)
+
+
+async def test_uploaded_images_are_read_with_their_path_and_hash(
+    factory: Factory, lookup: DbSimulationLookup
+) -> None:
+    asset = await factory.input_asset(
+        storage_path="simulator/x.png", sha256="c" * 64, mime_type="image/png"
+    )
+
+    found = await lookup.find_images([asset["asset_id"]])
+
+    assert found == {
+        asset["asset_id"]: ImageRef(
+            asset_id=asset["asset_id"],
+            storage_path="simulator/x.png",
+            mime_type="image/png",
+            sha256="c" * 64,
+        )
+    }
+
+
+async def test_images_that_were_never_uploaded_are_left_out(
+    factory: Factory, lookup: DbSimulationLookup
+) -> None:
+    asset = await factory.input_asset()
+
+    found = await lookup.find_images([asset["asset_id"], uuid.uuid4()])
+
+    assert list(found) == [asset["asset_id"]]
+    assert await lookup.find_images([]) == {}

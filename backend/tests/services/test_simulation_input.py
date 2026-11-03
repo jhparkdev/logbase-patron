@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 
 from app.services.simulation_input import (
@@ -5,15 +7,19 @@ from app.services.simulation_input import (
     HEARTBEAT_INTERVAL_SECONDS,
     SIMULATION_TIMEOUT_SECONDS,
     InputRequiredError,
+    MissingImageDataError,
     build_messages,
     build_prompt_text,
     build_request_routing_policy,
     build_run_routing_policy,
     compute_input_hash,
+    inline_images,
     resolve_execution_config,
     resolve_json_schema,
+    resolve_slot_config,
     validate_input_present,
 )
+from app.services.simulation_ports import ImageRef
 
 TEMPLATE = (
     "다음 상품 정보로 상세 설명 3문단과 마케팅 문구 1줄을 작성하세요.\n{{product_info}}"
@@ -114,34 +120,76 @@ def test_input_hash_changes_when_the_input_changes() -> None:
 
 
 # --- 시나리오 기본값 ---
-# call_model 이 아직 temperature 를 받지 않는다. 보내지 못하는 값을 기록하면 기록과 실제 호출이 달라지므로
-# 실제로 보내는 설정(max_tokens)만 남긴다. temperature 인자가 생기면 이 규칙을 되돌린다
+# call_model 이 보내는 설정(max_tokens, temperature, reasoning_effort)만 기록한다.
+# 보내지 못하는 값을 기록하면 기록과 실제 호출이 달라지기 때문이다
 
 
-def test_scenario_default_fills_in_max_tokens() -> None:
-    defaults = {"temperature": 0.7, "max_tokens": 1024}
+def test_scenario_default_fills_in_the_settings_that_are_sent() -> None:
+    defaults = {"temperature": 0.7, "max_tokens": 1024, "top_p": 0.9}
 
-    assert resolve_execution_config({}, defaults) == {"max_tokens": 1024}
+    assert resolve_execution_config({}, defaults) == {
+        "temperature": 0.7,
+        "max_tokens": 1024,
+    }
 
 
 def test_request_value_wins_over_the_scenario_default() -> None:
     defaults = {"temperature": 0.7, "max_tokens": 1024}
 
     assert resolve_execution_config({"max_tokens": 256}, defaults) == {
-        "max_tokens": 256
+        "temperature": 0.7,
+        "max_tokens": 256,
     }
 
 
 def test_max_tokens_falls_back_to_the_default_when_nobody_set_it() -> None:
     assert resolve_execution_config({}, None) == {"max_tokens": DEFAULT_MAX_TOKENS}
     assert resolve_execution_config({}, {"temperature": 0}) == {
+        "temperature": 0,
+        "max_tokens": DEFAULT_MAX_TOKENS,
+    }
+
+
+def test_settings_that_are_not_sent_are_not_recorded() -> None:
+    assert resolve_execution_config({"provider": "x", "top_k": 5}, None) == {
         "max_tokens": DEFAULT_MAX_TOKENS
     }
 
 
-def test_settings_that_cannot_be_sent_yet_are_not_recorded() -> None:
-    assert resolve_execution_config({"temperature": 0.2}, {"temperature": 0.7}) == {
-        "max_tokens": DEFAULT_MAX_TOKENS
+def test_reasoning_effort_is_kept_only_when_someone_set_it() -> None:
+    assert "reasoning_effort" not in resolve_execution_config({}, None)
+    assert resolve_execution_config({"reasoning_effort": "low"}, None) == {
+        "max_tokens": DEFAULT_MAX_TOKENS,
+        "reasoning_effort": "low",
+    }
+
+
+# --- 모델별 설정 ---
+def test_a_slot_setting_wins_over_the_run_setting_item_by_item() -> None:
+    run = {"max_tokens": 1024, "temperature": 0.7}
+
+    assert resolve_slot_config(run, {"temperature": 0.1}) == {
+        "max_tokens": 1024,
+        "temperature": 0.1,
+    }
+
+
+def test_a_slot_without_its_own_settings_uses_the_run_setting() -> None:
+    run = {"max_tokens": 1024, "temperature": 0.7}
+
+    assert resolve_slot_config(run, {}) == run
+
+
+def test_a_slot_can_add_a_setting_the_run_does_not_have() -> None:
+    assert resolve_slot_config({"max_tokens": 1024}, {"reasoning_effort": "high"}) == {
+        "max_tokens": 1024,
+        "reasoning_effort": "high",
+    }
+
+
+def test_slot_settings_that_are_not_sent_are_dropped() -> None:
+    assert resolve_slot_config({"max_tokens": 1024}, {"top_p": 0.5}) == {
+        "max_tokens": 1024
     }
 
 
@@ -181,3 +229,68 @@ def test_request_routing_policy_pins_the_chosen_provider() -> None:
     }
     # 실행 전체 정책은 바뀌지 않는다
     assert "order" not in run_policy
+
+
+# --- 이미지가 든 메시지 ---
+
+IMAGE_A = ImageRef(uuid.UUID(int=1), "simulator/a.png", "image/png", "a" * 64)
+IMAGE_B = ImageRef(uuid.UUID(int=2), "simulator/b.jpg", "image/jpeg", "b" * 64)
+
+
+def test_images_are_put_in_the_message_as_references_not_bytes() -> None:
+    # DB 에 남는 모양이다. 이미지 내용이 들어가면 "이미지는 DB 에 직접 넣지 않는다"를 어긴다
+    messages = build_messages("이 옷을 설명해 주세요", [IMAGE_A, IMAGE_B])
+
+    assert messages == [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "이 옷을 설명해 주세요"},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"asset:{IMAGE_A.asset_id}"},
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"asset:{IMAGE_B.asset_id}"},
+                },
+            ],
+        }
+    ]
+
+
+def test_inlining_swaps_each_reference_for_its_data_url() -> None:
+    stored = build_messages("질문", [IMAGE_A, IMAGE_B])
+    data_urls = {
+        str(IMAGE_A.asset_id): "data:image/png;base64,AAAA",
+        str(IMAGE_B.asset_id): "data:image/jpeg;base64,BBBB",
+    }
+
+    sent = inline_images(stored, data_urls)
+
+    parts = sent[0]["content"]
+    assert parts[0] == {"type": "text", "text": "질문"}
+    assert parts[1]["image_url"]["url"] == "data:image/png;base64,AAAA"
+    assert parts[2]["image_url"]["url"] == "data:image/jpeg;base64,BBBB"
+
+
+def test_inlining_leaves_the_stored_messages_untouched() -> None:
+    # 저장할 메시지와 보낼 메시지는 따로다. 보낼 것을 만들다 저장할 것이 바뀌면 이미지 내용이 DB 에 들어간다
+    stored = build_messages("질문", [IMAGE_A])
+
+    inline_images(stored, {str(IMAGE_A.asset_id): "data:image/png;base64,AAAA"})
+
+    assert stored[0]["content"][1]["image_url"]["url"] == f"asset:{IMAGE_A.asset_id}"
+
+
+def test_inlining_a_text_only_message_changes_nothing() -> None:
+    messages = build_messages("안녕")
+
+    assert inline_images(messages, {}) == messages
+
+
+def test_inlining_without_the_image_content_fails_instead_of_sending_a_reference() -> (
+    None
+):
+    with pytest.raises(MissingImageDataError):
+        inline_images(build_messages("질문", [IMAGE_A]), {})

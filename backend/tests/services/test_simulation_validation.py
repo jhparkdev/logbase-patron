@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from app.models import ModelStatus
@@ -92,6 +94,72 @@ def test_duplicate_is_found_even_at_the_upper_limit() -> None:
     with pytest.raises(DuplicateModelSelectionError) as error:
         validate_model_selection(selections)
     assert error.value.selection == ModelSelection(CLAUDE, "anthropic")
+
+
+# 같은 모델·Provider 도 실제 적용 설정이 다르면 별도 비교 대상이다. 설정까지 같을 때만 막는다
+def test_same_model_and_provider_with_different_settings_are_accepted() -> None:
+    validate_model_selection(
+        [
+            ModelSelection(GPT, "openai", {"max_tokens": 512, "temperature": 0.2}),
+            ModelSelection(GPT, "openai", {"max_tokens": 512, "temperature": 0.8}),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "setting", [{"max_tokens": 1024}, {"temperature": 0.5}, {"reasoning_effort": "low"}]
+)
+def test_each_setting_alone_tells_two_selections_apart(setting: dict[str, Any]) -> None:
+    base: dict[str, Any] = {
+        "max_tokens": 512,
+        "temperature": 0.2,
+        "reasoning_effort": "high",
+    }
+    validate_model_selection(
+        [
+            ModelSelection(GPT, "openai", base),
+            ModelSelection(GPT, "openai", {**base, **setting}),
+        ]
+    )
+
+
+def test_same_model_provider_and_settings_are_rejected() -> None:
+    config = {"max_tokens": 512, "reasoning_effort": "high"}
+    second = ModelSelection(GPT, "openai", dict(config))
+    with pytest.raises(DuplicateModelSelectionError) as error:
+        validate_model_selection([ModelSelection(GPT, "openai", config), second])
+    assert error.value.selection == second
+
+
+def test_setting_order_does_not_matter() -> None:
+    with pytest.raises(DuplicateModelSelectionError):
+        validate_model_selection(
+            [
+                ModelSelection(GPT, "openai", {"max_tokens": 512, "temperature": 0.2}),
+                ModelSelection(GPT, "openai", {"temperature": 0.2, "max_tokens": 512}),
+            ]
+        )
+
+
+def test_the_same_number_written_as_int_or_float_is_the_same_setting() -> None:
+    # DB 는 1 과 1.0 을 같은 값으로 보고 같은 해시를 만든다. 서버 검사도 같아야 DB 오류(500)가 나지 않는다
+    with pytest.raises(DuplicateModelSelectionError):
+        validate_model_selection(
+            [
+                ModelSelection(GPT, "openai", {"temperature": 1}),
+                ModelSelection(GPT, "openai", {"temperature": 1.0}),
+            ]
+        )
+
+
+def test_different_models_with_the_same_settings_are_accepted() -> None:
+    config = {"max_tokens": 512}
+    validate_model_selection(
+        [
+            ModelSelection(GPT, "openai", config),
+            ModelSelection(CLAUDE, "openai", config),
+        ]
+    )
 
 
 def test_selection_fields_are_named_after_the_db_columns() -> None:

@@ -1,6 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { Button } from "../../../shared/components/ui/Button";
+import { useId } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { FilterCard } from "../../../shared/components/ui/FilterCard";
+import { FIELD_CLASS } from "../../../shared/components/ui/fieldStyle";
+import { PeriodField } from "../../../shared/components/ui/PeriodField";
+import { Select } from "../../../shared/components/ui/Select";
+import { historySelectOptions } from "../lib/filter-options";
 import type { HistoryOption } from "../lib/presentation";
 import {
   type HistoryFilters as Filters,
@@ -9,10 +14,11 @@ import {
   historyFiltersSchema,
   STATUS_LABELS,
 } from "../lib/search";
-import { HistoryFilterSelect } from "./HistoryFilterSelect";
 
-const control =
-  "h-9.5 w-full rounded-control border border-neutral-weak bg-grey-50 px-3 text-body-sm focus:border-brand focus:outline-brand aria-invalid:border-red-500";
+const STATUS_OPTIONS = HISTORY_STATUSES.filter(
+  (status) => status !== "all",
+).map((status) => ({ key: status, name: STATUS_LABELS[status] }));
+
 export function HistoryFilters({
   values,
   scenarios,
@@ -24,9 +30,12 @@ export function HistoryFilters({
   models: readonly HistoryOption[];
   onSubmit: (value: Filters) => void;
 }) {
+  const periodErrorId = useId();
+  const simulationIdErrorId = useId();
+  const simulationIdInputId = useId();
   const {
     register,
-    control: formControl,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<Filters>({
@@ -35,105 +44,90 @@ export function HistoryFilters({
     mode: "onSubmit",
     reValidateMode: "onSubmit",
   });
+  const periodMessage = errors.from?.message ?? errors.to?.message;
+  const simulationIdMessage = errors.simulationId?.message;
   return (
-    <form
-      aria-label="실행 이력 검색"
-      noValidate
+    <FilterCard
       onSubmit={handleSubmit(onSubmit)}
-      className="rounded-2xl bg-white p-6"
+      errors={[
+        { id: periodErrorId, message: periodMessage },
+        { id: simulationIdErrorId, message: simulationIdMessage },
+      ]}
+      note={`기간은 KST 기준이며 최대 ${HISTORY_MAX_DAYS}일을 조회할 수 있어요.`}
     >
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
-        <label className="text-label text-grey-600">
-          조회 시작일
-          <input
-            type="date"
-            className={control}
-            aria-invalid={!!errors.from}
-            aria-describedby={errors.from ? "history-from-error" : undefined}
-            {...register("from")}
-          />
-        </label>
-        <label className="text-label text-grey-600">
-          조회 종료일
-          <input
-            type="date"
-            className={control}
-            aria-invalid={!!errors.to}
-            aria-describedby={errors.to ? "history-to-error" : undefined}
-            {...register("to")}
-          />
-        </label>
-        <HistoryFilterSelect
-          control={formControl}
+      <PeriodField
+        label="기간"
+        fromInput={register("from")}
+        toInput={register("to")}
+        errorId={periodMessage && periodErrorId}
+      />
+      {/* 고를 시나리오가 없으면 숨긴다. URL에 값이 있으면 지울 수 있게 남긴다 */}
+      {(scenarios.length > 0 || values.scenario) && (
+        <Controller
+          control={control}
           name="scenario"
-          label="시나리오"
-          options={scenarios}
-          className={control}
-        />
-        <HistoryFilterSelect
-          control={formControl}
-          name="model"
-          label="모델"
-          options={models}
-          className={control}
-        />
-        <HistoryFilterSelect
-          control={formControl}
-          name="status"
-          label="실행 상태"
-          allValue="all"
-          options={HISTORY_STATUSES.filter((status) => status !== "all").map(
-            (status) => ({ key: status, name: STATUS_LABELS[status] }),
+          render={({ field }) => (
+            <Select
+              label="시나리오"
+              labelPosition="side"
+              value={field.value}
+              options={historySelectOptions("시나리오", scenarios, field.value)}
+              onChange={field.onChange}
+              className="w-40"
+            />
           )}
-          className={control}
+        />
+      )}
+      <Controller
+        control={control}
+        name="model"
+        render={({ field }) => (
+          <Select
+            label="모델"
+            labelPosition="side"
+            value={field.value}
+            options={historySelectOptions("모델", models, field.value)}
+            onChange={field.onChange}
+            className="w-40"
+          />
+        )}
+      />
+      <Controller
+        control={control}
+        name="status"
+        render={({ field }) => (
+          <Select
+            label="실행 상태"
+            labelPosition="side"
+            value={field.value}
+            options={historySelectOptions(
+              "실행 상태",
+              STATUS_OPTIONS,
+              field.value,
+              "all",
+            )}
+            onChange={field.onChange}
+            className="w-40"
+          />
+        )}
+      />
+      <div className="flex items-center gap-2">
+        <label
+          htmlFor={simulationIdInputId}
+          className="text-label font-medium text-grey-700"
+        >
+          Simulation ID
+        </label>
+        <input
+          id={simulationIdInputId}
+          type="text"
+          placeholder="실행 ID를 입력해 주세요"
+          className={`${FIELD_CLASS} w-80 px-3 placeholder:text-grey-500`}
+          aria-invalid={simulationIdMessage !== undefined}
+          aria-describedby={simulationIdMessage && simulationIdErrorId}
+          {...register("simulationId")}
         />
       </div>
-      <div className="mt-4 flex items-end gap-4">
-        <label className="grow text-label text-grey-600">
-          Simulation ID
-          <input
-            type="text"
-            placeholder="실행 ID를 입력해 주세요"
-            className={control}
-            aria-invalid={!!errors.simulationId}
-            aria-describedby={
-              errors.simulationId ? "history-id-error" : undefined
-            }
-            {...register("simulationId")}
-          />
-        </label>
-        <Button type="submit">조회</Button>
-      </div>
-      {errors.from && (
-        <p
-          role="alert"
-          id="history-from-error"
-          className="mt-2 text-body-sm text-red-600"
-        >
-          {errors.from.message}
-        </p>
-      )}
-      {errors.to && (
-        <p
-          role="alert"
-          id="history-to-error"
-          className="mt-2 text-body-sm text-red-600"
-        >
-          {errors.to.message}
-        </p>
-      )}
-      {errors.simulationId && (
-        <p
-          role="alert"
-          id="history-id-error"
-          className="mt-2 text-body-sm text-red-600"
-        >
-          {errors.simulationId.message}
-        </p>
-      )}
-      <p className="mt-3 text-caption text-grey-600">
-        기간은 KST 기준이며 최대 {HISTORY_MAX_DAYS}일을 조회할 수 있어요.
-      </p>
-    </form>
+    </FilterCard>
   );
 }

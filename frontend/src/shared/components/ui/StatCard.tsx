@@ -55,7 +55,7 @@ export function StatCard({
       </span>
       <div className="flex min-w-0 flex-col gap-1">
         <p
-          className={`flex items-center gap-1 text-label font-medium break-keep ${warning ? "" : "text-grey-600"}`}
+          className={`flex items-center gap-1 text-label font-medium ${warning ? "" : "text-grey-600"}`}
         >
           {label}
           {help && <HelpTip text={help} />}
@@ -69,9 +69,7 @@ export function StatCard({
           )}
         </p>
         {trend && <TrendText {...trend} label={trendLabel} />}
-        {caption && (
-          <p className="text-caption break-keep text-grey-600">{caption}</p>
-        )}
+        {caption && <p className="text-caption text-grey-600">{caption}</p>}
       </div>
     </div>
   );
@@ -84,7 +82,7 @@ function TrendText({
 }: NonNullable<StatCardProps["trend"]> & { label: string }) {
   const { arrow, word, className } = TREND[direction];
   return (
-    <p className="text-label break-keep text-grey-600">
+    <p className="text-label text-grey-600">
       <span className={`font-semibold ${className}`}>
         <span aria-hidden="true">{arrow}</span>
         {rate}

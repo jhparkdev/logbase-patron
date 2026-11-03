@@ -1,12 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
+import { ApiError } from "../../../shared/api/client";
 import {
   createDefaultValues,
   type SimulatorDraft,
   type SimulatorFormValues,
   simulatorSchemaFor,
 } from "../lib/form";
+import type { ImageLimits } from "../lib/limits";
 import { MODEL_LIMITS } from "../lib/limits";
 import {
   type ModelChoice,
@@ -20,15 +22,17 @@ export function useSimulatorForm({
   onRun,
   running,
   initialValues,
+  imageLimits,
 }: {
   choices: ModelChoice[];
   scenarios: ScenarioChoice[];
   onRun?: (draft: SimulatorDraft) => void | Promise<void>;
   running: boolean;
   initialValues?: Partial<SimulatorFormValues>;
+  imageLimits?: ImageLimits;
 }) {
   const form = useForm<SimulatorFormValues, unknown, SimulatorDraft>({
-    resolver: zodResolver(simulatorSchemaFor(choices)),
+    resolver: zodResolver(simulatorSchemaFor(choices, imageLimits)),
     defaultValues: createDefaultValues(initialValues),
     mode: "onSubmit",
     reValidateMode: "onSubmit",
@@ -78,9 +82,12 @@ export function useSimulatorForm({
     setPendingDraft(undefined);
     try {
       await onRun(pendingDraft);
-    } catch {
+    } catch (error) {
+      // 서버가 사용자에게 보여 주라고 준 문구만 쓴다. 그 밖의 내부 오류는 노출하지 않는다.
       setIssues([
-        "실행 요청을 보내지 못했습니다. 잠시 후 다시 시도하시기 바랍니다.",
+        error instanceof ApiError
+          ? error.message
+          : "실행 요청을 보내지 못했습니다. 잠시 후 다시 시도하시기 바랍니다.",
       ]);
     } finally {
       sending.current = false;

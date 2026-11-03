@@ -1,4 +1,6 @@
-// 화면 전용 표시 props다. HTTP 계약은 OpenAPI 준비 후 adapter에서 연결한다.
+import type { components } from "../../../shared/api/schema";
+
+// 화면 전용 표시 props다. API 응답에서 바꾸는 일은 view.ts가 한다.
 export type HistoryOption = { key: string; name: string };
 export type HistoryRow = {
   key: string;
@@ -6,11 +8,13 @@ export type HistoryRow = {
   scenario: string;
   modelCount: number;
   status: { label: string; tone: "green" | "red" | "yellow" | "grey" };
+  // 서버가 합계를 주지 않으므로 확정과 추정을 나눠 둔다. 화면에서 더하지 않는다.
   cost: {
-    total: string | null;
-    estimated: boolean;
+    confirmed: string | null;
+    estimated: string | null;
     unknownCount: number;
-    checking: boolean;
+    // 서버가 정한 비용 상태. 화면에서 다시 판단하지 않는다.
+    checkStatus: components["schemas"]["CostCheckStatus"];
   };
   inactiveModelCount: number | null;
 };

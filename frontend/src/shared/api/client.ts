@@ -39,6 +39,18 @@ export function toApiError(status: number, error: unknown): ApiError {
   return new ApiError(status, undefined, UNEXPECTED_RESPONSE_MESSAGE);
 }
 
+/** 호출 결과를 데이터로 돌려주고 실패는 ApiError로 던진다. */
+export function unwrap<T>(result: {
+  data?: T;
+  error?: unknown;
+  response: Response;
+}): T {
+  if (result.data === undefined) {
+    throw toApiError(result.response.status, result.error);
+  }
+  return result.data;
+}
+
 /**
  * 생성된 OpenAPI 타입과 연결된 클라이언트. 경로는 모두 /api로 시작한다.
  * baseUrl은 화면의 출처라서 같은 출처(쿠키 포함)로 보낸다. 상대 경로만 주면 Request를 만들지 못하는 실행 환경이 있어 출처를 붙인다.

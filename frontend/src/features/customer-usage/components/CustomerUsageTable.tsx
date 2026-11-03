@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Badge } from "../../../shared/components/ui/Badge";
+import { DataBlock } from "../../../shared/components/ui/DataBlock";
 import {
   type Column,
   DataTable,
@@ -11,17 +12,16 @@ import { SectionCard } from "../../../shared/components/ui/SectionCard";
 import { TableSkeleton } from "../../../shared/components/ui/TableSkeleton";
 import { TextLink } from "../../../shared/components/ui/TextLink";
 import { UsageBar } from "../../../shared/components/ui/UsageBar";
-import { formatCount, formatUsd } from "../../../shared/lib/format";
+import { budgetStatusBadge, usageView } from "../../../shared/lib/budget";
+import {
+  formatCount,
+  formatUsd,
+  isZeroAmount,
+  unreflectedText,
+} from "../../../shared/lib/format";
 import { type CustomerUsageRow, customerRowsOptions } from "../api/usage";
 import { useCustomerSort, usePageChange } from "../hooks/useUsageList";
 import type { CustomerUsageSearch } from "../lib/search";
-import {
-  budgetStatusBadge,
-  isZeroAmount,
-  unreflectedText,
-  usageView,
-} from "../lib/view";
-import { DataBlock } from "./DataBlock";
 import { ViewAllLink } from "./ViewAllLink";
 
 const TITLE = "고객별 사용 현황";
@@ -44,6 +44,7 @@ const COLUMNS: Column<CustomerUsageRow>[] = [
           from="/customer-usage"
           to="/customer-usage"
           search={(prev) => ({ ...prev, detail: row.customer_id ?? undefined })}
+          resetScroll={false}
         >
           {row.customer_name}
         </TextLink>

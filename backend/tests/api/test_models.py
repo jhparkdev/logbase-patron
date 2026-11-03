@@ -96,6 +96,32 @@ async def test_금액은_문자열로_돌려준다(client: AsyncClient, factory:
     assert price["price_status"] == "KNOWN"
 
 
+async def test_작은_단가도_지수_표기가_아닌_숫자_문자열로_돌려준다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    model = await factory.model()
+    await factory.model_price(
+        model_id=model["model_id"],
+        input_price_per_token=Decimal("0.00000003"),
+        output_price_per_token=Decimal("0.00000004"),
+        cache_read_price_per_token=Decimal("0.00000001"),
+    )
+
+    listed = (await client.get(MODELS)).json()["items"][0]["current_price"]
+    detail = (await client.get(detail_url(model["model_id"]))).json()["current_price"]
+
+    for price in (listed, detail):
+        assert Decimal(price["input_price_per_token"]) == Decimal("0.00000003")
+        assert Decimal(price["output_price_per_token"]) == Decimal("0.00000004")
+        assert Decimal(price["cache_read_price_per_token"]) == Decimal("0.00000001")
+        for field in (
+            "input_price_per_token",
+            "output_price_per_token",
+            "cache_read_price_per_token",
+        ):
+            assert "e" not in price[field].lower()
+
+
 async def test_response_format이_없으면_JSON_Schema를_지원하지_않는다(
     client: AsyncClient, factory: Factory
 ) -> None:
@@ -104,6 +130,111 @@ async def test_response_format이_없으면_JSON_Schema를_지원하지_않는�
     item = (await client.get(MODELS)).json()["items"][0]
 
     assert item["supports_json_schema"] is False
+
+
+@pytest.mark.parametrize(
+    ("parameters", "expected"),
+    [(["tools", "temperature"], True), (["temperature"], False)],
+)
+async def test_tools가_있으면_함수_호출을_지원한다(
+    client: AsyncClient, factory: Factory, parameters: list[str], expected: bool
+) -> None:
+    await factory.model(supported_parameters=parameters)
+
+    item = (await client.get(MODELS)).json()["items"][0]
+
+    assert item["supports_tools"] is expected
+
+
+@pytest.mark.parametrize(
+    ("parameters", "temperature", "efforts"),
+    [
+        (
+            ["temperature", "reasoning"],
+            True,
+            ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
+        ),
+        (["temperature"], True, []),
+        (
+            ["reasoning"],
+            False,
+            ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
+        ),
+        ([], False, []),
+    ],
+)
+async def test_모델이_받을_수_있는_온도와_추론_강도를_돌려준다(
+    client: AsyncClient,
+    factory: Factory,
+    parameters: list[str],
+    temperature: bool,
+    efforts: list[str],
+) -> None:
+    created = await factory.model(supported_parameters=parameters)
+
+    listed = (await client.get(MODELS)).json()["items"][0]
+    detail = (await client.get(f"{MODELS}/{created['model_id']}")).json()
+
+    for item in (listed, detail):
+        assert item["temperature_supported"] is temperature
+        assert item["reasoning_efforts"] == efforts
+
+
+ALL_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+
+def stored(efforts: list[str] | None, mandatory: bool = False) -> dict[str, Any]:
+    return {"reasoning": {"mandatory": mandatory, "supported_efforts": efforts}}
+
+
+@pytest.mark.parametrize(
+    ("metadata", "efforts"),
+    [
+        (
+            stored(["high", "medium", "low", "minimal"]),
+            ["minimal", "low", "medium", "high"],
+        ),
+        (stored(None), ALL_EFFORTS),
+        (stored(None, mandatory=True), ALL_EFFORTS[1:]),
+        (stored([]), []),
+        (None, ALL_EFFORTS),
+    ],
+    ids=[
+        "일부 강도",
+        "모든 강도",
+        "필수 모델은 none 제외",
+        "강도 선택 없음",
+        "저장된 정보 없음",
+    ],
+)
+async def test_저장된_강도_정보가_있으면_모델별_추론_강도를_돌려준다(
+    client: AsyncClient,
+    factory: Factory,
+    metadata: dict[str, Any] | None,
+    efforts: list[str],
+) -> None:
+    created = await factory.model(
+        supported_parameters=["reasoning"], openrouter_metadata=metadata
+    )
+
+    listed = (await client.get(MODELS)).json()["items"][0]
+    detail = (await client.get(f"{MODELS}/{created['model_id']}")).json()
+
+    for item in (listed, detail):
+        assert item["reasoning_efforts"] == efforts
+
+
+async def test_추론을_받지_않는_모델은_저장된_강도가_있어도_빈_목록이다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(
+        supported_parameters=["temperature"],
+        openrouter_metadata=stored(["high"]),
+    )
+
+    item = (await client.get(MODELS)).json()["items"][0]
+
+    assert item["reasoning_efforts"] == []
 
 
 async def test_가격이_없는_모델은_current_price가_null이다(
@@ -173,10 +304,47 @@ async def test_모델_ID와_제공사로도_찾는다(
     )
 
     by_id = (await client.get(MODELS, params={"model_id": "nemo"})).json()
-    by_provider = (await client.get(MODELS, params={"provider": "open"})).json()
+    by_provider = (await client.get(MODELS, params={"provider": "openai"})).json()
 
     assert names(by_id) == ["B"]
     assert names(by_provider) == ["A"]
+
+
+async def test_제공사는_이름이_정확히_같을_때만_찾는다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(
+        display_name="A", openrouter_model_id="openai/a", provider="openai"
+    )
+    await factory.model(
+        display_name="B", openrouter_model_id="openai-labs/b", provider="openai-labs"
+    )
+
+    exact = (await client.get(MODELS, params={"provider": "openai"})).json()
+    partial = (await client.get(MODELS, params={"provider": "open"})).json()
+
+    assert names(exact) == ["A"]
+    assert partial["items"] == []
+
+
+async def test_제공사는_대소문자를_구분하지_않는다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(display_name="A", provider="openai")
+
+    body = (await client.get(MODELS, params={"provider": "OpenAI"})).json()
+
+    assert names(body) == ["A"]
+
+
+async def test_제공사의_퍼센트는_글자_그대로이다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await factory.model(display_name="A", provider="openai")
+
+    body = (await client.get(MODELS, params={"provider": "%"})).json()
+
+    assert body["items"] == []
 
 
 async def test_q는_표시_이름이나_모델_ID_중_하나에만_맞아도_찾는다(
@@ -454,6 +622,16 @@ async def test_상세는_목록의_한_줄과_같은_값을_돌려준다(
     assert response.status_code == status.HTTP_200_OK
     detail = response.json()
     assert {key: detail[key] for key in listed} == listed
+
+
+async def test_상세에도_함수_호출_지원_여부가_있다(
+    client: AsyncClient, factory: Factory
+) -> None:
+    model = await factory.model(supported_parameters=["tools"])
+
+    detail = (await client.get(detail_url(model["model_id"]))).json()
+
+    assert detail["supports_tools"] is True
 
 
 async def test_상세에는_활성화_비활성화_성공_테스트_시각이_더해진다(

@@ -435,6 +435,11 @@ class APIKey(Base):
     project_id: Mapped[int | None] = mapped_column(
         BigInteger, fk("projects.project_id")
     )
+    service_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        fk("services.service_id"),
+        comment="이 Key를 쓰는 서비스. 여러 서비스가 함께 쓰는 Key는 NULL",
+    )
     environment: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, server_default=KeyStatus.ACTIVE.value)
     limit_usd: Mapped[Decimal | None] = mapped_column(MONEY)
@@ -444,6 +449,45 @@ class APIKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_mock: Mapped[bool] = is_mock_column()
+    created_at: Mapped[datetime] = created_at_column()
+    updated_at: Mapped[datetime] = updated_at_column()
+
+
+class CommandCodeKey(Base):
+    """구성원별 Command Code Key 매핑. Key 원문은 저장하지 않는다. 삭제하지 않고 is_active=false로 비활성화.
+
+    OpenRouter Key(api_keys)와 달리 고객·프로젝트에 귀속되지 않고 비용 집계에도 들어가지 않아 따로 둔다.
+    """
+
+    __tablename__ = "command_code_keys"
+    __table_args__ = (
+        CheckConstraint(
+            "member_name <> '' AND member_name = btrim(member_name)",
+            name="command_code_keys_member_name_check",
+        ),
+        # Key 원문을 실수로 넣어도 거절되도록 정해진 형식의 이름만 받는다.
+        column_check(
+            "command_code_keys",
+            "secret_ref",
+            "secret_ref ~ '^COMMAND_CODE_KEY_[A-Z0-9_]+$'",
+        ),
+        Index(
+            "uq_command_code_keys_active_member",
+            "member_name",
+            unique=True,
+            postgresql_where=text("is_active"),
+        ),
+        {
+            "comment": "구성원별 Command Code Key 매핑. 원문은 저장하지 않고 참조 이름만 저장"
+        },
+    )
+
+    command_code_key_id: Mapped[int] = bigint_identity_pk()
+    member_name: Mapped[str] = mapped_column(Text)
+    secret_ref: Mapped[str] = mapped_column(
+        Text, unique=True, comment="Key 원문을 찾는 참조 이름. 원문 저장 금지"
+    )
+    is_active: Mapped[bool] = is_active_column()
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
 
@@ -1026,6 +1070,35 @@ class InputAsset(Base):
     file_size_bytes: Mapped[int] = mapped_column(BigInteger)
     original_filename: Mapped[str | None] = mapped_column(Text)
     uploaded_by: Mapped[int | None] = mapped_column(BigInteger, fk("users.user_id"))
+    created_at: Mapped[datetime] = created_at_column()
+
+
+class OutputAsset(Base):
+    """이미지 생성 호출이 만든 결과 이미지 참조. 파일은 저장소에 두고 DB에는 경로·해시만 둔다.
+
+    사람이 올린 입력 이미지(InputAsset)와 생기는 경로·검증이 달라 따로 둔다.
+    실행한 사람은 호출(ai_requests.executed_by)에 있다. 삭제하거나 덮어쓰지 않는다.
+    """
+
+    __tablename__ = "output_assets"
+    __table_args__ = (
+        column_check("output_assets", "sort_order", "sort_order >= 0"),
+        column_check("output_assets", "file_size_bytes", "file_size_bytes >= 0"),
+        UniqueConstraint(
+            "request_id", "sort_order", name="uq_output_assets_request_order"
+        ),
+        {"comment": "이미지 생성 결과 참조. 파일은 저장소에 보관, DB에는 경로·해시만"},
+    )
+
+    output_asset_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    request_id: Mapped[uuid.UUID] = mapped_column(Uuid, fk("ai_requests.request_id"))
+    sort_order: Mapped[int] = mapped_column(
+        SmallInteger, comment="한 호출이 돌려준 이미지 순서(0부터)"
+    )
+    storage_path: Mapped[str] = mapped_column(Text)
+    sha256: Mapped[str] = mapped_column(CHAR(SHA256_HEX_LENGTH))
+    mime_type: Mapped[str] = mapped_column(Text)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = created_at_column()
 
 

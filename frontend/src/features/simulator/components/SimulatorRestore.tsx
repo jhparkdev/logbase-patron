@@ -5,32 +5,34 @@ import { PageHeader } from "../../../shared/components/ui/PageHeader";
 import { Result } from "../../../shared/components/ui/Result";
 import { Skeleton } from "../../../shared/components/ui/Skeleton";
 import type { ModelFavoritesView } from "../lib/favorites";
-import type { SimulatorFormValues } from "../lib/form";
-import type { ModelChoice, ScenarioChoice } from "../lib/presentation";
 import { restoreRerunValues } from "../lib/rerun";
-import { SimulatorPage } from "./SimulatorPage";
+import type { SimulatorRestoreView } from "../lib/rerun-draft";
+import { SimulatorPage, type SimulatorPageProps } from "./SimulatorPage";
 
-// API adapter가 이미지까지 복원하고 현재 모델 목록을 확인한 뒤 ready 값을 전달한다.
-export type SimulatorRestoreView =
-  | { kind: "unavailable" | "loading" | "error" | "missing" }
-  | {
-      kind: "ready";
-      key: string;
-      values: SimulatorFormValues;
-      choices: ModelChoice[];
-      scenarios: ScenarioChoice[];
-    };
+const RESTORE_TITLES = {
+  unavailable: "재실행 조건 불러오기를 준비하고 있습니다",
+  missing: "재실행할 입력을 찾을 수 없습니다",
+  error: "재실행 조건을 불러오지 못했습니다",
+};
+const RESTORE_DESCRIPTIONS = {
+  unavailable:
+    "API가 연결되면 과거 입력과 현재 모델 정보를 확인해 복원할 수 있습니다.",
+  missing: "원래 이력을 확인하거나 잠시 후 다시 시도하시기 바랍니다.",
+  error: "원래 이력을 확인하거나 잠시 후 다시 시도하시기 바랍니다.",
+};
 
 export function SimulatorRestore({
   sourceKey,
   view = { kind: "unavailable" },
   onRetry,
   favorites,
+  page,
 }: {
   sourceKey: string;
   view?: SimulatorRestoreView;
   onRetry?: () => void;
   favorites?: ModelFavoritesView;
+  page?: Omit<SimulatorPageProps, "choices" | "scenarios" | "initialValues">;
 }) {
   if (view.kind !== "ready" || view.key !== sourceKey)
     return (
@@ -43,18 +45,8 @@ export function SimulatorRestore({
           </>
         ) : (
           <Result
-            title={
-              view.kind === "unavailable"
-                ? "재실행 조건 불러오기를 준비하고 있습니다"
-                : view.kind === "missing"
-                  ? "재실행할 입력을 찾을 수 없습니다"
-                  : "재실행 조건을 불러오지 못했습니다"
-            }
-            description={
-              view.kind === "unavailable"
-                ? "API가 연결되면 과거 입력과 현재 모델 정보를 확인해 복원할 수 있습니다."
-                : "원래 이력을 확인하거나 잠시 후 다시 시도하시기 바랍니다."
-            }
+            title={RESTORE_TITLES[view.kind]}
+            description={RESTORE_DESCRIPTIONS[view.kind]}
             action={
               view.kind === "error" && onRetry ? (
                 <Button variant="secondary" onClick={onRetry}>
@@ -95,6 +87,7 @@ export function SimulatorRestore({
         </ul>
       )}
       <SimulatorPage
+        {...page}
         key={sourceKey}
         initialValues={restored.values}
         choices={view.choices}

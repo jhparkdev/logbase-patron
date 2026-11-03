@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { lazy, Suspense } from "react";
+import { DataBlock } from "../../../shared/components/ui/DataBlock";
 import { RefreshingBar } from "../../../shared/components/ui/RefreshingBar";
 import { Result } from "../../../shared/components/ui/Result";
 import { SectionCard } from "../../../shared/components/ui/SectionCard";
@@ -8,7 +9,6 @@ import { formatCount, formatUsd } from "../../../shared/lib/format";
 import { usageTrendQuery } from "../api/usage";
 import type { CustomerUsageSearch } from "../lib/search";
 import { type TrendPointView, trendPoint } from "../lib/view";
-import { DataBlock } from "./DataBlock";
 
 const TITLE = "사용량·비용 추이";
 

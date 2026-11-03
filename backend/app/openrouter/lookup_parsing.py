@@ -16,7 +16,14 @@ from app.openrouter.json_access import (
     get_str,
     to_number,
 )
-from app.openrouter.lookup_result import GenerationInfo, KeyInfo, KeyUsage, ModelInfo
+from app.openrouter.lookup_result import (
+    EndpointInfo,
+    GenerationInfo,
+    KeyInfo,
+    KeyUsage,
+    ModelInfo,
+    ReasoningInfo,
+)
 
 ISO_DATE_LENGTH = len("2026-12-31")
 
@@ -67,6 +74,26 @@ def _str_list(raw: Any) -> list[str]:
     return [item for item in raw if isinstance(item, str)]
 
 
+def _parse_reasoning(item: dict[str, Any]) -> ReasoningInfo | None:
+    """모델의 reasoning 항목을 읽는다. 항목이 없거나 모양이 틀리면 None이다.
+
+    supported_efforts가 없으면 강도를 고를 수 없는 모델(빈 목록), null이면 모든 강도(None)로 본다.
+    """
+    raw = item.get("reasoning")
+    if not isinstance(raw, dict):
+        return None
+    mandatory = get_bool(raw, "mandatory") is True
+    if "supported_efforts" not in raw:
+        return ReasoningInfo(mandatory=mandatory, supported_efforts=[])
+    efforts = raw["supported_efforts"]
+    if efforts is None:
+        return ReasoningInfo(mandatory=mandatory, supported_efforts=None)
+    if not isinstance(efforts, list):
+        return None
+    names = [effort for effort in efforts if isinstance(effort, str)]
+    return ReasoningInfo(mandatory=mandatory, supported_efforts=names)
+
+
 def parse_models(body: dict[str, Any]) -> list[ModelInfo] | None:
     items = body.get("data")
     if not isinstance(items, list):
@@ -90,9 +117,36 @@ def parse_models(body: dict[str, Any]) -> list[ModelInfo] | None:
                 supported_parameters=_str_list(item.get("supported_parameters")),
                 context_length=get_int(item, "context_length"),
                 expiration_date=_parse_date(item.get("expiration_date")),
+                reasoning=_parse_reasoning(item),
             )
         )
     return models
+
+
+def parse_endpoints(body: dict[str, Any]) -> list[EndpointInfo] | None:
+    """모델 하나의 서버 업체 목록을 읽는다. 같은 이름은 처음 것만 남긴다.
+
+    같은 업체가 정밀도(fp8, fp16 등)별로 여러 번 나올 수 있다고 보고 이름으로 합친다.
+    provider.order에는 이름만 들어가기 때문이다. 실제로 겹치는지는 확인하지 못했다.
+    """
+    data = body.get("data")
+    if not isinstance(data, dict) or not isinstance(data.get("endpoints"), list):
+        return None
+
+    endpoints: dict[str, EndpointInfo] = {}
+    for item in data["endpoints"]:
+        if not isinstance(item, dict):
+            continue
+        name = get_str(item, "provider_name")
+        if not name or name in endpoints:
+            continue
+        endpoints[name] = EndpointInfo(
+            provider_name=name,
+            status=get_int(item, "status"),
+            uptime_last_1d=get_number(item, "uptime_last_1d"),
+            supported_parameters=_str_list(item.get("supported_parameters")),
+        )
+    return list(endpoints.values())
 
 
 def parse_generation(body: dict[str, Any]) -> GenerationInfo | None:

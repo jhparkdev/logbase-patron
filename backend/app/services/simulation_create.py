@@ -1,11 +1,20 @@
 import uuid
+from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from app.models import CallPurpose, DataSource, UsageOrigin
+from app.models import CallPurpose, DataSource, InputType, UsageOrigin
 from app.models import TestType as RunType
 from app.schemas.simulation import ModelSelectionRequest, SimulationCreateRequest
+from app.schemas.simulation_output import OutputType
+from app.services.model_parameters import (
+    ParameterSupport,
+    drop_unsupported,
+    narrow_to_provider,
+    reject_unsupported_overrides,
+)
 from app.services.simulation_input import (
     build_messages,
     build_prompt_text,
@@ -14,9 +23,12 @@ from app.services.simulation_input import (
     compute_input_hash,
     resolve_execution_config,
     resolve_json_schema,
+    resolve_slot_config,
     validate_input_present,
 )
+from app.services.simulation_output_config import build_image_execution_config
 from app.services.simulation_ports import (
+    ImageRef,
     IntakeDeps,
     ModelInfo,
     NewRequest,
@@ -27,7 +39,11 @@ from app.services.simulation_ports import (
     SimulatorContext,
     SlotPlan,
 )
-from app.services.simulation_validation import is_model_selectable
+from app.services.simulation_validation import (
+    ModelSelection,
+    is_model_selectable,
+    validate_model_selection,
+)
 
 # 실제 OpenRouter 를 부르는 실행이다. mock seed 는 MOCK 으로 구분한다
 RUN_DATA_SOURCE = DataSource.LIVE
@@ -58,6 +74,37 @@ class ModelNotActiveError(ValueError):
         self.model_ids = model_ids
 
 
+class ImageNotFoundError(LookupError):
+    """올리지 않았거나 없는 이미지(asset_id)를 골랐다."""
+
+    def __init__(self, asset_ids: list[uuid.UUID]) -> None:
+        super().__init__("올리지 않은 이미지다")
+        self.asset_ids = asset_ids
+
+
+class ImageRequiredError(ValueError):
+    """이미지가 필요한 시나리오인데 이미지를 보내지 않았다."""
+
+    def __init__(self) -> None:
+        super().__init__("이미지가 필요한 시나리오다")
+
+
+class ModelImageUnsupportedError(ValueError):
+    """이미지를 보냈는데 고른 모델 중에 이미지를 받지 못하는 모델이 있다."""
+
+    def __init__(self, model_ids: list[int]) -> None:
+        super().__init__("이미지를 지원하지 않는 모델이다")
+        self.model_ids = model_ids
+
+
+class ModelImageOutputUnsupportedError(ValueError):
+    """이미지 생성 실행인데 고른 모델 중에 이미지를 만들지 못하는 모델이 있다."""
+
+    def __init__(self, model_ids: list[int]) -> None:
+        super().__init__("이미지를 만들지 못하는 모델이다")
+        self.model_ids = model_ids
+
+
 async def create_simulation(
     request: SimulationCreateRequest, *, executed_by: int, deps: IntakeDeps
 ) -> SimulationJob:
@@ -70,15 +117,29 @@ async def create_simulation(
     scenario = await _find_scenario(request, deps)
     await _check_rerun_source(request, deps)
     models = await _find_selectable_models(request, deps)
+    images = await _find_images(request, deps)
+    _check_image_rules(scenario, images, models)
+    _check_output_rules(request.output_type, models)
     context = await deps.lookup.simulator_context()
 
-    execution_config = resolve_execution_config(
-        request.execution_config.model_dump(exclude_none=True),
-        scenario.default_execution_config if scenario else None,
-    )
-    json_schema = resolve_json_schema(
-        request.json_schema, scenario.default_json_schema if scenario else None
-    )
+    if request.output_type == OutputType.IMAGE:
+        # 이미지 호출은 텍스트 설정과 Schema 를 보내지 않으므로 시나리오 기본값도 쓰지 않는다
+        execution_config = build_image_execution_config(request.image_config)
+        json_schema = None
+        slot_configs = _image_slot_configs(request.models, execution_config)
+    else:
+        execution_config = resolve_execution_config(
+            request.execution_config.model_dump(exclude_none=True),
+            scenario.default_execution_config if scenario else None,
+        )
+        json_schema = resolve_json_schema(
+            request.json_schema, scenario.default_json_schema if scenario else None
+        )
+        slot_configs = _resolve_slot_configs(
+            request.models,
+            execution_config,
+            await _slot_supports(request.models, models, deps),
+        )
     shared = _RunValues(
         simulation_id=deps.new_id(),
         context=context,
@@ -87,7 +148,6 @@ async def create_simulation(
             allow_fallbacks=request.routing_policy.allow_fallbacks,
             has_json_schema=json_schema is not None,
         ),
-        execution_config=execution_config,
         input_hash=compute_input_hash(request.prompt_text, request.input_text),
         now=deps.now(),
     )
@@ -113,21 +173,126 @@ async def create_simulation(
             data_source=RUN_DATA_SOURCE,
         )
     )
+    if images:
+        await deps.store.insert_run_assets(
+            shared.simulation_id, [image.asset_id for image in images]
+        )
+    notes = comparability_notes(
+        [(chosen.model_id, chosen.execution_provider) for chosen in request.models]
+    )
     slots = [
-        await _save_slot(slot_no, chosen, models[chosen.model_id], shared, deps)
-        for slot_no, chosen in enumerate(request.models, start=1)
+        await _save_slot(
+            slot_no, chosen, models[chosen.model_id], shared, deps, note, config
+        )
+        for slot_no, (chosen, note, config) in enumerate(
+            zip(request.models, notes, slot_configs, strict=True), start=1
+        )
     ]
 
     return SimulationJob(
         simulation_id=shared.simulation_id,
         slots=slots,
         messages=build_messages(
-            build_prompt_text(request.prompt_text, request.input_text)
+            build_prompt_text(request.prompt_text, request.input_text), images
         ),
         json_schema=json_schema,
-        max_tokens=execution_config["max_tokens"],
         allow_fallbacks=request.routing_policy.allow_fallbacks,
+        images=images,
+        output_type=request.output_type,
     )
+
+
+def _image_slot_configs(
+    chosen_models: Sequence[ModelSelectionRequest], image_config: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """이미지 실행은 모든 칸에 같은 옵션을 보낸다. 같은 모델·Provider 두 칸은 같은 비교 대상이라 거절한다."""
+    configs = [dict(image_config) for _ in chosen_models]
+    validate_model_selection(
+        [
+            ModelSelection(chosen.model_id, chosen.execution_provider, config)
+            for chosen, config in zip(chosen_models, configs, strict=True)
+        ]
+    )
+    return configs
+
+
+async def _slot_supports(
+    chosen_models: Sequence[ModelSelectionRequest],
+    models: dict[int, ModelInfo],
+    deps: IntakeDeps,
+) -> list[ParameterSupport]:
+    """칸마다 받을 수 있는 설정. 모델이 받는 설정 중 그 칸의 서버 업체도 받는 것만 남긴다.
+
+    같은 모델을 업체만 바꿔 여러 칸에 고를 수 있으므로 업체 목록은 모델마다 한 번만 묻는다.
+    """
+    by_model = {
+        model_id: await deps.providers.provider_parameters(
+            models[model_id].openrouter_model_id
+        )
+        for model_id in dict.fromkeys(chosen.model_id for chosen in chosen_models)
+    }
+    supports: list[ParameterSupport] = []
+    for chosen in chosen_models:
+        providers = by_model[chosen.model_id]
+        supports.append(
+            narrow_to_provider(
+                models[chosen.model_id].parameter_support,
+                providers.get(chosen.execution_provider) if providers else None,
+            )
+        )
+    return supports
+
+
+def _resolve_slot_configs(
+    chosen_models: Sequence[ModelSelectionRequest],
+    run_config: dict[str, Any],
+    supports: Sequence[ParameterSupport],
+) -> list[dict[str, Any]]:
+    """칸마다 적용할 설정을 정하고, 모델·Provider·설정이 모두 같은 칸이 있으면 거절한다.
+
+    칸에 직접 넣은 설정을 그 칸의 모델·업체가 받지 못하면 거절하고, 실행 공통 설정(시나리오
+    기본값 포함)은 받지 못하는 칸에서만 뺀다. 요청한 설정과 실제 호출이 달라지는 것을 막기 위해서다.
+    중복은 이렇게 정한 적용 설정으로 판단한다(DB 제약과 같은 기준). 같은 모델·업체는 받을 수 있는
+    설정도 같으므로 공통 설정을 빼는 일이 중복 여부를 바꾸지는 않는다.
+    저장 전에 판단해야 거절되었을 때 아무것도 남지 않는다.
+    """
+    overrides = [
+        chosen.execution_config.model_dump(exclude_none=True)
+        for chosen in chosen_models
+    ]
+    reject_unsupported_overrides(
+        [
+            (chosen.model_id, support, override)
+            for chosen, support, override in zip(
+                chosen_models, supports, overrides, strict=True
+            )
+        ]
+    )
+    configs = [
+        resolve_slot_config(drop_unsupported(support, run_config), override)
+        for support, override in zip(supports, overrides, strict=True)
+    ]
+    validate_model_selection(
+        [
+            ModelSelection(chosen.model_id, chosen.execution_provider, config)
+            for chosen, config in zip(chosen_models, configs, strict=True)
+        ]
+    )
+    return configs
+
+
+def comparability_notes(
+    selections: Sequence[tuple[int, str]],
+) -> list[str | None]:
+    """칸마다 비교 조건 문구. 같은 모델을 두 칸 이상 넣었으면 그 칸들은 Provider 로 구분된다고 적는다.
+
+    (모델 ID, 실행 Provider) 목록을 받아 같은 순서로 돌려준다. 다른 모델끼리의 비교는 문구가 없다.
+    """
+    counts = Counter(model_id for model_id, _ in selections)
+    return [
+        f"같은 모델, 실행 Provider {provider}" if counts[model_id] > 1 else None
+        for model_id, provider in selections
+    ]
 
 
 @dataclass(frozen=True)
@@ -138,7 +303,6 @@ class _RunValues:
     context: SimulatorContext
     executed_by: int
     run_policy: dict[str, Any]
-    execution_config: dict[str, Any]
     input_hash: str
     now: datetime
 
@@ -149,6 +313,8 @@ async def _save_slot(
     model: ModelInfo,
     shared: _RunValues,
     deps: IntakeDeps,
+    comparability_note: str | None,
+    execution_config: dict[str, Any],
 ) -> SlotPlan:
     """모델 한 칸의 호출 이력(PENDING)과 칸 결과를 저장하고, 실행할 칸을 돌려준다."""
     request_id = deps.new_id()
@@ -169,7 +335,7 @@ async def _save_slot(
             routing_policy=build_request_routing_policy(
                 shared.run_policy, chosen.execution_provider
             ),
-            execution_config=shared.execution_config,
+            execution_config=execution_config,
             input_hash=shared.input_hash,
             requested_at=shared.now,
             data_source=RUN_DATA_SOURCE,
@@ -184,6 +350,7 @@ async def _save_slot(
             execution_provider=chosen.execution_provider,
             model_status_at_run=model.status,
             model_display_name_at_run=model.display_name,
+            comparability_note=comparability_note,
         )
     )
     return SlotPlan(
@@ -192,6 +359,7 @@ async def _save_slot(
         model_id=model.model_id,
         openrouter_model_id=model.openrouter_model_id,
         execution_provider=chosen.execution_provider,
+        execution_config=execution_config,
     )
 
 
@@ -216,6 +384,56 @@ async def _check_rerun_source(
     source = request.rerun_of_simulation_id
     if source is not None and not await deps.lookup.simulation_exists(source):
         raise RerunSourceNotFoundError
+
+
+async def _find_images(
+    request: SimulationCreateRequest, deps: IntakeDeps
+) -> tuple[ImageRef, ...]:
+    """요청한 순서대로 이미지를 돌려준다. 하나라도 올려 둔 적이 없거나 파일이 사라졌으면 거절한다.
+
+    파일은 실행을 만들기 전에 확인한다. 만든 뒤에 못 읽으면 모든 칸이 실패로 남는데,
+    실패 이력은 지울 수 없어 이력과 성공률에 계속 섞인다.
+    """
+    if not request.asset_ids:
+        return ()
+    found = await deps.lookup.find_images(request.asset_ids)
+    missing = [
+        asset_id
+        for asset_id in request.asset_ids
+        if asset_id not in found
+        or not await deps.image_files.exists(found[asset_id].storage_path)
+    ]
+    if missing:
+        raise ImageNotFoundError(missing)
+    return tuple(found[asset_id] for asset_id in request.asset_ids)
+
+
+def _check_image_rules(
+    scenario: ScenarioInfo | None,
+    images: Sequence[ImageRef],
+    models: dict[int, ModelInfo],
+) -> None:
+    """이미지가 필요한 시나리오에는 이미지가, 이미지를 보내면 이미지를 받는 모델만 있어야 한다.
+
+    모델 호출 비용이 나가기 전에 접수에서 막는다. 사용자는 고쳐서 다시 보낼 수 있다.
+    """
+    if scenario and scenario.input_type != InputType.TEXT and not images:
+        raise ImageRequiredError
+    if images:
+        unsupported = [
+            mid for mid, model in models.items() if not model.supports_images
+        ]
+        if unsupported:
+            raise ModelImageUnsupportedError(unsupported)
+
+
+def _check_output_rules(output_type: OutputType, models: dict[int, ModelInfo]) -> None:
+    """이미지 생성 실행에는 이미지를 만드는 모델만 고를 수 있다. 비용이 나가기 전에 접수에서 막는다."""
+    if output_type != OutputType.IMAGE:
+        return
+    unsupported = [mid for mid, model in models.items() if not model.generates_images]
+    if unsupported:
+        raise ModelImageOutputUnsupportedError(unsupported)
 
 
 async def _find_selectable_models(

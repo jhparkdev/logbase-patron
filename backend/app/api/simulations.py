@@ -1,26 +1,39 @@
 """비교 실행(시뮬레이터) 라우터. 입력 검증·인증·응답 변환만 하고 규칙은 services 에 맡긴다."""
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request, Response, status
 
 from app.api.deps import DevUserDep, NowDep
-from app.api.simulation_deps import CancelDepsDep, SimulationManagerDep
+from app.api.model_deps import EndpointCatalogDep
+from app.api.simulation_deps import (
+    CancelDepsDep,
+    ImageStorageDep,
+    SimulationManagerDep,
+    recovery_lifespan,
+)
 from app.api.simulation_errors import SimulationRoute
+from app.api.simulation_images import router as images_router
+from app.api.simulation_output_images import router as output_images_router
 from app.db import SessionDep
 from app.schemas.simulation import SimulationAccepted, SimulationCreateRequest
 from app.schemas.simulation_cancel import (
     RequestCancelOutcome,
     SimulationCancelResponse,
 )
-from app.schemas.simulation_error import SimulationErrorResponse
+from app.schemas.simulation_error import (
+    OriginNotAllowedResponse,
+    SimulationErrorResponse,
+    SimulationRequestErrorResponse,
+)
 from app.schemas.simulation_history import (
     SimulationHistoryList,
     SimulationHistoryQuery,
     SimulationRerunDraft,
 )
 from app.schemas.simulation_result import SimulationDetailResponse
+from app.services.provider_parameters import CatalogProviderParameters
 from app.services.simulation_cancel_service import (
     CancelReport,
     SimulationNotFoundError,
@@ -36,8 +49,22 @@ from app.services.simulation_recorders import SessionRequestRecorder
 from app.services.simulation_rerun import get_rerun_draft
 from app.services.simulation_store import DbSimulationStore
 
+# 오류 응답은 모두 {code, message} 다. OpenAPI 에도 그 형식으로 적어 프론트엔드 생성 타입이 실제와 같게 한다
+_INVALID_REQUEST: dict[int | str, dict[str, Any]] = {
+    status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": SimulationRequestErrorResponse}
+}
+_NOT_FOUND: dict[int | str, dict[str, Any]] = {
+    status.HTTP_404_NOT_FOUND: {"model": SimulationErrorResponse}
+}
+_ORIGIN_REFUSED: dict[int | str, dict[str, Any]] = {
+    status.HTTP_403_FORBIDDEN: {"model": OriginNotAllowedResponse}
+}
+
 router = APIRouter(
-    prefix="/simulations", tags=["simulations"], route_class=SimulationRoute
+    prefix="/simulations",
+    tags=["simulations"],
+    route_class=SimulationRoute,
+    lifespan=recovery_lifespan,
 )
 
 
@@ -45,7 +72,8 @@ router = APIRouter(
     "",
     status_code=status.HTTP_202_ACCEPTED,
     responses={
-        status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": SimulationErrorResponse},
+        **_ORIGIN_REFUSED,
+        **_INVALID_REQUEST,
         status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": SimulationErrorResponse},
     },
 )
@@ -57,6 +85,8 @@ async def create_simulation_run(
     session: SessionDep,
     now: NowDep,
     manager: SimulationManagerDep,
+    storage: ImageStorageDep,
+    endpoints: EndpointCatalogDep,
 ) -> SimulationAccepted:
     """비교 실행을 접수하고 바로 돌려준다. 모델 호출은 응답 뒤 백그라운드에서 진행한다."""
     job = await create_simulation(
@@ -66,6 +96,8 @@ async def create_simulation_run(
             lookup=DbSimulationLookup(session),
             recorder=SessionRequestRecorder(session),
             store=DbSimulationStore(session),
+            image_files=storage,
+            providers=CatalogProviderParameters(endpoints),
             now=lambda: now,
             new_id=uuid.uuid7,
         ),
@@ -80,22 +112,20 @@ async def create_simulation_run(
 
 @router.get(
     "",
-    responses={
-        status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": SimulationErrorResponse}
-    },
+    responses=_INVALID_REQUEST,
 )
 async def list_simulation_runs(
     query: Annotated[SimulationHistoryQuery, Query()],
     session: SessionDep,
     now: NowDep,
 ) -> SimulationHistoryList:
-    """이력 목록. 조건으로 거른 결과를 최신 순으로 상한까지 준다. 정렬·페이지는 화면이 한다."""
+    """이력 목록. 조건으로 거른 결과를 요청한 열·방향으로 정렬해 한 페이지씩 준다."""
     return await list_simulation_history(session, query, now)
 
 
 @router.get(
     "/{simulation_id}",
-    responses={status.HTTP_404_NOT_FOUND: {"model": SimulationErrorResponse}},
+    responses={**_NOT_FOUND, **_INVALID_REQUEST},
 )
 async def read_simulation_run(
     simulation_id: uuid.UUID, session: SessionDep
@@ -109,13 +139,13 @@ async def read_simulation_run(
 
 @router.get(
     "/{simulation_id}/rerun-draft",
-    responses={status.HTTP_404_NOT_FOUND: {"model": SimulationErrorResponse}},
+    responses={**_NOT_FOUND, **_INVALID_REQUEST},
 )
 async def read_rerun_draft(
-    simulation_id: uuid.UUID, session: SessionDep
+    simulation_id: uuid.UUID, session: SessionDep, storage: ImageStorageDep
 ) -> SimulationRerunDraft:
     """재실행 초안. 과거 입력으로 화면 입력칸을 채운다. 실행은 사용자가 새 실행 요청으로 보낼 때 시작한다."""
-    draft = await get_rerun_draft(session, simulation_id)
+    draft = await get_rerun_draft(session, simulation_id, storage)
     if draft is None:
         raise SimulationNotFoundError
     return draft
@@ -123,7 +153,7 @@ async def read_rerun_draft(
 
 @router.post(
     "/{simulation_id}/cancel",
-    responses={status.HTTP_404_NOT_FOUND: {"model": SimulationErrorResponse}},
+    responses={**_ORIGIN_REFUSED, **_NOT_FOUND, **_INVALID_REQUEST},
 )
 async def cancel_simulation_run(
     simulation_id: uuid.UUID, deps: CancelDepsDep
@@ -134,7 +164,7 @@ async def cancel_simulation_run(
 
 @router.post(
     "/{simulation_id}/slots/{slot_no}/cancel",
-    responses={status.HTTP_404_NOT_FOUND: {"model": SimulationErrorResponse}},
+    responses={**_ORIGIN_REFUSED, **_NOT_FOUND, **_INVALID_REQUEST},
 )
 async def cancel_simulation_slot(
     simulation_id: uuid.UUID, slot_no: int, deps: CancelDepsDep
@@ -157,3 +187,8 @@ def _to_cancel_response(report: CancelReport) -> SimulationCancelResponse:
             for outcome in report.outcomes
         ],
     )
+
+
+# 경로가 /{simulation_id} 와 겹치지 않는 /images, /output-images 는 끝에 붙인다
+router.include_router(images_router)
+router.include_router(output_images_router)

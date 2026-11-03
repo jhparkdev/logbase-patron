@@ -1,9 +1,12 @@
 import { z } from "zod";
+import type { components } from "../../../shared/api/schema";
 import { formatKstDateTime } from "../../../shared/lib/format";
+import { PAGE_SIZE } from "../../../shared/lib/pagination";
 
 const DAY_MS = 86_400_000;
 const DEFAULT_DAYS = 30;
 export const HISTORY_MAX_DAYS = 366;
+// 서버 허용 목록(HistorySortColumn)에 있는 값만 둔다. 총 비용은 서버가 정렬하지 않는다.
 export const HISTORY_SORTS = [
   "requestedAt",
   "id",
@@ -11,8 +14,7 @@ export const HISTORY_SORTS = [
   "modelCount",
   "status",
   "costStatus",
-  "totalCost",
-] as const;
+] as const satisfies readonly components["schemas"]["HistorySortColumn"][];
 export const HISTORY_STATUSES = [
   "all",
   "PENDING",
@@ -28,7 +30,7 @@ export const STATUS_LABELS: Record<(typeof HISTORY_STATUSES)[number], string> =
     PENDING: "대기",
     RUNNING: "진행 중",
     SUCCESS: "성공",
-    PARTIAL_SUCCESS: "일부 성공",
+    PARTIAL_SUCCESS: "부분 성공",
     FAILED: "실패",
     CANCELLED: "취소",
   };
@@ -43,6 +45,10 @@ const date = z
     );
   }, "올바른 날짜를 선택해 주세요.");
 const key = z.string().trim().max(128, "128자 이내로 입력해 주세요.");
+const simulationId = key.refine(
+  (value) => value === "" || z.guid().safeParse(value).success,
+  "실행 ID 형식을 확인해 주세요.",
+);
 export const historyFiltersSchema = z
   .object({
     from: date,
@@ -50,7 +56,7 @@ export const historyFiltersSchema = z
     scenario: key,
     model: key,
     status: z.enum(HISTORY_STATUSES),
-    simulationId: key,
+    simulationId,
   })
   .superRefine((value, ctx) => {
     const days = (Date.parse(value.to) - Date.parse(value.from)) / DAY_MS + 1;
@@ -83,12 +89,12 @@ export function createHistorySearchSchema(now = new Date()) {
       to: date.catch(defaults.to),
       scenario: key.catch(""),
       model: key.catch(""),
-      simulationId: key.catch(""),
+      simulationId: simulationId.catch(""),
       status: z.enum(HISTORY_STATUSES).catch("all"),
       sort: z.enum(HISTORY_SORTS).catch("requestedAt"),
       direction: z.enum(["asc", "desc"]).catch("desc"),
       page: z.number().int().min(1).catch(1),
-      selected: key.min(1).optional().catch(undefined),
+      selected: z.guid().optional().catch(undefined),
       detail: z.boolean().catch(false),
     })
     .transform((value) => {
@@ -102,6 +108,27 @@ export function createHistorySearchSchema(now = new Date()) {
 }
 export const historySearchSchema = createHistorySearchSchema();
 export type HistorySearch = z.output<typeof historySearchSchema>;
+
+const NUMERIC_ID = /^\d+$/;
+/** 고르지 않은 조건과 숫자 ID가 아닌 값은 보내지 않는다. 서버가 거절하면 목록 전체가 실패로 보인다. */
+export function historyListQuery(search: HistorySearch) {
+  return {
+    start_date: search.from,
+    end_date: search.to,
+    page: search.page,
+    page_size: PAGE_SIZE,
+    sort: search.sort,
+    direction: search.direction,
+    ...(NUMERIC_ID.test(search.scenario)
+      ? { scenario_id: Number(search.scenario) }
+      : {}),
+    ...(NUMERIC_ID.test(search.model)
+      ? { model_id: Number(search.model) }
+      : {}),
+    ...(search.status !== "all" ? { status: search.status } : {}),
+    ...(search.simulationId ? { simulation_id: search.simulationId } : {}),
+  };
+}
 export function changeHistorySort(
   search: HistorySearch,
   sort: HistorySearch["sort"],

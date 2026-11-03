@@ -36,6 +36,7 @@ DESIGN_TABLES = {
     "ai_requests",
     "ai_request_payloads",
     "input_assets",
+    "output_assets",
     "cost_adjustments",
     "simulation_run_assets",
     "simulation_results",
@@ -45,12 +46,16 @@ DESIGN_TABLES = {
     "usage_reconciliations",
     "change_logs",
     "user_model_favorites",
+    "command_code_keys",
 }
 DESIGN_VIEWS = {"v_request_facts", "v_simulation_summary"}
 # Alembic이 "어디까지 적용했는지" 기록하는 테이블
 ALEMBIC_VERSION_TABLE = "alembic_version"
 NO_CHARGE_REVISION = "7b2e4f6a9c10"
 SIMULATOR_SETTINGS_REVISION = "264258125f67"
+API_KEY_SERVICE_REVISION = "3f1c9a7e2b64"
+OUTPUT_ASSETS_REVISION = "a4d8e2c61f37"
+COMMAND_CODE_KEYS_REVISION = "404e6f91129f"
 
 
 def _schema_objects(database_url: URL) -> tuple[set[str], set[str]]:
@@ -295,3 +300,164 @@ async def test_settings_downgrade_preserves_history_and_schema(
         )
         is True
     )
+
+
+def _run_api_key_service_migration(
+    session: Session, config: Config, *, upgrade: bool
+) -> None:
+    revision = ScriptDirectory.from_config(config).get_revision(
+        API_KEY_SERVICE_REVISION
+    )
+    assert revision is not None
+    migrate = revision.module.upgrade if upgrade else revision.module.downgrade
+    with Operations.context(MigrationContext.configure(session.connection())):
+        migrate()
+
+
+async def _api_key_row(session: AsyncSession, key_id: int) -> dict[str, object]:
+    row = await session.execute(
+        text("SELECT * FROM api_keys WHERE key_id = :id"), {"id": key_id}
+    )
+    return dict(row.mappings().one())
+
+
+async def test_api_key_service_upgrade_keeps_existing_keys_as_null(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    await db_session.run_sync(
+        _run_api_key_service_migration, alembic_config, upgrade=False
+    )
+    key = await factory.api_key()
+
+    await db_session.run_sync(
+        _run_api_key_service_migration, alembic_config, upgrade=True
+    )
+
+    saved = await _api_key_row(db_session, key["key_id"])
+    assert saved.pop("service_id") is None
+    assert saved == dict(key)
+
+
+async def test_api_key_service_downgrade_stops_when_a_mapping_exists(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    """Key와 서비스의 연결이 있으면 지우지 않고 멈춘다."""
+    service = await factory.service()
+    key = await factory.api_key(service_id=service["service_id"])
+    version = await db_session.scalar(text("SELECT version_num FROM alembic_version"))
+
+    with pytest.raises(DBAPIError, match="Cannot downgrade.*service") as caught:
+        async with db_session.begin_nested():
+            await db_session.run_sync(
+                _run_api_key_service_migration, alembic_config, upgrade=False
+            )
+
+    assert caught.value.orig.sqlstate == "23514"
+    assert await _api_key_row(db_session, key["key_id"]) == dict(key)
+    assert (
+        await db_session.scalar(text("SELECT version_num FROM alembic_version"))
+        == version
+    )
+
+
+def _run_output_assets_migration(
+    session: Session, config: Config, *, upgrade: bool
+) -> None:
+    revision = ScriptDirectory.from_config(config).get_revision(OUTPUT_ASSETS_REVISION)
+    assert revision is not None
+    migrate = revision.module.upgrade if upgrade else revision.module.downgrade
+    with Operations.context(MigrationContext.configure(session.connection())):
+        migrate()
+
+
+async def _table_exists(session: AsyncSession, table: str) -> bool:
+    return bool(
+        await session.scalar(
+            text("SELECT to_regclass(:name) IS NOT NULL"), {"name": table}
+        )
+    )
+
+
+async def test_output_assets_downgrade_drops_the_table_only_when_empty(
+    db_session: AsyncSession, alembic_config: Config
+) -> None:
+    await db_session.run_sync(
+        _run_output_assets_migration, alembic_config, upgrade=False
+    )
+    assert not await _table_exists(db_session, "output_assets")
+
+    await db_session.run_sync(
+        _run_output_assets_migration, alembic_config, upgrade=True
+    )
+    assert await _table_exists(db_session, "output_assets")
+
+
+async def test_output_assets_downgrade_stops_when_an_image_is_recorded(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    """결과 이미지 기록이 있으면 지우지 않고 멈춘다."""
+    image = await factory.output_asset()
+    version = await db_session.scalar(text("SELECT version_num FROM alembic_version"))
+
+    with pytest.raises(DBAPIError, match="Cannot downgrade.*output images") as caught:
+        async with db_session.begin_nested():
+            await db_session.run_sync(
+                _run_output_assets_migration, alembic_config, upgrade=False
+            )
+
+    assert caught.value.orig.sqlstate == "23514"
+    saved = await db_session.execute(
+        text("SELECT * FROM output_assets WHERE output_asset_id = :id"),
+        {"id": image["output_asset_id"]},
+    )
+    assert dict(saved.mappings().one()) == dict(image)
+    assert (
+        await db_session.scalar(text("SELECT version_num FROM alembic_version"))
+        == version
+    )
+
+
+def _run_command_code_keys_migration(
+    session: Session, config: Config, *, upgrade: bool
+) -> None:
+    revision = ScriptDirectory.from_config(config).get_revision(
+        COMMAND_CODE_KEYS_REVISION
+    )
+    assert revision is not None
+    migrate = revision.module.upgrade if upgrade else revision.module.downgrade
+    with Operations.context(MigrationContext.configure(session.connection())):
+        migrate()
+
+
+async def test_command_code_keys_downgrade_drops_the_table_only_when_empty(
+    db_session: AsyncSession, alembic_config: Config
+) -> None:
+    await db_session.run_sync(
+        _run_command_code_keys_migration, alembic_config, upgrade=False
+    )
+    assert not await _table_exists(db_session, "command_code_keys")
+
+    await db_session.run_sync(
+        _run_command_code_keys_migration, alembic_config, upgrade=True
+    )
+    assert await _table_exists(db_session, "command_code_keys")
+
+
+async def test_command_code_keys_downgrade_stops_when_a_mapping_is_registered(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    """등록된 Key 매핑이 있으면 지우지 않고 멈춘다."""
+    key = await factory.command_code_key()
+
+    with pytest.raises(DBAPIError, match="Cannot downgrade.*key mappings") as caught:
+        async with db_session.begin_nested():
+            await db_session.run_sync(
+                _run_command_code_keys_migration, alembic_config, upgrade=False
+            )
+
+    assert caught.value.orig.sqlstate == "23514"
+    saved = await db_session.execute(
+        text("SELECT * FROM command_code_keys WHERE command_code_key_id = :id"),
+        {"id": key["command_code_key_id"]},
+    )
+    assert dict(saved.mappings().one()) == dict(key)

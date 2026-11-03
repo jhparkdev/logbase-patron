@@ -342,6 +342,8 @@ LOWER_BOUNDS: list[tuple[str, str, str, Any, Any, dict[str, Any], set[str]]] = [
         set(),
     ),
     ("input_assets", "input_asset", "file_size_bytes", 0, -1, {}, set()),
+    ("output_assets", "output_asset", "file_size_bytes", 0, -1, {}, set()),
+    ("output_assets", "output_asset", "sort_order", 0, -1, {}, set()),
     (
         "budgets",
         "budget",
@@ -1341,6 +1343,42 @@ async def test_result_request_belongs_to_same_simulation(
     )
 
 
+async def test_output_asset_order_is_unique_per_request(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    """uq_output_assets_request_order: 한 호출이 만든 이미지의 순서는 겹치지 않는다."""
+    request_id = (await factory.ai_request())["request_id"]
+    await factory.output_asset(request_id=request_id, sort_order=0)
+    await factory.output_asset(request_id=request_id, sort_order=1)
+    await factory.output_asset(sort_order=0)
+
+    await expect_rejected(
+        db_session,
+        factory.output_asset(request_id=request_id, sort_order=1),
+        constraint="uq_output_assets_request_order",
+    )
+
+
+async def test_output_asset_requires_existing_request_and_keeps_it(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    """결과 이미지는 실제 호출에만 붙고, 이미지가 있는 호출은 지울 수 없다."""
+    constraint = "output_assets_request_id_fkey"
+    await expect_rejected(
+        db_session, factory.output_asset(request_id=uuid.uuid4()), constraint=constraint
+    )
+    request_id = (await factory.ai_request())["request_id"]
+    await factory.output_asset(request_id=request_id)
+
+    await expect_rejected(
+        db_session,
+        db_session.execute(
+            text("DELETE FROM ai_requests WHERE request_id = :id"), {"id": request_id}
+        ),
+        constraint=constraint,
+    )
+
+
 async def test_task_reference_is_unique_per_service(
     factory: Factory, db_session: AsyncSession
 ) -> None:
@@ -1448,13 +1486,80 @@ async def test_owner_type_is_stored_not_virtual(db_session: AsyncSession) -> Non
     assert generated == "s"
 
 
-# (테이블, 기본키 컬럼, Factory 메서드): updated_at이 있는 12개 테이블
+@pytest.mark.parametrize(
+    "secret_ref",
+    [
+        "",
+        "COMMAND_CODE_KEY_",
+        "command_code_key_a",
+        "OPENROUTER_API_KEY",
+        "COMMAND_CODE_KEY_0000-0000-0000",
+        "0000-0000-0000",
+    ],
+)
+async def test_command_code_key_rejects_anything_but_a_reference_name(
+    factory: Factory, db_session: AsyncSession, secret_ref: str
+) -> None:
+    """Key 원문을 실수로 넣어도 저장되지 않게 정해진 형식의 이름만 받는다."""
+    await expect_rejected(
+        db_session,
+        factory.command_code_key(secret_ref=secret_ref),
+        constraint="command_code_keys_secret_ref_check",
+    )
+
+
+async def test_command_code_key_accepts_a_reference_name(factory: Factory) -> None:
+    key = await factory.command_code_key(secret_ref="COMMAND_CODE_KEY_MEMBER_01")
+
+    assert key["secret_ref"] == "COMMAND_CODE_KEY_MEMBER_01"
+    assert key["is_active"] is True
+
+
+async def test_command_code_key_reference_is_unique(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    await factory.command_code_key(secret_ref="COMMAND_CODE_KEY_A")
+
+    await expect_rejected(
+        db_session,
+        factory.command_code_key(secret_ref="COMMAND_CODE_KEY_A"),
+        constraint="command_code_keys_secret_ref_key",
+    )
+
+
+async def test_one_active_command_code_key_per_member(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    """같은 이름은 사용 중인 Key를 하나만 가지고, 비활성 행은 이력으로 남아도 막지 않는다."""
+    await factory.command_code_key(member_name="구성원 A", is_active=False)
+    await factory.command_code_key(member_name="구성원 A")
+
+    await expect_rejected(
+        db_session,
+        factory.command_code_key(member_name="구성원 A"),
+        constraint="uq_command_code_keys_active_member",
+    )
+
+
+@pytest.mark.parametrize("member_name", ["", " ", " 구성원", "구성원 "])
+async def test_command_code_key_rejects_blank_or_untrimmed_member_name(
+    factory: Factory, db_session: AsyncSession, member_name: str
+) -> None:
+    await expect_rejected(
+        db_session,
+        factory.command_code_key(member_name=member_name),
+        constraint="command_code_keys_member_name_check",
+    )
+
+
+# (테이블, 기본키 컬럼, Factory 메서드): updated_at이 있는 13개 테이블
 UPDATED_AT_TABLES = [
     ("customers", "customer_id", "customer"),
     ("projects", "project_id", "project"),
     ("users", "user_id", "user"),
     ("services", "service_id", "service"),
     ("api_keys", "key_id", "api_key"),
+    ("command_code_keys", "command_code_key_id", "command_code_key"),
     ("models", "model_id", "model"),
     ("ai_requests", "request_id", "ai_request"),
     ("test_scenarios", "scenario_id", "scenario"),
@@ -1514,6 +1619,14 @@ async def test_every_foreign_key_restricts_delete(db_session: AsyncSession) -> N
             "api_key",
             "customer_id",
             "api_keys_customer_id_fkey",
+        ),
+        (
+            "service",
+            "services",
+            "service_id",
+            "api_key",
+            "service_id",
+            "api_keys_service_id_fkey",
         ),
         (
             "user",

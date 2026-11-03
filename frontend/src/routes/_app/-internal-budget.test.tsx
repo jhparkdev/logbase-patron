@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { beforeAll, expect, test } from "vitest";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { stubInternalBudgetApi } from "../../test/internalBudgetApi";
 import { changePeriod, periodInputs } from "../../test/periodInputs";
 import { renderAt, routeMatch } from "../../test/renderAt";
 
@@ -10,6 +11,12 @@ beforeAll(() => {
     this.open = true;
   };
 });
+
+beforeEach(() => {
+  stubInternalBudgetApi();
+});
+
+afterEach(() => vi.restoreAllMocks());
 
 const ROUTE_ID = "/_app/internal-budget";
 
@@ -96,6 +103,22 @@ test("전체 목록에서 머리글을 누르면 정렬이 주소에 남고 1페
   );
 });
 
+test("머리글을 눌러 정렬해도 화면을 맨 위로 올리지 않는다", async () => {
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  const router = renderAt(`/internal-budget?${PERIOD}`);
+  const sortButton = await screen.findByRole("button", {
+    name: /비용 \(USD\)/,
+  });
+  scrollTo.mockClear();
+
+  fireEvent.click(sortButton);
+  await waitFor(() =>
+    expect(routeMatch(router, ROUTE_ID)?.search).toHaveProperty("requestsSort"),
+  );
+
+  expect(scrollTo).not.toHaveBeenCalled();
+});
+
 test("전체 목록에서 조회하면 목록은 유지하고 1페이지로 돌아간다", async () => {
   const router = renderAt(`/internal-budget?${PERIOD}&view=projects&page=3`);
   const { to } = await periodInputs();
@@ -144,7 +167,9 @@ test("요약 화면에서 머리글을 누르면 그 표의 정렬만 주소에 
     }),
   );
 
-  fireEvent.click(screen.getByRole("button", { name: /월 예산 \(USD\)/ }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: /월 예산 \(USD\)/ }),
+  );
   await waitFor(() =>
     expect(routeMatch(router, ROUTE_ID)?.search).toEqual({
       from: "2026-10-01",
@@ -158,9 +183,9 @@ test("요약 화면에서 머리글을 누르면 그 표의 정렬만 주소에 
 });
 
 test("주소에 프로젝트 번호가 있으면 프로젝트 상세 패널을 열고, 닫으면 그 값만 지운다", async () => {
-  const router = renderAt(`/internal-budget?${PERIOD}&project=3`);
+  const router = renderAt(`/internal-budget?${PERIOD}&detail=3`);
 
-  await screen.findByRole("dialog", { name: "프로젝트 상세" });
+  await screen.findByRole("dialog", { name: "사내 챗봇 구축" });
   // 패널 머리의 X. 폼 아래에도 같은 동작의 "닫기"가 있다.
   fireEvent.click(screen.getAllByRole("button", { name: "닫기" })[0]);
 
@@ -182,4 +207,25 @@ test("구독료 등록을 누르면 등록 패널이 열리고 주소에 남는�
     to: "2026-10-15",
     subscription: "new",
   });
+});
+
+test("프로젝트명이나 구독료 등록으로 패널을 열고 닫아도 화면을 맨 위로 올리지 않는다", async () => {
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  renderAt(`/internal-budget?${PERIOD}`);
+  const table = await screen.findByRole("table", {
+    name: "프로젝트별 예산 현황",
+  });
+  scrollTo.mockClear();
+
+  fireEvent.click(within(table).getAllByRole("link")[0]);
+  await screen.findByRole("dialog");
+  fireEvent.click(screen.getAllByRole("button", { name: "닫기" })[0]);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+  fireEvent.click(screen.getByRole("button", { name: "구독료 등록" }));
+  await screen.findByRole("dialog", { name: "구독료 등록" });
+  fireEvent.click(screen.getAllByRole("button", { name: "닫기" })[0]);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+  expect(scrollTo).not.toHaveBeenCalled();
 });

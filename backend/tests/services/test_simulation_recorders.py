@@ -118,6 +118,46 @@ async def test_session_recorder_refuses_a_second_outcome(
     assert await status_of(db_session, request.request_id) == R.CANCELLED
 
 
+async def test_a_late_result_after_cancel_is_kept_only_for_reconciliation(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    # 취소 뒤 도착한 결과는 호출 ID 와 원문만 남기고 상태·비용·토큰은 바꾸지 않는다(J-03)
+    recorder = SessionRequestRecorder(db_session)
+    request = await new_request(factory)
+    await recorder.create_pending(request)
+    await recorder.mark_running(request.request_id, T0)
+    assert await recorder.cancel_if_open(request.request_id, END)
+    record = to_slot_record(ok("늦은 응답", generation_id="gen-late"), None)
+
+    await recorder.keep_late_result(request.request_id, MESSAGES, record)
+
+    row = await saved(db_session, request.request_id)
+    assert (row.status, row.external_generation_id) == (R.CANCELLED, "gen-late")
+    assert (row.cost_status, row.cost_usd, row.output_tokens) == (
+        CostStatus.UNKNOWN,
+        None,
+        None,
+    )
+    payload = await db_session.get(AIRequestPayload, request.request_id)
+    assert payload is not None
+    assert payload.response_text == "늦은 응답"
+
+
+async def test_a_late_result_is_not_kept_for_a_call_that_was_not_cancelled(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    recorder = SessionRequestRecorder(db_session)
+    request = await new_request(factory)
+    await recorder.create_pending(request)
+    await recorder.mark_running(request.request_id, T0)
+    record = to_slot_record(ok("응답", generation_id="gen"), None)
+
+    await recorder.keep_late_result(request.request_id, MESSAGES, record)
+
+    assert await db_session.get(AIRequestPayload, request.request_id) is None
+    assert (await saved(db_session, request.request_id)).external_generation_id is None
+
+
 # --- 백그라운드용: 호출마다 새 세션을 열고 commit 한다 ---
 
 

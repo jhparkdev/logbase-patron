@@ -16,17 +16,19 @@ test("기본은 이름을 화면에 보이지 않고 화면 낭독기에만 알�
   expect(screen.queryByText("프로젝트")).toBeNull();
 });
 
-test("showLabel이면 상자 위에 보이는 라벨을 두고 상자와 연결한다", () => {
-  render(
-    <Select
-      label="프로젝트"
-      showLabel
-      value=""
-      options={OPTIONS}
-      onChange={() => {}}
-    />,
-  );
+for (const labelPosition of ["top", "side"] as const) {
+  test(`labelPosition이 ${labelPosition}이면 보이는 라벨을 두고 상자와 연결한다`, () => {
+    render(
+      <Select
+        label="프로젝트"
+        labelPosition={labelPosition}
+        value=""
+        options={OPTIONS}
+        onChange={() => {}}
+      />,
+    );
 
-  expect(screen.getByText("프로젝트").tagName).toBe("LABEL");
-  expect(screen.getByRole("combobox", { name: "프로젝트" })).toBeTruthy();
-});
+    expect(screen.getByText("프로젝트").tagName).toBe("LABEL");
+    expect(screen.getByRole("combobox", { name: "프로젝트" })).toBeTruthy();
+  });
+}

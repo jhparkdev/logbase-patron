@@ -18,7 +18,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import cli
-from app.models import User, UserSession
+from app.models import APIKey, User, UserSession
+from app.services import usage_catalog
 from tests.db_helpers import Factory
 
 # 시드를 넣은 뒤 테이블별 행 수 (설계 v0.6 mock 데이터 기준)
@@ -100,6 +101,43 @@ async def test_seed_twice_changes_nothing(db_session: AsyncSession) -> None:
 
     assert applied_again is False
     assert await _row_counts(db_session) == EXPECTED_ROWS
+
+
+async def test_data_summary_scenario_asks_for_structured_output(
+    db_session: AsyncSession,
+) -> None:
+    """요약 및 구조화 시나리오는 프롬프트와 Schema 둘 다 구조화를 요구한다."""
+    await cli.apply_seed(await db_session.connection())
+
+    row = (
+        await db_session.execute(
+            text(
+                "SELECT prompt_template, default_json_schema FROM test_scenarios "
+                "WHERE scenario_code = 'DATA_SUMMARY'"
+            )
+        )
+    ).one()
+
+    assert "JSON Schema" in row.prompt_template
+    assert "{{data}}" in row.prompt_template
+    assert row.default_json_schema["required"] == ["summary", "key_points"]
+
+
+async def test_past_data_summary_runs_keep_the_conditions_they_ran_with(
+    db_session: AsyncSession,
+) -> None:
+    """실행에는 당시 값을 복사해 두므로 시나리오를 고쳐도 과거 실행의 조건은 그대로다."""
+    await cli.apply_seed(await db_session.connection())
+
+    runs_with_schema = await db_session.scalar(
+        text(
+            "SELECT count(*) FROM simulation_runs AS run "
+            "JOIN test_scenarios USING (scenario_id) "
+            "WHERE scenario_code = 'DATA_SUMMARY' AND run.json_schema IS NOT NULL"
+        )
+    )
+
+    assert runs_with_schema == 0
 
 
 async def test_ids_after_seed_do_not_collide(db_session: AsyncSession) -> None:
@@ -347,3 +385,131 @@ async def test_user_command_runner_uses_database_and_reports_results(
     await cli.run_user_command(args, None)
     assert "만료 세션 1개 삭제 완료" in capsys.readouterr().out
     assert len((await db_session.scalars(select(UserSession.session_id))).all()) == 1
+
+
+# ---------------------------------------------------------------------------
+# 고객·서비스·Key 등록 명령
+# ---------------------------------------------------------------------------
+
+CUSTOMER_CREATE_ARGS = ["customer-create", "--customer-code", "C1", "--name", "고객"]
+SERVICE_CREATE_ARGS = ["service-create", "--service-code", "S1", "--name", "서비스"]
+KEY_REGISTER_ARGS = [
+    "key-register",
+    "--display-name",
+    "고객 Key",
+    "--secret-ref",
+    "CUSTOMER_API_KEY",
+    "--customer-code",
+    "C1",
+    "--service-code",
+    "S1",
+    "--environment",
+    "PROD",
+]
+CATALOG_COMMANDS = [CUSTOMER_CREATE_ARGS, SERVICE_CREATE_ARGS, KEY_REGISTER_ARGS]
+
+
+@pytest.fixture
+def catalog_commands(monkeypatch: pytest.MonkeyPatch) -> list[argparse.Namespace]:
+    calls: list[argparse.Namespace] = []
+
+    async def fake_run_catalog_command(args: argparse.Namespace) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(cli, "run_catalog_command", fake_run_catalog_command)
+    monkeypatch.setattr(cli, "current_app_env", lambda: "development")
+    return calls
+
+
+@pytest.mark.parametrize("args", CATALOG_COMMANDS)
+def test_catalog_commands_require_production_confirmation_before_db(
+    monkeypatch: pytest.MonkeyPatch,
+    catalog_commands: list[argparse.Namespace],
+    args: list[str],
+) -> None:
+    monkeypatch.setattr(cli, "current_app_env", lambda: "production")
+
+    assert cli.main(args) == 1
+    assert catalog_commands == []
+    assert cli.main([*args, "--confirm-production"]) == 0
+    assert len(catalog_commands) == 1
+
+
+@pytest.mark.parametrize("args", CATALOG_COMMANDS)
+def test_catalog_commands_do_not_prompt_for_a_password(
+    monkeypatch: pytest.MonkeyPatch,
+    catalog_commands: list[argparse.Namespace],
+    args: list[str],
+) -> None:
+    def no_prompt(prompt: str) -> str:
+        pytest.fail("등록 명령은 비밀번호를 묻지 않습니다.")
+
+    monkeypatch.setattr(cli, "getpass", no_prompt)
+    assert cli.main(args) == 0
+    assert catalog_commands[0].command == args[0]
+
+
+def test_service_create_defaults_to_a_customer_facing_service(
+    catalog_commands: list[argparse.Namespace],
+) -> None:
+    assert cli.main(SERVICE_CREATE_ARGS) == 0
+    assert catalog_commands[0].service_type == "CUSTOMER_FACING"
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        [*SERVICE_CREATE_ARGS, "--service-type", "UNKNOWN"],
+        [*KEY_REGISTER_ARGS[:-1], "STAGING"],
+        KEY_REGISTER_ARGS[:-2],
+        # Key 원문은 명령줄 인자로 받지 않는다.
+        [*KEY_REGISTER_ARGS, "--secret", "must-not-be-accepted"],
+    ],
+)
+def test_catalog_commands_reject_invalid_arguments(
+    catalog_commands: list[argparse.Namespace], args: list[str]
+) -> None:
+    with pytest.raises(SystemExit) as error:
+        cli.main(args)
+    assert error.value.code == 2
+    assert catalog_commands == []
+
+
+def test_catalog_errors_are_reported_without_a_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    catalog_commands: list[argparse.Namespace],
+) -> None:
+    async def fail(args: argparse.Namespace) -> None:
+        raise usage_catalog.CatalogCommandError("보여 줄 오류")
+
+    monkeypatch.setattr(cli, "run_catalog_command", fail)
+    assert cli.main(CUSTOMER_CREATE_ARGS) == 1
+    assert "보여 줄 오류" in capsys.readouterr().err
+
+
+async def test_catalog_command_runner_registers_rows_and_reports_ids(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    @asynccontextmanager
+    async def test_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    monkeypatch.setattr(cli, "get_sessionmaker", lambda: test_session)
+    parser = cli.make_parser()
+
+    await cli.run_catalog_command(parser.parse_args(CUSTOMER_CREATE_ARGS))
+    assert "고객 등록 완료" in capsys.readouterr().out
+    await cli.run_catalog_command(parser.parse_args(SERVICE_CREATE_ARGS))
+    assert "서비스 등록 완료" in capsys.readouterr().out
+    await cli.run_catalog_command(parser.parse_args(KEY_REGISTER_ARGS))
+    output = capsys.readouterr().out
+    assert "Key 등록 완료" in output
+    assert "CUSTOMER_API_KEY" not in output
+
+    key = await db_session.scalar(select(APIKey))
+    assert key is not None
+    assert key.secret_ref == "CUSTOMER_API_KEY"
+    assert key.service_id is not None
