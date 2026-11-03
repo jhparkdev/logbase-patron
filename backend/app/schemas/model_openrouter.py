@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.models import DEFAULT_PAGE_SIZE, MAX_PAGE, MAX_PAGE_SIZE, SearchText
 from app.schemas.plain_decimal import PlainDecimal
 
+MAX_NEW_DAYS = 365
+
 
 class OpenRouterModelSearchQuery(BaseModel):
     """GET /api/models/openrouter의 검색 조건. 정해지지 않은 조건 이름은 거절한다."""
@@ -15,6 +17,8 @@ class OpenRouterModelSearchQuery(BaseModel):
 
     # 모델 ID나 이름에 들어 있는 글자. 없으면 전체
     q: SearchText | None = None
+    # 보내면 이 일수 안에 OpenRouter에 올라온 미등록 모델만 최근 순으로 준다(신규 모델 알림에서 열 때)
+    new_days: int | None = Field(default=None, ge=1, le=MAX_NEW_DAYS)
     page: int = Field(default=1, ge=1, le=MAX_PAGE)
     page_size: int = Field(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE)
 
@@ -35,6 +39,8 @@ class OpenRouterModelRead(BaseModel):
     supports_tools: bool
     # 이미 등록된 모델인지
     registered: bool
+    # OpenRouter에 올라온 시각. 주지 않는 모델은 null
+    created_at: datetime | None
 
 
 class OpenRouterModelListResponse(BaseModel):
@@ -44,8 +50,7 @@ class OpenRouterModelListResponse(BaseModel):
     total: int
 
 
-DEFAULT_NEW_DAYS = 30
-MAX_NEW_DAYS = 365
+DEFAULT_NEW_DAYS = 5
 DEFAULT_NEW_LIMIT = 5
 MAX_NEW_LIMIT = 50
 

@@ -5,7 +5,7 @@ from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.openrouter.lookup_result import ModelInfo
-from app.services.model_new import find_new_models
+from app.services.model_new import find_new_models, search_new_models
 from tests.api.model_helpers import info
 from tests.db_helpers import T0, Factory
 
@@ -94,3 +94,51 @@ async def test_모델이_없으면_빈_결과이다(db_session: AsyncSession) ->
     found = await find_new_models(db_session, [], now=NOW, days=DAYS, limit=5)
 
     assert (found.items, found.total) == ([], 0)
+
+
+async def test_검색은_새_모델_안에서_ID와_이름의_글자로_찾는다(
+    db_session: AsyncSession,
+) -> None:
+    models = [
+        made("acme/alpha", timedelta(days=1)),
+        info("beta/gamma", name="Acme: Gamma", created_at=NOW - timedelta(days=2)),
+        made("other/delta", timedelta(days=3)),
+        made("acme/old", timedelta(days=200)),
+    ]
+
+    found = await search_new_models(
+        db_session, models, q="ACME", now=NOW, days=DAYS, page=1, page_size=10
+    )
+
+    assert [entry.model.model_id for entry in found.items] == [
+        "acme/alpha",
+        "beta/gamma",
+    ]
+    assert found.total == 2
+
+
+async def test_검색은_페이지로_나누고_전체_개수는_나누기_전_개수이다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await factory.model(openrouter_model_id="a/registered")
+    models = [made(f"a/m{number}", timedelta(days=number)) for number in range(1, 6)]
+    models.append(made("a/registered", timedelta(days=1)))
+
+    second = await search_new_models(
+        db_session, models, q=None, now=NOW, days=DAYS, page=2, page_size=2
+    )
+
+    assert [entry.model.model_id for entry in second.items] == ["a/m3", "a/m4"]
+    assert second.total == 5
+
+
+async def test_검색은_범위를_넘은_페이지에_빈_목록을_준다(
+    db_session: AsyncSession,
+) -> None:
+    models = [made("a/one", timedelta(days=1))]
+
+    found = await search_new_models(
+        db_session, models, q=None, now=NOW, days=DAYS, page=3, page_size=10
+    )
+
+    assert (found.items, found.total) == ([], 1)

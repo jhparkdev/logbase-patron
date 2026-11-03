@@ -67,15 +67,15 @@ async def test_모델_한_건의_필드를_돌려준다(
     assert datetime.fromisoformat(item["created_at"]) == days_ago(now, 1)
 
 
-async def test_조건을_보내지_않으면_30일과_5개가_기본이다(
+async def test_조건을_보내지_않으면_5일과_5개가_기본이다(
     client: AsyncClient, catalog: FakeCatalog, now: datetime
 ) -> None:
     catalog.models = [info(f"v/m{n}", created_at=days_ago(now, 1)) for n in range(7)]
-    catalog.models.append(info("v/old", created_at=days_ago(now, 31)))
+    catalog.models.append(info("v/old", created_at=days_ago(now, 6)))
 
     body = (await client.get(URL)).json()
 
-    assert (body["days"], body["total"]) == (30, 7)
+    assert (body["days"], body["total"]) == (5, 7)
     assert len(body["items"]) == 5
 
 
@@ -98,9 +98,9 @@ async def test_최근에_올라온_순으로_준다(
     client: AsyncClient, catalog: FakeCatalog, now: datetime
 ) -> None:
     catalog.models = [
-        info("v/old", created_at=days_ago(now, 9)),
+        info("v/old", created_at=days_ago(now, 4)),
         info("v/new", created_at=days_ago(now, 1)),
-        info("v/mid", created_at=days_ago(now, 4)),
+        info("v/mid", created_at=days_ago(now, 2)),
     ]
 
     assert ids((await client.get(URL)).json()) == ["v/new", "v/mid", "v/old"]
@@ -184,3 +184,85 @@ async def test_조건의_양쪽_끝_값은_받는다(
     client: AsyncClient, catalog: FakeCatalog, params: dict[str, Any]
 ) -> None:
     assert (await client.get(URL, params=params)).status_code == status.HTTP_200_OK
+
+
+# ---------------------------------------------------------------
+# 신규 모델만 보기: 등록 패널이 알림에서 열릴 때 쓰는 GET /api/models/openrouter?new_days=
+# ---------------------------------------------------------------
+SEARCH = "/api/models/openrouter"
+
+
+async def test_new_days를_보내면_최근_모델만_최신순으로_주고_출시일을_담는다(
+    client: AsyncClient, catalog: FakeCatalog, now: datetime
+) -> None:
+    catalog.models = [
+        info("v/old", created_at=days_ago(now, 40)),
+        info("v/mid", created_at=days_ago(now, 4)),
+        info("v/new", created_at=days_ago(now, 1)),
+        info("v/unknown", created_at=None),
+    ]
+
+    body = (await client.get(SEARCH, params={"new_days": 30})).json()
+
+    assert ids(body) == ["v/new", "v/mid"]
+    assert body["total"] == 2
+    assert datetime.fromisoformat(body["items"][0]["created_at"]) == days_ago(now, 1)
+    assert all(item["registered"] is False for item in body["items"])
+
+
+async def test_new_days를_보내면_이미_등록한_모델은_목록에서_빠진다(
+    client: AsyncClient, catalog: FakeCatalog, factory: Factory, now: datetime
+) -> None:
+    await factory.model(openrouter_model_id="v/registered")
+    catalog.models = [
+        info("v/registered", created_at=days_ago(now, 1)),
+        info("v/new", created_at=days_ago(now, 2)),
+    ]
+
+    body = (await client.get(SEARCH, params={"new_days": 30})).json()
+
+    assert ids(body) == ["v/new"]
+    assert body["total"] == 1
+
+
+async def test_new_days는_검색어와_페이지와_함께_쓸_수_있다(
+    client: AsyncClient, catalog: FakeCatalog, now: datetime
+) -> None:
+    catalog.models = [
+        info(f"acme/m{number}", created_at=days_ago(now, number))
+        for number in range(1, 6)
+    ]
+    catalog.models.append(info("other/x", created_at=days_ago(now, 1)))
+
+    body = (
+        await client.get(
+            SEARCH,
+            params={"new_days": 30, "q": "acme", "page": 2, "page_size": 2},
+        )
+    ).json()
+
+    assert ids(body) == ["acme/m3", "acme/m4"]
+    assert (body["page"], body["page_size"], body["total"]) == (2, 2, 5)
+
+
+async def test_new_days를_보내지_않으면_출시일과_상관없이_모델_ID순_전체이다(
+    client: AsyncClient, catalog: FakeCatalog, now: datetime
+) -> None:
+    catalog.models = [
+        info("b/old", created_at=days_ago(now, 400)),
+        info("a/unknown", created_at=None),
+    ]
+
+    body = (await client.get(SEARCH)).json()
+
+    assert ids(body) == ["a/unknown", "b/old"]
+    assert [item["created_at"] is None for item in body["items"]] == [True, False]
+
+
+@pytest.mark.parametrize("days", [0, 366, "many"])
+async def test_new_days가_범위를_벗어나면_422이다(
+    client: AsyncClient, catalog: FakeCatalog, days: Any
+) -> None:
+    response = await client.get(SEARCH, params={"new_days": days})
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT

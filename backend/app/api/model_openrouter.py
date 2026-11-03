@@ -47,6 +47,7 @@ def to_openrouter_model_read(info: ModelInfo, registered: bool) -> OpenRouterMod
         supports_json_schema=supports_json_schema(info.supported_parameters),
         supports_tools=supports_tools(info.supported_parameters),
         registered=registered,
+        created_at=info.created_at,
     )
 
 
@@ -78,11 +79,32 @@ async def search_openrouter_models(
     query: Annotated[OpenRouterModelSearchQuery, Query()],
     catalog: CatalogDep,
     session: SessionDep,
+    now: NowDep,
 ) -> OpenRouterModelListResponse | JSONResponse:
     try:
         models = await catalog.get()
     except OpenRouterUnavailableError:
         return model_error_response(ModelErrorCode.OPENROUTER_UNAVAILABLE)
+
+    if query.new_days is not None:
+        found = await model_new.search_new_models(
+            session,
+            models,
+            q=query.q,
+            now=now,
+            days=query.new_days,
+            page=query.page,
+            page_size=query.page_size,
+        )
+        # 새 모델은 미등록만 골라 오므로 등록 여부는 항상 아니오다
+        return OpenRouterModelListResponse(
+            items=[
+                to_openrouter_model_read(entry.model, False) for entry in found.items
+            ],
+            page=query.page,
+            page_size=query.page_size,
+            total=found.total,
+        )
 
     page = model_search.search_models(
         models, q=query.q, page=query.page, page_size=query.page_size

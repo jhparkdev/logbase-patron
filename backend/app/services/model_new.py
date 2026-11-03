@@ -28,15 +28,10 @@ class NewModels:
     total: int
 
 
-async def find_new_models(
-    session: AsyncSession,
-    models: Sequence[ModelInfo],
-    *,
-    now: datetime,
-    days: int,
-    limit: int,
-) -> NewModels:
-    """days일 안에 올라온 미등록 모델을 최근 순(같으면 모델 ID순)으로 limit개까지 돌려준다.
+async def _unregistered_recent(
+    session: AsyncSession, models: Sequence[ModelInfo], *, now: datetime, days: int
+) -> list[NewModel]:
+    """days일 안에 올라온 미등록 모델을 최근 순(같으면 모델 ID순)으로 모두 돌려준다.
 
     올라온 시각을 모르는 모델은 새 모델인지 알 수 없어 뺀다. 기간의 경계(정확히 days일 전)는 포함한다.
     """
@@ -51,4 +46,44 @@ async def find_new_models(
     )
     fresh = [entry for entry in recent if entry.model.model_id not in registered]
     fresh.sort(key=lambda entry: (-entry.created_at.timestamp(), entry.model.model_id))
+    return fresh
+
+
+async def find_new_models(
+    session: AsyncSession,
+    models: Sequence[ModelInfo],
+    *,
+    now: datetime,
+    days: int,
+    limit: int,
+) -> NewModels:
+    """새 모델을 최근 순으로 limit개까지 돌려준다. total은 limit과 관계없는 전체 개수다."""
+    fresh = await _unregistered_recent(session, models, now=now, days=days)
     return NewModels(items=fresh[:limit], total=len(fresh))
+
+
+async def search_new_models(
+    session: AsyncSession,
+    models: Sequence[ModelInfo],
+    *,
+    q: str | None,
+    now: datetime,
+    days: int,
+    page: int,
+    page_size: int,
+) -> NewModels:
+    """새 모델 안에서 q가 모델 ID나 이름에 들어 있는 것을 최근 순으로 한 페이지만 돌려준다.
+
+    대소문자는 구분하지 않는다. total은 찾은 전체 개수다.
+    """
+    fresh = await _unregistered_recent(session, models, now=now, days=days)
+    if q:
+        needle = q.casefold()
+        fresh = [
+            entry
+            for entry in fresh
+            if needle in entry.model.model_id.casefold()
+            or needle in (entry.model.name or "").casefold()
+        ]
+    start = (page - 1) * page_size
+    return NewModels(items=fresh[start : start + page_size], total=len(fresh))
