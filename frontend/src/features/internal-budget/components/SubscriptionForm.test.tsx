@@ -35,7 +35,31 @@ test("등록 폼은 비어 있는 필수 칸을 한꺼번에 알려 주고 상�
   expect(await screen.findByText("구독 식별값을 입력해 주세요.")).toBeTruthy();
   expect(screen.getByText("도구명을 입력해 주세요.")).toBeTruthy();
   expect(screen.getByText("금액을 입력해 주세요.")).toBeTruthy();
+  expect(screen.getByText("귀속 프로젝트를 골라 주세요.")).toBeTruthy();
   expect(onSubmit).not.toHaveBeenCalled();
+});
+
+test("등록 폼의 프로젝트 칸은 처음에 고르지 않은 상태이고 미배분 선택지가 없다", () => {
+  render(
+    <SubscriptionForm
+      defaultMonth="2026-10"
+      projects={PROJECTS}
+      onSubmit={vi.fn()}
+      onClose={vi.fn()}
+    />,
+  );
+
+  const project = screen.getByLabelText<HTMLSelectElement>("귀속 프로젝트");
+  expect(project.value).toBe("");
+  expect(
+    Array.from(project.options).map((option) => option.textContent),
+  ).toEqual([
+    "프로젝트를 골라 주세요",
+    "사내 챗봇 구축",
+    "문서 요약",
+    "새 프로젝트 추가…",
+  ]);
+  expect(screen.queryByText("미배분")).toBeNull();
 });
 
 test("등록 폼을 채우면 입력한 값으로 등록을 요청한다", async () => {
@@ -153,6 +177,47 @@ test("수정 폼은 구독 식별값·도구명·구독 종류·적용 월을 �
   await waitFor(() =>
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ status: "CANCELLED", amount: "100" }),
+    ),
+  );
+});
+
+test("프로젝트가 있는 구독료의 수정 폼에는 비울 수 있는 항목이 없다", () => {
+  render(
+    <SubscriptionForm
+      editing={subscriptionFormValues(SUBSCRIPTIONS.items[0])}
+      projects={PROJECTS}
+      onSubmit={vi.fn()}
+      onClose={vi.fn()}
+    />,
+  );
+
+  const project = screen.getByLabelText<HTMLSelectElement>("귀속 프로젝트");
+  expect(Array.from(project.options).map((option) => option.value)).toEqual([
+    "1",
+    "2",
+    "new",
+  ]);
+});
+
+test("프로젝트가 비어 있는 옛 구독료도 프로젝트를 고르지 않고 다른 칸을 저장할 수 있다", async () => {
+  const onSubmit = vi.fn();
+  render(
+    <SubscriptionForm
+      editing={subscriptionFormValues(SUBSCRIPTIONS.items[1])}
+      projects={PROJECTS}
+      onSubmit={onSubmit}
+      onClose={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByLabelText<HTMLSelectElement>("귀속 프로젝트").value).toBe(
+    "",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+  await waitFor(() =>
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ project: "" }),
     ),
   );
 });

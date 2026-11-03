@@ -127,6 +127,13 @@ def test_an_image_run_with_text_settings_is_refused(config: dict[str, Any]) -> N
         SimulationCreateRequest(**image_body(execution_config=config))
 
 
+def test_an_image_run_with_common_settings_off_is_accepted() -> None:
+    # 공통 설정을 끈 것은 텍스트 설정을 보내지 않은 것과 같다
+    request = SimulationCreateRequest(**image_body(execution_config=None))
+
+    assert request.execution_config is None
+
+
 def test_an_image_run_with_text_settings_on_one_model_is_refused() -> None:
     models = [
         {

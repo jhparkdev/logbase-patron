@@ -2,12 +2,12 @@ import type { components } from "../../../shared/api/schema";
 
 type Project = components["schemas"]["SubscriptionProject"];
 
-/** 귀속 프로젝트 선택 상자에서 "새 프로젝트 추가…"를 고른 값. 번호나 빈 문자열(미배분)과 겹치지 않는다. */
+/** 귀속 프로젝트 선택 상자에서 "새 프로젝트 추가…"를 고른 값. 번호나 빈 문자열(고르지 않음)과 겹치지 않는다. */
 export const NEW_PROJECT_VALUE = "new";
 
 const WHITESPACE = /\s+/g;
 
-/** 선택 상자 값(프로젝트 번호 문자열)을 번호로 바꾼다. 빈 문자열은 미배분이라 null이다. */
+/** 선택 상자 값(프로젝트 번호 문자열)을 번호로 바꾼다. 빈 문자열(옛 미배분 구독료의 수정)은 null이다. */
 export function projectIdOf(text: string): number | null {
   return text === "" ? null : Number(text);
 }

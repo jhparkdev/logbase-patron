@@ -36,13 +36,16 @@ export function useSaveSubscription(
       const projectId = created
         ? (await createProject(resolved.createName)).project_id
         : resolved.projectId;
-      if (target === "new") {
-        await createSubscription(subscriptionCreateBody(values, projectId));
-      } else {
+      if (target !== "new") {
         await updateSubscription(
           target.id,
           subscriptionUpdateBody(target.before, values, projectId),
         );
+      } else if (projectId === null) {
+        // 등록 폼은 subscriptionCreateSchema로 프로젝트를 반드시 받으므로 여기 오지 않는다. 타입을 좁히기 위한 것이다.
+        throw new Error("귀속 프로젝트를 골라 주세요.");
+      } else {
+        await createSubscription(subscriptionCreateBody(values, projectId));
       }
       return created;
     },

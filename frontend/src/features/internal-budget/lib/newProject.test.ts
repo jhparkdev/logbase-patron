@@ -17,7 +17,7 @@ test("sameProjectName은 띄어쓰기(없는 것 포함)와 대소문자를 무�
 });
 
 describe("resolveProject", () => {
-  test("고른 프로젝트 번호나 미배분은 그대로 돌려준다", () => {
+  test("고른 프로젝트 번호는 그대로 돌려주고, 비어 있으면 null이다", () => {
     expect(
       resolveProject({ project: "2", newProjectName: "" }, PROJECTS),
     ).toEqual({ projectId: 2 });

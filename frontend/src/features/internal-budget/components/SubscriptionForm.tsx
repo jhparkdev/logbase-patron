@@ -12,6 +12,7 @@ import {
   emptySubscription,
   type SubscriptionFormInput,
   type SubscriptionFormValues,
+  subscriptionCreateSchema,
   subscriptionFormSchema,
 } from "../lib/forms";
 import { SubscriptionFixedFields } from "./SubscriptionFixedFields";
@@ -45,7 +46,11 @@ type SubscriptionFormProps = SubscriptionFormCommonProps &
       }
   );
 
-/** 구독료 등록·수정 폼. 제출할 때만 검증한다. 상태는 수정에서만 바꾼다. */
+/**
+ * 구독료 등록·수정 폼. 제출할 때만 검증한다. 상태는 수정에서만 바꾼다.
+ * 등록은 귀속 프로젝트를 반드시 골라야 한다. 수정은 프로젝트를 비울 수 없고,
+ * 옛 미배분 구독료(프로젝트가 비어 있음)만 그대로 두고 다른 칸을 저장할 수 있다.
+ */
 export function SubscriptionForm({
   projects,
   submitting = false,
@@ -62,7 +67,9 @@ export function SubscriptionForm({
     formState: { errors },
   } = useForm<SubscriptionFormInput, unknown, SubscriptionFormValues>({
     defaultValues: editing ?? emptySubscription(defaultMonth),
-    resolver: zodResolver(subscriptionFormSchema),
+    resolver: zodResolver(
+      editing ? subscriptionFormSchema : subscriptionCreateSchema,
+    ),
     reValidateMode: "onSubmit",
   });
 
@@ -100,6 +107,7 @@ export function SubscriptionForm({
         register={register}
         errors={errors}
         projects={projects}
+        withPlaceholder={editing === undefined || editing.project === ""}
       />
       {editing && <SubscriptionStatusField field={register("status")} />}
       <FormField label="메모 (선택)">
