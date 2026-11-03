@@ -6,6 +6,7 @@ import { renderAt } from "../../test/renderAt";
 
 const TABLE = "등록된 AI 모델";
 const DIALOG = "연결 테스트";
+const RUN = "테스트 실행";
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function () {
@@ -23,9 +24,12 @@ async function openFromPanel() {
   const panel = within(
     await screen.findByRole("dialog", { name: "GPT-4o mini" }),
   );
-  fireEvent.click(panel.getByRole("button", { name: DIALOG }));
+  fireEvent.click(panel.getByRole("button", { name: RUN }));
   return within(screen.getByRole("dialog", { name: DIALOG }));
 }
+
+const panelOf = () =>
+  within(screen.getByRole("dialog", { name: "GPT-4o mini" }));
 
 function runTest(dialog: ReturnType<typeof within>, prompt?: string) {
   if (prompt !== undefined) {
@@ -39,7 +43,7 @@ function runTest(dialog: ReturnType<typeof within>, prompt?: string) {
 const posts = (requests: { url: URL; method: string; body: unknown }[]) =>
   requests.filter(({ method }) => method === "POST");
 
-test("패널의 연결 테스트 버튼은 Prompt 입력 칸과 비용 안내가 있는 창을 열고 아직 요청하지 않는다", async () => {
+test("패널의 테스트 실행 버튼은 Prompt 입력 칸과 비용 안내가 있는 창을 열고 아직 요청하지 않는다", async () => {
   const { requests } = stubModelsApi();
   const dialog = await openFromPanel();
 
@@ -48,23 +52,26 @@ test("패널의 연결 테스트 버튼은 Prompt 입력 칸과 비용 안내가
   expect(posts(requests)).toHaveLength(0);
 });
 
-test("실행하면 입력한 Prompt를 보내고 결과를 같은 창에 보여 준다", async () => {
+test("패널에서 실행해 성공하면 창이 닫히고 패널의 숫자 네 칸에 이번 결과가 채워진다", async () => {
   const { requests } = stubModelsApi();
   const dialog = await openFromPanel();
 
   runTest(dialog, "  안녕하세요  ");
 
-  expect(await dialog.findByText("성공")).toBeTruthy();
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: DIALOG })).toBeNull(),
+  );
   expect(posts(requests)).toHaveLength(1);
   expect(posts(requests)[0].url.pathname).toBe("/api/models/3/test");
   expect(posts(requests)[0].body).toEqual({ prompt: "안녕하세요" });
-  expect(dialog.getByText("2026-11-01 12:00:00")).toBeTruthy();
-  expect(dialog.getByText("1,234 ms")).toBeTruthy();
-  expect(dialog.getByText("12")).toBeTruthy();
-  expect(dialog.getByText("30")).toBeTruthy();
-  expect(dialog.getByText("0.0004")).toBeTruthy();
-  expect(dialog.getByText("OpenAI")).toBeTruthy();
-  expect(dialog.queryByRole("button", { name: "테스트 실행" })).toBeNull();
+  const panel = panelOf();
+  expect(panel.getByText("1.23")).toBeTruthy();
+  expect(panel.getByText("초")).toBeTruthy();
+  expect(panel.getByText("12")).toBeTruthy();
+  expect(panel.getByText("30")).toBeTruthy();
+  expect(panel.getByText("0.0004")).toBeTruthy();
+  expect(panel.queryByText("—")).toBeNull();
+  expect(panel.queryByText(/실행하면 이번 결과가 표시돼요/)).toBeNull();
 });
 
 test("Prompt를 비워도 실행할 수 있다", async () => {
@@ -73,11 +80,11 @@ test("Prompt를 비워도 실행할 수 있다", async () => {
 
   runTest(dialog);
 
-  await dialog.findByText("성공");
+  await waitFor(() => expect(posts(requests)).toHaveLength(1));
   expect(posts(requests)[0].body).toEqual({ prompt: "" });
 });
 
-test("실패한 테스트는 오류 문구를 보여 주고 비용은 0이 아니라 미확인이다", async () => {
+test("실패한 테스트는 창을 닫지 않고 오류 문구를 보여 주며, 패널 칸은 0이 아니라 미확인이다", async () => {
   stubModelsApi({
     test: {
       status: 200,
@@ -103,6 +110,10 @@ test("실패한 테스트는 오류 문구를 보여 주고 비용은 0이 아�
   expect(dialog.getByText("인증에 실패했어요.")).toBeTruthy();
   expect(dialog.getAllByText("미확인").length).toBeGreaterThan(0);
   expect(dialog.queryByText("0.0000")).toBeNull();
+  const panel = panelOf();
+  expect(panel.queryByText("—")).toBeNull();
+  expect(panel.getAllByText("미확인").length).toBeGreaterThanOrEqual(4);
+  expect(panel.queryByText("0.0000")).toBeNull();
 });
 
 test("Prompt 칸 아래에 지금 글자 수를 한도와 함께 보여 준다", async () => {

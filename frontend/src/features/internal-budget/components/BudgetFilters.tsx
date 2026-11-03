@@ -40,13 +40,11 @@ export function BudgetFilters({ values, onSubmit }: BudgetFiltersProps) {
     reValidateMode: "onSubmit",
   });
   const periodMessage = errors.from?.message ?? errors.to?.message;
-  const periodError =
-    periodMessage === undefined
-      ? undefined
-      : { id: periodErrorId, message: periodMessage };
-
   return (
-    <FilterCard onSubmit={handleSubmit(onSubmit)} error={periodError}>
+    <FilterCard
+      onSubmit={handleSubmit(onSubmit)}
+      errors={[{ id: periodErrorId, message: periodMessage }]}
+    >
       {SELECTS.map((select) => (
         <Controller
           key={select.name}
@@ -55,7 +53,7 @@ export function BudgetFilters({ values, onSubmit }: BudgetFiltersProps) {
           render={({ field }) => (
             <Select
               label={select.label}
-              showLabel
+              labelPosition="side"
               value={field.value}
               options={[
                 { value: "", label: select.all },
@@ -66,7 +64,7 @@ export function BudgetFilters({ values, onSubmit }: BudgetFiltersProps) {
               ]}
               onChange={field.onChange}
               disabled={options.data === undefined}
-              className="w-50"
+              className="w-44"
             />
           )}
         />
@@ -75,7 +73,7 @@ export function BudgetFilters({ values, onSubmit }: BudgetFiltersProps) {
         label="기간"
         fromInput={register("from")}
         toInput={register("to")}
-        errorId={periodError?.id}
+        errorId={periodMessage && periodErrorId}
       />
     </FilterCard>
   );

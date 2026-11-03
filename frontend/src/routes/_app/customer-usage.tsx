@@ -101,7 +101,10 @@ function CustomerUsagePage() {
           customerId={detail}
           budgetMonth={budgetMonth}
           onClose={() =>
-            navigate({ search: (prev) => ({ ...prev, detail: undefined }) })
+            navigate({
+              search: (prev) => ({ ...prev, detail: undefined }),
+              resetScroll: false,
+            })
           }
         />
       )}

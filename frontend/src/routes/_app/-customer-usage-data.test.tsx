@@ -129,6 +129,25 @@ test("머리글을 누르면 그 표의 정렬만 주소에 남기고 1페이지
   );
 });
 
+for (const [tableName, header, sortParam] of [
+  ["고객별 사용 현황", "사용률 (추정 포함)", "customersSort"],
+  ["상세 API 호출 내역", "비용 (USD)", "requestsSort"],
+] as const) {
+  test(`${tableName} 머리글을 눌러 정렬해도 화면을 맨 위로 올리지 않는다`, async () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const router = renderAt(OCTOBER);
+    const table = await tableNamed(tableName);
+    scrollTo.mockClear();
+
+    fireEvent.click(within(table).getByRole("button", { name: header }));
+    await waitFor(() =>
+      expect(routeMatch(router, ROUTE_ID)?.search).toHaveProperty(sortParam),
+    );
+
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+}
+
 test("전체보기는 페이지를 주소에 남기고 그 페이지를 요청한다", async () => {
   const { requests } = stubCustomerUsageApi();
   const router = renderAt(`${OCTOBER}&view=customers`);
@@ -227,8 +246,18 @@ test("고객명을 누르면 상세 패널에 서비스별 사용액을 보여 �
 
   const panel = await screen.findByRole("dialog", { name: "A기업" });
   expect(routeMatch(router, ROUTE_ID)?.search?.detail).toBe(1);
-  expect(within(panel).getByText("서비스별 사용액")).toBeTruthy();
-  expect(within(panel).getByRole("cell", { name: "AI PDP" })).toBeTruthy();
+  const services = within(panel).getByRole("list", { name: "서비스별 사용액" });
+  expect(within(services).getByText("AI PDP")).toBeTruthy();
+});
+
+test("예산을 넘은 고객은 남은 예산 대신 초과 금액과 실제 비중을 보여 준다", async () => {
+  renderAt(`${OCTOBER}&detail=1`);
+
+  const panel = await screen.findByRole("dialog", { name: "A기업" });
+  expect(within(panel).getByText("초과 금액")).toBeTruthy();
+  expect(within(panel).getByText("2.10 USD")).toBeTruthy();
+  expect(within(panel).getByText(/예산의 121%/)).toBeTruthy();
+  expect(within(panel).getByText(/미확인 2건 미반영/)).toBeTruthy();
 });
 
 test("이 고객 사용 내역 보기는 패널을 닫고 고객 조건을 적용한다", async () => {
@@ -290,4 +319,18 @@ test("서버가 예산을 거절하면 그 이유를 폼 위에 보여 준다", 
   expect(alert.textContent).toBe(
     "이미 적용 중이거나 예정된 예산과 기간이 겹쳐요.",
   );
+});
+
+test("고객명으로 패널을 열고 닫아도 화면을 맨 위로 올리지 않는다", async () => {
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  renderAt(OCTOBER);
+  const table = await tableNamed("고객별 사용 현황");
+  scrollTo.mockClear();
+
+  fireEvent.click(within(table).getByRole("link", { name: "A기업" }));
+  await screen.findByRole("dialog", { name: "A기업" });
+  fireEvent.click(screen.getAllByRole("button", { name: "닫기" })[0]);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+  expect(scrollTo).not.toHaveBeenCalled();
 });

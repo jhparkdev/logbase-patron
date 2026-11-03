@@ -22,6 +22,7 @@ export function useCustomerSort() {
           ...prev,
           ...customerSortParams(nextSort(sort, key)),
         }),
+        resetScroll: false,
       }),
   };
 }
@@ -39,6 +40,7 @@ export function useRequestSort() {
           ...prev,
           ...requestSortParams(nextSort(sort, key)),
         }),
+        resetScroll: false,
       }),
   };
 }
@@ -46,5 +48,6 @@ export function useRequestSort() {
 /** 전체보기의 페이지 이동. 페이지는 주소에 남긴다. */
 export function usePageChange() {
   const navigate = route.useNavigate();
-  return (page: number) => navigate({ search: (prev) => ({ ...prev, page }) });
+  return (page: number) =>
+    navigate({ search: (prev) => ({ ...prev, page }), resetScroll: false });
 }

@@ -86,7 +86,7 @@ export function ResultTable({
             >
               <th
                 scope="row"
-                className="max-w-56 break-words px-4 py-4 text-left font-semibold"
+                className="max-w-56 px-4 py-4 text-left font-semibold"
               >
                 {slot.name}
                 <span className="mt-1 block text-caption font-normal text-grey-600">
