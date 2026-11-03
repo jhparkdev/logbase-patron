@@ -199,6 +199,7 @@ test("확인 후 실행을 접수하고 주소에 실행 ID를 남겨 결과를 
       { model_id: 2, execution_provider: "DekaLLM", execution_config: {} },
     ],
     asset_ids: [],
+    output_type: "TEXT",
   });
   expect(await screen.findByText("모델 응답 원문")).toBeDefined();
 });

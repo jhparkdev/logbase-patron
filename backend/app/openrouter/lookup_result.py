@@ -24,6 +24,17 @@ class LookupResult[T]:
         return self.error_type is None
 
 
+class ReasoningInfo(BaseModel):
+    """모델의 추론 설정. OpenRouter /models의 reasoning 항목이다."""
+
+    model_config = ConfigDict(frozen=True)
+
+    # 추론이 필수인 모델. 이 모델에는 강도 none을 보내면 400이다
+    mandatory: bool = False
+    # 고를 수 있는 강도 이름. None이면 모든 강도, 빈 목록이면 강도를 고를 수 없는 모델이다
+    supported_efforts: list[str] | None
+
+
 class ModelInfo(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -37,6 +48,8 @@ class ModelInfo(BaseModel):
     supported_parameters: list[str]
     context_length: int | None = None
     expiration_date: date | None = None
+    # reasoning 항목이 없거나 모양이 틀리면 None이다(정보 없음)
+    reasoning: ReasoningInfo | None = None
 
 
 class EndpointInfo(BaseModel):
@@ -49,6 +62,8 @@ class EndpointInfo(BaseModel):
     status: int | None = None
     # 최근 1일 가동률(%)
     uptime_last_1d: Decimal | None = None
+    # 이 업체가 받는 설정 이름(OpenRouter의 supported_parameters). 읽지 못하면 빈 목록이다
+    supported_parameters: list[str] = Field(default_factory=list)
 
 
 class GenerationInfo(BaseModel):

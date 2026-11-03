@@ -4,15 +4,19 @@ from decimal import Decimal
 import pytest
 
 from app.models import ModelStatus
+from app.openrouter.lookup_result import ReasoningInfo
+from app.schemas.simulation import ReasoningEffort
 from app.services.model_registry import (
     AvailabilityStatus,
     PriceSnapshot,
     StatusChangeError,
+    build_metadata,
     check_status_change,
     judge_availability,
     price_changed,
     provider_from_model_id,
     snapshot_from_pricing,
+    stored_reasoning_efforts,
     supports_json_schema,
     supports_tools,
 )
@@ -274,3 +278,72 @@ def test_캐시_단가가_생기면_바뀐_것이다() -> None:
     )
 
     assert price_changed(old, new) is True
+
+
+# ---------------------------------------------------------------
+# 모델별 추론 강도 (등록할 때 저장한 정보)
+# ---------------------------------------------------------------
+EFFORT = ReasoningEffort
+
+
+def stored(efforts: list[str] | None, mandatory: bool = False) -> dict[str, object]:
+    return {"reasoning": {"mandatory": mandatory, "supported_efforts": efforts}}
+
+
+def test_추론_정보가_없으면_저장할_메타데이터도_없다() -> None:
+    assert build_metadata(None) is None
+
+
+def test_추론_정보를_메타데이터로_만든다() -> None:
+    reasoning = ReasoningInfo(mandatory=True, supported_efforts=["high", "low"])
+
+    assert build_metadata(reasoning) == stored(["high", "low"], mandatory=True)
+
+
+def test_모든_강도를_받는_모델은_강도_목록이_null로_저장된다() -> None:
+    reasoning = ReasoningInfo(mandatory=False, supported_efforts=None)
+
+    assert build_metadata(reasoning) == stored(None)
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        None,
+        {},
+        {"reasoning": "문자열"},
+        {"reasoning": {"mandatory": False}},
+        {"reasoning": {"supported_efforts": "high"}},
+    ],
+    ids=["저장 안 함", "빈 값", "모양이 다름", "강도 목록 없음", "강도가 문자열"],
+)
+def test_저장된_정보가_없거나_모양이_틀리면_None이다(
+    metadata: dict[str, object] | None,
+) -> None:
+    assert stored_reasoning_efforts(metadata) is None
+
+
+def test_저장된_강도를_고정된_순서로_돌려준다() -> None:
+    efforts = stored_reasoning_efforts(stored(["high", "minimal", "medium", "low"]))
+
+    assert efforts == (EFFORT.MINIMAL, EFFORT.LOW, EFFORT.MEDIUM, EFFORT.HIGH)
+
+
+def test_모르는_강도는_버린다() -> None:
+    assert stored_reasoning_efforts(stored(["high", "turbo"])) == (EFFORT.HIGH,)
+
+
+def test_강도_목록이_null이면_모든_강도를_받는다() -> None:
+    assert stored_reasoning_efforts(stored(None)) == tuple(EFFORT)
+
+
+def test_강도를_고를_수_없는_모델은_빈_튜플이다() -> None:
+    assert stored_reasoning_efforts(stored([])) == ()
+
+
+def test_추론이_필수인_모델에는_none을_허용하지_않는다() -> None:
+    listed = stored_reasoning_efforts(stored(["none", "low"], mandatory=True))
+    all_efforts = stored_reasoning_efforts(stored(None, mandatory=True))
+
+    assert listed == (EFFORT.LOW,)
+    assert all_efforts == tuple(effort for effort in EFFORT if effort != EFFORT.NONE)
