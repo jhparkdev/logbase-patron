@@ -2,7 +2,6 @@ import { queryOptions } from "@tanstack/react-query";
 import { api, unwrap } from "../../../shared/api/client";
 import type { components } from "../../../shared/api/schema";
 import { PAGE_SIZE } from "../../../shared/lib/pagination";
-import { NEW_MODEL_NAME_COUNT } from "../lib/newModels";
 import { type ModelsSearch, modelListQuery } from "../lib/search";
 
 /** 목록 한 줄. 백엔드 ModelRead 계약 그대로 */
@@ -30,7 +29,9 @@ const OPENROUTER_STALE_TIME_MS = 60_000;
 /** 새 모델은 자주 늘지 않아 화면을 오갈 때마다 다시 묻지 않음 */
 const NEW_MODELS_STALE_TIME_MS = 5 * 60_000;
 /** 이 일수 안에 OpenRouter에 올라온 모델을 새 모델로 봄 */
-const NEW_MODELS_DAYS = 30;
+export const NEW_MODELS_DAYS = 5;
+/** 개수(total)만 알면 되므로 모델은 서버가 허용하는 최소 1개만 받음 */
+const NEW_MODELS_LIMIT = 1;
 
 /** 목록 조회. 조회 조건별로 캐시 */
 export function modelListOptions(search: ModelsSearch) {
@@ -110,8 +111,18 @@ export async function changeModelStatus(
 }
 
 /** OpenRouter 모델 검색. 이미 등록된 모델은 registered로 표시되어 옴 */
-export function openRouterModelsQuery(search: { q?: string; page: number }) {
-  const query = { q: search.q, page: search.page, page_size: PAGE_SIZE };
+export function openRouterModelsQuery(search: {
+  q?: string;
+  page: number;
+  /** 있으면 이 일수 안에 올라온 미등록 모델만, 최근 순으로 받음 */
+  newDays?: number;
+}) {
+  const query = {
+    q: search.q,
+    new_days: search.newDays,
+    page: search.page,
+    page_size: PAGE_SIZE,
+  };
   return queryOptions({
     queryKey: [...OPENROUTER_MODELS_KEY, query],
     queryFn: async () =>
@@ -131,7 +142,7 @@ export const newOpenRouterModelsQuery = queryOptions({
     unwrap(
       await api.GET("/api/models/openrouter/new", {
         params: {
-          query: { days: NEW_MODELS_DAYS, limit: NEW_MODEL_NAME_COUNT },
+          query: { days: NEW_MODELS_DAYS, limit: NEW_MODELS_LIMIT },
         },
       }),
     ),

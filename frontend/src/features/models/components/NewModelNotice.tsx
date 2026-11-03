@@ -13,6 +13,7 @@ export function NewModelNotice({ onRegister }: NewModelNoticeProps) {
   if (!notice) return null;
   return (
     <Notice
+      tone="yellow"
       title={notice.title}
       description={notice.description}
       action={

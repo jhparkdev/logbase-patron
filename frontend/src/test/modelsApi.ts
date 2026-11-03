@@ -101,6 +101,7 @@ const OPENROUTER_BASE: Schemas["OpenRouterModelRead"] = {
   supports_json_schema: true,
   supports_tools: true,
   registered: false,
+  created_at: null,
 };
 
 export const OPENROUTER: Schemas["OpenRouterModelListResponse"] = {
@@ -142,24 +143,16 @@ const NEW_MODEL_BASE: Schemas["OpenRouterNewModelRead"] = {
   output_price_per_token: "0.000002",
 };
 
-/** 새 모델 5개 중 최근 3개만 담긴 응답 */
+/** 새 모델 5개 중 최근 1개만 담긴 응답 */
 export const NEW_MODELS: Schemas["OpenRouterNewModelsResponse"] = {
-  days: 30,
+  days: 5,
   total: 5,
-  items: [
-    NEW_MODEL_BASE,
-    { ...NEW_MODEL_BASE, openrouter_model_id: "acme/beta", name: "Acme: Beta" },
-    {
-      ...NEW_MODEL_BASE,
-      openrouter_model_id: "acme/gamma",
-      name: "Acme: Gamma",
-    },
-  ],
+  items: [NEW_MODEL_BASE],
 };
 
 /** 새 모델이 없는 응답. 알림이 보이지 않는 것이 기본 상태다 */
 export const NO_NEW_MODELS: Schemas["OpenRouterNewModelsResponse"] = {
-  days: 30,
+  days: 5,
   total: 0,
   items: [],
 };

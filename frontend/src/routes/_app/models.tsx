@@ -27,7 +27,8 @@ function ModelsPage() {
   const navigate = Route.useNavigate();
   // 재조회 중에는 이전 결과를 유지하고, 새 결과가 오면 교체
   const shown = useDeferredValue(search);
-  const [registering, setRegistering] = useState(false);
+  // 등록 패널: 닫힘, 전체 모델, 알림에서 열어 새 모델만
+  const [registering, setRegistering] = useState<"all" | "new">();
 
   return (
     <>
@@ -36,11 +37,11 @@ function ModelsPage() {
           title="AI 모델 관리"
           description="사용 가능한 AI 모델을 등록하고 관리할 수 있어요. 등록된 모델은 시뮬레이터에서 사용할 수 있으며, ACTIVE 상태의 모델만 고를 수 있어요."
         />
-        <Button icon={plusIcon} onClick={() => setRegistering(true)}>
+        <Button icon={plusIcon} onClick={() => setRegistering("all")}>
           신규 모델 등록
         </Button>
       </div>
-      <NewModelNotice onRegister={() => setRegistering(true)} />
+      <NewModelNotice onRegister={() => setRegistering("new")} />
       <ModelFilters
         search={search}
         // 조건이 바뀌면 1페이지로 복귀
@@ -52,7 +53,10 @@ function ModelsPage() {
       />
       <ModelTable search={shown} refreshing={shown !== search} />
       {registering && (
-        <ModelRegisterPanel onClose={() => setRegistering(false)} />
+        <ModelRegisterPanel
+          onlyNew={registering === "new"}
+          onClose={() => setRegistering(undefined)}
+        />
       )}
       {search.model !== undefined && (
         <ModelDetailPanel

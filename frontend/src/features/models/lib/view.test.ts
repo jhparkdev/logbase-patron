@@ -4,6 +4,7 @@ import {
   modalitiesLabel,
   modalityLabel,
   providerOptions,
+  releasedLabel,
   STATUS_OPTIONS,
   statusBadge,
   statusChangeErrorMessage,
@@ -166,4 +167,11 @@ test("성공한 테스트가 없다는 거절은 시간 조건 없이 다음에 
       "현재 상태에서는 선택한 상태로 바꿀 수 없습니다.",
     ),
   ).toBe("현재 상태에서는 선택한 상태로 바꿀 수 없습니다.");
+});
+
+test("OpenRouter에 올라온 날을 KST 날짜로 보여 주고, 모르면 보여 주지 않는다", () => {
+  expect(releasedLabel("2026-11-02T13:29:14Z")).toBe("2026-11-02 출시");
+  // UTC 15시 이후는 KST로 다음 날이다
+  expect(releasedLabel("2026-11-02T15:30:00Z")).toBe("2026-11-03 출시");
+  expect(releasedLabel(null)).toBeNull();
 });
