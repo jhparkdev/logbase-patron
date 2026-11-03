@@ -748,6 +748,8 @@ export interface components {
             /** Unknown Cost Count */
             unknown_cost_count: number;
             status: components["schemas"]["BudgetStatus"];
+            /** Warning Threshold Pct */
+            warning_threshold_pct: string;
         };
         /**
          * CancelDecision
@@ -909,6 +911,8 @@ export interface components {
             confirmed_cost_usd: string;
             /** Estimated Cost Usd */
             estimated_cost_usd: string;
+            /** Total Cost Usd */
+            total_cost_usd: string;
             /** Unknown Cost Count */
             unknown_cost_count: number;
             /** Budget Share Pct */
@@ -1618,6 +1622,8 @@ export interface components {
             /** Unknown Cost Count */
             unknown_cost_count: number;
             status: components["schemas"]["BudgetStatus"];
+            /** Warning Threshold Pct */
+            warning_threshold_pct: string;
         };
         /**
          * ProjectRowSort
