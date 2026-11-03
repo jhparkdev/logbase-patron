@@ -1,5 +1,7 @@
 """OpenRouter 모델 검색(P-03) 요청·응답 모델."""
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.models import DEFAULT_PAGE_SIZE, MAX_PAGE, MAX_PAGE_SIZE, SearchText
@@ -40,3 +42,43 @@ class OpenRouterModelListResponse(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+DEFAULT_NEW_DAYS = 30
+MAX_NEW_DAYS = 365
+DEFAULT_NEW_LIMIT = 5
+MAX_NEW_LIMIT = 50
+
+
+class OpenRouterNewModelsQuery(BaseModel):
+    """GET /api/models/openrouter/new의 조건. 정해지지 않은 조건 이름은 거절한다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # 이 일수 안에 OpenRouter에 올라온 모델만 새 모델로 본다
+    days: int = Field(default=DEFAULT_NEW_DAYS, ge=1, le=MAX_NEW_DAYS)
+    # 돌려줄 모델 수. 조건에 맞는 전체 개수는 total로 따로 알려 준다
+    limit: int = Field(default=DEFAULT_NEW_LIMIT, ge=1, le=MAX_NEW_LIMIT)
+
+
+class OpenRouterNewModelRead(BaseModel):
+    """아직 등록하지 않은 새 모델 한 건. 등록 여부는 항상 "아니오"라 담지 않는다."""
+
+    openrouter_model_id: str
+    name: str
+    provider: str | None
+    # OpenRouter에 올라온 시각
+    created_at: datetime
+    input_modalities: list[str]
+    output_modalities: list[str]
+    context_length: int | None
+    # 토큰 1개당 단가(USD). 모르면 null
+    input_price_per_token: PlainDecimal | None
+    output_price_per_token: PlainDecimal | None
+
+
+class OpenRouterNewModelsResponse(BaseModel):
+    days: int
+    # limit과 관계없이 조건에 맞는 전체 개수
+    total: int
+    items: list[OpenRouterNewModelRead]
