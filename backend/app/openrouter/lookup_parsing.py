@@ -144,6 +144,7 @@ def parse_endpoints(body: dict[str, Any]) -> list[EndpointInfo] | None:
             provider_name=name,
             status=get_int(item, "status"),
             uptime_last_1d=get_number(item, "uptime_last_1d"),
+            supported_parameters=_str_list(item.get("supported_parameters")),
         )
     return list(endpoints.values())
 

@@ -413,6 +413,51 @@ def test_업체가_하나도_없어도_정상_응답이면_빈_목록이다() ->
     assert endpoints == []
 
 
+def test_업체가_받는_설정_목록을_꺼낸다() -> None:
+    item = endpoint("Io Net", supported_parameters=["max_tokens", "temperature"])
+
+    endpoints = parse_endpoints({"data": {"endpoints": [item]}})
+
+    assert endpoints is not None
+    assert endpoints[0].supported_parameters == ["max_tokens", "temperature"]
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        {"provider_name": "DekaLLM"},
+        {"provider_name": "DekaLLM", "supported_parameters": None},
+        {"provider_name": "DekaLLM", "supported_parameters": "temperature"},
+        {"provider_name": "DekaLLM", "supported_parameters": 5},
+    ],
+    ids=["항목 없음", "null", "문자열", "숫자"],
+)
+def test_설정_목록이_없거나_모양이_다르면_빈_목록이다(item: dict[str, Any]) -> None:
+    endpoints = parse_endpoints({"data": {"endpoints": [item]}})
+
+    assert endpoints is not None
+    assert endpoints[0].supported_parameters == []
+
+
+def test_설정_목록의_문자열이_아닌_항목은_버린다() -> None:
+    item = endpoint("DekaLLM", supported_parameters=["max_tokens", 5, None])
+
+    endpoints = parse_endpoints({"data": {"endpoints": [item]}})
+
+    assert endpoints is not None
+    assert endpoints[0].supported_parameters == ["max_tokens"]
+
+
+def test_같은_이름의_업체는_처음_것의_설정_목록을_남긴다() -> None:
+    first = endpoint("DeepInfra", supported_parameters=["max_tokens"])
+    second = endpoint("DeepInfra", supported_parameters=["temperature"])
+
+    endpoints = parse_endpoints({"data": {"endpoints": [first, second]}})
+
+    assert endpoints is not None
+    assert [item.supported_parameters for item in endpoints] == [["max_tokens"]]
+
+
 @pytest.mark.parametrize(
     "body",
     [

@@ -62,6 +62,8 @@ class EndpointInfo(BaseModel):
     status: int | None = None
     # 최근 1일 가동률(%)
     uptime_last_1d: Decimal | None = None
+    # 이 업체가 받는 설정 이름(OpenRouter의 supported_parameters). 읽지 못하면 빈 목록이다
+    supported_parameters: list[str] = Field(default_factory=list)
 
 
 class GenerationInfo(BaseModel):
