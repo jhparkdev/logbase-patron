@@ -6,7 +6,8 @@ import {
   providerOptions,
   STATUS_OPTIONS,
   statusBadge,
-  statusChangeTargets,
+  statusNotices,
+  statusSegments,
   testCostView,
   testResultView,
   timeOrNone,
@@ -86,12 +87,6 @@ test("비용 금액이 없으면 상태가 확정이어도 미확인으로 본�
   });
 });
 
-test("상태 변경 버튼은 현재 상태를 뺀 사용 중·사용 중단이다", () => {
-  expect(statusChangeTargets("TESTING")).toEqual(["ACTIVE", "INACTIVE"]);
-  expect(statusChangeTargets("ACTIVE")).toEqual(["INACTIVE"]);
-  expect(statusChangeTargets("INACTIVE")).toEqual(["ACTIVE"]);
-});
-
 test("시각이 없으면 빈칸 대신 없음, 있으면 KST로 보여 준다", () => {
   expect(timeOrNone(null)).toBe("없음");
   expect(timeOrNone("2026-10-31T05:32:21Z")).toBe("2026-10-31 14:32:21");
@@ -104,4 +99,53 @@ test("입력 형식 → 출력 형식으로 한 줄에 보여 준다", () => {
   expect(modalitiesFlow(["text"], ["text", "image"])).toBe(
     "텍스트 → 텍스트·이미지",
   );
+});
+
+test("상태 칸은 세 상태 순서대로, 현재 상태가 선택되고 검증 중과 현재 상태는 누를 수 없다", () => {
+  expect(statusSegments("ACTIVE")).toEqual([
+    {
+      status: "TESTING",
+      label: "검증 중",
+      tone: "blue",
+      selected: false,
+      disabled: true,
+    },
+    {
+      status: "ACTIVE",
+      label: "사용 중",
+      tone: "green",
+      selected: true,
+      disabled: true,
+    },
+    {
+      status: "INACTIVE",
+      label: "사용 중단",
+      tone: "grey",
+      selected: false,
+      disabled: false,
+    },
+  ]);
+  expect(
+    statusSegments("TESTING").map((s) => [s.selected, s.disabled]),
+  ).toEqual([
+    [true, true],
+    [false, false],
+    [false, false],
+  ]);
+});
+
+test("상태 안내는 누를 수 있는 칸마다 그 칸을 누르면 무슨 일이 생기는지 적는다", () => {
+  expect(statusNotices("ACTIVE")).toEqual([
+    {
+      label: "사용 중단",
+      hint: "새 시뮬레이션에서 이 모델이 빠져요. 지난 사용 기록과 결과는 그대로 남아요.",
+    },
+  ]);
+  expect(statusNotices("INACTIVE")).toEqual([
+    { label: "사용 중", hint: "시뮬레이터에서 이 모델을 선택할 수 있게 돼요." },
+  ]);
+  expect(statusNotices("TESTING").map((n) => n.label)).toEqual([
+    "사용 중",
+    "사용 중단",
+  ]);
 });

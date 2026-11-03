@@ -106,14 +106,24 @@ export function testCostView({
 // TESTING으로 돌아가는 상태 변경은 없음. 가능 여부(24시간 안의 성공 테스트 등)는 서버가 판단
 export type ChangeableStatus = Exclude<ModelStatus, "TESTING">;
 
-const CHANGEABLE_STATUSES = [
-  "ACTIVE",
-  "INACTIVE",
-] as const satisfies readonly ChangeableStatus[];
+/** 상태 전환 칸 세 개. 검증 중으로는 돌아갈 수 없고 현재 상태는 다시 고를 수 없다 */
+export function statusSegments(current: ModelStatus) {
+  return MODEL_STATUSES.map((status) => ({
+    status,
+    ...STATUS_BADGES[status],
+    selected: status === current,
+    disabled: status === "TESTING" || status === current,
+  }));
+}
 
-/** 상태 변경 버튼으로 보여 줄 상태. 현재 상태는 뺌 */
-export function statusChangeTargets(current: ModelStatus): ChangeableStatus[] {
-  return CHANGEABLE_STATUSES.filter((status) => status !== current);
+/** 상태 칸 아래 안내. 누를 수 있는 칸마다 누르면 무슨 일이 생기는지 */
+export function statusNotices(current: ModelStatus) {
+  return statusSegments(current)
+    .filter((segment) => !segment.disabled && segment.status !== "TESTING")
+    .map((segment) => ({
+      label: segment.label,
+      hint: STATUS_CHANGES[segment.status as ChangeableStatus].hint,
+    }));
 }
 
 const STATUS_CHANGES = {
