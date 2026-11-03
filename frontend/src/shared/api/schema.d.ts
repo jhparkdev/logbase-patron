@@ -2282,8 +2282,7 @@ export interface components {
             amount_usd: number | string;
             /** Project Id */
             project_id?: number | null;
-            /** @default ACTIVE */
-            status: components["schemas"]["SubscriptionStatus"];
+            status?: components["schemas"]["SubscriptionStatus"];
             /** Note */
             note?: string | null;
         };

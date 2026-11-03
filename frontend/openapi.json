@@ -7962,8 +7962,7 @@
             "title": "Project Id"
           },
           "status": {
-            "$ref": "#/components/schemas/SubscriptionStatus",
-            "default": "ACTIVE"
+            "$ref": "#/components/schemas/SubscriptionStatus"
           },
           "note": {
             "anyOf": [
