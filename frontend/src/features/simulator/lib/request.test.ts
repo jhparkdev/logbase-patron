@@ -28,6 +28,7 @@ test("직접 작성 실행을 API 요청으로 바꾼다", () => {
       { model_id: 3, execution_provider: "DekaLLM", execution_config: {} },
     ],
     asset_ids: [],
+    output_type: "TEXT",
   });
 });
 

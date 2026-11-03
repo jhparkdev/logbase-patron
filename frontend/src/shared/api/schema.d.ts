@@ -216,6 +216,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/simulations/images/{asset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Simulation Image
+         * @description 올린 이미지 파일. 화면은 <img src> 로 이 주소를 쓴다.
+         */
+        get: operations["download_simulation_image_api_simulations_images__asset_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulations/output-images/{output_asset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Output Image
+         * @description 모델이 만든 이미지 파일. 화면은 <img src> 로 이 주소를 쓴다.
+         */
+        get: operations["download_output_image_api_simulations_output_images__output_asset_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models": {
         parameters: {
             query?: never;
@@ -476,7 +516,7 @@ export interface paths {
         post: operations["add_model_favorite_api_model_favorites_post"];
         /**
          * Remove Model Favorite
-         * @description 해제한다. 없는 항목도 204 다. 삭제와 목록은 로그인 사용자 본인 행에만 닿는다.
+         * @description 해제한다. 없는 항목도 204 다. 삭제와 목록은 그 계정의 행에만 닿는다.
          */
         delete: operations["remove_model_favorite_api_model_favorites_delete"];
         options?: never;
@@ -1006,10 +1046,11 @@ export interface components {
          * @description 이력 목록의 정렬 열(허용 목록). 값은 이력 화면의 URL 정렬 키와 같다.
          *
          *     요약 뷰의 어느 열로 정렬할지는 서비스(simulation_history.py)가 정한다. 총 비용(totalCost)은
-         *     요약 뷰에 합계 열이 생기면 여기와 서비스의 열 대응표에 한 줄씩 추가한다.
+         *     요약의 total_cost_usd 와 같은 값이다. 금액을 아는 호출이 없는 실행은 0 으로 보지 않고
+         *     다른 빈 값처럼 방향과 관계없이 맨 뒤에 둔다.
          * @enum {string}
          */
-        HistorySortColumn: "requestedAt" | "id" | "scenario" | "modelCount" | "status" | "costStatus";
+        HistorySortColumn: "requestedAt" | "id" | "scenario" | "modelCount" | "status" | "costStatus" | "totalCost";
         /**
          * ImageAssetRead
          * @description 올린 이미지 한 장. 비교 실행 요청에는 asset_id 만 보낸다.
@@ -1026,6 +1067,19 @@ export interface components {
             file_size_bytes: number;
             /** Original Filename */
             original_filename: string | null;
+        };
+        /**
+         * ImageConfig
+         * @description 이미지 생성 옵션. 모든 칸에 같은 값을 보낸다. 보내지 않은 항목은 모델 기본값을 쓴다.
+         */
+        ImageConfig: {
+            /** N */
+            n?: number | null;
+            /** Aspect Ratio */
+            aspect_ratio?: string | null;
+            /** Resolution */
+            resolution?: string | null;
+            quality?: components["schemas"]["ImageQuality"] | null;
         };
         /**
          * ImageLimits
@@ -1045,6 +1099,12 @@ export interface components {
          * @enum {string}
          */
         ImageMimeType: "image/jpeg" | "image/png" | "image/webp";
+        /**
+         * ImageQuality
+         * @description OpenRouter 이미지 생성의 quality 값.
+         * @enum {string}
+         */
+        ImageQuality: "auto" | "low" | "medium" | "high";
         /**
          * InputType
          * @enum {string}
@@ -1421,6 +1481,29 @@ export interface components {
             message: string;
         };
         /**
+         * OutputImageRead
+         * @description 칸 하나가 만든 결과 이미지 한 장. 파일은 GET /simulations/output-images/{output_asset_id} 로 받는다.
+         */
+        OutputImageRead: {
+            /**
+             * Output Asset Id
+             * Format: uuid
+             */
+            output_asset_id: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Mime Type */
+            mime_type: string;
+            /** File Size Bytes */
+            file_size_bytes: number;
+        };
+        /**
+         * OutputType
+         * @description 실행 한 건이 만드는 결과. 한 실행의 모든 칸이 같은 종류다.
+         * @enum {string}
+         */
+        OutputType: "TEXT" | "IMAGE";
+        /**
          * PriceRead
          * @description 토큰 1개당 단가(USD). 금액은 문자열로 내려간다.
          */
@@ -1785,6 +1868,9 @@ export interface components {
             models: components["schemas"]["ModelSelectionRequest"][];
             /** Asset Ids */
             asset_ids?: string[];
+            /** @default TEXT */
+            output_type: components["schemas"]["OutputType"];
+            image_config?: components["schemas"]["ImageConfig"] | null;
         };
         /**
          * SimulationDetailResponse
@@ -1802,7 +1888,7 @@ export interface components {
          * @description 시뮬레이터 API 의 오류 코드. 프론트엔드는 이 값으로 상황별로 분기한다.
          * @enum {string}
          */
-        SimulationErrorCode: "INVALID_REQUEST" | "DUPLICATE_MODEL_SELECTION" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "MODEL_IMAGE_NOT_SUPPORTED" | "MODEL_PARAMETER_NOT_SUPPORTED" | "IMAGE_REQUIRED" | "IMAGE_NOT_FOUND" | "IMAGE_EMPTY" | "IMAGE_TOO_LARGE" | "IMAGE_TYPE_NOT_SUPPORTED" | "PROVIDER_NOT_AVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
+        SimulationErrorCode: "INVALID_REQUEST" | "DUPLICATE_MODEL_SELECTION" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "MODEL_IMAGE_NOT_SUPPORTED" | "MODEL_IMAGE_OUTPUT_NOT_SUPPORTED" | "MODEL_PARAMETER_NOT_SUPPORTED" | "IMAGE_REQUIRED" | "IMAGE_NOT_FOUND" | "IMAGE_EMPTY" | "IMAGE_TOO_LARGE" | "IMAGE_TYPE_NOT_SUPPORTED" | "IMAGE_FILE_NOT_FOUND" | "PROVIDER_NOT_AVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
         /**
          * SimulationErrorResponse
          * @description 공통 오류 형식 {code, message} 에서 code 를 시뮬레이터 코드로 좁힌 응답.
@@ -1856,6 +1942,13 @@ export interface components {
             cost_check_status: components["schemas"]["CostCheckStatus"];
             /** Inactive Model Count */
             inactive_model_count: number;
+            /**
+             * Total Cost Usd
+             * @description 확정 + 추정. 금액을 아는 호출이 없으면 null 이다(0 이 아님).
+             *
+             *     미확인 호출은 들어 있지 않다. 일부만 더한 값인지는 unknown_cost_count·cost_check_status 로 안다.
+             */
+            readonly total_cost_usd: string | null;
         };
         /**
          * SimulationHistoryList
@@ -1918,6 +2011,9 @@ export interface components {
             response_text: string | null;
             /** Error Message */
             error_message: string | null;
+            output_type: components["schemas"]["OutputType"];
+            /** Output Images */
+            output_images: components["schemas"]["OutputImageRead"][];
         };
         /**
          * SimulationRequestErrorResponse
@@ -1937,7 +2033,7 @@ export interface components {
          *
          *     입력 필드는 비교 실행 요청(SimulationCreateRequest)과 같고, 화면이 안내에 쓰는
          *     rerunnable·blocked_reason 과 모델 칸의 현재 상태가 더해진다. 사용자가 고친 값은
-         *     그 둘을 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).
+         *     그 둘과 images 를 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).
          *     과거 이력은 지금 규칙으로 다시 거절하지 않는다. 새 실행 요청이 들어올 때 검증한다.
          */
         SimulationRerunDraft: {
@@ -1966,6 +2062,10 @@ export interface components {
             models: components["schemas"]["RerunModel"][];
             /** Asset Ids */
             asset_ids: string[];
+            /** Images */
+            images: components["schemas"]["ImageAssetRead"][];
+            output_type: components["schemas"]["OutputType"];
+            image_config: components["schemas"]["ImageConfig"] | null;
             /** Rerunnable */
             rerunnable: boolean;
             blocked_reason: components["schemas"]["RerunBlockReason"] | null;
@@ -1981,6 +2081,7 @@ export interface components {
          *
          *     confirmed_cost_usd·estimated_cost_usd 가 null 이면 그 상태의 호출이 하나도 없다는 뜻이다(0 이 아님).
          *     비용 미확인 호출은 금액 합계에 넣지 않고 unknown_cost_count 로 센다.
+         *     total_cost_usd 만은 뷰의 칸이 아니다. 뷰가 낸 두 합계를 더할 뿐 호출을 다시 합산하지 않는다.
          */
         SimulationSummary: {
             /**
@@ -2018,6 +2119,13 @@ export interface components {
             /** Unknown Cost Count */
             unknown_cost_count: number;
             cost_check_status: components["schemas"]["CostCheckStatus"];
+            /**
+             * Total Cost Usd
+             * @description 확정 + 추정. 금액을 아는 호출이 없으면 null 이다(0 이 아님).
+             *
+             *     미확인 호출은 들어 있지 않다. 일부만 더한 값인지는 unknown_cost_count·cost_check_status 로 안다.
+             */
+            readonly total_cost_usd: string | null;
         };
         /**
          * SortDirection
@@ -2747,6 +2855,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageLimits"];
+                };
+            };
+        };
+    };
+    download_simulation_image_api_simulations_images__asset_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 이미지 파일 내용 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
+                    "image/png": unknown;
+                    "image/webp": unknown;
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
+                };
+            };
+        };
+    };
+    download_output_image_api_simulations_output_images__output_asset_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                output_asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 이미지 파일 내용 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
+                    "image/png": unknown;
+                    "image/webp": unknown;
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
                 };
             };
         };
@@ -3493,9 +3685,7 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: {
-                patron_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -3508,15 +3698,6 @@ export interface operations {
                     "application/json": components["schemas"]["ModelFavoriteList"];
                 };
             };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
         };
     };
     add_model_favorite_api_model_favorites_post: {
@@ -3524,9 +3705,7 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: {
-                patron_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody: {
             content: {
@@ -3571,9 +3750,7 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: {
-                patron_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
