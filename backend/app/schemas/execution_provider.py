@@ -16,6 +16,8 @@ class ExecutionProviderRead(BaseModel):
     status: int | None
     # 최근 1일 가동률(%). 문자열로 내려간다.
     uptime_last_1d: PlainDecimal | None
+    # 이 업체가 받는 설정 이름(예: max_tokens, temperature, response_format). 읽지 못하면 빈 목록이다
+    supported_parameters: list[str]
 
 
 class ExecutionProviderListResponse(BaseModel):

@@ -168,8 +168,18 @@ const MODELS: Schemas["ModelListResponse"] = {
 
 export const EXECUTION_PROVIDERS: Schemas["ExecutionProviderListResponse"] = {
   items: [
-    { execution_provider: "DeepInfra", status: 0, uptime_last_1d: "99.5" },
-    { execution_provider: "DekaLLM", status: 0, uptime_last_1d: null },
+    {
+      execution_provider: "DeepInfra",
+      status: 0,
+      uptime_last_1d: "99.5",
+      supported_parameters: [],
+    },
+    {
+      execution_provider: "DekaLLM",
+      status: 0,
+      uptime_last_1d: null,
+      supported_parameters: [],
+    },
   ],
 };
 

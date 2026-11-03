@@ -4410,13 +4410,21 @@
               }
             ],
             "title": "Uptime Last 1D"
+          },
+          "supported_parameters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Parameters"
           }
         },
         "type": "object",
         "required": [
           "execution_provider",
           "status",
-          "uptime_last_1d"
+          "uptime_last_1d",
+          "supported_parameters"
         ],
         "title": "ExecutionProviderRead",
         "description": "모델 하나를 처리하는 서버 업체 한 곳. 모델 제공사(예: mistralai)와는 다르다.\n\nexecution_provider는 비교 실행 요청의 execution_provider에 그대로 쓴다."
