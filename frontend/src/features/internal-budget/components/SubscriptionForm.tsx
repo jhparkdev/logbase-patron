@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import {
   FIELD_INPUT_CLASS,
   FIELD_TEXTAREA_CLASS,
@@ -7,7 +7,6 @@ import {
   FormField,
   FormHint,
 } from "../../../shared/components/ui/PanelForm";
-import { Select } from "../../../shared/components/ui/Select";
 import type { SubscriptionProject } from "../api/budget";
 import {
   emptySubscription,
@@ -17,10 +16,8 @@ import {
 } from "../lib/forms";
 import { SubscriptionFixedFields } from "./SubscriptionFixedFields";
 import { SubscriptionNewFields } from "./SubscriptionNewFields";
+import { SubscriptionProjectField } from "./SubscriptionProjectField";
 import { SubscriptionStatusField } from "./SubscriptionStatusField";
-
-/** 귀속 프로젝트를 고르지 않은 구독료 */
-const UNASSIGNED_OPTION = { value: "", label: "미배분" };
 
 /** 등록·수정이 함께 받는 props. 패널이 저장 상태와 선택지를 채운다. */
 export type SubscriptionFormCommonProps = {
@@ -98,26 +95,11 @@ export function SubscriptionForm({
           />
         )}
       </FormField>
-      <Controller
+      <SubscriptionProjectField
         control={control}
-        name="project"
-        render={({ field }) => (
-          <Select
-            label="귀속 프로젝트"
-            labelPosition="top"
-            value={field.value}
-            options={[
-              UNASSIGNED_OPTION,
-              ...(projects ?? []).map((project) => ({
-                value: String(project.project_id),
-                label: project.name,
-              })),
-            ]}
-            onChange={field.onChange}
-            disabled={projects === undefined}
-            className="w-full"
-          />
-        )}
+        register={register}
+        errors={errors}
+        projects={projects}
       />
       {editing && <SubscriptionStatusField field={register("status")} />}
       <FormField label="메모 (선택)">

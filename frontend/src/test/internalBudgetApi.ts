@@ -174,6 +174,13 @@ export const SUBSCRIPTION_OPTIONS: Schemas["SubscriptionOptions"] = {
   ],
 };
 
+export const PROJECT_CREATED: Schemas["ProjectRead"] = {
+  project_id: 3,
+  project_code: "PRJ-3",
+  name: "신규 프로젝트",
+  project_type: "INTERNAL_DEV",
+};
+
 const SAVED_BUDGET: Schemas["ProjectBudgetRead"] = {
   budget_id: 9,
   project_id: 1,
@@ -199,12 +206,14 @@ const DEFAULT_REPLIES = {
   subscriptionUpdate: ok(SUBSCRIPTIONS.items[0]),
   detail: ok(PROJECT_DETAIL),
   budget: ok(SAVED_BUDGET),
+  projectCreate: { status: 201, body: PROJECT_CREATED },
 };
 
 /** 경로 끝부분별 응답을 바꾼다. 예: { summary: { status: 500, body: {} } } */
 type Replies = Partial<Record<keyof typeof DEFAULT_REPLIES, Reply>>;
 
 const SUBSCRIPTIONS_PATH = "/api/subscriptions";
+const PROJECTS_PATH = "/api/projects";
 const SUBSCRIPTION_PATH = /^\/api\/subscriptions\/\d+$/;
 const PROJECT_DETAIL_PATH = /^projects\/\d+$/;
 const PROJECT_BUDGET_PATH = /^projects\/\d+\/budget$/;
@@ -218,6 +227,9 @@ function blockOf(
   }
   if (pathname === `${SUBSCRIPTIONS_PATH}/options`) {
     return "subscriptionOptions";
+  }
+  if (pathname === PROJECTS_PATH) {
+    return "projectCreate";
   }
   if (SUBSCRIPTION_PATH.test(pathname)) {
     return method === "GET" ? "subscription" : "subscriptionUpdate";

@@ -22,7 +22,7 @@ type SavingFormProps = PanelFormProps & { target: SubscriptionSaveTarget } & (
 
 /** 저장 상태(진행 중, 서버 거절 문구)를 폼에 넘긴다. 성공하면 패널을 닫는다. */
 export function SavingForm({ target, onClose, ...formProps }: SavingFormProps) {
-  const save = useSaveSubscription(target, onClose);
+  const save = useSaveSubscription(target, formProps.projects ?? [], onClose);
   return (
     <SubscriptionForm
       {...formProps}

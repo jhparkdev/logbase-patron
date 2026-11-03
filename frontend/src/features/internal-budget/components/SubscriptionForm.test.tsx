@@ -74,9 +74,54 @@ test("등록 폼을 채우면 입력한 값으로 등록을 요청한다", async
       month: "2026-10",
       amount: "300",
       project: "2",
+      newProjectName: "",
       status: "ACTIVE",
       note: "",
     }),
+  );
+});
+
+test("귀속 프로젝트에서 새 프로젝트 추가를 고르면 이름 칸이 나오고, 비워 두면 알려 준다", async () => {
+  const onSubmit = vi.fn();
+  render(
+    <SubscriptionForm
+      defaultMonth="2026-10"
+      projects={PROJECTS}
+      onSubmit={onSubmit}
+      onClose={vi.fn()}
+    />,
+  );
+
+  expect(screen.queryByLabelText("새 프로젝트 이름")).toBeNull();
+  fireEvent.change(screen.getByLabelText("귀속 프로젝트"), {
+    target: { value: "new" },
+  });
+  fireEvent.change(screen.getByLabelText("구독 식별값"), {
+    target: { value: "claude-team" },
+  });
+  fireEvent.change(screen.getByLabelText("도구명"), {
+    target: { value: "Claude Team" },
+  });
+  fireEvent.change(screen.getByLabelText("금액 (USD)"), {
+    target: { value: "300" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "등록" }));
+  expect(
+    await screen.findByText("새 프로젝트 이름을 입력해 주세요."),
+  ).toBeTruthy();
+  expect(onSubmit).not.toHaveBeenCalled();
+
+  fireEvent.change(screen.getByLabelText("새 프로젝트 이름"), {
+    target: { value: "신규 프로젝트" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "등록" }));
+  await waitFor(() =>
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project: "new",
+        newProjectName: "신규 프로젝트",
+      }),
+    ),
   );
 });
 

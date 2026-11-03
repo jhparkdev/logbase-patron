@@ -2,6 +2,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import {
+  PROJECT_CREATED,
   SUBSCRIPTIONS,
   stubInternalBudgetApi,
 } from "../../test/internalBudgetApi";
@@ -76,6 +77,117 @@ test("등록 패널에서 채운 값을 보내고, 성공하면 패널을 닫고
       before.summary,
     );
   });
+});
+
+/** 등록 패널을 열고 새 프로젝트 이름까지 채운다. 등록 버튼은 누르지 않는다. */
+async function fillWithNewProject(name: string) {
+  const dialog = await screen.findByRole("dialog", { name: "구독료 등록" });
+  const project =
+    within(dialog).getByLabelText<HTMLSelectElement>("귀속 프로젝트");
+  await waitFor(() => expect(project.disabled).toBe(false));
+  fireEvent.change(within(dialog).getByLabelText("구독 식별값"), {
+    target: { value: "claude-team" },
+  });
+  fireEvent.change(within(dialog).getByLabelText("도구명"), {
+    target: { value: "Claude Team" },
+  });
+  fireEvent.change(within(dialog).getByLabelText("금액 (USD)"), {
+    target: { value: "300" },
+  });
+  fireEvent.change(project, { target: { value: "new" } });
+  fireEvent.change(within(dialog).getByLabelText("새 프로젝트 이름"), {
+    target: { value: name },
+  });
+  return dialog;
+}
+
+test("새 프로젝트 이름을 적어 등록하면 프로젝트를 먼저 만들고 그 번호로 구독료를 등록한 뒤 선택지를 다시 불러온다", async () => {
+  const { requests } = stubInternalBudgetApi();
+  renderAt(`${OCTOBER}&subscription=new`);
+  const dialog = await fillWithNewProject("신규 프로젝트");
+  const optionsBefore = countOf(requests, "/api/subscriptions/options");
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "등록" }));
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  const posts = requests.filter(({ method }) => method === "POST");
+  expect(posts.map(({ url }) => url.pathname)).toEqual([
+    "/api/projects",
+    "/api/subscriptions",
+  ]);
+  expect(posts[0].body).toMatchObject({ name: "신규 프로젝트" });
+  expect(posts[1].body).toMatchObject({
+    project_id: PROJECT_CREATED.project_id,
+  });
+  await waitFor(() => {
+    expect(countOf(requests, "/api/subscriptions/options")).toBeGreaterThan(
+      optionsBefore,
+    );
+    expect(countOf(requests, "/api/usage/internal/options")).toBeGreaterThan(1);
+  });
+});
+
+test("새 프로젝트 이름이 선택지에 있는 이름이면(띄어쓰기·대소문자 무시) 만들지 않고 그 프로젝트에 귀속한다", async () => {
+  const { requests } = stubInternalBudgetApi();
+  renderAt(`${OCTOBER}&subscription=new`);
+  const dialog = await fillWithNewProject("문서요약");
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "등록" }));
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  const posts = requests.filter(({ method }) => method === "POST");
+  expect(posts.map(({ url }) => url.pathname)).toEqual(["/api/subscriptions"]);
+  expect(posts[0].body).toMatchObject({ project_id: 2 });
+});
+
+test("프로젝트 등록이 중복(409)이면 서버가 알려 준 기존 프로젝트 번호로 구독료를 등록한다", async () => {
+  const { requests } = stubInternalBudgetApi({
+    projectCreate: {
+      status: 409,
+      body: {
+        code: "PROJECT_DUPLICATE",
+        message: "이미 있는 프로젝트입니다. 목록에서 선택해 주세요.",
+        existing: { ...PROJECT_CREATED, project_id: 7 },
+      },
+    },
+  });
+  renderAt(`${OCTOBER}&subscription=new`);
+  const dialog = await fillWithNewProject("신규 프로젝트");
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "등록" }));
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  const subscription = requests.find(
+    ({ method, url }) =>
+      method === "POST" && url.pathname === "/api/subscriptions",
+  );
+  expect(subscription?.body).toMatchObject({ project_id: 7 });
+});
+
+test("프로젝트 등록이 다른 이유로 실패하면 구독료를 등록하지 않고 서버 문구를 보여 준다", async () => {
+  const { requests } = stubInternalBudgetApi({
+    projectCreate: {
+      status: 422,
+      body: {
+        code: "VALIDATION_ERROR",
+        message: "프로젝트 이름이 너무 길어요.",
+      },
+    },
+  });
+  renderAt(`${OCTOBER}&subscription=new`);
+  const dialog = await fillWithNewProject("신규 프로젝트");
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "등록" }));
+
+  expect((await within(dialog).findByRole("alert")).textContent).toBe(
+    "프로젝트 이름이 너무 길어요.",
+  );
+  expect(
+    requests.some(
+      ({ method, url }) =>
+        method === "POST" && url.pathname === "/api/subscriptions",
+    ),
+  ).toBe(false);
 });
 
 test("서버가 중복이라고 거절하면 그 이유를 폼 위에 보여 주고 패널은 열어 둔다", async () => {
