@@ -20,10 +20,18 @@ export const subscriptionFormSchema = z.object({
     (value) => !value.startsWith("-"),
     "금액은 0 이상이어야 해요.",
   ),
-  /** 귀속 프로젝트 번호. 선택 상자 값이라 문자열이고, 빈 문자열은 미배분이다. */
+  /**
+   * 귀속 프로젝트 번호. 선택 상자 값이라 문자열이다. 빈 문자열은 아직 고르지 않은 상태로,
+   * 등록은 반드시 골라야 한다(subscriptionCreateSchema). 수정은 옛 미배분 구독료가 비어 있어서 허용한다.
+   */
   project: z.string(),
   status: z.enum(STATUSES),
   note: z.string().trim(),
+});
+
+/** 등록 폼의 검증. 귀속 프로젝트를 반드시 고르게 한다. */
+export const subscriptionCreateSchema = subscriptionFormSchema.extend({
+  project: z.string().min(1, "귀속 프로젝트를 골라 주세요."),
 });
 
 export type SubscriptionFormInput = z.input<typeof subscriptionFormSchema>;
@@ -47,8 +55,9 @@ function orNull(text: string): string | null {
   return text === "" ? null : text;
 }
 
-function projectIdOf(text: string): number | null {
-  return text === "" ? null : Number(text);
+/** 폼의 프로젝트 값을 서버로 보낼 번호로 바꾼다. 등록은 검증을 통과한 값이라 비어 있지 않다. */
+function projectIdOf(text: string): number {
+  return Number(text);
 }
 
 export function subscriptionCreateBody(
@@ -93,6 +102,7 @@ export function subscriptionFormValues(
     type: row.subscription_type ?? "",
     month: row.applied_month,
     amount: amountForInput(row.amount_usd),
+    // 프로젝트 없이 저장된 옛 구독료는 비어 있다
     project: row.project_id === null ? "" : String(row.project_id),
     status: row.status,
     note: row.note ?? "",

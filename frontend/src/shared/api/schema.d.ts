@@ -2339,7 +2339,7 @@ export interface components {
             /** Amount Usd */
             amount_usd: number | string;
             /** Project Id */
-            project_id?: number | null;
+            project_id: number;
             status?: components["schemas"]["SubscriptionStatus"];
             /** Note */
             note?: string | null;
@@ -2417,13 +2417,13 @@ export interface components {
         SubscriptionStatus: "ACTIVE" | "CANCELLED";
         /**
          * SubscriptionUpdate
-         * @description 보낸 항목만 바꾼다. project_id와 note는 null을 보내면 값이 지워진다.
+         * @description 보낸 항목만 바꾼다. note는 null을 보내면 값이 지워지고, 금액·프로젝트·상태는 비울 수 없다.
          */
         SubscriptionUpdate: {
             /** Amount Usd */
             amount_usd?: (number | string) | null;
             /** Project Id */
-            project_id?: number | null;
+            project_id?: number;
             status?: components["schemas"]["SubscriptionStatus"] | null;
             /** Note */
             note?: string | null;

@@ -573,6 +573,72 @@ async def test_a_scenario_default_is_left_out_of_a_slot_that_cannot_take_it() ->
     ]
 
 
+# --- 공통 설정 끔(execution_config: null) ---
+# 칸마다 직접 고른 값만 보내고, 고르지 않은 항목은 모델 기본값에 맡긴다.
+# max_tokens 만 call_model 이 반드시 받으므로 기본값을 넣는다
+
+
+async def test_with_common_settings_off_scenario_defaults_are_not_sent() -> None:
+    intake = Intake()
+
+    job = await create_simulation(
+        scenario_request(
+            execution_config=None, models=[tuned(1, temperature=0.2), selection(2)]
+        ),
+        executed_by=USER_ID,
+        deps=intake.deps,
+    )
+
+    assert [slot.execution_config for slot in job.slots] == [
+        {"max_tokens": DEFAULT_MAX_TOKENS, "temperature": 0.2},
+        {"max_tokens": DEFAULT_MAX_TOKENS},
+    ]
+    assert [r.execution_config for r in intake.recorder.created] == [
+        slot.execution_config for slot in job.slots
+    ]
+    [run] = intake.store.runs
+    assert run.execution_config == {"max_tokens": DEFAULT_MAX_TOKENS}
+
+
+async def test_with_common_settings_off_the_scenario_schema_is_still_used() -> None:
+    # 공통 설정은 실행 설정만 가리킨다. Schema 는 따로 정한다
+    intake = Intake()
+
+    job = await create_simulation(
+        scenario_request(execution_config=None), executed_by=USER_ID, deps=intake.deps
+    )
+
+    assert job.json_schema == {"type": "object", "required": ["name"]}
+
+
+async def test_with_common_settings_off_a_model_without_temperature_runs() -> None:
+    intake = Intake()
+    limit_support(intake, 1, NO_TEMPERATURE)
+
+    job = await create_simulation(
+        scenario_request(execution_config=None), executed_by=USER_ID, deps=intake.deps
+    )
+
+    assert [slot.execution_config for slot in job.slots] == [
+        {"max_tokens": DEFAULT_MAX_TOKENS},
+        {"max_tokens": DEFAULT_MAX_TOKENS},
+    ]
+
+
+async def test_with_common_settings_off_an_unsupported_slot_value_is_rejected() -> None:
+    intake = Intake()
+    limit_support(intake, 1, NO_TEMPERATURE)
+    request = scenario_request(
+        execution_config=None, models=[tuned(1, temperature=0.2), selection(2)]
+    )
+
+    with pytest.raises(ModelParameterUnsupportedError) as error:
+        await create_simulation(request, executed_by=USER_ID, deps=intake.deps)
+
+    assert error.value.model_ids == [1]
+    assert intake.nothing_was_saved()
+
+
 async def test_a_value_typed_into_a_slot_that_cannot_take_it_is_rejected() -> None:
     intake = Intake()
     limit_support(intake, 2, NO_REASONING)
