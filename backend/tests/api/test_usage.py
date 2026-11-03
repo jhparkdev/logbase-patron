@@ -9,6 +9,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.models import Budget
+from app.services.budget_policy import WARNING_PCT
 from tests.db_helpers import Factory
 
 BASE = "/api/usage/customers"
@@ -157,6 +158,30 @@ async def test_detail_returns_budget_and_services(
     assert body["budget"]["effective_from_month"] == "2026-10"
     assert body["budget"]["status"] == "NORMAL"
     assert Decimal(body["services"][0]["budget_share_pct"]) == Decimal(20)
+
+
+async def test_detail_sends_threshold_and_service_total_as_strings(
+    client: AsyncClient, factory: Factory
+) -> None:
+    customer = await factory.customer()
+    await customer_call(
+        factory,
+        customer_id=customer["customer_id"],
+        cost_status="CONFIRMED",
+        cost_usd=Decimal("1.25"),
+    )
+
+    response = await client.get(
+        f"{BASE}/{customer['customer_id']}", params={"month": "2026-10"}
+    )
+
+    body = response.json()
+    threshold = body["budget"]["warning_threshold_pct"]
+    total = body["services"][0]["total_cost_usd"]
+    assert isinstance(threshold, str)
+    assert Decimal(threshold) == WARNING_PCT
+    assert isinstance(total, str)
+    assert Decimal(total) == Decimal("1.25")
 
 
 async def test_detail_of_an_unknown_customer_is_404(client: AsyncClient) -> None:

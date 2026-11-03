@@ -29,6 +29,7 @@ class ProjectBudgetUsage(BaseModel):
     remaining_usd: PlainDecimal | None
     unknown_cost_count: int  # 사용액에 반영되지 않은 호출 수
     status: BudgetStatus
+    warning_threshold_pct: PlainDecimal  # 상태 판단에 쓰는 WARNING 기준 사용률
 
 
 class ProjectServiceUsage(BaseModel):

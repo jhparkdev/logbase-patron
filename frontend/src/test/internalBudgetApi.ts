@@ -161,6 +161,7 @@ export const PROJECT_DETAIL: Schemas["ProjectUsageDetail"] = {
     remaining_usd: "1579.500000000000",
     unknown_cost_count: 2,
     status: "NORMAL",
+    warning_threshold_pct: "80",
   },
   services: [],
   subscriptions: [],

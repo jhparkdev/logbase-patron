@@ -3583,6 +3583,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/BudgetStatus"
+          },
+          "warning_threshold_pct": {
+            "type": "string",
+            "title": "Warning Threshold Pct"
           }
         },
         "type": "object",
@@ -3595,7 +3599,8 @@
           "confirmed_usage_pct",
           "remaining_usd",
           "unknown_cost_count",
-          "status"
+          "status",
+          "warning_threshold_pct"
         ],
         "title": "BudgetUsage",
         "description": "그 달의 고객 예산 현황. 서비스·모델 필터와 관계없이 고객 전체 사용액으로 계산한다."
@@ -4079,6 +4084,10 @@
             "type": "string",
             "title": "Estimated Cost Usd"
           },
+          "total_cost_usd": {
+            "type": "string",
+            "title": "Total Cost Usd"
+          },
           "unknown_cost_count": {
             "type": "integer",
             "title": "Unknown Cost Count"
@@ -4103,6 +4112,7 @@
           "call_count",
           "confirmed_cost_usd",
           "estimated_cost_usd",
+          "total_cost_usd",
           "unknown_cost_count",
           "budget_share_pct"
         ],
@@ -6103,6 +6113,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/BudgetStatus"
+          },
+          "warning_threshold_pct": {
+            "type": "string",
+            "title": "Warning Threshold Pct"
           }
         },
         "type": "object",
@@ -6115,7 +6129,8 @@
           "confirmed_usage_pct",
           "remaining_usd",
           "unknown_cost_count",
-          "status"
+          "status",
+          "warning_threshold_pct"
         ],
         "title": "ProjectBudgetUsage",
         "description": "그 달의 프로젝트 예산 현황. 사용액에는 이 프로젝트에 귀속된 구독료가 들어간다."
