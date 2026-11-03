@@ -9,7 +9,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
-import { sessionOptions } from "../../features/assistant/api/assistant";
+import { currentUserQueryOptions } from "../../features/auth/api/auth";
 import { renderAt } from "../../test/renderAt";
 import {
   ACTIVE_MODEL,
@@ -402,16 +402,29 @@ test("conversation survives close and route navigation until explicitly cleared"
   expect(screen.queryByText("대화 유지 확인")).toBeNull();
 });
 
-test("unauthenticated users see login and never call the agent", async () => {
+test("the assistant reuses the global user without an extra session request or login form", async () => {
+  const requests = stub(async () => response({ message: "로그인 유지 확인" }));
+  renderAt("/simulator", { user });
+  await openChat();
+  expect(screen.queryByLabelText("이메일")).toBeNull();
+  expect(screen.queryByLabelText("비밀번호")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "채팅창 닫기" }));
+  await openChat();
+  expect(
+    requests.filter(
+      (request) => new URL(request.url).pathname === "/api/auth/me",
+    ),
+  ).toHaveLength(0);
+});
+
+test("unauthenticated users use the common login page and never call the agent", async () => {
   const requests = stub(async () => {
     throw new Error("must not call");
   }, false);
-  renderAt("/simulator");
-  fireEvent.click(
-    await screen.findByRole("button", { name: "AI 도우미 열기" }),
-  );
-  expect(await screen.findByLabelText("비밀번호")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "보내기" })).toBeNull();
+  const router = renderAt("/simulator", { user: null });
+  await screen.findByRole("heading", { level: 1, name: "로그인" });
+  expect(router.state.location.pathname).toBe("/login");
+  expect(screen.queryByRole("button", { name: "AI 도우미 열기" })).toBeNull();
   expect(
     requests.some((request) =>
       new URL(request.url).pathname.startsWith("/api/assistant/"),
@@ -419,124 +432,260 @@ test("unauthenticated users see login and never call the agent", async () => {
   ).toBe(false);
 });
 
-test.each([401, 503])(
-  "login inputs survive a window-focus session check returning %i",
+test.each([200, 503])(
+  "a global background session check returning %i preserves chat and draft input",
   async (status) => {
-    stub(async () => response({ message: "unused" }), false);
+    stub(async () => response({ message: "유지할 대화" }));
     const originalFetch = fetch;
     let finish: ((value: Response) => void) | undefined;
-    let sessionChecks = 0;
-    vi.stubGlobal("fetch", (request: Request) => {
-      if (new URL(request.url).pathname === "/api/auth/me") {
-        sessionChecks += 1;
-        if (sessionChecks > 1)
-          return new Promise<Response>((resolve) => {
+    vi.stubGlobal("fetch", (request: Request) =>
+      new URL(request.url).pathname === "/api/auth/me"
+        ? new Promise<Response>((resolve) => {
             finish = resolve;
-          });
-      }
-      return originalFetch(request);
-    });
-    renderAt("/simulator");
-    fireEvent.click(
-      await screen.findByRole("button", { name: "AI 도우미 열기" }),
+          })
+        : originalFetch(request),
     );
-    const email = (await screen.findByLabelText("이메일")) as HTMLInputElement;
-    const password = screen.getByLabelText("비밀번호") as HTMLInputElement;
-    fireEvent.change(email, { target: { value: "draft@example.test" } });
-    fireEvent.change(password, {
-      target: { value: "temporary-test-password" },
-    });
-
+    const router = renderAt("/simulator", { user });
+    await openChat();
+    await send();
+    await screen.findByText("유지할 대화");
+    const input = screen.getByLabelText(
+      "질문 또는 설정 요청",
+    ) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "입력 중인 질문" } });
     await act(async () => {
+      await router.options.context.queryClient.invalidateQueries({
+        queryKey: currentUserQueryOptions.queryKey,
+        refetchType: "none",
+      });
       focusManager.setFocused(false);
       focusManager.setFocused(true);
     });
     await waitFor(() => expect(finish).toBeDefined());
-    expect(screen.queryByLabelText("이메일")).toBe(email);
-    expect(screen.queryByLabelText("비밀번호")).toBe(password);
+    expect(screen.getByText("유지할 대화")).toBeTruthy();
+    expect(input.value).toBe("입력 중인 질문");
     await act(async () => {
-      finish?.(response({ code: "BAD_REQUEST", message: "확인 실패" }, status));
+      finish?.(
+        response(
+          status === 200 ? user : { code: "BAD_REQUEST", message: "확인 실패" },
+          status,
+        ),
+      );
     });
-    expect((await screen.findByLabelText("이메일")) as HTMLInputElement).toBe(
-      email,
-    );
-    expect(email.value).toBe("draft@example.test");
-    expect(password.value).toBe("temporary-test-password");
+    expect(screen.getByLabelText("질문 또는 설정 요청")).toBe(input);
+    expect(input.value).toBe("입력 중인 질문");
+    expect(router.state.location.pathname).toBe("/simulator");
   },
 );
 
-test("an earlier focus check cannot undo a successful login", async () => {
-  stub(async () => response({ message: "unused" }), false);
+test("global session expiry redirects to login and aborts a pending answer", async () => {
+  let finish: ((value: Response) => void) | undefined;
+  let signal: AbortSignal | undefined;
+  stub(async (request) => {
+    signal = request.signal;
+    return new Promise<Response>((resolve) => {
+      finish = resolve;
+    });
+  });
+  const router = renderAt("/simulator", { user });
+  await openChat();
+  await send();
+  await waitFor(() => expect(finish).toBeDefined());
+  await act(async () => {
+    router.options.context.queryClient.setQueryData(
+      currentUserQueryOptions.queryKey,
+      null,
+    );
+  });
+  await screen.findByRole("heading", { level: 1, name: "로그인" });
+  expect(router.state.location.search).toMatchObject({ reason: "expired" });
+  expect(signal?.aborted).toBe(true);
+  await act(async () => {
+    finish?.(
+      response({
+        message: "이전 세션의 응답",
+        patch: { prompt_text: "오래된 변경" },
+      }),
+    );
+  });
+  expect(screen.queryByText("이전 세션의 응답")).toBeNull();
+  expect(screen.queryByRole("button", { name: "AI 도우미 열기" })).toBeNull();
+});
+
+test.each(["status", "chat", "settings/validate"])(
+  "an assistant %s 401 expires the common session",
+  async (endpoint) => {
+    stub(async () =>
+      response({
+        message: "설정 초안",
+        patch: { execution_config: { max_tokens: 1024 } },
+      }),
+    );
+    const originalFetch = fetch;
+    vi.stubGlobal("fetch", (request: Request) =>
+      new URL(request.url).pathname === `/api/assistant/${endpoint}`
+        ? Promise.resolve(
+            response(
+              { code: "UNAUTHENTICATED", message: "로그인이 필요합니다." },
+              401,
+            ),
+          )
+        : originalFetch(request),
+    );
+    const router = renderAt(
+      endpoint === "settings/validate" ? "/models" : "/simulator",
+      { user },
+    );
+    if (endpoint === "status") {
+      fireEvent.click(
+        await screen.findByRole("button", { name: "AI 도우미 열기" }),
+      );
+    } else {
+      await openChat();
+      await send();
+      if (endpoint === "settings/validate") {
+        await screen.findByRole("link", { name: "시뮬레이터 열기" });
+        await act(async () => {
+          await router.navigate({
+            to: "/simulator",
+            search: { sort: "model", direction: "asc" },
+          });
+        });
+        fireEvent.click(
+          await screen.findByRole("button", { name: "설정 적용" }),
+        );
+      }
+    }
+    await screen.findByRole("heading", { level: 1, name: "로그인" });
+    expect(router.state.location.search).toMatchObject({ reason: "expired" });
+    expect(
+      router.options.context.queryClient.getQueryData(
+        currentUserQueryOptions.queryKey,
+      ),
+    ).toBeNull();
+    expect(screen.queryByText("설정 초안")).toBeNull();
+  },
+);
+
+test("an account change clears chat and aborts the previous user's pending settings", async () => {
+  let finish: ((value: Response) => void) | undefined;
+  let signal: AbortSignal | undefined;
+  stub(async (request) => {
+    signal = request.signal;
+    return new Promise<Response>((resolve) => {
+      finish = resolve;
+    });
+  });
+  const router = renderAt("/simulator", { user });
+  await openChat();
+  await send();
+  await waitFor(() => expect(finish).toBeDefined());
+  const nextUser = { ...user, user_id: 2, user_code: "U-2" };
+  await act(async () => {
+    router.options.context.queryClient.setQueryData(
+      currentUserQueryOptions.queryKey,
+      nextUser,
+    );
+  });
+  await screen.findByRole("button", { name: "AI 도우미 열기" });
+  expect(signal?.aborted).toBe(true);
+  await openChat();
+  await act(async () => {
+    finish?.(
+      response({
+        message: "이전 계정의 응답",
+        patch: { prompt_text: "오래된 변경" },
+      }),
+    );
+  });
+  expect(screen.queryByText("이전 계정의 응답")).toBeNull();
+  expect(screen.queryByText("토큰만 바꿔줘")).toBeNull();
+  expect((screen.getByLabelText("Prompt") as HTMLTextAreaElement).value).toBe(
+    "",
+  );
+  expect(
+    router.options.context.queryClient.getQueryData(
+      currentUserQueryOptions.queryKey,
+    ),
+  ).toEqual(nextUser);
+});
+
+test("a late status 401 from an old account cannot expire a new account", async () => {
+  stub(async () => response({ message: "사용하지 않음" }));
   const originalFetch = fetch;
   let finish: ((value: Response) => void) | undefined;
-  let sessionChecks = 0;
+  let statusCalls = 0;
   vi.stubGlobal("fetch", (request: Request) => {
-    const path = new URL(request.url).pathname;
-    if (path === "/api/auth/login") return Promise.resolve(response(user));
-    if (path === "/api/auth/me" && ++sessionChecks > 1)
+    if (
+      new URL(request.url).pathname === "/api/assistant/status" &&
+      ++statusCalls === 1
+    )
       return new Promise<Response>((resolve) => {
         finish = resolve;
       });
     return originalFetch(request);
   });
-  const router = renderAt("/simulator");
+  const router = renderAt("/simulator", { user });
   fireEvent.click(
     await screen.findByRole("button", { name: "AI 도우미 열기" }),
   );
-  fireEvent.change(await screen.findByLabelText("이메일"), {
-    target: { value: "draft@example.test" },
-  });
-  fireEvent.change(screen.getByLabelText("비밀번호"), {
-    target: { value: "temporary-test-password" },
-  });
-  await act(async () => {
-    focusManager.setFocused(false);
-    focusManager.setFocused(true);
-  });
   await waitFor(() => expect(finish).toBeDefined());
-  fireEvent.click(screen.getByRole("button", { name: "로그인" }));
-  await screen.findByRole("button", { name: "보내기" });
+  const nextUser = { ...user, user_id: 2, user_code: "U-2" };
+  await act(async () => {
+    router.options.context.queryClient.setQueryData(
+      currentUserQueryOptions.queryKey,
+      nextUser,
+    );
+  });
+  await openChat();
   await act(async () => {
     finish?.(
       response({ code: "UNAUTHENTICATED", message: "로그인 필요" }, 401),
     );
   });
+  expect(screen.getByLabelText("질문 또는 설정 요청")).toBeTruthy();
+  expect(router.state.location.pathname).toBe("/simulator");
   expect(
-    router.options.context.queryClient.getQueryData(sessionOptions.queryKey),
-  ).toEqual(user);
-  expect(screen.queryByLabelText("비밀번호")).toBeNull();
+    router.options.context.queryClient.getQueryData(
+      currentUserQueryOptions.queryKey,
+    ),
+  ).toEqual(nextUser);
 });
 
-test("focus revalidation still hides authenticated chat and clears expired sessions", async () => {
-  stub(async () => response({ message: "이전 세션의 대화" }));
+test("the same user can reopen chat after a status expiry and a fresh common login", async () => {
+  stub(async () => response({ message: "사용하지 않음" }));
   const originalFetch = fetch;
-  let finish: ((value: Response) => void) | undefined;
-  let sessionChecks = 0;
+  let expired = false;
   vi.stubGlobal("fetch", (request: Request) => {
-    if (new URL(request.url).pathname === "/api/auth/me" && ++sessionChecks > 1)
-      return new Promise<Response>((resolve) => {
-        finish = resolve;
-      });
+    const path = new URL(request.url).pathname;
+    if (path === "/api/auth/login") return Promise.resolve(response(user));
+    if (path === "/api/assistant/status" && expired)
+      return Promise.resolve(
+        response({ code: "UNAUTHENTICATED", message: "로그인 필요" }, 401),
+      );
     return originalFetch(request);
   });
-  renderAt("/simulator");
+  const router = renderAt("/simulator", { user });
   await openChat();
-  await send();
-  await screen.findByText("이전 세션의 대화");
-  await act(async () => {
-    focusManager.setFocused(false);
-    focusManager.setFocused(true);
+  fireEvent.click(screen.getByRole("button", { name: "채팅창 닫기" }));
+  expired = true;
+  fireEvent.click(screen.getByRole("button", { name: "AI 도우미 열기" }));
+  await screen.findByRole("heading", { level: 1, name: "로그인" });
+  expired = false;
+  fireEvent.change(screen.getByLabelText("이메일"), {
+    target: { value: "test@example.com" },
   });
-  await waitFor(() => expect(finish).toBeDefined());
-  await screen.findByText("로그인 상태를 확인하고 있어요.");
-  expect(screen.queryByText("이전 세션의 대화")).toBeNull();
-  await act(async () => {
-    finish?.(
-      response({ code: "UNAUTHENTICATED", message: "로그인 필요" }, 401),
-    );
+  fireEvent.change(screen.getByLabelText("비밀번호"), {
+    target: { value: "test-password" },
   });
-  await screen.findByLabelText("비밀번호");
-  expect(screen.queryByText("이전 세션의 대화")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "로그인하기" }));
+  await openChat();
+  expect(router.state.location.pathname).toBe("/simulator");
+  expect(
+    router.options.context.queryClient.getQueryData(
+      currentUserQueryOptions.queryKey,
+    ),
+  ).toEqual(user);
 });
 
 test("a patch prepared on another screen is revalidated against P04 before applying", async () => {

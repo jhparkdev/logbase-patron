@@ -1,25 +1,20 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../../shared/api/client";
 import {
   type SimulatorSnapshot,
   useAssistantBridge,
 } from "../../../shared/lib/assistant";
-import {
-  chatAssistant,
-  sessionOptions,
-  validateAssistantSettings,
-} from "../api/assistant";
+import { chatAssistant, validateAssistantSettings } from "../api/assistant";
 import { type ChatMessage, requestMessages } from "../lib/conversation";
 import { requestsRawValues } from "../lib/message-content";
 import type { AssistantPageContext } from "../lib/page-context";
 
 export function useAssistantChat(
-  userId: number | null | undefined,
+  onSessionExpired: () => void,
   pageContext?: AssistantPageContext,
 ) {
   const bridge = useAssistantBridge();
-  const queryClient = useQueryClient();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState("");
   const [undoId, setUndoId] = useState<string>();
@@ -48,26 +43,10 @@ export function useAssistantChat(
     gcTime: 0,
   });
   const { reset: resetValidation } = validation;
-  useEffect(() => {
-    if (userId === undefined) return;
-    // 계정 변경·세션 만료 후 늦게 온 응답도 이전 대화에 다시 붙이지 않는다.
-    controller.current?.abort();
-    controller.current = null;
-    setMessages([]);
-    setError("");
-    setUndoId(undefined);
-    resetMutation();
-    resetValidation();
-  }, [userId, resetMutation, resetValidation]);
   useEffect(() => () => controller.current?.abort(), []);
 
   const send = async (content: string) => {
-    if (
-      mutation.isPending ||
-      validation.isPending ||
-      !content.trim() ||
-      !userId
-    )
+    if (mutation.isPending || validation.isPending || !content.trim())
       return false;
     const target = bridge?.getSnapshot();
     let snapshot: SimulatorSnapshot | undefined;
@@ -114,6 +93,10 @@ export function useAssistantChat(
       return true;
     } catch (failure) {
       if (abort.signal.aborted) return false;
+      if (failure instanceof ApiError && failure.status === 401) {
+        onSessionExpired();
+        return false;
+      }
       setMessages((previous) =>
         previous.filter((message) => message.id !== id),
       );
@@ -122,16 +105,12 @@ export function useAssistantChat(
           ? failure.message
           : "응답을 받지 못했어요. 다시 시도해 주세요.",
       );
-      if (failure instanceof ApiError && failure.status === 401)
-        void queryClient.invalidateQueries({
-          queryKey: sessionOptions.queryKey,
-        });
       return false;
     }
   };
 
   const apply = async (id: string) => {
-    if (mutation.isPending || validation.isPending || !userId) return;
+    if (mutation.isPending || validation.isPending) return;
     const message = messages.find((item) => item.id === id);
     const target = bridge?.getSnapshot();
     if (!message?.patch || !target) {
@@ -154,14 +133,14 @@ export function useAssistantChat(
           : target.apply(patch, snapshot.revision);
     } catch (failure) {
       if (abort.signal.aborted) return;
+      if (failure instanceof ApiError && failure.status === 401) {
+        onSessionExpired();
+        return;
+      }
       notice =
         failure instanceof ApiError
           ? failure.message
           : "현재 입력값을 확인한 뒤 다시 요청해 주세요.";
-      if (failure instanceof ApiError && failure.status === 401)
-        void queryClient.invalidateQueries({
-          queryKey: sessionOptions.queryKey,
-        });
     }
     setMessages((previous) =>
       previous.map((item) =>

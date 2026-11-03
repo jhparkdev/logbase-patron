@@ -28,8 +28,25 @@ export const Route = createFileRoute("/_app")({
 });
 
 function AppLayout() {
+  const { queryClient } = Route.useRouteContext();
   const { logout, isPending, isIdle, errorMessage } = useLogout();
-  useSessionWatch({ paused: !isIdle });
+  const user = useSessionWatch({ paused: !isIdle });
+  const expireSession = async () => {
+    if (
+      !user ||
+      queryClient.getQueryData(currentUserQueryOptions.queryKey)?.user_id !==
+        user.user_id
+    )
+      return;
+    await queryClient.cancelQueries({
+      queryKey: currentUserQueryOptions.queryKey,
+    });
+    if (
+      queryClient.getQueryData(currentUserQueryOptions.queryKey)?.user_id ===
+      user.user_id
+    )
+      queryClient.setQueryData(currentUserQueryOptions.queryKey, null);
+  };
   const page = useRouterState({
     select: (state) => ({
       path: state.location.pathname,
@@ -58,12 +75,17 @@ function AppLayout() {
             <Outlet />
           </main>
         </div>
-        <AssistantWidget
-          pageContext={pageContext}
-          onLogout={() => logout()}
-          logoutPending={isPending}
-          logoutError={errorMessage}
-        />
+        {user && (
+          <AssistantWidget
+            key={user.user_id}
+            userId={user.user_id}
+            onSessionExpired={expireSession}
+            pageContext={pageContext}
+            onLogout={() => logout()}
+            logoutPending={isPending}
+            logoutError={errorMessage}
+          />
+        )}
       </div>
     </AssistantProvider>
   );

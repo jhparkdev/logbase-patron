@@ -9,15 +9,15 @@ import {
 } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../../shared/api/client";
 import { Button } from "../../../shared/components/ui/Button";
 import { useAssistantBridge } from "../../../shared/lib/assistant";
-import { assistantStatusOptions, sessionOptions } from "../api/assistant";
+import { assistantStatusOptions } from "../api/assistant";
 import { useAssistantChat } from "../hooks/useAssistantChat";
 import {
   type AssistantPageContext,
   pageContextLabel,
 } from "../lib/page-context";
-import { AssistantLogin } from "./AssistantLogin";
 import { AssistantMessages } from "./AssistantMessages";
 
 const schema = z.object({
@@ -31,11 +31,15 @@ const noopSubscribe = () => () => {};
 const emptySnapshot = () => null;
 
 export function AssistantWidget({
+  userId,
+  onSessionExpired,
   pageContext,
   onLogout,
   logoutPending,
   logoutError,
 }: {
+  userId: number;
+  onSessionExpired: () => void;
   pageContext?: AssistantPageContext;
   onLogout: () => void;
   logoutPending: boolean;
@@ -50,15 +54,20 @@ export function AssistantWidget({
     bridge?.subscribe ?? noopSubscribe,
     bridge?.getSnapshot ?? emptySnapshot,
   );
-  const session = useQuery({ ...sessionOptions, enabled: open });
   const status = useQuery({
-    ...assistantStatusOptions,
-    enabled: open && !!session.data,
+    ...assistantStatusOptions(userId),
+    enabled: open,
   });
-  const chat = useAssistantChat(
-    session.data?.user_id ?? (session.isPending ? undefined : null),
-    pageContext,
-  );
+  const chat = useAssistantChat(onSessionExpired, pageContext);
+  useEffect(() => {
+    if (
+      open &&
+      !status.isFetching &&
+      status.error instanceof ApiError &&
+      status.error.status === 401
+    )
+      onSessionExpired();
+  }, [open, status.error, status.isFetching, onSessionExpired]);
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: { message: "" },
@@ -106,26 +115,22 @@ export function AssistantWidget({
               AI 도우미
             </h2>
             <div className="flex items-center gap-1">
-              {session.data && (
-                <>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={chat.busy}
-                    onClick={chat.clear}
-                  >
-                    대화 지우기
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={chat.busy || logoutPending}
-                    onClick={onLogout}
-                  >
-                    로그아웃
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={chat.busy}
+                onClick={chat.clear}
+              >
+                대화 지우기
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={chat.busy || logoutPending}
+                onClick={onLogout}
+              >
+                로그아웃
+              </Button>
               <Button
                 variant="secondary"
                 size="sm"
@@ -136,135 +141,103 @@ export function AssistantWidget({
               </Button>
             </div>
           </header>
-          {session.isPending || (session.isFetching && !!session.data) ? (
-            <p role="status" className="p-5 text-body-sm">
-              로그인 상태를 확인하고 있어요.
+          <AssistantMessages
+            messages={chat.messages}
+            busy={chat.busy}
+            onApply={chat.apply}
+            onUndo={chat.undo}
+            undoId={chat.undoId}
+            inSimulator={!!target}
+          />
+          {status.isPending && (
+            <p role="status" className="px-5 text-caption text-grey-600">
+              AI 연결 설정을 확인하고 있어요.
             </p>
-          ) : session.isError && session.data !== null ? (
-            <div className="space-y-3 p-5">
-              <p role="alert" className="text-body-sm">
-                로그인 상태를 확인하지 못했어요.
-              </p>
+          )}
+          {status.isError && (
+            <div className="px-5 text-caption text-red-600">
+              <p role="alert">AI 상태를 확인하지 못했어요.</p>
               <Button
                 variant="secondary"
-                onClick={() => void session.refetch()}
+                size="sm"
+                onClick={() => {
+                  void status.refetch();
+                }}
               >
                 다시 확인
               </Button>
             </div>
-          ) : !session.data ? (
-            <>
-              <AssistantLogin />
-              {session.isError && (
-                <p role="alert" className="px-5 pb-5 text-body-sm text-red-600">
-                  로그인 상태를 다시 확인하지 못했어요. 로그인하거나 잠시 후
-                  다시 시도해 주세요.
-                </p>
-              )}
-            </>
-          ) : (
-            <>
-              <AssistantMessages
-                messages={chat.messages}
-                busy={chat.busy}
-                onApply={chat.apply}
-                onUndo={chat.undo}
-                undoId={chat.undoId}
-                inSimulator={!!target}
-              />
-              {status.isPending && (
-                <p role="status" className="px-5 text-caption text-grey-600">
-                  AI 연결 설정을 확인하고 있어요.
-                </p>
-              )}
-              {status.isError && (
-                <div className="px-5 text-caption text-red-600">
-                  <p role="alert">AI 상태를 확인하지 못했어요.</p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      void session.refetch();
-                      void status.refetch();
-                    }}
-                  >
-                    다시 확인
-                  </Button>
-                </div>
-              )}
-              {status.data && !status.data.enabled && (
-                <p role="status" className="px-5 text-body-sm text-grey-600">
-                  AI 도우미가 비활성화되어 있어요. 관리자에게 문의해 주세요.
-                </p>
-              )}
-              {(chat.error || logoutError) && (
-                <p role="alert" className="px-5 py-2 text-body-sm text-red-600">
-                  {chat.error || logoutError}
-                </p>
-              )}
-              <form
-                noValidate
-                onSubmit={form.handleSubmit(async ({ message }) => {
-                  if (await chat.send(message)) form.reset();
-                })}
-                className="shrink-0 space-y-2 border-t border-grey-100 p-4"
-              >
-                <label htmlFor={`${panelId}-message`} className="sr-only">
-                  질문 또는 설정 요청
-                </label>
-                {pageContext && (
-                  <p className="text-caption text-grey-600">
-                    조회 기준: {pageContextLabel(pageContext)}
-                  </p>
-                )}
-                <textarea
-                  id={`${panelId}-message`}
-                  {...form.register("message")}
-                  onKeyDown={(event) => {
-                    if (
-                      event.key !== "Enter" ||
-                      event.shiftKey ||
-                      event.nativeEvent.isComposing ||
-                      event.nativeEvent.keyCode === 229
-                    )
-                      return;
-                    event.preventDefault();
-                    if (event.repeat || chat.busy || !status.data?.enabled)
-                      return;
-                    event.currentTarget.form?.requestSubmit();
-                  }}
-                  rows={3}
-                  maxLength={1000}
-                  aria-describedby={`${panelId}-message-help`}
-                  placeholder="조회하거나 바꿀 설정을 입력해 주세요"
-                  disabled={chat.busy || !status.data?.enabled}
-                  className="w-full resize-none rounded-control border border-grey-200 bg-grey-50 p-3 text-body-sm focus:outline-brand disabled:opacity-50"
-                />
-                {form.formState.errors.message && (
-                  <p role="alert" className="text-caption text-red-600">
-                    {form.formState.errors.message.message}
-                  </p>
-                )}
-                <div className="flex items-center justify-between gap-3">
-                  <p
-                    id={`${panelId}-message-help`}
-                    className="text-caption text-grey-600"
-                  >
-                    Enter로 전송 · Shift+Enter로 줄바꿈
-                    <br />
-                    새로고침하면 대화가 지워져요.
-                  </p>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={chat.busy || !status.data?.enabled}
-                  >
-                    보내기
-                  </Button>
-                </div>
-              </form>
-            </>
           )}
+          {status.data && !status.data.enabled && (
+            <p role="status" className="px-5 text-body-sm text-grey-600">
+              AI 도우미가 비활성화되어 있어요. 관리자에게 문의해 주세요.
+            </p>
+          )}
+          {(chat.error || logoutError) && (
+            <p role="alert" className="px-5 py-2 text-body-sm text-red-600">
+              {chat.error || logoutError}
+            </p>
+          )}
+          <form
+            noValidate
+            onSubmit={form.handleSubmit(async ({ message }) => {
+              if (await chat.send(message)) form.reset();
+            })}
+            className="shrink-0 space-y-2 border-t border-grey-100 p-4"
+          >
+            <label htmlFor={`${panelId}-message`} className="sr-only">
+              질문 또는 설정 요청
+            </label>
+            {pageContext && (
+              <p className="text-caption text-grey-600">
+                조회 기준: {pageContextLabel(pageContext)}
+              </p>
+            )}
+            <textarea
+              id={`${panelId}-message`}
+              {...form.register("message")}
+              onKeyDown={(event) => {
+                if (
+                  event.key !== "Enter" ||
+                  event.shiftKey ||
+                  event.nativeEvent.isComposing ||
+                  event.nativeEvent.keyCode === 229
+                )
+                  return;
+                event.preventDefault();
+                if (event.repeat || chat.busy || !status.data?.enabled) return;
+                event.currentTarget.form?.requestSubmit();
+              }}
+              rows={3}
+              maxLength={1000}
+              aria-describedby={`${panelId}-message-help`}
+              placeholder="조회하거나 바꿀 설정을 입력해 주세요"
+              disabled={chat.busy || !status.data?.enabled}
+              className="w-full resize-none rounded-control border border-grey-200 bg-grey-50 p-3 text-body-sm focus:outline-brand disabled:opacity-50"
+            />
+            {form.formState.errors.message && (
+              <p role="alert" className="text-caption text-red-600">
+                {form.formState.errors.message.message}
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              <p
+                id={`${panelId}-message-help`}
+                className="text-caption text-grey-600"
+              >
+                Enter로 전송 · Shift+Enter로 줄바꿈
+                <br />
+                새로고침하면 대화가 지워져요.
+              </p>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={chat.busy || !status.data?.enabled}
+              >
+                보내기
+              </Button>
+            </div>
+          </form>
         </section>
       )}
     </>
