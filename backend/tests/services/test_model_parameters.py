@@ -31,6 +31,47 @@ def test_a_reasoning_model_accepts_every_effort_value() -> None:
     assert parameter_support(["reasoning"]).reasoning_efforts == ALL_EFFORTS
 
 
+def stored(efforts: list[str] | None, mandatory: bool = False) -> dict[str, object]:
+    return {"reasoning": {"mandatory": mandatory, "supported_efforts": efforts}}
+
+
+# 저장된 값을 읽는 세부 규칙은 stored_reasoning_efforts 의 테스트(test_model_registry)가 맡는다.
+# 여기서는 모델 응답(model_common)과 같은 방식으로 합치는지만 본다
+
+
+def test_a_reasoning_model_accepts_only_the_stored_efforts() -> None:
+    support = parameter_support(["reasoning"], stored(["high", "low"]))
+
+    assert support.reasoning_efforts == (ReasoningEffort.LOW, ReasoningEffort.HIGH)
+
+
+def test_a_reasoning_model_with_an_empty_stored_list_accepts_no_effort() -> None:
+    assert parameter_support(["reasoning"], stored([])).reasoning_efforts == ()
+
+
+def test_a_model_that_must_reason_does_not_accept_none() -> None:
+    support = parameter_support(["reasoning"], stored(["none", "low"], mandatory=True))
+
+    assert support.reasoning_efforts == (ReasoningEffort.LOW,)
+
+
+def test_stored_efforts_do_not_count_without_reasoning() -> None:
+    assert parameter_support(["temperature"], stored(["low"])).reasoning_efforts == ()
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [None, {"mock": True}, {"reasoning": {"mandatory": False}}, stored(None)],
+)
+def test_a_reasoning_model_without_a_stored_list_accepts_every_effort(
+    metadata: dict[str, object] | None,
+) -> None:
+    # 저장 전에 등록된 모델(seed 포함)은 지금처럼 모든 강도를 받는다
+    support = parameter_support(["reasoning"], metadata)
+
+    assert support.reasoning_efforts == ALL_EFFORTS
+
+
 def test_a_model_without_any_listed_parameter_supports_neither() -> None:
     assert parameter_support([]) == ParameterSupport(
         temperature=False, reasoning_efforts=()
