@@ -26,20 +26,34 @@ class ModelParameterUnsupportedError(ValueError):
         self.parameters = parameters
 
 
-def parameter_support(supported_parameters: Collection[str]) -> ParameterSupport:
-    """OpenRouter 가 알려 준 지원 파라미터에서 받을 수 있는 설정을 판단한다.
+def parameter_support(
+    supported_parameters: Collection[str],
+    openrouter_metadata: Mapping[str, Any] | None = None,
+) -> ParameterSupport:
+    """OpenRouter 가 알려 준 지원 파라미터와 모델 정보에서 받을 수 있는 설정을 판단한다.
 
-    강도별 지원 범위는 이 목록만으로 알 수 없어 reasoning 이 있으면 모든 값을 받는 것으로 본다.
-    강도별 판단이 생기면 이 함수만 바꾼다.
+    강도별 지원 범위는 모델 정보의 reasoning.supported_efforts 에서 읽는다.
+    그 목록이 없거나 아는 값이 하나도 없으면(목록 저장 전에 등록된 모델 등) 모든 값을 받는 것으로 본다.
     """
     return ParameterSupport(
         temperature=TEMPERATURE_PARAMETER in supported_parameters,
         reasoning_efforts=(
-            tuple(ReasoningEffort)
+            _listed_efforts(openrouter_metadata) or tuple(ReasoningEffort)
             if REASONING_PARAMETER in supported_parameters
             else ()
         ),
     )
+
+
+def _listed_efforts(
+    openrouter_metadata: Mapping[str, Any] | None,
+) -> tuple[ReasoningEffort, ...]:
+    # DB 의 JSONB 라 모양을 믿지 않는다. 모르는 강도 값은 보낼 수 없으므로 뺀다
+    reasoning = (openrouter_metadata or {}).get(REASONING_PARAMETER)
+    listed = reasoning.get("supported_efforts") if isinstance(reasoning, dict) else None
+    if not isinstance(listed, list):
+        return ()
+    return tuple(effort for effort in ReasoningEffort if effort.value in listed)
 
 
 def unsupported_parameters(

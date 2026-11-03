@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import InputType, ModelStatus
+from app.schemas.simulation import ReasoningEffort
 from app.services.simulation_lookup import (
     SIMULATOR_KEY_SECRET_REF,
     SIMULATOR_PROJECT_CODE,
@@ -216,6 +217,21 @@ async def test_a_model_carries_what_settings_it_can_take(
     support = found[row["model_id"]].parameter_support
     assert support.temperature is temperature
     assert bool(support.reasoning_efforts) is has_efforts
+
+
+async def test_a_model_takes_only_the_efforts_saved_with_it(
+    factory: Factory, lookup: DbSimulationLookup
+) -> None:
+    row = await factory.model(
+        status="ACTIVE",
+        supported_parameters=["reasoning"],
+        openrouter_metadata={"reasoning": {"supported_efforts": ["high", "low"]}},
+    )
+
+    found = await lookup.find_models([row["model_id"]])
+
+    support = found[row["model_id"]].parameter_support
+    assert support.reasoning_efforts == (ReasoningEffort.LOW, ReasoningEffort.HIGH)
 
 
 async def test_uploaded_images_are_read_with_their_path_and_hash(

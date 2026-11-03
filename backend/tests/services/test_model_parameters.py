@@ -30,6 +30,51 @@ def test_a_reasoning_model_accepts_every_effort_value() -> None:
     assert parameter_support(["reasoning"]).reasoning_efforts == ALL_EFFORTS
 
 
+def test_a_reasoning_model_accepts_only_the_efforts_openrouter_listed() -> None:
+    metadata = {"reasoning": {"supported_efforts": ["high", "low"]}}
+
+    support = parameter_support(["reasoning"], metadata)
+
+    # 순서는 OpenRouter 가 준 순서가 아니라 ReasoningEffort 의 순서를 따른다
+    assert support.reasoning_efforts == (ReasoningEffort.LOW, ReasoningEffort.HIGH)
+
+
+def test_efforts_we_do_not_know_are_left_out() -> None:
+    metadata = {"reasoning": {"supported_efforts": ["low", "turbo", 3]}}
+
+    support = parameter_support(["reasoning"], metadata)
+
+    assert support.reasoning_efforts == (ReasoningEffort.LOW,)
+
+
+def test_listed_efforts_do_not_count_without_reasoning() -> None:
+    metadata = {"reasoning": {"supported_efforts": ["low"]}}
+
+    assert parameter_support(["temperature"], metadata).reasoning_efforts == ()
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        None,
+        {},
+        {"reasoning": None},
+        {"reasoning": {}},
+        {"reasoning": {"supported_efforts": None}},
+        {"reasoning": {"supported_efforts": "low"}},
+        {"reasoning": {"supported_efforts": []}},
+        {"reasoning": {"supported_efforts": ["turbo"]}},
+    ],
+)
+def test_a_reasoning_model_without_a_usable_effort_list_accepts_every_value(
+    metadata: dict[str, object] | None,
+) -> None:
+    # 목록을 모르는 것과 "지원하지 않는다"는 다르다. 모르면 막지 않고 OpenRouter 에 맡긴다
+    support = parameter_support(["reasoning"], metadata)
+
+    assert support.reasoning_efforts == ALL_EFFORTS
+
+
 def test_a_model_without_any_listed_parameter_supports_neither() -> None:
     assert parameter_support([]) == ParameterSupport(
         temperature=False, reasoning_efforts=()
