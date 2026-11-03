@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
-from pydantic_settings.exceptions import SettingsError
 
 from app.config import Settings
 
@@ -221,5 +220,56 @@ def test_broken_command_code_api_keys_json_stops_startup(
     clean_env.setenv("DATABASE_URL", DEV_URL)
     clean_env.setenv("COMMAND_CODE_API_KEYS", "{not json")
 
-    with pytest.raises(SettingsError):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+@pytest.mark.parametrize(
+    "broken",
+    ['{"COMMAND_CODE_KEY_A": "cc-secret-mark"', '["cc-secret-mark"]'],
+)
+def test_startup_error_for_broken_command_code_api_keys_hides_the_value(
+    clean_env: pytest.MonkeyPatch, broken: str
+) -> None:
+    """깨진 값을 알리는 오류 문구에 Key로 보이는 글자가 섞여 나오지 않는다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", broken)
+
+    with pytest.raises(ValidationError) as error:
+        Settings(_env_file=None)
+
+    assert "cc-secret-mark" not in str(error.value)
+    assert "cc-secret-mark" not in repr(error.value)
+
+
+@pytest.mark.parametrize("empty", ["", "   "])
+def test_empty_command_code_api_keys_means_no_keys(
+    clean_env: pytest.MonkeyPatch, empty: str
+) -> None:
+    """.env.example를 그대로 복사해 값이 빈 채로 두어도 앱이 뜬다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", empty)
+
+    assert Settings(_env_file=None).command_code_api_keys == {}
+
+
+def test_empty_command_code_api_keys_line_in_env_file_means_no_keys(
+    clean_env: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        f"DATABASE_URL={DEV_URL}\nCOMMAND_CODE_API_KEYS=\n", encoding="utf-8"
+    )
+
+    assert Settings(_env_file=env_file).command_code_api_keys == {}
+
+
+@pytest.mark.parametrize("not_a_map", ["[]", '"text"', "1", "null"])
+def test_command_code_api_keys_must_be_a_json_object(
+    clean_env: pytest.MonkeyPatch, not_a_map: str
+) -> None:
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", not_a_map)
+
+    with pytest.raises(ValidationError):
         Settings(_env_file=None)
