@@ -5,12 +5,12 @@ import {
   formatUsd,
   isZeroAmount,
 } from "../../../shared/lib/format";
-import { serviceBudgetShare } from "../lib/panel";
+import { serviceBudgetShare, serviceTotal } from "../lib/panel";
 
 type Service = components["schemas"]["CustomerServiceUsage"];
 
 /**
- * 서비스별 사용액. 확정과 추정은 화면에서 더하지 않고 나눠 보여 준다.
+ * 서비스별 사용액. 합계는 서버가 더한 값이고, 확정·추정·미확인은 아래에 나눠 보여 준다.
  * 막대는 서비스별 예산이 아니라, 고객 예산에서 그 서비스가 차지하는 비중이다.
  */
 export function CustomerServiceList({ services }: { services: Service[] }) {
@@ -31,12 +31,18 @@ export function CustomerServiceList({ services }: { services: Service[] }) {
       <ul aria-labelledby={headingId} className="flex flex-col gap-4">
         {services.map((service) => {
           const share = serviceBudgetShare(service.budget_share_pct);
+          const total = serviceTotal(service);
           return (
             <li key={service.service_id} className="flex flex-col gap-1.5">
               <div className="flex items-baseline justify-between gap-3 text-body-sm">
                 <span className="font-medium">{service.service_name}</span>
-                <span className="text-grey-600 tabular-nums">
-                  {share.label}
+                <span className="inline-flex items-baseline gap-1.5 tabular-nums">
+                  {total.note && (
+                    <span className="text-caption text-grey-600">
+                      {total.note}
+                    </span>
+                  )}
+                  <span className="font-semibold">{total.label} USD</span>
                 </span>
               </div>
               {share.width !== undefined && (
@@ -52,7 +58,8 @@ export function CustomerServiceList({ services }: { services: Service[] }) {
                 </div>
               )}
               <p className="text-caption text-grey-600 tabular-nums">
-                확정 {formatUsd(service.confirmed_cost_usd, "summary")} · 추정{" "}
+                {share.label} · 확정{" "}
+                {formatUsd(service.confirmed_cost_usd, "summary")} · 추정{" "}
                 {isZeroAmount(service.estimated_cost_usd) ? "" : "≈ "}
                 {formatUsd(service.estimated_cost_usd, "summary")} · 미확인{" "}
                 {formatCount(service.unknown_cost_count)}건

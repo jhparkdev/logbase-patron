@@ -20,9 +20,12 @@ const TRACK_CLASS = {
 export function UsageBar({
   usage,
   size = "md",
+  warningAt,
 }: {
   usage: UsageView;
   size?: keyof typeof TRACK_CLASS;
+  /** 서버가 판정에 쓰는 주의 기준 사용률(%). 있으면 막대 위에 기준선을 둔다 */
+  warningAt?: number;
 }) {
   if (usage.status === "unset") {
     return <span className="text-grey-600">예산을 정하면 사용률이 보여요</span>;
@@ -43,13 +46,20 @@ export function UsageBar({
       />
       <div
         aria-hidden="true"
-        className={`flex-1 rounded-full ${TRACK_CLASS[size]}`}
+        className={`relative flex-1 rounded-full ${TRACK_CLASS[size]}`}
       >
         <div
           className={`h-full rounded-full ${FILL_CLASS[usage.status]}`}
           // 너비는 서버가 준 사용률에서 정해지므로 inline style로 둔다.
           style={{ width: `${fill}%` }}
         />
+        {warningAt !== undefined && (
+          <span
+            data-mark="warning"
+            className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-yellow-700"
+            style={{ left: `${Math.min(warningAt, FULL_PERCENT)}%` }}
+          />
+        )}
       </div>
       <span
         className={`w-11 text-right ${usage.status === "over" ? "font-semibold text-red-600" : ""}`}

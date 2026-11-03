@@ -9,7 +9,7 @@ import {
   isZeroAmount,
   unreflectedText,
 } from "../../../shared/lib/format";
-import { remainingBudget } from "../lib/panel";
+import { remainingBudget, warningMark } from "../lib/panel";
 
 type Detail = components["schemas"]["CustomerUsageDetail"];
 
@@ -31,6 +31,7 @@ export function CustomerUsageSummary({
   const { budget } = detail;
   const badge = budgetStatusBadge(budget.status);
   const remaining = remainingBudget(budget.remaining_usd);
+  const mark = warningMark(budget);
   const hasEstimate = !isZeroAmount(detail.estimated_cost_usd);
   const estimated = formatUsd(detail.estimated_cost_usd, "summary");
   const facts = [
@@ -53,7 +54,14 @@ export function CustomerUsageSummary({
           </div>
           <Badge tone={badge.tone}>{badge.label}</Badge>
         </div>
-        <UsageBar usage={usageView(budget)} size="lg" />
+        <div className="flex flex-col gap-1">
+          <UsageBar usage={usageView(budget)} size="lg" warningAt={mark} />
+          {mark !== undefined && (
+            <p className="text-caption text-grey-600 tabular-nums">
+              주의 기준 {mark}%
+            </p>
+          )}
+        </div>
         {budget.monthly_amount_usd !== null && remaining && (
           <dl className="grid grid-cols-[1fr_auto] gap-y-1 border-t border-grey-200 pt-3 text-body-sm tabular-nums">
             <dt className="text-grey-700">월 예산</dt>

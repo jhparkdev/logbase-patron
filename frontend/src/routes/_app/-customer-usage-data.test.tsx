@@ -256,7 +256,7 @@ test("예산을 넘은 고객은 남은 예산 대신 초과 금액과 실제 �
   const panel = await screen.findByRole("dialog", { name: "A기업" });
   expect(within(panel).getByText("초과 금액")).toBeTruthy();
   expect(within(panel).getByText("2.10 USD")).toBeTruthy();
-  expect(within(panel).getByText("예산의 121%")).toBeTruthy();
+  expect(within(panel).getByText(/예산의 121%/)).toBeTruthy();
   expect(within(panel).getByText(/미확인 2건 미반영/)).toBeTruthy();
 });
 

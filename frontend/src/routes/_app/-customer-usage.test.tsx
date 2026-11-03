@@ -41,6 +41,29 @@ test("상세 패널은 조회 종료일이 속한 달의 사용 요약과 월 �
   ).toBe("2026-10");
 });
 
+test("상세 패널은 서버가 준 주의 기준을 막대 기준선과 글자로 보여 준다", async () => {
+  renderAt("/customer-usage?from=2026-09-20&to=2026-10-15&detail=3");
+
+  const panel = await screen.findByRole("dialog", { name: "A기업" });
+  expect(within(panel).getByText("주의 기준 80%")).toBeTruthy();
+  expect(panel.querySelector("[data-mark='warning']")).toBeTruthy();
+});
+
+test("서비스별 사용액은 서버가 준 합계를 추정 포함 표시와 함께 보여 주고 화면에서 더하지 않는다", async () => {
+  renderAt("/customer-usage?from=2026-09-20&to=2026-10-15&detail=3");
+
+  const panel = await screen.findByRole("dialog", { name: "A기업" });
+  const list = within(
+    within(panel).getByRole("list", { name: "서비스별 사용액" }),
+  );
+  expect(list.getByText("AI PDP")).toBeTruthy();
+  expect(list.getByText("≈ 12.10 USD")).toBeTruthy();
+  expect(list.getByText("추정 포함")).toBeTruthy();
+  expect(
+    list.getByText(/예산의 121% · 확정 2.10 · 추정 ≈ 10.00 · 미확인 2건/),
+  ).toBeTruthy();
+});
+
 test("상세 패널을 닫으면 패널 값만 지우고 조회 조건과 전체보기는 그대로다", async () => {
   const router = renderAt(
     "/customer-usage?from=2026-10-01&to=2026-10-15&view=customers&detail=3",

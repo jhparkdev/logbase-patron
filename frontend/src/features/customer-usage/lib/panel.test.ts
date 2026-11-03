@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { remainingBudget, serviceBudgetShare } from "./panel";
+import {
+  remainingBudget,
+  serviceBudgetShare,
+  serviceTotal,
+  warningMark,
+} from "./panel";
 
 describe("remainingBudget", () => {
   test("예산이 없으면 남은 예산 줄을 보여 주지 않는다", () => {
@@ -40,5 +45,36 @@ describe("serviceBudgetShare", () => {
       label: "예산의 121%",
       width: 100,
     });
+  });
+});
+
+describe("warningMark", () => {
+  test("서버가 준 주의 기준 사용률을 정수로 돌려준다", () => {
+    expect(warningMark({ status: "NORMAL", warning_threshold_pct: "80" })).toBe(
+      80,
+    );
+    expect(
+      warningMark({ status: "OVER", warning_threshold_pct: "79.50" }),
+    ).toBe(80);
+  });
+
+  test("예산이 없으면 기준선을 두지 않는다", () => {
+    expect(
+      warningMark({ status: "UNSET", warning_threshold_pct: "80" }),
+    ).toBeUndefined();
+  });
+});
+
+describe("serviceTotal", () => {
+  test("추정이 섞였으면 ≈를 붙이고 추정 포함을 알린다", () => {
+    expect(
+      serviceTotal({ total_cost_usd: "12.10", estimated_cost_usd: "10.00" }),
+    ).toEqual({ label: "≈ 12.10", note: "추정 포함" });
+  });
+
+  test("확정만 있으면 금액 그대로다", () => {
+    expect(
+      serviceTotal({ total_cost_usd: "2.10", estimated_cost_usd: "0.00" }),
+    ).toEqual({ label: "2.10", note: undefined });
   });
 });
