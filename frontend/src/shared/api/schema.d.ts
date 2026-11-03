@@ -1027,6 +1027,8 @@ export interface components {
             status: number | null;
             /** Uptime Last 1D */
             uptime_last_1d: string | null;
+            /** Supported Parameters */
+            supported_parameters: string[];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
