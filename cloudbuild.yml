@@ -22,7 +22,7 @@ substitutions:
   _FRONTEND_SA: patron-frontend-run@patron-512508.iam.gserviceaccount.com
   _CLOUDSQL_INSTANCE: patron-512508:asia-northeast3:patron-db
   # Secret은 공식 문서 권장대로 버전 번호를 고정한다. 값을 바꾸면 새 버전을 만들고 여기 번호를 올린다.
-  _DB_SECRET: database-url-dev:1
+  _DB_SECRET: database-url-dev:2
   _OPENROUTER_SECRET: openrouter-key-dev:1
 
 steps:
