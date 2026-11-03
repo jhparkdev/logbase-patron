@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 from enum import StrEnum
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 from pydantic import (
     BaseModel,
@@ -97,10 +97,19 @@ class SubscriptionOptions(BaseModel):
     projects: list[SubscriptionProject]
 
 
+def _status_is_optional(schema: dict[str, Any]) -> None:
+    """OpenAPI에서 status의 default를 뺀다.
+
+    default가 있으면 생성된 프론트엔드 타입에서 필수 항목이 되어, 상태를 보내지 않는 등록 폼이
+    타입 검사에서 실패한다. 서버는 보내지 않으면 진행 중으로 저장하므로 선택 항목이 맞다.
+    """
+    schema["properties"]["status"].pop("default", None)
+
+
 class SubscriptionCreate(BaseModel):
     """구독료 등록. 같은 subscription_reference와 applied_month는 한 번만 등록할 수 있다."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_status_is_optional)
 
     subscription_reference: ShortText
     tool_name: ShortText
@@ -108,7 +117,7 @@ class SubscriptionCreate(BaseModel):
     applied_month: Month
     amount_usd: SubscriptionAmount
     project_id: ProjectId | None = None  # 없으면 미배분
-    # 이미 해지된 구독을 뒤늦게 기록할 때 쓴다. 보내지 않으면 진행 중이다
+    # 이미 해지된 구독을 뒤늦게 기록할 때 쓴다. 보내지 않으면 진행 중이고, null은 받지 않는다
     status: SubscriptionStatus = SubscriptionStatus.ACTIVE
     note: Note | None = None
 

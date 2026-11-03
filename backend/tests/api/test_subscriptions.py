@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from fastapi import status
+from fastapi import FastAPI, status
 from httpx import AsyncClient
 from sqlalchemy import select
 
@@ -437,6 +437,14 @@ async def test_상태를_진행_중으로_보내도_등록된다(
 
     assert response.status_code == status.HTTP_201_CREATED
     assert response.json()["status"] == "ACTIVE"
+
+
+async def test_OpenAPI에서_등록_본문의_상태는_필수가_아니다(app: FastAPI) -> None:
+    schema = app.openapi()["components"]["schemas"]["SubscriptionCreate"]
+
+    assert "status" not in schema.get("required", [])
+    # default가 있으면 생성된 프론트엔드 타입에서 필수 항목이 된다
+    assert "default" not in schema["properties"]["status"]
 
 
 @pytest.mark.parametrize(
