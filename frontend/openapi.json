@@ -1397,6 +1397,140 @@
         }
       }
     },
+    "/api/models/{model_id}/execution-providers/ranking": {
+      "get": {
+        "tags": [
+          "models",
+          "models"
+        ],
+        "summary": "Rank Execution Providers",
+        "description": "업체를 예상 총비용이 싼 순서로 알려 준다. 상태·가동률이 나쁜 업체와 단가를 모르는 업체는 따로 알린다.",
+        "operationId": "rank_execution_providers_api_models__model_id__execution_providers_ranking_get",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "input_tokens",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000000,
+              "minimum": 0,
+              "title": "Input Tokens"
+            }
+          },
+          {
+            "name": "output_tokens",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000000,
+              "minimum": 0,
+              "title": "Output Tokens"
+            }
+          },
+          {
+            "name": "cache_hit_ratio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.0,
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "default": "0",
+              "title": "Cache Hit Ratio"
+            }
+          },
+          {
+            "name": "min_uptime",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 100.0,
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "default": "90",
+              "title": "Min Uptime"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderRankingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ModelErrorResponse"
+                    }
+                  ],
+                  "title": "Response 404 Rank Execution Providers Api Models  Model Id  Execution Providers Ranking Get"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          }
+        }
+      }
+    },
     "/api/models/{model_id}": {
       "patch": {
         "tags": [
@@ -3698,6 +3832,14 @@
   },
   "components": {
     "schemas": {
+      "AutoProvider": {
+        "type": "string",
+        "enum": [
+          "AUTO_CHEAPEST"
+        ],
+        "title": "AutoProvider",
+        "description": "업체 이름 대신 쓰는 선택 값. 접수할 때 실제 업체 이름으로 바뀌며 저장되지는 않는다."
+      },
       "Body_upload_simulation_image_api_simulations_images_post": {
         "properties": {
           "file": {
@@ -4675,6 +4817,33 @@
           "UNKNOWN_ERROR"
         ],
         "title": "ErrorType"
+      },
+      "ExcludedProviderRead": {
+        "properties": {
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/ExcludedReason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_provider",
+          "reason"
+        ],
+        "title": "ExcludedProviderRead"
+      },
+      "ExcludedReason": {
+        "type": "string",
+        "enum": [
+          "STATUS_NOT_OK",
+          "LOW_UPTIME",
+          "PRICE_UNKNOWN"
+        ],
+        "title": "ExcludedReason",
+        "description": "순위에서 뺀 이유. 한 업체에 하나만 알리며, 이 순서로 먼저 맞는 이유를 쓴다."
       },
       "ExecutionConfig": {
         "properties": {
@@ -5812,8 +5981,15 @@
             "title": "Model Id"
           },
           "execution_provider": {
-            "type": "string",
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "$ref": "#/components/schemas/AutoProvider"
+              }
+            ],
             "title": "Execution Provider"
           },
           "execution_config": {
@@ -6893,6 +7069,30 @@
         ],
         "title": "ProviderListResponse"
       },
+      "ProviderRankingResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RankedProviderRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/ExcludedProviderRead"
+            },
+            "type": "array",
+            "title": "Excluded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "excluded"
+        ],
+        "title": "ProviderRankingResponse"
+      },
       "ProviderRead": {
         "properties": {
           "provider": {
@@ -6911,6 +7111,63 @@
         ],
         "title": "ProviderRead",
         "description": "화면의 제공사 선택 상자 한 줄. provider는 모델 목록의 provider 조건에 그대로 쓴다."
+      },
+      "RankedProviderRead": {
+        "properties": {
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider"
+          },
+          "expected_cost_usd": {
+            "type": "string",
+            "title": "Expected Cost Usd"
+          },
+          "input_price_per_token": {
+            "type": "string",
+            "title": "Input Price Per Token"
+          },
+          "output_price_per_token": {
+            "type": "string",
+            "title": "Output Price Per Token"
+          },
+          "cache_read_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Price Per Token"
+          },
+          "cache_write_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Price Per Token"
+          },
+          "supports_caching": {
+            "type": "boolean",
+            "title": "Supports Caching"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_provider",
+          "expected_cost_usd",
+          "input_price_per_token",
+          "output_price_per_token",
+          "cache_read_price_per_token",
+          "cache_write_price_per_token",
+          "supports_caching"
+        ],
+        "title": "RankedProviderRead"
       },
       "ReasoningEffort": {
         "type": "string",
@@ -7354,6 +7611,7 @@
           "IMAGE_TYPE_NOT_SUPPORTED",
           "IMAGE_FILE_NOT_FOUND",
           "PROVIDER_NOT_AVAILABLE",
+          "AUTO_PROVIDER_UNAVAILABLE",
           "PERIOD_INCOMPLETE",
           "PERIOD_START_AFTER_END",
           "PERIOD_TOO_LONG",
