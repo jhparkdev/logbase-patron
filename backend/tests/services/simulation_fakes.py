@@ -425,3 +425,27 @@ class FakeLookup:
 
     async def simulator_context(self) -> SimulatorContext:
         return self.context
+
+
+class FakeProviderParameters:
+    """모델별 서버 업체가 받는 설정. 정해 두지 않은 모델은 읽지 못한 것(None)으로 답하고, 물은 모델을 센다."""
+
+    def __init__(self) -> None:
+        self.by_model: dict[str, dict[str, list[str]]] = {}
+        self.asked: list[str] = []
+
+    async def provider_parameters(
+        self, openrouter_model_id: str
+    ) -> Mapping[str, Sequence[str]] | None:
+        self.asked.append(openrouter_model_id)
+        return self.by_model.get(openrouter_model_id)
+
+
+class FakeImageFiles:
+    """저장소의 이미지 파일. 기본은 모든 파일이 있고, missing 에 넣은 키만 없다."""
+
+    def __init__(self) -> None:
+        self.missing: set[str] = set()
+
+    async def exists(self, key: str) -> bool:
+        return key not in self.missing

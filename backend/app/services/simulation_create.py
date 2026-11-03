@@ -10,7 +10,9 @@ from app.models import TestType as RunType
 from app.schemas.simulation import ModelSelectionRequest, SimulationCreateRequest
 from app.schemas.simulation_output import OutputType
 from app.services.model_parameters import (
+    ParameterSupport,
     drop_unsupported,
+    narrow_to_provider,
     reject_unsupported_overrides,
 )
 from app.services.simulation_input import (
@@ -133,7 +135,11 @@ async def create_simulation(
         json_schema = resolve_json_schema(
             request.json_schema, scenario.default_json_schema if scenario else None
         )
-        slot_configs = _resolve_slot_configs(request.models, execution_config, models)
+        slot_configs = _resolve_slot_configs(
+            request.models,
+            execution_config,
+            await _slot_supports(request.models, models, deps),
+        )
     shared = _RunValues(
         simulation_id=deps.new_id(),
         context=context,
@@ -210,16 +216,43 @@ def _image_slot_configs(
     return configs
 
 
+async def _slot_supports(
+    chosen_models: Sequence[ModelSelectionRequest],
+    models: dict[int, ModelInfo],
+    deps: IntakeDeps,
+) -> list[ParameterSupport]:
+    """칸마다 받을 수 있는 설정. 모델이 받는 설정 중 그 칸의 서버 업체도 받는 것만 남긴다.
+
+    같은 모델을 업체만 바꿔 여러 칸에 고를 수 있으므로 업체 목록은 모델마다 한 번만 묻는다.
+    """
+    by_model = {
+        model_id: await deps.providers.provider_parameters(
+            models[model_id].openrouter_model_id
+        )
+        for model_id in dict.fromkeys(chosen.model_id for chosen in chosen_models)
+    }
+    supports: list[ParameterSupport] = []
+    for chosen in chosen_models:
+        providers = by_model[chosen.model_id]
+        supports.append(
+            narrow_to_provider(
+                models[chosen.model_id].parameter_support,
+                providers.get(chosen.execution_provider) if providers else None,
+            )
+        )
+    return supports
+
+
 def _resolve_slot_configs(
     chosen_models: Sequence[ModelSelectionRequest],
     run_config: dict[str, Any],
-    models: dict[int, ModelInfo],
+    supports: Sequence[ParameterSupport],
 ) -> list[dict[str, Any]]:
     """칸마다 적용할 설정을 정하고, 모델·Provider·설정이 모두 같은 칸이 있으면 거절한다.
 
-    칸에 직접 넣은 설정을 모델이 받지 못하면 거절하고, 실행 공통 설정(시나리오 기본값 포함)은
-    받지 못하는 칸에서만 뺀다. 요청한 설정과 실제 호출이 달라지는 것을 막기 위해서다.
-    중복은 이렇게 정한 적용 설정으로 판단한다(DB 제약과 같은 기준). 같은 모델은 받을 수 있는
+    칸에 직접 넣은 설정을 그 칸의 모델·업체가 받지 못하면 거절하고, 실행 공통 설정(시나리오
+    기본값 포함)은 받지 못하는 칸에서만 뺀다. 요청한 설정과 실제 호출이 달라지는 것을 막기 위해서다.
+    중복은 이렇게 정한 적용 설정으로 판단한다(DB 제약과 같은 기준). 같은 모델·업체는 받을 수 있는
     설정도 같으므로 공통 설정을 빼는 일이 중복 여부를 바꾸지는 않는다.
     저장 전에 판단해야 거절되었을 때 아무것도 남지 않는다.
     """
@@ -227,7 +260,6 @@ def _resolve_slot_configs(
         chosen.execution_config.model_dump(exclude_none=True)
         for chosen in chosen_models
     ]
-    supports = [models[chosen.model_id].parameter_support for chosen in chosen_models]
     reject_unsupported_overrides(
         [
             (chosen.model_id, support, override)
@@ -357,11 +389,20 @@ async def _check_rerun_source(
 async def _find_images(
     request: SimulationCreateRequest, deps: IntakeDeps
 ) -> tuple[ImageRef, ...]:
-    """요청한 순서대로 이미지를 돌려준다. 하나라도 올려 둔 적이 없으면 거절한다."""
+    """요청한 순서대로 이미지를 돌려준다. 하나라도 올려 둔 적이 없거나 파일이 사라졌으면 거절한다.
+
+    파일은 실행을 만들기 전에 확인한다. 만든 뒤에 못 읽으면 모든 칸이 실패로 남는데,
+    실패 이력은 지울 수 없어 이력과 성공률에 계속 섞인다.
+    """
     if not request.asset_ids:
         return ()
     found = await deps.lookup.find_images(request.asset_ids)
-    missing = [asset_id for asset_id in request.asset_ids if asset_id not in found]
+    missing = [
+        asset_id
+        for asset_id in request.asset_ids
+        if asset_id not in found
+        or not await deps.image_files.exists(found[asset_id].storage_path)
+    ]
     if missing:
         raise ImageNotFoundError(missing)
     return tuple(found[asset_id] for asset_id in request.asset_ids)

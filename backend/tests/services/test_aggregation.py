@@ -17,7 +17,7 @@ from app.schemas.usage import (
 )
 from app.services import aggregation
 from app.services.aggregation import UsageFilter, change_pct, previous_period
-from app.services.budget_policy import BudgetStatus
+from app.services.budget_policy import WARNING_PCT, BudgetStatus
 from app.services.simulation_period import DateRange
 from tests.db_helpers import Factory
 
@@ -919,6 +919,96 @@ async def test_detail_without_budget_has_no_share(
     assert detail is not None
     assert detail.services[0].budget_share_pct is None
     assert detail.budget.effective_from_month is None
+
+
+async def test_detail_service_total_adds_confirmed_and_estimated_but_not_unknown(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    customer = await factory.customer()
+    service = await factory.service()
+    same = {"customer_id": customer["customer_id"], "service_id": service["service_id"]}
+    await customer_call(factory, **same, **confirmed("2"))
+    await customer_call(factory, **same, **await estimated(factory, "3"))
+    await customer_call(factory, **same)
+
+    detail = await aggregation.customer_detail(
+        db_session, customer["customer_id"], OCTOBER_1ST
+    )
+
+    assert detail is not None
+    [usage] = detail.services
+    assert usage.total_cost_usd == Decimal(5)
+    assert usage.unknown_cost_count == 1
+
+
+async def test_detail_service_totals_add_up_to_the_budget_usage(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    customer = await factory.customer()
+    customer_id = customer["customer_id"]
+    for name, amount in (("가 서비스", "1.5"), ("나 서비스", "2.25")):
+        service = await factory.service(name=name)
+        await customer_call(
+            factory,
+            customer_id=customer_id,
+            service_id=service["service_id"],
+            **confirmed(amount),
+        )
+        await customer_call(
+            factory,
+            customer_id=customer_id,
+            service_id=service["service_id"],
+            **await estimated(factory, amount),
+        )
+
+    detail = await aggregation.customer_detail(db_session, customer_id, OCTOBER_1ST)
+
+    assert detail is not None
+    services_total = sum((s.total_cost_usd for s in detail.services), Decimal(0))
+    assert services_total == detail.budget.used_usd == Decimal("7.5")
+
+
+@pytest.mark.parametrize(
+    ("offset", "expected"),
+    [
+        (Decimal("-0.01"), BudgetStatus.NORMAL),
+        (Decimal(0), BudgetStatus.WARNING),
+        (Decimal("0.01"), BudgetStatus.WARNING),
+    ],
+    ids=["기준 바로 전", "기준과 같음", "기준 바로 후"],
+)
+async def test_detail_budget_sends_the_warning_threshold_its_status_uses(
+    db_session: AsyncSession, factory: Factory, offset: Decimal, expected: BudgetStatus
+) -> None:
+    customer = await factory.customer()
+    customer_id = customer["customer_id"]
+    # 예산을 100달러로 두면 사용액이 곧 사용률(%)이다
+    await factory.budget(
+        scope_type="CUSTOMER", customer_id=customer_id, monthly_amount_usd=Decimal(100)
+    )
+    await customer_call(
+        factory, customer_id=customer_id, **confirmed(str(WARNING_PCT + offset))
+    )
+
+    detail = await aggregation.customer_detail(db_session, customer_id, OCTOBER_1ST)
+
+    assert detail is not None
+    assert detail.budget.warning_threshold_pct == WARNING_PCT
+    assert detail.budget.status == expected
+
+
+async def test_detail_without_budget_still_sends_the_warning_threshold(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    customer = await factory.customer()
+
+    detail = await aggregation.customer_detail(
+        db_session, customer["customer_id"], OCTOBER_1ST
+    )
+
+    assert detail is not None
+    assert detail.budget.status == BudgetStatus.UNSET
+    assert detail.budget.warning_threshold_pct == WARNING_PCT
 
 
 async def test_detail_of_an_unknown_customer_is_none(db_session: AsyncSession) -> None:

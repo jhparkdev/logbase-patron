@@ -6,6 +6,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 
+from sqlalchemy import null
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +20,11 @@ from app.models import (
     PriceStatus,
 )
 from app.openrouter.lookup_result import ModelInfo
-from app.services.model_registry import provider_from_model_id, snapshot_from_pricing
+from app.services.model_registry import (
+    build_metadata,
+    provider_from_model_id,
+    snapshot_from_pricing,
+)
 
 ENTITY_TYPE = "models"
 CREATE_REASON = "모델 등록"
@@ -65,6 +70,8 @@ async def register_model(
             supported_parameters=info.supported_parameters,
             # 글자 수 한도는 0보다 커야 저장할 수 있다. 0 이하로 오면 모르는 것으로 둔다.
             context_length=_positive_or_none(info.context_length),
+            # 정보가 없으면 JSON null이 아니라 SQL NULL로 둔다
+            openrouter_metadata=build_metadata(info.reasoning) or null(),
             metadata_fetched_at=now,
             created_by=user_id,
         )

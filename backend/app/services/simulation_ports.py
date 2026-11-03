@@ -356,6 +356,22 @@ class ImageSource(Protocol):
     async def data_url(self, image: ImageRef) -> str: ...
 
 
+class ImageFiles(Protocol):
+    """저장소에 이미지 파일이 실제로 있는지 본다. 접수 때 읽기만 한다."""
+
+    async def exists(self, key: str) -> bool: ...
+
+
+class ProviderParameterLookup(Protocol):
+    """모델별 서버 업체가 받는 설정 이름. 접수 때 읽기만 한다."""
+
+    async def provider_parameters(
+        self, openrouter_model_id: str
+    ) -> Mapping[str, Sequence[str]] | None:
+        """업체 이름별 설정 이름 목록. 읽지 못하면 None 이다."""
+        ...
+
+
 @dataclass(frozen=True)
 class IntakeDeps:
     """요청 접수에 필요한 것. 현재 시각과 새 ID 는 주입한다."""
@@ -363,6 +379,8 @@ class IntakeDeps:
     lookup: SimulationLookup
     recorder: RequestRecorder
     store: SimulationStore
+    image_files: ImageFiles
+    providers: ProviderParameterLookup
     now: Callable[[], datetime]
     new_id: Callable[[], uuid.UUID]
 

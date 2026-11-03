@@ -3,11 +3,11 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ChangeLog, ModelPrice, ModelRegistry
-from app.openrouter.lookup_result import ModelInfo
+from app.openrouter.lookup_result import ModelInfo, ReasoningInfo
 from app.services.model_register import (
     ModelAlreadyRegisteredError,
     ModelNotInOpenRouterError,
@@ -90,6 +90,31 @@ async def test_TESTING_상태로_저장하고_OpenRouter의_정보를_채운다(
     assert model.context_length == 1000
     assert model.created_by == user_id
     assert model.metadata_fetched_at == NOW
+
+
+async def test_추론_정보를_알면_메타데이터로_저장한다(
+    db_session: AsyncSession, user_id: int
+) -> None:
+    reasoning = ReasoningInfo(mandatory=False, supported_efforts=["high", "low"])
+
+    model_id = await register(db_session, user_id, models=[info(reasoning=reasoning)])
+
+    model = await stored_model(db_session, model_id)
+    assert model.openrouter_metadata == {
+        "reasoning": {"mandatory": False, "supported_efforts": ["high", "low"]}
+    }
+
+
+async def test_추론_정보를_모르면_메타데이터는_SQL_NULL로_둔다(
+    db_session: AsyncSession, user_id: int
+) -> None:
+    model_id = await register(db_session, user_id)
+
+    is_null = await db_session.scalar(
+        text("SELECT openrouter_metadata IS NULL FROM models WHERE model_id = :id"),
+        {"id": model_id},
+    )
+    assert is_null is True
 
 
 async def test_단가를_알면_첫_가격_이력도_함께_저장한다(

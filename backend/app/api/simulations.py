@@ -6,6 +6,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Query, Request, Response, status
 
 from app.api.deps import DevUserDep, NowDep
+from app.api.model_deps import EndpointCatalogDep
 from app.api.simulation_deps import (
     CancelDepsDep,
     ImageStorageDep,
@@ -32,6 +33,7 @@ from app.schemas.simulation_history import (
     SimulationRerunDraft,
 )
 from app.schemas.simulation_result import SimulationDetailResponse
+from app.services.provider_parameters import CatalogProviderParameters
 from app.services.simulation_cancel_service import (
     CancelReport,
     SimulationNotFoundError,
@@ -83,6 +85,8 @@ async def create_simulation_run(
     session: SessionDep,
     now: NowDep,
     manager: SimulationManagerDep,
+    storage: ImageStorageDep,
+    endpoints: EndpointCatalogDep,
 ) -> SimulationAccepted:
     """비교 실행을 접수하고 바로 돌려준다. 모델 호출은 응답 뒤 백그라운드에서 진행한다."""
     job = await create_simulation(
@@ -92,6 +96,8 @@ async def create_simulation_run(
             lookup=DbSimulationLookup(session),
             recorder=SessionRequestRecorder(session),
             store=DbSimulationStore(session),
+            image_files=storage,
+            providers=CatalogProviderParameters(endpoints),
             now=lambda: now,
             new_id=uuid.uuid7,
         ),

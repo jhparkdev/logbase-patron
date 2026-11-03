@@ -3583,6 +3583,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/BudgetStatus"
+          },
+          "warning_threshold_pct": {
+            "type": "string",
+            "title": "Warning Threshold Pct"
           }
         },
         "type": "object",
@@ -3595,7 +3599,8 @@
           "confirmed_usage_pct",
           "remaining_usd",
           "unknown_cost_count",
-          "status"
+          "status",
+          "warning_threshold_pct"
         ],
         "title": "BudgetUsage",
         "description": "그 달의 고객 예산 현황. 서비스·모델 필터와 관계없이 고객 전체 사용액으로 계산한다."
@@ -4079,6 +4084,10 @@
             "type": "string",
             "title": "Estimated Cost Usd"
           },
+          "total_cost_usd": {
+            "type": "string",
+            "title": "Total Cost Usd"
+          },
           "unknown_cost_count": {
             "type": "integer",
             "title": "Unknown Cost Count"
@@ -4103,6 +4112,7 @@
           "call_count",
           "confirmed_cost_usd",
           "estimated_cost_usd",
+          "total_cost_usd",
           "unknown_cost_count",
           "budget_share_pct"
         ],
@@ -4410,13 +4420,21 @@
               }
             ],
             "title": "Uptime Last 1D"
+          },
+          "supported_parameters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Parameters"
           }
         },
         "type": "object",
         "required": [
           "execution_provider",
           "status",
-          "uptime_last_1d"
+          "uptime_last_1d",
+          "supported_parameters"
         ],
         "title": "ExecutionProviderRead",
         "description": "모델 하나를 처리하는 서버 업체 한 곳. 모델 제공사(예: mistralai)와는 다르다.\n\nexecution_provider는 비교 실행 요청의 execution_provider에 그대로 쓴다."
@@ -6095,6 +6113,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/BudgetStatus"
+          },
+          "warning_threshold_pct": {
+            "type": "string",
+            "title": "Warning Threshold Pct"
           }
         },
         "type": "object",
@@ -6107,7 +6129,8 @@
           "confirmed_usage_pct",
           "remaining_usd",
           "unknown_cost_count",
-          "status"
+          "status",
+          "warning_threshold_pct"
         ],
         "title": "ProjectBudgetUsage",
         "description": "그 달의 프로젝트 예산 현황. 사용액에는 이 프로젝트에 귀속된 구독료가 들어간다."
@@ -7289,6 +7312,13 @@
             "type": "array",
             "title": "Asset Ids"
           },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/ImageAssetRead"
+            },
+            "type": "array",
+            "title": "Images"
+          },
           "output_type": {
             "$ref": "#/components/schemas/OutputType"
           },
@@ -7329,13 +7359,14 @@
           "routing_policy",
           "models",
           "asset_ids",
+          "images",
           "output_type",
           "image_config",
           "rerunnable",
           "blocked_reason"
         ],
         "title": "SimulationRerunDraft",
-        "description": "재실행 초안(S-09) 응답. 과거 실행의 입력값을 그대로 돌려주어 화면 입력칸을 채운다.\n\n입력 필드는 비교 실행 요청(SimulationCreateRequest)과 같고, 화면이 안내에 쓰는\nrerunnable·blocked_reason 과 모델 칸의 현재 상태가 더해진다. 사용자가 고친 값은\n그 둘을 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).\n과거 이력은 지금 규칙으로 다시 거절하지 않는다. 새 실행 요청이 들어올 때 검증한다."
+        "description": "재실행 초안(S-09) 응답. 과거 실행의 입력값을 그대로 돌려주어 화면 입력칸을 채운다.\n\n입력 필드는 비교 실행 요청(SimulationCreateRequest)과 같고, 화면이 안내에 쓰는\nrerunnable·blocked_reason 과 모델 칸의 현재 상태가 더해진다. 사용자가 고친 값은\n그 둘과 images 를 뺀 채 새 실행 요청으로 보낸다(rerun_of_simulation_id 는 그대로 보낸다).\n과거 이력은 지금 규칙으로 다시 거절하지 않는다. 새 실행 요청이 들어올 때 검증한다."
       },
       "SimulationStatus": {
         "type": "string",

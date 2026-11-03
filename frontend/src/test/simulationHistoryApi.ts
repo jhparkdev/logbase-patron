@@ -23,6 +23,7 @@ export const HISTORY_ITEM: Schemas["SimulationHistoryItem"] = {
   failure_count: 1,
   confirmed_cost_usd: "0.125",
   estimated_cost_usd: null,
+  total_cost_usd: "0.125",
   unknown_cost_count: 1,
   cost_check_status: "미확인 포함",
   inactive_model_count: 1,
@@ -59,7 +60,9 @@ export const RUN_DETAIL: Schemas["SimulationDetailResponse"] = {
       schema_validation_status: "NOT_APPLICABLE",
       missing_required_fields: null,
       comparability_note: null,
+      output_type: "TEXT",
       response_text: "모델 응답 원문",
+      output_images: [],
       error_message: null,
     },
     {
@@ -83,7 +86,9 @@ export const RUN_DETAIL: Schemas["SimulationDetailResponse"] = {
       schema_validation_status: "NOT_EXECUTED",
       missing_required_fields: null,
       comparability_note: null,
+      output_type: "TEXT",
       response_text: null,
+      output_images: [],
       error_message: "응답 시간을 초과했습니다.",
     },
   ],
@@ -117,6 +122,9 @@ export const RERUN_DRAFT: Schemas["SimulationRerunDraft"] = {
     },
   ],
   asset_ids: [],
+  images: [],
+  output_type: "TEXT",
+  image_config: null,
   rerunnable: true,
   blocked_reason: null,
 };
@@ -160,8 +168,18 @@ const MODELS: Schemas["ModelListResponse"] = {
 
 export const EXECUTION_PROVIDERS: Schemas["ExecutionProviderListResponse"] = {
   items: [
-    { execution_provider: "DeepInfra", status: 0, uptime_last_1d: "99.5" },
-    { execution_provider: "DekaLLM", status: 0, uptime_last_1d: null },
+    {
+      execution_provider: "DeepInfra",
+      status: 0,
+      uptime_last_1d: "99.5",
+      supported_parameters: [],
+    },
+    {
+      execution_provider: "DekaLLM",
+      status: 0,
+      uptime_last_1d: null,
+      supported_parameters: [],
+    },
   ],
 };
 

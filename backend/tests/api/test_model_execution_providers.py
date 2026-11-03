@@ -36,7 +36,12 @@ async def test_모델의_서버_업체를_OpenRouter_모델_ID로_물어_돌려�
 ) -> None:
     model = await factory.model(openrouter_model_id="mistralai/mistral-nemo")
     endpoints.endpoints = [
-        EndpointInfo(provider_name="Io Net", status=0, uptime_last_1d=UPTIME),
+        EndpointInfo(
+            provider_name="Io Net",
+            status=0,
+            uptime_last_1d=UPTIME,
+            supported_parameters=["max_tokens", "temperature"],
+        ),
         EndpointInfo(provider_name="DekaLLM"),
     ]
 
@@ -49,8 +54,14 @@ async def test_모델의_서버_업체를_OpenRouter_모델_ID로_물어_돌려�
                 "execution_provider": "Io Net",
                 "status": 0,
                 "uptime_last_1d": "99.51388888888889",
+                "supported_parameters": ["max_tokens", "temperature"],
             },
-            {"execution_provider": "DekaLLM", "status": None, "uptime_last_1d": None},
+            {
+                "execution_provider": "DekaLLM",
+                "status": None,
+                "uptime_last_1d": None,
+                "supported_parameters": [],
+            },
         ]
     }
     assert endpoints.asked == ["mistralai/mistral-nemo"]
