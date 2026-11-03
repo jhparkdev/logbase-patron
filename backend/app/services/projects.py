@@ -1,7 +1,7 @@
 """프로젝트(P-02) 등록. 삭제는 없다: 쓰지 않는 프로젝트는 is_active를 끈다.
 
-이름이 같은 사용 중 프로젝트는 만들지 않는다. 사용자는 이름만 적으므로 띄어쓰기와 대소문자만
-다른 같은 프로젝트가 두 번 생기지 않게 한다. DB에는 이름의 유일 제약이 없어서, 같은 순간에 같은
+이름이 같은 사용 중 프로젝트는 만들지 않는다. 사용자는 이름만 적으므로 띄어쓰기(없는 것 포함)와
+대소문자만 다른 같은 프로젝트가 두 번 생기지 않게 한다. DB에는 이름의 유일 제약이 없어서, 같은 순간에 같은
 이름이 두 번 들어오면 둘 다 만들어질 수 있다(PoC에서는 받아들인다).
 """
 
@@ -20,7 +20,7 @@ ENTITY_TYPE = "projects"
 CREATE_REASON = "프로젝트 등록"
 CODE_PREFIX = "PRJ-"
 CODE_NUMBER_DIGITS = 6
-# 이름은 앞뒤 공백을 없애고 가운데 공백은 하나로 모은 뒤 소문자로 비교한다
+# 이름은 공백을 모두 없애고 소문자로 만들어 비교한다
 WHITESPACE_RUN = r"\s+"
 LOGGED_COLUMNS = ("project_code", "name", "project_type")
 
@@ -34,7 +34,7 @@ class ProjectDuplicateError(ValueError):
 
 
 def normalize_name(name: str) -> str:
-    return " ".join(name.split()).lower()
+    return "".join(name.split()).lower()
 
 
 def _read(project: Project) -> ProjectRead:
@@ -47,10 +47,8 @@ def _read(project: Project) -> ProjectRead:
 
 
 async def _find_by_name(session: AsyncSession, name: str) -> Project | None:
-    # 공백(탭 포함)을 하나로 모은 뒤 앞뒤를 지우고 소문자로 만든다. normalize_name과 같은 규칙이다
-    normalized = func.lower(
-        func.btrim(func.regexp_replace(Project.name, WHITESPACE_RUN, " ", "g"))
-    )
+    # 공백(탭 포함)을 모두 지우고 소문자로 만든다. normalize_name과 같은 규칙이다
+    normalized = func.lower(func.regexp_replace(Project.name, WHITESPACE_RUN, "", "g"))
     return await session.scalar(
         select(Project)
         .where(Project.is_active, normalized == normalize_name(name))

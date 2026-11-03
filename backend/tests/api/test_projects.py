@@ -112,8 +112,8 @@ async def test_같은_이름은_409이고_기존_프로젝트를_돌려준다(
 
 @pytest.mark.parametrize(
     "name",
-    ["my project", "MY PROJECT", "  My Project  ", "My   Project"],
-    ids=["소문자", "대문자", "앞뒤 공백", "가운데 공백이 여러 개"],
+    ["my project", "MY PROJECT", "  My Project  ", "My   Project", "MyProject"],
+    ids=["소문자", "대문자", "앞뒤 공백", "가운데 공백이 여러 개", "띄어쓰기 없음"],
 )
 async def test_띄어쓰기와_대소문자만_다른_이름도_409이다(
     client: AsyncClient, name: str
@@ -124,6 +124,18 @@ async def test_띄어쓰기와_대소문자만_다른_이름도_409이다(
 
     assert response.status_code == status.HTTP_409_CONFLICT
     assert response.json()["existing"]["project_id"] == first["project_id"]
+
+
+async def test_한글_이름도_띄어쓰기가_없거나_달라도_409이다(
+    client: AsyncClient,
+) -> None:
+    first = (await client.post(BASE, json={"name": "확인용 프로젝트"})).json()
+
+    for name in ("확인용프로젝트", "확인용  프로젝트", " 확인용 프로 젝트 "):
+        response = await client.post(BASE, json={"name": name})
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.json()["existing"]["project_id"] == first["project_id"]
 
 
 async def test_사용_중이_아닌_프로젝트와_같은_이름은_등록된다(

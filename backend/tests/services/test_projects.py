@@ -119,8 +119,24 @@ async def test_등록하면_생성_이력_한_건을_남긴다(
 # ---------------------------------------------------------------
 @pytest.mark.parametrize(
     "name",
-    ["my project", "MY PROJECT", "  My Project  ", "My   Project"],
-    ids=["소문자", "대문자", "앞뒤 공백", "가운데 공백이 여러 개"],
+    [
+        "my project",
+        "MY PROJECT",
+        "  My Project  ",
+        "My   Project",
+        "MyProject",
+        "M y P r o j e c t",
+        "My\tProject",
+    ],
+    ids=[
+        "소문자",
+        "대문자",
+        "앞뒤 공백",
+        "가운데 공백이 여러 개",
+        "띄어쓰기 없음",
+        "글자마다 띄어쓰기",
+        "탭",
+    ],
 )
 async def test_띄어쓰기와_대소문자만_다른_이름은_중복이다(
     db_session: AsyncSession, user_id: int, name: str
@@ -135,8 +151,8 @@ async def test_띄어쓰기와_대소문자만_다른_이름은_중복이다(
     assert len(await logs_of(db_session, first.project_id)) == 1
 
 
-@pytest.mark.parametrize("name", ["My-Project", "MyProject", "My Project 2"])
-async def test_글자가_다르면_다른_프로젝트로_등록한다(
+@pytest.mark.parametrize("name", ["My-Project", "My Project 2", "My_Project"])
+async def test_공백을_빼도_글자가_다르면_다른_프로젝트로_등록한다(
     db_session: AsyncSession, user_id: int, name: str
 ) -> None:
     await create_project(db_session, new_values(name="My Project"), user_id)
