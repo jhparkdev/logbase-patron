@@ -130,6 +130,40 @@ export const OPENROUTER: Schemas["OpenRouterModelListResponse"] = {
   total: 3,
 };
 
+const NEW_MODEL_BASE: Schemas["OpenRouterNewModelRead"] = {
+  openrouter_model_id: "acme/alpha",
+  name: "Acme: Alpha",
+  provider: "acme",
+  created_at: "2026-11-02T13:29:14Z",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  context_length: 128000,
+  input_price_per_token: "0.000001",
+  output_price_per_token: "0.000002",
+};
+
+/** 새 모델 5개 중 최근 3개만 담긴 응답 */
+export const NEW_MODELS: Schemas["OpenRouterNewModelsResponse"] = {
+  days: 30,
+  total: 5,
+  items: [
+    NEW_MODEL_BASE,
+    { ...NEW_MODEL_BASE, openrouter_model_id: "acme/beta", name: "Acme: Beta" },
+    {
+      ...NEW_MODEL_BASE,
+      openrouter_model_id: "acme/gamma",
+      name: "Acme: Gamma",
+    },
+  ],
+};
+
+/** 새 모델이 없는 응답. 알림이 보이지 않는 것이 기본 상태다 */
+export const NO_NEW_MODELS: Schemas["OpenRouterNewModelsResponse"] = {
+  days: 30,
+  total: 0,
+  items: [],
+};
+
 export const PROVIDERS: Schemas["ProviderListResponse"] = {
   items: [
     { provider: "openai", model_count: 3 },
@@ -146,6 +180,7 @@ type Replies = {
   test?: Reply;
   status?: Reply;
   openrouter?: Reply;
+  newModels?: Reply;
   register?: Reply;
 };
 
@@ -158,6 +193,9 @@ function replyFor(request: Request, replies: Replies): Reply {
   const { pathname } = new URL(url);
   if (pathname === "/api/models" && request.method === "POST") {
     return replies.register ?? { status: 201, body: DETAIL };
+  }
+  if (pathname === "/api/models/openrouter/new") {
+    return replies.newModels ?? { status: 200, body: NO_NEW_MODELS };
   }
   if (pathname === "/api/models/openrouter") {
     return replies.openrouter ?? { status: 200, body: OPENROUTER };
