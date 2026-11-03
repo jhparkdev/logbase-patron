@@ -129,7 +129,9 @@ async def create_simulation(
         slot_configs = _image_slot_configs(request.models, execution_config)
     else:
         execution_config = resolve_execution_config(
-            request.execution_config.model_dump(exclude_none=True),
+            request.execution_config.model_dump(exclude_none=True)
+            if request.execution_config is not None
+            else None,
             scenario.default_execution_config if scenario else None,
         )
         json_schema = resolve_json_schema(

@@ -7040,7 +7040,14 @@
             "title": "Json Schema"
           },
           "execution_config": {
-            "$ref": "#/components/schemas/ExecutionConfig"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "routing_policy": {
             "$ref": "#/components/schemas/RoutingPolicy"
