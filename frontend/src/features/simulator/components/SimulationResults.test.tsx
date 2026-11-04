@@ -298,6 +298,9 @@ test("실행이 끝나면 성공한 칸 중 최단·최저를 표에 표시하�
   expect(screen.getByText("최저").closest("tr")?.textContent).toContain(
     "싼 모델",
   );
+  // 배지는 값 앞에 온다. 오른쪽 정렬 숫자 열에서 끝자리가 흔들리지 않게 하기 위함.
+  expect(screen.getByText("최단").closest("td")?.textContent).toMatch(/^최단/);
+  expect(screen.getByText("최저").closest("td")?.textContent).toMatch(/^최저/);
   const ongoing = run(slots);
   ongoing.status = { label: "진행 중", tone: "grey", ongoing: true };
   page.rerender(<SimulationResults view={{ kind: "ready", run: ongoing }} />);

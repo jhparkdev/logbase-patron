@@ -24,7 +24,7 @@ const VALIDATION_TONE: Record<string, "green" | "red" | "grey"> = {
 
 function BestMark({ label }: { label: string }) {
   return (
-    <span className="ml-1.5 inline-flex h-5 items-center rounded-full bg-brand-weak px-1.5 text-caption font-bold text-blue-600">
+    <span className="mr-1.5 inline-flex h-5 items-center rounded-full bg-brand-weak px-1.5 text-caption font-bold text-blue-600">
       {label}
     </span>
   );
@@ -123,8 +123,8 @@ export function ResultTable({
                 <ExecutionStatus status={slot.status} />
               </td>
               <td className="px-4 py-4 text-right tabular-nums whitespace-nowrap">
-                {durationLabel(slot.durationMs)}
                 {best.fastest.includes(slot.key) && <BestMark label="최단" />}
+                {durationLabel(slot.durationMs)}
               </td>
               <td className="px-4 py-4 text-right tabular-nums">
                 {slot.inputTokens === null
@@ -137,8 +137,8 @@ export function ResultTable({
                   : formatCount(slot.outputTokens)}
               </td>
               <td className="px-4 py-4 text-right whitespace-nowrap">
-                <CostValue cost={slot.cost} />
                 {best.cheapest.includes(slot.key) && <BestMark label="최저" />}
+                <CostValue cost={slot.cost} />
               </td>
               <td className="px-4 py-4">
                 <Badge tone={VALIDATION_TONE[slot.jsonValidation] ?? "grey"}>
