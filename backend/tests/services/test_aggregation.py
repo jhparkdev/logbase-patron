@@ -260,7 +260,7 @@ async def test_only_customer_service_calls_are_counted(
     db_session: AsyncSession, factory: Factory
 ) -> None:
     await customer_call(factory, **confirmed("1"))
-    for origin in ("INTERNAL_DEVELOPMENT", "SIMULATION", "SYSTEM_TEST"):
+    for origin in ("INTERNAL_DEVELOPMENT", "SIMULATION", "SYSTEM_TEST", "ASSISTANT"):
         await factory.ai_request(
             usage_origin=origin, requested_at=IN_OCTOBER, **confirmed("100")
         )
