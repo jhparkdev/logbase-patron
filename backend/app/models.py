@@ -131,12 +131,14 @@ class PriceSource(StrEnum):
 
 
 class UsageOrigin(StrEnum):
-    """호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트)를 섞지 않는다."""
+    """호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트·AI 도우미)를 섞지 않는다."""
 
     CUSTOMER_SERVICE = "CUSTOMER_SERVICE"
     INTERNAL_DEVELOPMENT = "INTERNAL_DEVELOPMENT"
     SIMULATION = "SIMULATION"
     SYSTEM_TEST = "SYSTEM_TEST"
+    # 관리 콘솔 AI 도우미의 모델 호출. 내부 개발과 나눠 무엇에 비용이 들었는지 구분한다.
+    ASSISTANT = "ASSISTANT"
 
 
 class RequestOwnerType(StrEnum):
@@ -807,7 +809,7 @@ class SimulationRun(Base):
     updated_at: Mapped[datetime] = updated_at_column()
 
 
-# owner_type 자동 계산식: 고객 호출 → CUSTOMER, 내부 개발 → INTERNAL, 시뮬레이션·연결 테스트 → POC
+# owner_type 자동 계산식: 고객 호출 → CUSTOMER, 내부 개발 → INTERNAL, 시뮬레이션·연결 테스트·AI 도우미 → POC
 OWNER_TYPE_EXPRESSION = (
     "CASE usage_origin "
     f"WHEN '{UsageOrigin.CUSTOMER_SERVICE}' THEN '{RequestOwnerType.CUSTOMER}' "
