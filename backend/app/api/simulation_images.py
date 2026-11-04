@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, Response, UploadFile, status
 
-from app.api.deps import DevUserDep
+from app.api.deps import CurrentUserDep
 from app.api.simulation_deps import ImageStorageDep
 from app.api.simulation_errors import SimulationRoute
 from app.db import SessionDep
@@ -70,7 +70,7 @@ router = APIRouter(
 @router.post("", status_code=status.HTTP_201_CREATED, responses=_UPLOAD_ERRORS)
 async def upload_simulation_image(
     file: UploadFile,
-    user: DevUserDep,
+    user: CurrentUserDep,
     session: SessionDep,
     storage: ImageStorageDep,
 ) -> ImageAssetRead:
@@ -94,7 +94,13 @@ async def upload_simulation_image(
     )
 
 
-@router.get("/limits")
+# 받는 값은 없지만 세션 쿠키를 읽으므로 FastAPI 가 422 를 문서에 넣는다. 실제 형식({code, message})으로 적는다
+@router.get(
+    "/limits",
+    responses={
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": SimulationRequestErrorResponse}
+    },
+)
 async def read_image_limits() -> ImageLimits:
     """이미지 입력 한도. 화면이 숫자를 따로 정하지 않고 이 값을 쓴다."""
     return ImageLimits.current()

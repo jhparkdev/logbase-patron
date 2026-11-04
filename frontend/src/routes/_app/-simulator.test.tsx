@@ -44,6 +44,8 @@ function stub(overrides: Record<string, Reply> = {}) {
     if (key === "GET /api/scenarios") return { status: 200, body: SCENARIOS };
     if (path.endsWith("/execution-providers"))
       return { status: 200, body: EXECUTION_PROVIDERS };
+    if (path.endsWith("/execution-providers/ranking"))
+      return { status: 200, body: { items: [], excluded: [] } };
     if (key === "GET /api/simulations/images/limits")
       return {
         status: 200,
@@ -344,6 +346,34 @@ test("재실행은 과거 입력을 복원하고 실행 전에는 호출하지 �
   expect(body.rerun_of_simulation_id).toBe(RUN_ID);
   expect(body.prompt_text).toBe("과거 Prompt 원문");
   expect(body.models[1].execution_provider).toBe("DekaLLM");
+});
+
+test("재실행에 쓰는 기존 이미지를 원래 파일 이름으로 보여 준다", async () => {
+  stub({
+    [`GET /api/simulations/${RUN_ID}/rerun-draft`]: {
+      status: 200,
+      body: {
+        ...CUSTOM_DRAFT,
+        asset_ids: [ASSET],
+        images: [
+          {
+            asset_id: ASSET,
+            mime_type: "image/png",
+            file_size_bytes: 5,
+            original_filename: "receipt.png",
+          },
+        ],
+      },
+    },
+  });
+  renderAt(`/simulator?sourceRun=${RUN_ID}`);
+  const list = await screen.findByRole("list", {
+    name: "재실행에 쓰는 기존 이미지",
+  });
+  expect(within(list).getByText("receipt.png")).toBeDefined();
+  expect(
+    within(list).getByRole("button", { name: "receipt.png 제거" }),
+  ).toBeDefined();
 });
 
 test("지금 고를 수 없는 업체는 비우고 안내한다", async () => {

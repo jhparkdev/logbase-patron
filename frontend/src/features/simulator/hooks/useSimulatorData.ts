@@ -7,6 +7,7 @@ import {
   createSimulation,
   executionProvidersOptions,
   imageLimitsQuery,
+  providerRankingOptions,
   rerunDraftOptions,
   runKey,
   runOptions,
@@ -28,6 +29,10 @@ function useCatalog() {
   const providers = useQueries({
     queries: items.map((model) => executionProvidersOptions(model.model_id)),
   });
+  // 순위는 표시를 위한 부가 정보다. 받지 못해도 업체 목록은 순서 그대로 보여 준다.
+  const rankings = useQueries({
+    queries: items.map((model) => providerRankingOptions(model.model_id)),
+  });
   const choices: ModelChoice[] = items.flatMap((model, index) => {
     const query = providers[index];
     return toModelChoices(
@@ -35,11 +40,16 @@ function useCatalog() {
       query?.data
         ? {
             providers: query.data.items.map((item) => item.execution_provider),
+            cheapest: rankings[index]?.data?.items[0]?.execution_provider,
           }
         : { failed: true },
     );
   });
-  const pending = models.isPending || providers.some((q) => q.isPending);
+  // 순위가 늦게 도착해 목록 순서가 바뀌지 않도록 순위까지 기다린다.
+  const pending =
+    models.isPending ||
+    providers.some((q) => q.isPending) ||
+    rankings.some((q) => q.isPending);
   const catalogState: "loading" | "error" | "ready" = models.isError
     ? "error"
     : pending
@@ -50,7 +60,8 @@ function useCatalog() {
     catalogState,
     onRetryCatalog: () => {
       void models.refetch();
-      for (const query of providers) if (query.isError) void query.refetch();
+      for (const query of [...providers, ...rankings])
+        if (query.isError) void query.refetch();
     },
   };
 }

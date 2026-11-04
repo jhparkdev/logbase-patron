@@ -130,6 +130,22 @@ test("Schema와 입력이 없던 실행은 빈 칸으로 되돌리고 이미지�
   ).toMatchObject({ text: "", jsonSchema: "", existingAssetIds: [assetId] });
 });
 
+test("기존 이미지의 원래 파일 이름을 ID별로 되돌리고, 이름이 없던 이미지는 넣지 않는다", () => {
+  const named = "01a1611f-3e80-73c5-a130-3efa5a1f7700";
+  const unnamed = "01a1611f-3e80-73c5-a130-3efa5a1f7701";
+  const image = { mime_type: "image/png", file_size_bytes: 5 };
+  expect(
+    toRerunValues({
+      ...custom,
+      asset_ids: [named, unnamed],
+      images: [
+        { ...image, asset_id: named, original_filename: "receipt.png" },
+        { ...image, asset_id: unnamed, original_filename: null },
+      ],
+    }).existingImageNames,
+  ).toEqual({ [named]: "receipt.png" });
+});
+
 const ready = {
   draft: custom,
   catalogReady: true,
@@ -209,4 +225,37 @@ test("입력을 구할 수 없는 실행은 복원하지 않는다", () => {
       [],
     ).kind,
   ).toBe("missing");
+});
+
+test("이미지 생성 실행은 출력 형식과 이미지 옵션을 되돌려 다시 이미지로 실행한다", () => {
+  const draft = {
+    ...RERUN_DRAFT,
+    test_type: "CUSTOM" as const,
+    scenario_id: null,
+    json_schema: null,
+    execution_config: {},
+    models: RERUN_DRAFT.models.map((model) => ({
+      ...model,
+      execution_config: {},
+    })),
+    output_type: "IMAGE" as const,
+    image_config: { n: 2, quality: "high" as const },
+  };
+  const values = toRerunValues(draft);
+  expect(values).toMatchObject({
+    outputType: "IMAGE",
+    imageCount: "2",
+    imageQuality: "high",
+  });
+  const request = toCreateRequest(simulatorFormSchema.parse(values), []);
+  expect(request).toMatchObject({
+    output_type: "IMAGE",
+    image_config: { n: 2, quality: "high" },
+  });
+});
+
+test("이미지 옵션 없이 실행한 이미지 생성은 빈 옵션으로 되돌린다", () => {
+  expect(
+    toRerunValues({ ...RERUN_DRAFT, output_type: "IMAGE", image_config: null }),
+  ).toMatchObject({ outputType: "IMAGE", imageCount: "", imageQuality: "" });
 });

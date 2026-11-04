@@ -11,6 +11,8 @@ from httpx import AsyncClient
 
 from app.config import get_settings
 from app.main import API_PREFIX
+from tests.api.test_auth import make_user
+from tests.db_helpers import Factory
 
 # 로그인 없이 호출할 수 있는 라우트. 여기에 추가하려면 CLAUDE.md의 예외(로그인·health·기록 API)인지 확인한다.
 PUBLIC_ROUTES = {("GET", "/api/health"), ("POST", "/api/auth/login")}
@@ -51,6 +53,57 @@ async def test_api_routes_use_common_error_format(client: AsyncClient) -> None:
 
 
 # 인증
+
+
+async def test_only_public_routes_skip_login(
+    app: FastAPI, client: AsyncClient, factory: Factory
+) -> None:
+    """세션 없이 401이 아닌 응답을 주는 라우트는 공개 목록과 정확히 같아야 한다."""
+    # 활성 계정이 있어도 세션이 없으면 거절해야 한다. 계정이 없어서 거절되는 경우와 구분한다
+    await make_user(factory)
+    reachable_without_login: set[tuple[str, str]] = set()
+    for method, path in api_routes(app):
+        # 기록 API는 세션 대신 수신 토큰으로 거절한다. 토큰 검사는 test_usage_records.py 에서 본다
+        if (method, path) in INGEST_ROUTES:
+            continue
+        response = await client.request(method, concrete_path(path))
+        if response.status_code == status.HTTP_401_UNAUTHORIZED:
+            assert response.json()["code"] == "UNAUTHENTICATED", (method, path)
+        else:
+            # 공개 로그인은 본문이 없으면 422다. 성공 여부 대신 세션 요구 여부를 비교한다.
+            reachable_without_login.add((method, path))
+
+    assert reachable_without_login == PUBLIC_ROUTES
+
+
+def test_login_and_validation_errors_are_documented_as_code_and_message(
+    app: FastAPI,
+) -> None:
+    """로그인이 필요한 라우트의 401·422 문서는 실제 응답 형식({code, message})과 같아야 한다.
+
+    프론트엔드 타입이 이 문서에서 생성되므로, FastAPI 기본 형식({detail})이 남으면 타입이 실제와 달라진다.
+    """
+    document = app.openapi()
+    schemas = document["components"]["schemas"]
+    skipped = PUBLIC_ROUTES | INGEST_ROUTES
+    for path, operations in document["paths"].items():
+        for method, operation in operations.items():
+            if (method.upper(), path) in skipped:
+                continue
+            responses = operation["responses"]
+            assert "401" in responses, (method, path)
+            for code in ("401", "422"):
+                if code not in responses:
+                    continue
+                schema = responses[code]["content"]["application/json"]["schema"]
+                # 오류 형식이 여러 개면 anyOf 로 적힌다. 하나하나가 {code, message} 여야 한다
+                for option in schema.get("anyOf", [schema]):
+                    target = schemas[option["$ref"].rsplit("/", 1)[-1]]
+                    assert set(target["properties"]) == {"code", "message"}, (
+                        method,
+                        path,
+                        code,
+                    )
 
 
 # Origin 검사

@@ -1,14 +1,11 @@
-"""고객 AI 사용 현황(P-01) 경로. 입력 검증과 응답 변환만 하고, 집계는 services/aggregation이 한다.
-
-로그인 검사는 팀 결정으로 뒤로 미뤘다(main.py). 복구할 때 이 라우터도 함께 대상이 된다.
-"""
+"""고객 AI 사용 현황(P-01) 경로. 입력 검증과 응답 변환만 하고, 집계는 services/aggregation이 한다."""
 
 from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, status
 
-from app.api.deps import DevUserDep, NowDep
+from app.api.deps import CurrentUserDep, NowDep
 from app.api.errors import ApiError
 from app.db import SessionDep
 from app.schemas.common import ErrorCode, ErrorResponse
@@ -136,7 +133,7 @@ async def save_customer_budget(
     customer_id: CustomerIdPath,
     body: CustomerBudgetSave,
     session: SessionDep,
-    user: DevUserDep,
+    user: CurrentUserDep,
 ) -> CustomerBudgetRead:
     try:
         budget = await customer_budgets.save_customer_budget(

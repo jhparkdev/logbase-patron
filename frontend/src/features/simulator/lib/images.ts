@@ -25,6 +25,14 @@ export function imageFilesSchemaFor(limits: ImageLimits) {
 
 export const imageFilesSchema = imageFilesSchemaFor(IMAGE_LIMITS);
 
+export function existingImageLabel(
+  assetId: string,
+  index: number,
+  names: Readonly<Record<string, string>>,
+) {
+  return names[assetId] ?? `기존 이미지 ${index + 1}`;
+}
+
 export function fileKey(file: File) {
   return `${file.name}:${file.size}:${file.lastModified}:${file.type}`;
 }

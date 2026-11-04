@@ -35,19 +35,36 @@ test.each([
   ["0.1", null, "0.1"],
   [null, "0.2", "0.2"],
   [null, null, null],
-  // 합산은 서버의 일이다. 서버가 합계를 주지 않으므로 둘 다 있으면 합계를 만들지 않는다
-  ["0.1", "0.2", null],
-])("확정 %s·추정 %s의 합계는 %s다", (confirmed, estimated, total) => {
+  ["0.1", "0.2", "0.3"],
+])(
+  "확정 %s·추정 %s이면 서버 합계 %s를 그대로 쓴다",
+  (confirmed, estimated, total) => {
+    expect(
+      toRunView({
+        ...RUN_DETAIL,
+        summary: {
+          ...summary,
+          confirmed_cost_usd: confirmed,
+          estimated_cost_usd: estimated,
+          total_cost_usd: total,
+        },
+      }).totalCost,
+    ).toBe(total);
+  },
+);
+
+test("합계는 화면에서 다시 더하지 않고 서버 값을 쓴다", () => {
   expect(
     toRunView({
       ...RUN_DETAIL,
       summary: {
         ...summary,
-        confirmed_cost_usd: confirmed,
-        estimated_cost_usd: estimated,
+        confirmed_cost_usd: "0.1",
+        estimated_cost_usd: "0.2",
+        total_cost_usd: "0.300000000000",
       },
     }).totalCost,
-  ).toBe(total);
+  ).toBe("0.300000000000");
 });
 
 test("모델 칸의 성공 결과를 그대로 옮긴다", () => {
@@ -152,4 +169,54 @@ test("대기 중인 칸은 진행 중으로 본다", () => {
       results: [{ ...first, status: "PENDING" }, second],
     }).slots[0].status,
   ).toEqual({ label: "대기", tone: "grey", ongoing: true });
+});
+
+test("이미지 출력 칸은 결과 이미지를 순서대로 옮기고 이미지 옵션을 한국어로 적는다", () => {
+  const [first] = RUN_DETAIL.results;
+  const slot = toRunView({
+    ...RUN_DETAIL,
+    results: [
+      {
+        ...first,
+        output_type: "IMAGE",
+        response_text: null,
+        execution_config: { output_type: "IMAGE", n: 2, quality: "high" },
+        output_images: [
+          {
+            output_asset_id: "b",
+            sort_order: 1,
+            mime_type: "image/png",
+            file_size_bytes: 10,
+          },
+          {
+            output_asset_id: "a",
+            sort_order: 0,
+            mime_type: "image/jpeg",
+            file_size_bytes: 20,
+          },
+        ],
+      },
+    ],
+  }).slots[0];
+  expect(slot.images).toEqual([
+    {
+      key: "a",
+      url: "/api/simulations/output-images/a",
+      mimeType: "image/jpeg",
+    },
+    {
+      key: "b",
+      url: "/api/simulations/output-images/b",
+      mimeType: "image/png",
+    },
+  ]);
+  expect(slot.settings).toEqual([
+    { label: "출력 형식", value: "이미지" },
+    { label: "이미지 수", value: "2장" },
+    { label: "품질", value: "높음" },
+  ]);
+});
+
+test("텍스트 출력 칸에는 이미지 목록을 두지 않는다", () => {
+  expect(toRunView(RUN_DETAIL).slots[0].images).toBeUndefined();
 });

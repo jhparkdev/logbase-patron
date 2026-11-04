@@ -4,7 +4,7 @@ from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import DevUserDep, NowDep
+from app.api.deps import CurrentUserDep, NowDep
 from app.api.model_common import ModelIdPath, model_not_found, to_model_detail_read
 from app.api.model_deps import ConnectionCallerDep
 from app.api.model_errors import model_error_response
@@ -45,7 +45,7 @@ async def _read_detail(session: AsyncSession, model_id: int) -> ModelDetailRead:
 
 @router.patch("", response_model=ModelDetailRead, responses=COMMON_ERROR_RESPONSES)
 async def update_model_info(
-    model_id: ModelIdPath, body: ModelUpdate, session: SessionDep, user: DevUserDep
+    model_id: ModelIdPath, body: ModelUpdate, session: SessionDep, user: CurrentUserDep
 ) -> ModelDetailRead:
     try:
         # 보낸 항목만 넘긴다. 보내지 않은 항목은 바뀌지 않는다.
@@ -64,7 +64,7 @@ async def change_model_status(
     model_id: ModelIdPath,
     body: ModelStatusChange,
     session: SessionDep,
-    user: DevUserDep,
+    user: CurrentUserDep,
     now: NowDep,
 ) -> ModelDetailRead | JSONResponse:
     try:
@@ -85,7 +85,7 @@ async def run_model_connection_test(
     model_id: ModelIdPath,
     body: ConnectionTestRequest,
     session: SessionDep,
-    user: DevUserDep,
+    user: CurrentUserDep,
     now: NowDep,
     caller: ConnectionCallerDep,
 ) -> ConnectionTestResult | JSONResponse:

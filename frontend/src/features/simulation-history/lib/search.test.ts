@@ -42,10 +42,16 @@ test("정렬을 변경하면 필터와 선택은 유지하고 첫 페이지로 �
     direction: "asc",
   });
 });
-test("서버가 지원하지 않는 총 비용 정렬은 URL에서 기본 정렬로 복구한다", () => {
-  expect(createHistorySearchSchema(now).parse({ sort: "totalCost" }).sort).toBe(
-    "requestedAt",
-  );
+test("총 비용 정렬은 URL에서 유지하고 서버 조회 조건으로 보낸다", () => {
+  const search = createHistorySearchSchema(now).parse({
+    sort: "totalCost",
+    direction: "desc",
+  });
+  expect(search).toMatchObject({ sort: "totalCost", direction: "desc" });
+  expect(historyListQuery(search)).toMatchObject({
+    sort: "totalCost",
+    direction: "desc",
+  });
 });
 test("UUID가 아닌 실행 ID는 URL에서 지우고 조회 폼에서는 거절한다", () => {
   const search = createHistorySearchSchema(now).parse({

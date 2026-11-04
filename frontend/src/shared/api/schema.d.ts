@@ -379,6 +379,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/openrouter/discoveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Model Discoveries
+         * @description 새 모델과 기본 모델의 비교 결과. 모델 관리 화면의 신규 모델 알림에 쓴다.
+         */
+        get: operations["list_model_discoveries_api_models_openrouter_discoveries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{model_id}/execution-providers": {
         parameters: {
             query?: never;
@@ -388,6 +408,26 @@ export interface paths {
         };
         /** List Execution Providers */
         get: operations["list_execution_providers_api_models__model_id__execution_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{model_id}/execution-providers/ranking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rank Execution Providers
+         * @description 업체를 예상 총비용이 싼 순서로 알려 준다. 상태·가동률이 나쁜 업체와 단가를 모르는 업체는 따로 알린다.
+         */
+        get: operations["rank_execution_providers_api_models__model_id__execution_providers_ranking_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -934,6 +974,12 @@ export interface components {
             /** Model */
             model: string;
         };
+        /**
+         * AutoProvider
+         * @description 업체 이름 대신 쓰는 선택 값. 접수할 때 실제 업체 이름으로 바뀌며 저장되지는 않는다.
+         * @enum {string}
+         */
+        AutoProvider: "AUTO_CHEAPEST";
         /** Body_upload_simulation_image_api_simulations_images_post */
         Body_upload_simulation_image_api_simulations_images_post: {
             /** File */
@@ -1237,6 +1283,12 @@ export interface components {
             budget: components["schemas"]["BudgetUsage"];
         };
         /**
+         * DiscoveryStatus
+         * @description 새 모델 비교 진행 상태.
+         * @enum {string}
+         */
+        DiscoveryStatus: "PENDING" | "COMPARED" | "SKIPPED" | "FAILED";
+        /**
          * ErrorCode
          * @description 오류 응답 코드. 프론트엔드는 OpenAPI enum으로 받아 코드별로 화면 처리를 나눈다.
          * @enum {string}
@@ -1256,6 +1308,18 @@ export interface components {
          * @enum {string}
          */
         ErrorType: "AUTH_ERROR" | "RATE_LIMIT" | "TIMEOUT_ERROR" | "PROVIDER_ERROR" | "NETWORK_ERROR" | "INVALID_RESPONSE" | "UNSUPPORTED_INPUT" | "UNKNOWN_ERROR";
+        /** ExcludedProviderRead */
+        ExcludedProviderRead: {
+            /** Execution Provider */
+            execution_provider: string;
+            reason: components["schemas"]["ExcludedReason"];
+        };
+        /**
+         * ExcludedReason
+         * @description 순위에서 뺀 이유. 한 업체에 하나만 알리며, 이 순서로 먼저 맞는 이유를 쓴다.
+         * @enum {string}
+         */
+        ExcludedReason: "STATUS_NOT_OK" | "LOW_UPTIME" | "PRICE_UNKNOWN";
         /**
          * ExecutionConfig
          * @description 모델 실행 설정. 시나리오 기본 실행 설정(test_scenarios.default_execution_config)과 같은 항목이다.
@@ -1557,6 +1621,43 @@ export interface components {
             /** Last Success Test At */
             last_success_test_at: string | null;
         };
+        /** ModelDiscoveriesResponse */
+        ModelDiscoveriesResponse: {
+            /** Items */
+            items: components["schemas"]["ModelDiscoveryRead"][];
+        };
+        /** ModelDiscoveryRead */
+        ModelDiscoveryRead: {
+            /** Openrouter Model Id */
+            openrouter_model_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Discovered At
+             * Format: date-time
+             */
+            discovered_at: string;
+            status: components["schemas"]["DiscoveryStatus"];
+            skip_reason: components["schemas"]["SkipReason"] | null;
+            /** Base Model Name */
+            base_model_name: string | null;
+            /** New Cost Usd */
+            new_cost_usd: string | null;
+            /** Base Cost Usd */
+            base_cost_usd: string | null;
+            /** New Latency Ms */
+            new_latency_ms: number | null;
+            /** Base Latency Ms */
+            base_latency_ms: number | null;
+            /** Cost Change Pct */
+            cost_change_pct: string | null;
+            /** Latency Change Pct */
+            latency_change_pct: string | null;
+            /** Cheaper */
+            cheaper: boolean | null;
+            /** Faster */
+            faster: boolean | null;
+        };
         /**
          * ModelErrorCode
          * @description 프론트엔드는 이 값으로 상황별로 화면을 나눈다.
@@ -1662,7 +1763,7 @@ export interface components {
             /** Model Id */
             model_id: number;
             /** Execution Provider */
-            execution_provider: string;
+            execution_provider: string | components["schemas"]["AutoProvider"];
             execution_config?: components["schemas"]["ExecutionConfig"];
         };
         /**
@@ -2032,6 +2133,13 @@ export interface components {
             /** Items */
             items: components["schemas"]["ProviderRead"][];
         };
+        /** ProviderRankingResponse */
+        ProviderRankingResponse: {
+            /** Items */
+            items: components["schemas"]["RankedProviderRead"][];
+            /** Excluded */
+            excluded: components["schemas"]["ExcludedProviderRead"][];
+        };
         /**
          * ProviderRead
          * @description 화면의 제공사 선택 상자 한 줄. provider는 모델 목록의 provider 조건에 그대로 쓴다.
@@ -2041,6 +2149,23 @@ export interface components {
             provider: string;
             /** Model Count */
             model_count: number;
+        };
+        /** RankedProviderRead */
+        RankedProviderRead: {
+            /** Execution Provider */
+            execution_provider: string;
+            /** Expected Cost Usd */
+            expected_cost_usd: string;
+            /** Input Price Per Token */
+            input_price_per_token: string;
+            /** Output Price Per Token */
+            output_price_per_token: string;
+            /** Cache Read Price Per Token */
+            cache_read_price_per_token: string | null;
+            /** Cache Write Price Per Token */
+            cache_write_price_per_token: string | null;
+            /** Supports Caching */
+            supports_caching: boolean;
         };
         /**
          * ReasoningEffort
@@ -2234,7 +2359,7 @@ export interface components {
          * @description 시뮬레이터 API 의 오류 코드. 프론트엔드는 이 값으로 상황별로 분기한다.
          * @enum {string}
          */
-        SimulationErrorCode: "INVALID_REQUEST" | "DUPLICATE_MODEL_SELECTION" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "MODEL_IMAGE_NOT_SUPPORTED" | "MODEL_IMAGE_OUTPUT_NOT_SUPPORTED" | "MODEL_PARAMETER_NOT_SUPPORTED" | "IMAGE_REQUIRED" | "IMAGE_NOT_FOUND" | "IMAGE_EMPTY" | "IMAGE_TOO_LARGE" | "IMAGE_TYPE_NOT_SUPPORTED" | "IMAGE_FILE_NOT_FOUND" | "PROVIDER_NOT_AVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
+        SimulationErrorCode: "INVALID_REQUEST" | "DUPLICATE_MODEL_SELECTION" | "INPUT_REQUIRED" | "SIMULATION_NOT_FOUND" | "SLOT_NOT_FOUND" | "RERUN_SOURCE_NOT_FOUND" | "SCENARIO_NOT_FOUND" | "MODEL_NOT_FOUND" | "MODEL_NOT_ACTIVE" | "MODEL_IMAGE_NOT_SUPPORTED" | "MODEL_IMAGE_OUTPUT_NOT_SUPPORTED" | "MODEL_PARAMETER_NOT_SUPPORTED" | "IMAGE_REQUIRED" | "IMAGE_NOT_FOUND" | "IMAGE_EMPTY" | "IMAGE_TOO_LARGE" | "IMAGE_TYPE_NOT_SUPPORTED" | "IMAGE_FILE_NOT_FOUND" | "PROVIDER_NOT_AVAILABLE" | "AUTO_PROVIDER_UNAVAILABLE" | "PERIOD_INCOMPLETE" | "PERIOD_START_AFTER_END" | "PERIOD_TOO_LONG" | "INTERNAL_ERROR";
         /**
          * SimulationErrorResponse
          * @description 공통 오류 형식 {code, message} 에서 code 를 시뮬레이터 코드로 좁힌 응답.
@@ -2511,6 +2636,12 @@ export interface components {
              */
             has_images: boolean;
         };
+        /**
+         * SkipReason
+         * @description 새 모델을 비교하지 않고 넘어간 이유.
+         * @enum {string}
+         */
+        SkipReason: "INITIAL" | "PRICE_TOO_HIGH";
         /**
          * SortDirection
          * @enum {string}
@@ -3123,13 +3254,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3163,13 +3294,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3190,7 +3321,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3201,6 +3334,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SimulationHistoryList"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -3219,7 +3361,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -3234,6 +3378,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SimulationAccepted"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Forbidden */
@@ -3272,7 +3425,9 @@ export interface operations {
             path: {
                 simulation_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3283,6 +3438,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SimulationDetailResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -3312,7 +3476,9 @@ export interface operations {
             path: {
                 simulation_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3323,6 +3489,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SimulationRerunDraft"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -3352,7 +3527,9 @@ export interface operations {
             path: {
                 simulation_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3363,6 +3540,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SimulationCancelResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Forbidden */
@@ -3402,7 +3588,9 @@ export interface operations {
                 simulation_id: string;
                 slot_no: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3413,6 +3601,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SimulationCancelResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Forbidden */
@@ -3449,7 +3646,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -3464,6 +3663,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageAssetRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Forbidden */
@@ -3509,7 +3717,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3522,6 +3732,24 @@ export interface operations {
                     "application/json": components["schemas"]["ImageLimits"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
+                };
+            };
         };
     };
     download_simulation_image_api_simulations_images__asset_id__get: {
@@ -3531,7 +3759,9 @@ export interface operations {
             path: {
                 asset_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3544,6 +3774,15 @@ export interface operations {
                     "image/jpeg": unknown;
                     "image/png": unknown;
                     "image/webp": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -3573,7 +3812,9 @@ export interface operations {
             path: {
                 output_asset_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3586,6 +3827,15 @@ export interface operations {
                     "image/jpeg": unknown;
                     "image/png": unknown;
                     "image/webp": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -3623,7 +3873,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3661,7 +3913,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -3730,7 +3984,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3741,6 +3997,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProviderListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3755,7 +4029,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3766,6 +4042,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpenRouterModelListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -3796,7 +4081,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3807,6 +4094,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpenRouterNewModelsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -3829,6 +4125,48 @@ export interface operations {
             };
         };
     };
+    list_model_discoveries_api_models_openrouter_discoveries_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDiscoveriesResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_execution_providers_api_models__model_id__execution_providers_get: {
         parameters: {
             query?: never;
@@ -3836,7 +4174,9 @@ export interface operations {
             path: {
                 model_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3847,6 +4187,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExecutionProviderListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"] | components["schemas"]["ModelErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelErrorResponse"];
+                };
+            };
+        };
+    };
+    rank_execution_providers_api_models__model_id__execution_providers_ranking_get: {
+        parameters: {
+            query: {
+                input_tokens: number;
+                output_tokens: number;
+                cache_hit_ratio?: number | string;
+                min_uptime?: number | string;
+            };
+            header?: never;
+            path: {
+                model_id: number;
+            };
+            cookie?: {
+                patron_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderRankingResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -3885,7 +4299,9 @@ export interface operations {
             path: {
                 model_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3896,6 +4312,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelDetailRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -3925,7 +4350,9 @@ export interface operations {
             path: {
                 model_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -3987,7 +4414,9 @@ export interface operations {
             path: {
                 model_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -4058,7 +4487,9 @@ export interface operations {
             path: {
                 model_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -4127,7 +4558,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4138,6 +4571,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageOptions"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4153,7 +4604,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4164,6 +4617,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageSummary"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -4188,7 +4650,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4199,6 +4663,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageTrend"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -4229,7 +4702,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4240,6 +4715,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerUsagePage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -4269,7 +4753,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4280,6 +4766,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerRequestPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -4302,7 +4797,9 @@ export interface operations {
             path: {
                 customer_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4313,6 +4810,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerUsageDetail"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -4342,7 +4848,9 @@ export interface operations {
             path: {
                 customer_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -4357,6 +4865,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerBudgetRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -4393,7 +4910,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4406,6 +4925,24 @@ export interface operations {
                     "application/json": components["schemas"]["ModelFavoriteList"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     add_model_favorite_api_model_favorites_post: {
@@ -4413,7 +4950,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -4439,6 +4978,15 @@ export interface operations {
                     "application/json": components["schemas"]["ModelFavoriteRead"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Unprocessable Content */
             422: {
                 headers: {
@@ -4458,7 +5006,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4469,13 +5019,22 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4490,7 +5049,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4501,6 +5062,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InternalSummary"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -4524,7 +5094,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4535,6 +5107,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InternalTrend"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -4564,7 +5145,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4575,6 +5158,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InternalRequestPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -4593,7 +5185,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4604,6 +5198,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InternalOptions"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4623,7 +5235,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4634,6 +5248,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectBudgetPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -4656,7 +5279,9 @@ export interface operations {
             path: {
                 project_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4667,6 +5292,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectUsageDetail"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -4696,7 +5330,9 @@ export interface operations {
             path: {
                 project_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -4711,6 +5347,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectBudgetRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -4747,7 +5392,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4758,6 +5405,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandCodeUsageList"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4776,7 +5441,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4787,6 +5454,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubscriptionList"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -4805,7 +5481,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -4820,6 +5498,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubscriptionRow"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Conflict */
@@ -4847,7 +5534,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4860,6 +5549,24 @@ export interface operations {
                     "application/json": components["schemas"]["SubscriptionOptions"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     read_subscription_api_subscriptions__subscription_id__get: {
@@ -4869,7 +5576,9 @@ export interface operations {
             path: {
                 subscription_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4880,6 +5589,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubscriptionRow"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -4909,7 +5627,9 @@ export interface operations {
             path: {
                 subscription_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -4924,6 +5644,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubscriptionRow"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -4951,7 +5680,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -4966,6 +5697,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Conflict */
@@ -4995,7 +5735,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -5006,6 +5748,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScenarioList"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */

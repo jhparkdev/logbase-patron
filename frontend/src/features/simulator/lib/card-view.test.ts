@@ -199,3 +199,11 @@ test.each([
 ])("모델 %i개일 때 실행 버튼 옆 안내", (count, reason) => {
   expect(runBlockReason(count)).toBe(reason);
 });
+
+test("이미지 출력이면 이미지를 못 만드는 모델 카드에 경고한다", () => {
+  const input = { hasImages: false, hasSchema: false, imageOutput: true };
+  expect(cardWarnings(choice, input)).toEqual([
+    "이미지를 만들지 못해요. 출력 형식을 텍스트로 바꾸거나 모델을 바꿔 주세요.",
+  ]);
+  expect(cardWarnings({ ...choice, generatesImages: true }, input)).toEqual([]);
+});

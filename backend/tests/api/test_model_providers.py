@@ -1,9 +1,13 @@
 """GET /api/models/providers 테스트. 모델 목록 화면의 제공사 선택 상자에 쓸 선택지를 확인한다."""
 
+import pytest
 from fastapi import status
 from httpx import AsyncClient
 
 from tests.db_helpers import Factory
+
+# 로그인한 사용자만 부를 수 있는 API다. 로그인 경계는 tests/test_main.py 에서 확인한다
+pytestmark = pytest.mark.usefixtures("signed_in")
 
 PROVIDERS = "/api/models/providers"
 

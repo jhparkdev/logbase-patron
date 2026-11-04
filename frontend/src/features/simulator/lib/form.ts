@@ -9,6 +9,7 @@ import {
   TEMPERATURE,
   TEXT_LIMIT,
 } from "./limits";
+import { outputFields } from "./output";
 import { parameterIssue } from "./parameters";
 import type { ModelChoice } from "./presentation";
 
@@ -93,6 +94,9 @@ const createFormSchema = (limits: ImageLimits) =>
       files: imageFilesSchemaFor(limits),
       // 재실행에서 그대로 다시 쓰는 이미지. 파일을 다시 올리지 않는다.
       existingAssetIds: z.array(z.string()),
+      // 기존 이미지를 화면에 부를 이름. 요청에는 보내지 않는다.
+      existingImageNames: z.record(z.string(), z.string()),
+      ...outputFields,
     })
     .superRefine((values, context) => {
       if (values.mode === "scenario" && !values.scenarioKey)
@@ -175,6 +179,10 @@ export function createDefaultValues(
     reasoningEffort: "",
     files: [],
     existingAssetIds: [],
+    existingImageNames: {},
+    outputType: "TEXT",
+    imageCount: "",
+    imageQuality: "",
     ...initialValues,
     comparisons:
       initialValues?.comparisons?.map((item) => ({

@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # 기록 수신 API(X-Patron-Ingest-Token)의 비밀값. 로컬에서는 없어도 앱은 뜨고, 없으면 수신 API가
     # 모든 요청을 거절한다. 고객 서비스가 기록을 보낼 때 같은 값을 헤더에 넣는다.
     ingest_token: SecretStr | None = None
+    # 새 모델을 기본 모델과 실제 호출로 비교한다. 꺼져 있으면 새 모델을 기록만 한다.
+    new_model_compare_enabled: bool = False
+    # 최근 24시간 동안 새 모델 비교 호출에 쓸 수 있는 비용 상한(USD)
+    new_model_daily_cap_usd: Decimal = Decimal(1)
     # AI 도우미는 명시적으로 켠 환경에서만 제공한다.
     assistant_enabled: bool = False
     # 로컬 개발은 Ollama, 배포는 OpenRouter다. OpenRouter는 위의 OPENROUTER_API_KEY(시뮬레이터와 같은 Key)를 쓴다.

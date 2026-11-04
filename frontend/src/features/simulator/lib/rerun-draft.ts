@@ -66,6 +66,17 @@ export function toRerunValues(draft: RerunDraft): SimulatorFormValues {
     maxTokens: configText(draft.execution_config, "max_tokens"),
     reasoningEffort: configText(draft.execution_config, "reasoning_effort"),
     existingAssetIds: draft.asset_ids,
+    existingImageNames: Object.fromEntries(
+      draft.images.flatMap((image) =>
+        image.original_filename === null
+          ? []
+          : [[image.asset_id, image.original_filename]],
+      ),
+    ),
+    outputType: draft.output_type,
+    imageCount:
+      draft.image_config?.n == null ? "" : String(draft.image_config.n),
+    imageQuality: draft.image_config?.quality ?? "",
     comparisons: draft.models.map((model) => {
       const comparison = createComparison(
         choiceKey(model.model_id, model.execution_provider),

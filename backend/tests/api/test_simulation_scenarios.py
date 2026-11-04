@@ -4,6 +4,7 @@ import pytest
 from httpx import AsyncClient
 
 from app.models import InputType
+from tests.api.test_auth import make_user
 from tests.db_helpers import Factory
 
 SCENARIOS = "/api/scenarios"
@@ -13,6 +14,16 @@ async def listed_ids(client: AsyncClient, **params: object) -> list[int]:
     response = await client.get(SCENARIOS, params=params)
     assert response.status_code == 200, response.text
     return [item["scenario_id"] for item in response.json()["items"]]
+
+
+async def test_the_list_needs_a_login(client: AsyncClient, factory: Factory) -> None:
+    await make_user(factory)
+    await factory.scenario(scenario_code="PRODUCT_COPY")
+
+    response = await client.get(SCENARIOS)
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHENTICATED"
 
 
 @pytest.mark.usefixtures("signed_in")

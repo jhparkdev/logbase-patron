@@ -1,5 +1,6 @@
 """OpenRouter 모델 검색(P-03) 경로. models 라우터에 붙어 /api/models/openrouter가 된다."""
 
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
@@ -11,6 +12,11 @@ from app.api.model_errors import model_error_response
 from app.db import SessionDep
 from app.openrouter.lookup_result import ModelInfo
 from app.schemas.common import ErrorResponse
+from app.schemas.model_discovery import (
+    ModelDiscoveriesQuery,
+    ModelDiscoveriesResponse,
+    ModelDiscoveryRead,
+)
 from app.schemas.model_error import ModelErrorCode, ModelErrorResponse
 from app.schemas.model_openrouter import (
     OpenRouterModelListResponse,
@@ -20,7 +26,8 @@ from app.schemas.model_openrouter import (
     OpenRouterNewModelsQuery,
     OpenRouterNewModelsResponse,
 )
-from app.services import model_new, model_search
+from app.services import model_discovery_list, model_new, model_search
+from app.services.model_comparison import CallMetrics, compare
 from app.services.model_new import NewModel
 from app.services.model_registry import (
     provider_from_model_id,
@@ -151,3 +158,47 @@ async def list_new_openrouter_models(
         total=found.total,
         items=[to_new_model_read(entry) for entry in found.items],
     )
+
+
+PCT_PLACES = Decimal("0.1")
+
+
+def to_discovery_read(row: model_discovery_list.DiscoveryRow) -> ModelDiscoveryRead:
+    found = row.discovery
+    comparison = compare(
+        CallMetrics(found.base_cost_usd, found.base_latency_ms),
+        CallMetrics(found.new_cost_usd, found.new_latency_ms),
+    )
+    return ModelDiscoveryRead(
+        openrouter_model_id=found.openrouter_model_id,
+        name=found.model_name or found.openrouter_model_id,
+        discovered_at=found.discovered_at,
+        status=found.status,
+        skip_reason=found.skip_reason,
+        base_model_name=row.base_model_name,
+        new_cost_usd=found.new_cost_usd,
+        base_cost_usd=found.base_cost_usd,
+        new_latency_ms=found.new_latency_ms,
+        base_latency_ms=found.base_latency_ms,
+        cost_change_pct=_rounded(comparison.cost_change_pct),
+        latency_change_pct=_rounded(comparison.latency_change_pct),
+        cheaper=comparison.cheaper,
+        faster=comparison.faster,
+    )
+
+
+def _rounded(value: Decimal | None) -> Decimal | None:
+    return None if value is None else value.quantize(PCT_PLACES)
+
+
+@router.get(
+    "/discoveries",
+    response_model=ModelDiscoveriesResponse,
+    responses={status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorResponse}},
+)
+async def list_model_discoveries(
+    query: Annotated[ModelDiscoveriesQuery, Query()], session: SessionDep
+) -> ModelDiscoveriesResponse:
+    """새 모델과 기본 모델의 비교 결과. 모델 관리 화면의 신규 모델 알림에 쓴다."""
+    rows = await model_discovery_list.list_discoveries(session, limit=query.limit)
+    return ModelDiscoveriesResponse(items=[to_discovery_read(row) for row in rows])

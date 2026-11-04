@@ -9,6 +9,7 @@ from app.models import CallPurpose, DataSource, InputType, UsageOrigin
 from app.models import TestType as RunType
 from app.schemas.simulation import ModelSelectionRequest, SimulationCreateRequest
 from app.schemas.simulation_output import OutputType
+from app.services.auto_provider import resolve_auto_providers
 from app.services.model_parameters import (
     ParameterSupport,
     drop_unsupported,
@@ -126,6 +127,7 @@ async def create_simulation(
         # 이미지 호출은 텍스트 설정과 Schema 를 보내지 않으므로 시나리오 기본값도 쓰지 않는다
         execution_config = build_image_execution_config(request.image_config)
         json_schema = None
+        request = await _with_real_providers(request, models, None, deps)
         slot_configs = _image_slot_configs(request.models, execution_config)
     else:
         execution_config = resolve_execution_config(
@@ -136,6 +138,9 @@ async def create_simulation(
         )
         json_schema = resolve_json_schema(
             request.json_schema, scenario.default_json_schema if scenario else None
+        )
+        request = await _with_real_providers(
+            request, models, execution_config["max_tokens"], deps
         )
         slot_configs = _resolve_slot_configs(
             request.models,
@@ -202,6 +207,23 @@ async def create_simulation(
         images=images,
         output_type=request.output_type,
     )
+
+
+async def _with_real_providers(
+    request: SimulationCreateRequest,
+    models: dict[int, ModelInfo],
+    run_max_tokens: int | None,
+    deps: IntakeDeps,
+) -> SimulationCreateRequest:
+    """ "가장 싼 업체 자동" 칸을 실제 업체 이름으로 바꾼 요청. 이후 검증과 저장은 실제 이름만 본다."""
+    resolved = await resolve_auto_providers(
+        request.models,
+        models,
+        prompt_text=build_prompt_text(request.prompt_text, request.input_text),
+        run_max_tokens=run_max_tokens,
+        providers=deps.providers,
+    )
+    return request.model_copy(update={"models": resolved})
 
 
 def _image_slot_configs(
