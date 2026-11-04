@@ -7,6 +7,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.services.assistant_reply import (
     AssistantReply,
+    AssistantReplyTruncatedError,
     AssistantUnavailableError,
     ToolCall,
 )
@@ -64,7 +65,9 @@ class OllamaCaller:
             if len(response.content) > 100_000:
                 raise AssistantUnavailableError
             reply = OllamaReply.model_validate(response.json())
-            if not reply.done or reply.done_reason == "length":
+            if reply.done_reason == "length":
+                raise AssistantReplyTruncatedError
+            if not reply.done:
                 raise AssistantUnavailableError
             if reply.message.role != "assistant":
                 raise AssistantUnavailableError

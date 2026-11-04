@@ -324,11 +324,9 @@ class AssistantTools:
                     "input_modalities": model.input_modalities,
                     "supported_parameters": model.supported_parameters,
                     "reasoning_efforts": list(support.reasoning_efforts),
+                    # 업체별 지원 파라미터는 설정 준비 때 서버가 다시 검증한다. 목록이 길어 모델 문맥만 차지하므로 이름만 준다.
                     "providers": [
-                        {
-                            "execution_provider": endpoint.provider_name,
-                            "supported_parameters": endpoint.supported_parameters,
-                        }
+                        {"execution_provider": endpoint.provider_name}
                         for endpoint in endpoints
                     ],
                     "price": (

@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.openrouter.lookup_result import EndpointInfo
 from app.schemas.assistant import SimulatorState
 from app.services.assistant_tools import AssistantTools
 from tests.api.model_helpers import FakeEndpointCatalog
@@ -218,3 +219,20 @@ async def test_unknown_sort_is_rejected_as_invalid_tool_input(
     result = await list_tools(db_session).execute("find_models", {"sort": "popular"})
 
     assert "error" in result
+
+
+async def test_provider_lists_carry_only_names_to_keep_the_model_context_small(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    """업체별 지원 파라미터는 설정을 준비할 때 서버가 다시 검증하므로 모델에게 보내지 않는다."""
+    await factory.model(status="ACTIVE")
+    catalog = FakeEndpointCatalog(
+        [EndpointInfo(provider_name="업체A", supported_parameters=["tools", "seed"])]
+    )
+    tools = AssistantTools(
+        db_session, catalog, T0, None, request_text="모델의 실행 업체를 알려줘"
+    )
+
+    result = await tools.execute("find_models", {})
+
+    assert result["items"][0]["providers"] == [{"execution_provider": "업체A"}]

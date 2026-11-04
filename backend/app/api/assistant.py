@@ -27,7 +27,10 @@ from app.schemas.assistant import (
 from app.schemas.common import ErrorCode, ErrorResponse
 from app.services.assistant import answer
 from app.services.assistant_budget import daily_limit_reached, spent_today
-from app.services.assistant_reply import AssistantUnavailableError
+from app.services.assistant_reply import (
+    AssistantReplyTruncatedError,
+    AssistantUnavailableError,
+)
 from app.services.assistant_settings import InvalidSettingsError, validate_patch
 from app.services.assistant_tools import AssistantTools
 from app.services.execution_provider_catalog import ModelNotOnOpenRouterError
@@ -90,6 +93,12 @@ async def chat(
                 ),
                 now=now,
             )
+    except AssistantReplyTruncatedError:
+        raise ApiError(
+            503,
+            ErrorCode.BAD_REQUEST,
+            "요청이 길어 답을 끝까지 만들지 못했어요. 바꿀 항목을 두 번에 나눠 요청해 주세요.",
+        ) from None
     except AssistantUnavailableError, TimeoutError:
         raise ApiError(
             503, ErrorCode.BAD_REQUEST, unavailable_message(settings)

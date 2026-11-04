@@ -608,3 +608,23 @@ async def test_daily_limit_stops_openrouter_chat_before_any_call(
     assert response.status_code == 429
     assert "한도" in response.json()["message"]
     assert model_call.calls == []
+
+
+async def test_a_reply_cut_off_by_the_output_limit_asks_to_split_the_request(
+    app: FastAPI, client: AsyncClient, factory: Factory
+) -> None:
+    await authenticate(client, factory)
+    await assistant_context(factory)
+    use_openrouter(app)
+    model_call = ModelCall(
+        [success(requested_model=OPENROUTER_MODEL, finish_reason="length")]
+    )
+    app.dependency_overrides[get_assistant_model_call] = lambda: model_call
+
+    response = await client.post(
+        "/api/assistant/chat",
+        json={"messages": [{"role": "user", "content": "등록된 모델 목록을 알려줘"}]},
+    )
+
+    assert response.status_code == 503
+    assert "나눠" in response.json()["message"]

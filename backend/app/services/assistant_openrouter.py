@@ -23,11 +23,14 @@ from app.services.assistant_records import (
 )
 from app.services.assistant_reply import (
     AssistantReply,
+    AssistantReplyTruncatedError,
     AssistantUnavailableError,
     ToolCall,
 )
 
-MAX_OUTPUT_TOKENS = 768
+# 여러 칸을 한 번에 바꾸는 설정 도구 호출(Prompt·입력 텍스트·모델 목록)이 768에서 잘린 사례가 있어 늘렸다.
+# 출력은 실제로 만든 만큼만 청구되므로 평소 비용은 그대로다.
+MAX_OUTPUT_TOKENS = 1500
 # 요청 전체 제한(120초) 안에서 여러 번 왕복할 수 있게 한 번의 호출은 이보다 짧게 둔다.
 CALL_TIMEOUT_SECONDS = 60
 # 같은 입력에는 같은 도구 선택이 나오도록 무작위성을 끈다. 받지 않는 모델에는 보내지 않는다.
@@ -125,8 +128,10 @@ class OpenRouterAssistantCaller:
             await cancel_call(self._session, request_id, self._clock())
             raise
         await finish_call(self._session, request_id, result, self._clock())
-        if result.status != CallStatus.SUCCESS or result.truncated:
+        if result.status != CallStatus.SUCCESS:
             raise AssistantUnavailableError
+        if result.truncated:
+            raise AssistantReplyTruncatedError
         try:
             return AssistantReply(
                 content=result.content or "",

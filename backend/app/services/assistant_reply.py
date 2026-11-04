@@ -12,6 +12,10 @@ class AssistantUnavailableError(Exception):
     """모델 응답을 믿고 쓸 수 없어 요청을 끝내야 한다. 원인은 사용자에게 드러내지 않는다."""
 
 
+class AssistantReplyTruncatedError(AssistantUnavailableError):
+    """응답이 출력 한도에서 잘렸다. 다시 보내도 같을 수 있어 요청을 나누도록 안내한다."""
+
+
 class ToolFunction(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     arguments: dict[str, Any]

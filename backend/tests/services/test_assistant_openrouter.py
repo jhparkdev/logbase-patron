@@ -18,7 +18,11 @@ from app.services.assistant_openrouter import (
     openrouter_transcript,
 )
 from app.services.assistant_records import AssistantCallContext
-from app.services.assistant_reply import AssistantReply, AssistantUnavailableError
+from app.services.assistant_reply import (
+    AssistantReply,
+    AssistantReplyTruncatedError,
+    AssistantUnavailableError,
+)
 from tests.connection_helpers import MODEL_ID, NOW, FakeCaller, failure, success
 from tests.db_helpers import Factory
 
@@ -278,3 +282,15 @@ async def test_temperature를_받지_않는_모델에는_보내지도_기록하�
     assert fake.calls[0]["temperature"] is None
     row = (await requests_of(db_session))[0]
     assert "temperature" not in row.execution_config
+
+
+async def test_a_cut_off_reply_is_reported_as_too_long_and_still_billed(
+    db_session: AsyncSession, context: AssistantCallContext
+) -> None:
+    result = success(finish_reason="length")
+
+    with pytest.raises(AssistantReplyTruncatedError):
+        await caller_for(db_session, context, FakeCaller(result)).chat(MESSAGES, TOOLS)
+
+    row = (await requests_of(db_session))[0]
+    assert row.cost_status == "CONFIRMED"
