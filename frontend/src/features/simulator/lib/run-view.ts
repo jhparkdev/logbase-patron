@@ -1,4 +1,9 @@
 import type { components } from "../../../shared/api/schema";
+import {
+  IMAGE_QUALITY_LABELS,
+  OUTPUT_TYPE_LABELS,
+  outputImageUrl,
+} from "./output";
 import { PARAMETER_LABELS } from "./parameters";
 import type { CostView, RunView, SlotView, StatusView } from "./presentation";
 
@@ -37,6 +42,17 @@ const SETTING_LABELS: Readonly<Record<string, string>> = {
   temperature: PARAMETER_LABELS.temperature,
   max_tokens: PARAMETER_LABELS.maxTokens,
   reasoning_effort: PARAMETER_LABELS.reasoningEffort,
+  output_type: "출력 형식",
+  n: "이미지 수",
+  quality: "품질",
+};
+// 기록에는 내부 값이 남는다. 화면에는 코드 대신 읽을 수 있는 값으로 적는다.
+const labelOf = (labels: Readonly<Record<string, string>>) => (value: string) =>
+  labels[value] ?? value;
+const SETTING_VALUES: Readonly<Record<string, (value: string) => string>> = {
+  output_type: labelOf(OUTPUT_TYPE_LABELS),
+  n: (value) => `${value}장`,
+  quality: labelOf(IMAGE_QUALITY_LABELS),
 };
 
 /** 아는 설정을 먼저 정해진 순서로 두고, 과거 이력에만 남은 설정은 키 이름 그대로 뒤에 붙인다. */
@@ -46,11 +62,12 @@ function toSettings(config: Result["execution_config"]): SlotView["settings"] {
   return [...known, ...others].flatMap((key) => {
     const value = config[key];
     if (value === undefined || value === null) return [];
+    const text =
+      typeof value === "object" ? JSON.stringify(value) : String(value);
     return [
       {
         label: SETTING_LABELS[key] ?? key,
-        value:
-          typeof value === "object" ? JSON.stringify(value) : String(value),
+        value: SETTING_VALUES[key]?.(text) ?? text,
       },
     ];
   });
@@ -63,6 +80,16 @@ function toCost(result: Result): CostView {
     kind: result.cost_status === "ESTIMATED" ? "estimated" : "confirmed",
     amount: result.cost_usd,
   };
+}
+
+function toImages(result: Result): SlotView["images"] {
+  return [...result.output_images]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((image) => ({
+      key: image.output_asset_id,
+      url: outputImageUrl(image.output_asset_id),
+      mimeType: image.mime_type,
+    }));
 }
 
 function toSlot(result: Result): SlotView {
@@ -86,6 +113,7 @@ function toSlot(result: Result): SlotView {
       : VALIDATION_NOT_RUN,
     missingFields: result.missing_required_fields ?? undefined,
     response: result.response_text,
+    ...(result.output_type === "IMAGE" ? { images: toImages(result) } : {}),
     errorMessage: result.error_message ?? undefined,
     comparisonNote: result.comparability_note,
     statusAtRun: MODEL_STATUS[result.model_status_at_run],

@@ -294,6 +294,92 @@ def test_비정상_응답이어도_대조에_쓸_generation_id와_원문은_남�
 
 
 # ---------------------------------------------------------------
+# 도구 호출 응답. 본문이 비어 있어도 도구 호출이 있으면 정상이다
+# ---------------------------------------------------------------
+def tool_call_body(*calls: dict[str, Any]) -> dict[str, Any]:
+    body = make_body()
+    body["choices"][0]["message"] = {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": list(calls),
+    }
+    body["choices"][0]["finish_reason"] = "tool_calls"
+    return body
+
+
+def tool_call(
+    arguments: Any = '{"q": "claude", "page": 2}', **overrides: Any
+) -> dict[str, Any]:
+    return {
+        "id": "call_abc123",
+        "type": "function",
+        "function": {"name": "find_models", "arguments": arguments},
+        **overrides,
+    }
+
+
+def test_도구_호출만_있는_응답은_SUCCESS이고_인자를_객체로_읽는다() -> None:
+    result = build(tool_call_body(tool_call()))
+
+    assert result.status == CallStatus.SUCCESS
+    assert result.content is None
+    assert result.cost_status == CostStatus.CONFIRMED
+    assert [(item.id, item.name, item.arguments) for item in result.tool_calls] == [
+        ("call_abc123", "find_models", {"q": "claude", "page": 2})
+    ]
+
+
+def test_여러_도구_호출을_순서대로_읽고_빈_인자는_빈_객체다() -> None:
+    result = build(
+        tool_call_body(tool_call(), tool_call(arguments="", id="call_second"))
+    )
+
+    assert [item.id for item in result.tool_calls] == ["call_abc123", "call_second"]
+    assert result.tool_calls[1].arguments == {}
+
+
+def test_도구_호출이_없는_일반_응답은_tool_calls가_비어_있다() -> None:
+    assert build(make_body()).tool_calls == ()
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        tool_call(arguments="{not json"),
+        tool_call(arguments="[1, 2]"),
+        tool_call(arguments={"q": "already-an-object"}),
+        tool_call(id=""),
+        {"type": "function", "function": {"name": "find_models", "arguments": "{}"}},
+        tool_call(type="web_search"),
+        {"id": "call_abc123", "type": "function", "function": {"arguments": "{}"}},
+        {"id": "call_abc123", "type": "function", "function": "find_models"},
+        "find_models",
+    ],
+)
+def test_형식이_틀린_도구_호출은_INVALID_RESPONSE이고_대조용_ID는_남긴다(
+    broken: Any,
+) -> None:
+    result = build(tool_call_body(broken))
+
+    assert result.status == CallStatus.FAILED
+    assert result.error_type == ErrorType.INVALID_RESPONSE
+    assert result.cost_status == CostStatus.UNKNOWN
+    assert result.tool_calls == ()
+    assert result.generation_id == "gen-abc123"
+
+
+def test_tool_calls가_목록이_아니면_INVALID_RESPONSE다() -> None:
+    body = tool_call_body()
+    body["choices"][0]["message"]["tool_calls"] = {"id": "call_abc123"}
+
+    assert build(body).error_type == ErrorType.INVALID_RESPONSE
+
+
+def test_본문도_도구_호출도_없으면_INVALID_RESPONSE다() -> None:
+    assert build(tool_call_body()).error_type == ErrorType.INVALID_RESPONSE
+
+
+# ---------------------------------------------------------------
 # 호출 ID는 응답 헤더(X-Generation-Id)에서도 받는다
 # ---------------------------------------------------------------
 def build_with_header(body: dict[str, Any], header_id: str | None) -> CallResult:

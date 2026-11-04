@@ -563,3 +563,95 @@ def test_출시_시각이_아예_없으면_정보_없음이다() -> None:
 
     assert models is not None
     assert models[0].created_at is None
+
+
+def test_업체_목록에서_업체별_단가를_꺼낸다() -> None:
+    body = {
+        "data": {
+            "endpoints": [
+                endpoint(
+                    "DeepInfra",
+                    pricing={
+                        "prompt": "0.000002",
+                        "completion": "0.00001",
+                        "input_cache_read": "0.0000002",
+                        "input_cache_write": "0.0000025",
+                    },
+                ),
+                endpoint("Parasail", pricing={"prompt": "0.000001"}),
+                endpoint("DekaLLM"),
+            ]
+        }
+    }
+
+    endpoints = parse_endpoints(body)
+
+    assert endpoints is not None
+    assert endpoints[0].pricing == {
+        "prompt": Decimal("0.000002"),
+        "completion": Decimal("0.00001"),
+        "input_cache_read": Decimal("0.0000002"),
+        "input_cache_write": Decimal("0.0000025"),
+    }
+    assert endpoints[1].pricing == {"prompt": Decimal("0.000001")}
+    assert endpoints[2].pricing == {}
+
+
+@pytest.mark.parametrize(
+    "pricing",
+    [
+        {"prompt": "-1", "completion": "-1"},
+        {"prompt": "abc", "completion": None},
+        {"prompt": True, "completion": []},
+        "문자열",
+        None,
+    ],
+    ids=["음수(가격 미정)", "숫자가 아님", "엉뚱한 형식", "문자열", "null"],
+)
+def test_업체_단가가_음수이거나_숫자가_아니면_단가가_없는_것으로_본다(
+    pricing: Any,
+) -> None:
+    endpoints = parse_endpoints(
+        {"data": {"endpoints": [endpoint("A", pricing=pricing)]}}
+    )
+
+    assert endpoints is not None
+    assert endpoints[0].pricing == {}
+
+
+def test_단가는_float_오차_없이_자릿수_그대로_읽는다() -> None:
+    endpoints = parse_endpoints(
+        {
+            "data": {
+                "endpoints": [
+                    endpoint(
+                        "A", pricing={"prompt": "0.0000000042", "completion": 1e-07}
+                    )
+                ]
+            }
+        }
+    )
+
+    assert endpoints is not None
+    assert endpoints[0].pricing["prompt"] == Decimal("0.0000000042")
+
+
+def test_업체_목록에서_최근_30분_가동률을_꺼낸다() -> None:
+    body = {
+        "data": {
+            "endpoints": [
+                endpoint("A", uptime_last_30m=87.5),
+                endpoint("B"),
+                endpoint("C", uptime_last_30m="abc"),
+            ]
+        }
+    }
+
+    endpoints = parse_endpoints(body)
+
+    assert endpoints is not None
+    assert [item.uptime_last_30m for item in endpoints] == [
+        Decimal("87.5"),
+        None,
+        None,
+    ]

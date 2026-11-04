@@ -15,6 +15,7 @@ export function ModelCatalogTable({
   favorites,
   onToggle,
   counts,
+  showSchema = true,
 }: {
   choices: ModelChoice[];
   pending: string[];
@@ -22,6 +23,7 @@ export function ModelCatalogTable({
   favorites: ModelFavoritesView;
   onToggle: (key: string) => void;
   counts?: Readonly<Record<string, number>>;
+  showSchema?: boolean;
 }) {
   return (
     <div className="max-h-80 overflow-y-auto rounded-control border border-grey-200">
@@ -88,9 +90,14 @@ export function ModelCatalogTable({
                     </p>
                   )}
                 </th>
-                <td className="p-3 text-grey-700">{choice.provider}</td>
+                <td className="p-3 text-grey-700">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {choice.provider}
+                    {choice.cheapest && <Badge tone="green">최저가</Badge>}
+                  </span>
+                </td>
                 <td className="p-3">
-                  <SupportTags choice={choice} />
+                  <SupportTags choice={choice} showSchema={showSchema} />
                 </td>
                 <td className="p-3 text-right tabular-nums">
                   {price ?? <Badge tone="yellow">미확인</Badge>}

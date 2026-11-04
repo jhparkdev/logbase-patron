@@ -1611,6 +1611,53 @@
         }
       }
     },
+    "/api/models/openrouter/discoveries": {
+      "get": {
+        "tags": [
+          "models",
+          "models"
+        ],
+        "summary": "List Model Discoveries",
+        "description": "새 모델과 기본 모델의 비교 결과. 모델 관리 화면의 신규 모델 알림에 쓴다.",
+        "operationId": "list_model_discoveries_api_models_openrouter_discoveries_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDiscoveriesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/models/{model_id}/execution-providers": {
       "get": {
         "tags": [
@@ -1656,6 +1703,140 @@
                     }
                   ],
                   "title": "Response 404 List Execution Providers Api Models  Model Id  Execution Providers Get"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          }
+        }
+      }
+    },
+    "/api/models/{model_id}/execution-providers/ranking": {
+      "get": {
+        "tags": [
+          "models",
+          "models"
+        ],
+        "summary": "Rank Execution Providers",
+        "description": "업체를 예상 총비용이 싼 순서로 알려 준다. 상태·가동률이 나쁜 업체와 단가를 모르는 업체는 따로 알린다.",
+        "operationId": "rank_execution_providers_api_models__model_id__execution_providers_ranking_get",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "input_tokens",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000000,
+              "minimum": 0,
+              "title": "Input Tokens"
+            }
+          },
+          {
+            "name": "output_tokens",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000000,
+              "minimum": 0,
+              "title": "Output Tokens"
+            }
+          },
+          {
+            "name": "cache_hit_ratio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.0,
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "default": "0",
+              "title": "Cache Hit Ratio"
+            }
+          },
+          {
+            "name": "min_uptime",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 100.0,
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "default": "90",
+              "title": "Min Uptime"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderRankingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ModelErrorResponse"
+                    }
+                  ],
+                  "title": "Response 404 Rank Execution Providers Api Models  Model Id  Execution Providers Ranking Get"
                 }
               }
             },
@@ -4498,6 +4679,14 @@
         ],
         "title": "AssistantStatus"
       },
+      "AutoProvider": {
+        "type": "string",
+        "enum": [
+          "AUTO_CHEAPEST"
+        ],
+        "title": "AutoProvider",
+        "description": "업체 이름 대신 쓰는 선택 값. 접수할 때 실제 업체 이름으로 바뀌며 저장되지는 않는다."
+      },
       "Body_upload_simulation_image_api_simulations_images_post": {
         "properties": {
           "file": {
@@ -5427,6 +5616,17 @@
         "title": "CustomerUsageRow",
         "description": "고객 × 서비스 한 행. 고객을 알 수 없는 호출은 customer_id가 null인 미분류 행으로 모은다."
       },
+      "DiscoveryStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "COMPARED",
+          "SKIPPED",
+          "FAILED"
+        ],
+        "title": "DiscoveryStatus",
+        "description": "새 모델 비교 진행 상태."
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -5475,6 +5675,33 @@
           "UNKNOWN_ERROR"
         ],
         "title": "ErrorType"
+      },
+      "ExcludedProviderRead": {
+        "properties": {
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/ExcludedReason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_provider",
+          "reason"
+        ],
+        "title": "ExcludedProviderRead"
+      },
+      "ExcludedReason": {
+        "type": "string",
+        "enum": [
+          "STATUS_NOT_OK",
+          "LOW_UPTIME",
+          "PRICE_UNKNOWN"
+        ],
+        "title": "ExcludedReason",
+        "description": "순위에서 뺀 이유. 한 업체에 하나만 알리며, 이 순서로 먼저 맞는 이유를 쓴다."
       },
       "ExecutionConfig": {
         "properties": {
@@ -6336,6 +6563,169 @@
         "title": "ModelDetailRead",
         "description": "상세 패널용. 목록의 한 줄에 활성화·비활성화·마지막 성공 테스트 시각이 더해진다."
       },
+      "ModelDiscoveriesResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelDiscoveryRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ModelDiscoveriesResponse"
+      },
+      "ModelDiscoveryRead": {
+        "properties": {
+          "openrouter_model_id": {
+            "type": "string",
+            "title": "Openrouter Model Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "discovered_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Discovered At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DiscoveryStatus"
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkipReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "base_model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Model Name"
+          },
+          "new_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Cost Usd"
+          },
+          "base_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Cost Usd"
+          },
+          "new_latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Latency Ms"
+          },
+          "base_latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Latency Ms"
+          },
+          "cost_change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Change Pct"
+          },
+          "latency_change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Change Pct"
+          },
+          "cheaper": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheaper"
+          },
+          "faster": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faster"
+          }
+        },
+        "type": "object",
+        "required": [
+          "openrouter_model_id",
+          "name",
+          "discovered_at",
+          "status",
+          "skip_reason",
+          "base_model_name",
+          "new_cost_usd",
+          "base_cost_usd",
+          "new_latency_ms",
+          "base_latency_ms",
+          "cost_change_pct",
+          "latency_change_pct",
+          "cheaper",
+          "faster"
+        ],
+        "title": "ModelDiscoveryRead"
+      },
       "ModelErrorCode": {
         "type": "string",
         "enum": [
@@ -6612,8 +7002,15 @@
             "title": "Model Id"
           },
           "execution_provider": {
-            "type": "string",
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "$ref": "#/components/schemas/AutoProvider"
+              }
+            ],
             "title": "Execution Provider"
           },
           "execution_config": {
@@ -7693,6 +8090,30 @@
         ],
         "title": "ProviderListResponse"
       },
+      "ProviderRankingResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RankedProviderRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/ExcludedProviderRead"
+            },
+            "type": "array",
+            "title": "Excluded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "excluded"
+        ],
+        "title": "ProviderRankingResponse"
+      },
       "ProviderRead": {
         "properties": {
           "provider": {
@@ -7711,6 +8132,63 @@
         ],
         "title": "ProviderRead",
         "description": "화면의 제공사 선택 상자 한 줄. provider는 모델 목록의 provider 조건에 그대로 쓴다."
+      },
+      "RankedProviderRead": {
+        "properties": {
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider"
+          },
+          "expected_cost_usd": {
+            "type": "string",
+            "title": "Expected Cost Usd"
+          },
+          "input_price_per_token": {
+            "type": "string",
+            "title": "Input Price Per Token"
+          },
+          "output_price_per_token": {
+            "type": "string",
+            "title": "Output Price Per Token"
+          },
+          "cache_read_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Price Per Token"
+          },
+          "cache_write_price_per_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Price Per Token"
+          },
+          "supports_caching": {
+            "type": "boolean",
+            "title": "Supports Caching"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_provider",
+          "expected_cost_usd",
+          "input_price_per_token",
+          "output_price_per_token",
+          "cache_read_price_per_token",
+          "cache_write_price_per_token",
+          "supports_caching"
+        ],
+        "title": "RankedProviderRead"
       },
       "ReasoningEffort": {
         "type": "string",
@@ -8154,6 +8632,7 @@
           "IMAGE_TYPE_NOT_SUPPORTED",
           "IMAGE_FILE_NOT_FOUND",
           "PROVIDER_NOT_AVAILABLE",
+          "AUTO_PROVIDER_UNAVAILABLE",
           "PERIOD_INCOMPLETE",
           "PERIOD_START_AFTER_END",
           "PERIOD_TOO_LONG",
@@ -9046,6 +9525,15 @@
         "type": "object",
         "title": "SimulatorState"
       },
+      "SkipReason": {
+        "type": "string",
+        "enum": [
+          "INITIAL",
+          "PRICE_TOO_HIGH"
+        ],
+        "title": "SkipReason",
+        "description": "새 모델을 비교하지 않고 넘어간 이유."
+      },
       "SortDirection": {
         "type": "string",
         "enum": [
@@ -9461,10 +9949,11 @@
           "CUSTOMER_SERVICE",
           "INTERNAL_DEVELOPMENT",
           "SIMULATION",
-          "SYSTEM_TEST"
+          "SYSTEM_TEST",
+          "ASSISTANT"
         ],
         "title": "UsageOrigin",
-        "description": "호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트)를 섞지 않는다."
+        "description": "호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트·AI 도우미)를 섞지 않는다."
       },
       "UsageRecordCreate": {
         "properties": {

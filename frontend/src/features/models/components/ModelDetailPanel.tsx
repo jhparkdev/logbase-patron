@@ -11,6 +11,7 @@ import { ModelDetailContent, SECTION_TITLES } from "./ModelDetailContent";
 const SKELETON_SECTIONS = [
   { title: SECTION_TITLES.basic, height: "h-80" },
   { title: SECTION_TITLES.price, height: "h-24" },
+  { title: SECTION_TITLES.ranking, height: "h-32" },
   { title: SECTION_TITLES.test, height: "h-48" },
   { title: SECTION_TITLES.status, height: "h-40" },
 ] as const;

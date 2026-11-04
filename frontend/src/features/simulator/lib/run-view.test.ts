@@ -170,3 +170,53 @@ test("대기 중인 칸은 진행 중으로 본다", () => {
     }).slots[0].status,
   ).toEqual({ label: "대기", tone: "grey", ongoing: true });
 });
+
+test("이미지 출력 칸은 결과 이미지를 순서대로 옮기고 이미지 옵션을 한국어로 적는다", () => {
+  const [first] = RUN_DETAIL.results;
+  const slot = toRunView({
+    ...RUN_DETAIL,
+    results: [
+      {
+        ...first,
+        output_type: "IMAGE",
+        response_text: null,
+        execution_config: { output_type: "IMAGE", n: 2, quality: "high" },
+        output_images: [
+          {
+            output_asset_id: "b",
+            sort_order: 1,
+            mime_type: "image/png",
+            file_size_bytes: 10,
+          },
+          {
+            output_asset_id: "a",
+            sort_order: 0,
+            mime_type: "image/jpeg",
+            file_size_bytes: 20,
+          },
+        ],
+      },
+    ],
+  }).slots[0];
+  expect(slot.images).toEqual([
+    {
+      key: "a",
+      url: "/api/simulations/output-images/a",
+      mimeType: "image/jpeg",
+    },
+    {
+      key: "b",
+      url: "/api/simulations/output-images/b",
+      mimeType: "image/png",
+    },
+  ]);
+  expect(slot.settings).toEqual([
+    { label: "출력 형식", value: "이미지" },
+    { label: "이미지 수", value: "2장" },
+    { label: "품질", value: "높음" },
+  ]);
+});
+
+test("텍스트 출력 칸에는 이미지 목록을 두지 않는다", () => {
+  expect(toRunView(RUN_DETAIL).slots[0].images).toBeUndefined();
+});

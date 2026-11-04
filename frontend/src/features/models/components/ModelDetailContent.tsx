@@ -5,10 +5,12 @@ import { BasicInfoSection } from "./BasicInfoSection";
 import { ConnectionTestSection } from "./ConnectionTestSection";
 import { ModelStatusControls } from "./ModelStatusControls";
 import { PriceSection, priceCheckedCaption } from "./PriceSection";
+import { ProviderRankingSection } from "./ProviderRankingSection";
 
 export const SECTION_TITLES = {
   basic: "기본 정보",
   price: "토큰 단가 (1M 토큰 기준)",
+  ranking: "추천 서버 업체",
   test: "연결 테스트",
   status: "운영 상태",
 } as const;
@@ -34,7 +36,7 @@ function Section({
   );
 }
 
-/** 모델 상세 내용. 구역 넷과 맨 아래 마지막 수정 시각 */
+/** 모델 상세 내용. 구역 다섯과 맨 아래 마지막 수정 시각 */
 export function ModelDetailContent({ model }: { model: ModelDetail }) {
   return (
     <div className="flex flex-col gap-8">
@@ -50,6 +52,9 @@ export function ModelDetailContent({ model }: { model: ModelDetail }) {
         }
       >
         <PriceSection model={model} />
+      </Section>
+      <Section title={SECTION_TITLES.ranking}>
+        <ProviderRankingSection modelId={model.model_id} />
       </Section>
       <ConnectionTestSection title={SECTION_TITLES.test} model={model} />
       <Section title={SECTION_TITLES.status}>

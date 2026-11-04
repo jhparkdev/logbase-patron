@@ -47,6 +47,7 @@ DESIGN_TABLES = {
     "change_logs",
     "user_model_favorites",
     "command_code_keys",
+    "model_discoveries",
 }
 DESIGN_VIEWS = {"v_request_facts", "v_simulation_summary"}
 # Alembic이 "어디까지 적용했는지" 기록하는 테이블
@@ -56,6 +57,8 @@ SIMULATOR_SETTINGS_REVISION = "264258125f67"
 API_KEY_SERVICE_REVISION = "3f1c9a7e2b64"
 OUTPUT_ASSETS_REVISION = "a4d8e2c61f37"
 COMMAND_CODE_KEYS_REVISION = "404e6f91129f"
+ASSISTANT_ORIGIN_REVISION = "c5e1a9d3b702"
+MODEL_DISCOVERIES_REVISION = "d7a3b81f4c26"
 
 
 def _schema_objects(database_url: URL) -> tuple[set[str], set[str]]:
@@ -461,3 +464,132 @@ async def test_command_code_keys_downgrade_stops_when_a_mapping_is_registered(
         {"id": key["command_code_key_id"]},
     )
     assert dict(saved.mappings().one()) == dict(key)
+
+
+def _run_assistant_origin_migration(
+    session: Session, config: Config, *, upgrade: bool
+) -> None:
+    """같은 트랜잭션에서 실행해 검증용 이력과 DDL을 테스트 종료 시 함께 롤백한다."""
+    revision = ScriptDirectory.from_config(config).get_revision(
+        ASSISTANT_ORIGIN_REVISION
+    )
+    assert revision is not None
+    migrate: Callable[[], None] = (
+        revision.module.upgrade if upgrade else revision.module.downgrade
+    )
+    with Operations.context(MigrationContext.configure(session.connection())):
+        migrate()
+
+
+async def test_assistant_origin_migration_preserves_history_and_restores_old_check(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    """기존 이력을 유지한 채 내렸다 올리고, 각 버전에서 ASSISTANT 허용 여부를 확인한다."""
+    request = await factory.ai_request(usage_origin="SIMULATION")
+    await db_session.run_sync(
+        _run_assistant_origin_migration, alembic_config, upgrade=False
+    )
+    await expect_rejected(
+        db_session,
+        factory.ai_request(usage_origin="ASSISTANT"),
+        constraint="ai_requests_usage_origin_check",
+    )
+    await expect_rejected(
+        db_session,
+        factory.task(usage_origin="ASSISTANT"),
+        constraint="tasks_usage_origin_check",
+    )
+
+    await db_session.run_sync(
+        _run_assistant_origin_migration, alembic_config, upgrade=True
+    )
+    restored = await db_session.execute(
+        text("SELECT * FROM ai_requests WHERE request_id = :id"),
+        {"id": request["request_id"]},
+    )
+    assert restored.mappings().one() == request
+    assistant = await factory.ai_request(usage_origin="ASSISTANT")
+    assert assistant["owner_type"] == "POC"
+    await factory.task(usage_origin="ASSISTANT")
+
+
+@pytest.mark.parametrize(
+    ("factory_name", "table", "key"),
+    [("ai_request", "ai_requests", "request_id"), ("task", "tasks", "task_id")],
+)
+async def test_assistant_history_blocks_downgrade_without_changing_data_or_schema(
+    factory: Factory,
+    db_session: AsyncSession,
+    alembic_config: Config,
+    factory_name: str,
+    table: str,
+    key: str,
+) -> None:
+    """ASSISTANT 이력이 있으면 명확한 오류로 멈추고 행·제약·리비전을 보존한다."""
+    row = await getattr(factory, factory_name)(usage_origin="ASSISTANT")
+    checks_query = text(
+        "SELECT conrelid::regclass::text, conname, pg_get_constraintdef(oid) "
+        "FROM pg_constraint WHERE conrelid IN ('ai_requests'::regclass, "
+        "'tasks'::regclass) AND contype = 'c' ORDER BY 1, 2"
+    )
+    checks_before = (await db_session.execute(checks_query)).all()
+    version_before = await db_session.scalar(
+        text("SELECT version_num FROM alembic_version")
+    )
+
+    with pytest.raises(DBAPIError, match="Cannot downgrade.*ASSISTANT") as caught:
+        async with db_session.begin_nested():
+            await db_session.run_sync(
+                _run_assistant_origin_migration, alembic_config, upgrade=False
+            )
+
+    assert caught.value.orig.sqlstate == "23514"
+    assert (await db_session.execute(checks_query)).all() == checks_before
+    assert (
+        await db_session.scalar(text("SELECT version_num FROM alembic_version"))
+        == version_before
+    )
+    preserved = await db_session.execute(
+        text(f"SELECT * FROM {table} WHERE {key} = :id"), {"id": row[key]}
+    )
+    assert preserved.mappings().one() == row
+
+
+def _run_model_discoveries_migration(
+    session: Session, config: Config, *, upgrade: bool
+) -> None:
+    revision = ScriptDirectory.from_config(config).get_revision(
+        MODEL_DISCOVERIES_REVISION
+    )
+    assert revision is not None
+    migrate = revision.module.upgrade if upgrade else revision.module.downgrade
+    with Operations.context(MigrationContext.configure(session.connection())):
+        migrate()
+
+
+async def test_model_discoveries_downgrade_drops_the_table_only_when_empty(
+    db_session: AsyncSession, alembic_config: Config
+) -> None:
+    await db_session.run_sync(
+        _run_model_discoveries_migration, alembic_config, upgrade=False
+    )
+    assert not await _table_exists(db_session, "model_discoveries")
+
+    await db_session.run_sync(
+        _run_model_discoveries_migration, alembic_config, upgrade=True
+    )
+    assert await _table_exists(db_session, "model_discoveries")
+
+
+async def test_model_discoveries_downgrade_stops_when_a_record_exists(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    await factory.model_discovery()
+
+    with pytest.raises(DBAPIError, match="Cannot downgrade.*records") as caught:
+        async with db_session.begin_nested():
+            await db_session.run_sync(
+                _run_model_discoveries_migration, alembic_config, upgrade=False
+            )
+
+    assert caught.value.orig.sqlstate == "23514"
