@@ -4,7 +4,7 @@ import { Badge } from "../../../shared/components/ui/Badge";
 import { formatCount } from "../../../shared/lib/format";
 import { useImageSelection } from "../hooks/useImageSelection";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
-import { fileKey } from "../lib/images";
+import { existingImageLabel, fileKey } from "../lib/images";
 import { controlClass, type ImageLimits, TEXT_LIMIT } from "../lib/limits";
 import type { ScenarioChoice } from "../lib/presentation";
 import { StepHeading } from "./StepHeading";
@@ -35,9 +35,25 @@ export function InputFields({
     setValue,
     formState: { errors },
   } = useFormContext<SimulatorFormValues, unknown, SimulatorDraft>();
-  const [mode, prompt, text, files, existingAssetIds, jsonSchema] = useWatch({
+  const [
+    mode,
+    prompt,
+    text,
+    files,
+    existingAssetIds,
+    existingImageNames,
+    jsonSchema,
+  ] = useWatch({
     control,
-    name: ["mode", "prompt", "text", "files", "existingAssetIds", "jsonSchema"],
+    name: [
+      "mode",
+      "prompt",
+      "text",
+      "files",
+      "existingAssetIds",
+      "existingImageNames",
+      "jsonSchema",
+    ],
   });
   const fileError =
     errors.files?.message ??
@@ -221,22 +237,29 @@ export function InputFields({
                       aria-label="재실행에 쓰는 기존 이미지"
                       className="space-y-1 text-body-sm"
                     >
-                      {existingAssetIds.map((assetId, index) => (
-                        <li
-                          key={assetId}
-                          className="flex items-center justify-between gap-2 rounded-lg border border-grey-200 bg-white px-3 py-2"
-                        >
-                          <span>기존 이미지 {index + 1}</span>
-                          <button
-                            type="button"
-                            aria-label={`기존 이미지 ${index + 1} 제거`}
-                            onClick={() => removeExisting(index)}
-                            className="shrink-0 rounded-lg px-2 text-grey-600 focus-visible:outline-2 focus-visible:outline-brand"
+                      {existingAssetIds.map((assetId, index) => {
+                        const label = existingImageLabel(
+                          assetId,
+                          index,
+                          existingImageNames,
+                        );
+                        return (
+                          <li
+                            key={assetId}
+                            className="flex items-center justify-between gap-2 rounded-lg border border-grey-200 bg-white px-3 py-2"
                           >
-                            제거
-                          </button>
-                        </li>
-                      ))}
+                            <span className="min-w-0 break-all">{label}</span>
+                            <button
+                              type="button"
+                              aria-label={`${label} 제거`}
+                              onClick={() => removeExisting(index)}
+                              className="shrink-0 rounded-lg px-2 text-grey-600 focus-visible:outline-2 focus-visible:outline-brand"
+                            >
+                              제거
+                            </button>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                   {files.length > 0 && (
@@ -249,7 +272,7 @@ export function InputFields({
                           <span className="min-w-0 break-all">{file.name}</span>
                           <button
                             type="button"
-                            aria-label={`이미지 ${index + 1} 제거`}
+                            aria-label={`${file.name} 제거`}
                             onClick={() => removeFile(index)}
                             className="shrink-0 rounded-lg px-2 text-grey-600 focus-visible:outline-2 focus-visible:outline-brand"
                           >
