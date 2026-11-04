@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import cli
 from app.models import APIKey, User, UserSession
 from app.services import usage_catalog
+from app.services.model_discovery import DiscoverySummary
 from app.services.provider_price_sync import SyncSummary
 from tests.db_helpers import Factory
 
@@ -601,3 +602,45 @@ def test_price_sync_requires_production_confirmation_before_db(
     assert price_syncs == []
     assert cli.main([*PRICE_SYNC_ARGS, "--confirm-production"]) == 0
     assert price_syncs == ["run"]
+
+
+# --- new-models-check ---
+NEW_MODELS_ARGS = ["new-models-check"]
+NEW_MODELS_SUMMARY = DiscoverySummary(
+    recorded=2, compared=1, skipped=1, failed=0, pending=3
+)
+
+
+@pytest.fixture
+def new_models_checks(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    calls: list[str] = []
+
+    async def fake_run_new_models_check() -> DiscoverySummary:
+        calls.append("run")
+        return NEW_MODELS_SUMMARY
+
+    monkeypatch.setattr(cli, "run_new_models_check", fake_run_new_models_check)
+    monkeypatch.setattr(cli, "current_app_env", lambda: "development")
+    return calls
+
+
+def test_new_models_check_reports_what_it_did(
+    new_models_checks: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cli.main(NEW_MODELS_ARGS) == 0
+
+    assert new_models_checks == ["run"]
+    output = capsys.readouterr().out
+    for expected in ("새 모델 2개", "비교 1", "넘어감 1", "실패 0", "대기 3"):
+        assert expected in output
+
+
+def test_new_models_check_requires_production_confirmation_before_db(
+    monkeypatch: pytest.MonkeyPatch, new_models_checks: list[str]
+) -> None:
+    monkeypatch.setattr(cli, "current_app_env", lambda: "production")
+
+    assert cli.main(NEW_MODELS_ARGS) == 1
+    assert new_models_checks == []
+    assert cli.main([*NEW_MODELS_ARGS, "--confirm-production"]) == 0
+    assert new_models_checks == ["run"]
