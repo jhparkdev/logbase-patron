@@ -31,7 +31,7 @@ substitutions:
   _IMAGE_BUCKET: logb-patron-images-dev
   # AI 도우미. 배포에는 Ollama가 없으므로 OpenRouter로 부르고, 위 _OPENROUTER_SECRET(시뮬레이터와 같은 Key)를 쓴다.
   # 호출마다 비용이 기록되며, DB에 PATRON_ASSISTANT 서비스가 없으면 도우미 요청은 503으로 막힌다.
-  # 운영 트리거에서 검증 전까지 끄려면 _ASSISTANT_ENABLED를 "false"로 바꾼다.
+  # 도우미를 끄려면 트리거에서 _ASSISTANT_ENABLED를 "false"로 바꾼다.
   _ASSISTANT_ENABLED: "true"
   # OpenRouter 모델 ID(제공사/모델). 도구 호출을 지원해야 한다.
   _ASSISTANT_MODEL: anthropic/claude-haiku-5.5
