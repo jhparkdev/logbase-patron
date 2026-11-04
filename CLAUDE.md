@@ -50,7 +50,7 @@ pnpm --dir frontend build                            # 프론트엔드 빌드
 - OpenRouter 호출은 `backend/app/openrouter/client.py`에서만 한다. 테스트에서는 가짜 클라이언트를 주입한다.
 - AIRequest 생성과 상태·비용 변경은 `backend/app/services/requests.py`만 한다.
 - P-01·P-02 집계는 `backend/app/services/aggregation.py`만 한다. 화면과 라우터에서 따로 합산하지 않는다.
-- 금액과 단가는 `Decimal`과 `NUMERIC(20,12)`로 다룬다. float을 쓰지 않는다. API에서는 금액을 문자열로 주고받는다. (OpenRouter 단가가 토큰당 소수 10자리까지 나오는 것을 검증으로 확인함)
+- 금액과 단가는 `Decimal`과 `NUMERIC(30,18)`로 다룬다. float을 쓰지 않는다. API에서는 금액을 문자열로 주고받는다. (OpenRouter 단가가 토큰당 소수 10자리까지 나오는 것을 검증으로 확인함)
 - 시각은 UTC(`timestamptz`)로 저장하고, KST 변환은 화면(`frontend/src/shared/lib`)에서 한다. 월 경계 집계는 서버에서 KST 기준으로 계산한다.
 - DB 스키마 변경은 Alembic 마이그레이션(`backend/migrations/`)으로만 한다.
 - 프론트엔드는 `/api`만 상대 경로로 호출한다. 개발은 Vite proxy가, 배포는 frontend 컨테이너(nginx)가 `/api/*`를 backend로 프록시한다. 조회 조건·정렬·페이지는 URL 검색 파라미터에 둔다.

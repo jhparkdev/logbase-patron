@@ -55,7 +55,7 @@ tests/                 # 구현 코드와 분리한다. app/ 폴더 구조를 �
 - 모델은 `Mapped[...]`와 `mapped_column()`으로 타입을 명시한다. async에서는 지연 로딩이 오류를 내므로 관계는 `selectinload`로 명시적으로 불러온다.
 - 상태값은 PostgreSQL ENUM 대신 `String` 컬럼과 `CheckConstraint`로 표현한다. ENUM은 값을 추가할 때마다 별도 migration이 필요하다.
 - 불변조건은 DB 제약으로도 지킨다. 예: `cost_status='UNKNOWN'` ⇔ `cost_usd IS NULL` CHECK, `request_id`와 `openrouter_model_id` 고유 제약.
-- 금액과 단가는 `NUMERIC(20,12)`, 시각은 `DateTime(timezone=True)`(timestamptz), ID는 UUID, 테이블과 컬럼 이름은 `snake_case`다.
+- 금액과 단가는 `NUMERIC(30,18)`, 시각은 `DateTime(timezone=True)`(timestamptz), ID는 UUID, 테이블과 컬럼 이름은 `snake_case`다.
 - `MetaData(naming_convention=...)`로 제약 이름 규칙을 정해 두어 Alembic이 매번 같은 이름을 만들게 한다.
 - 쿼리는 SQLAlchemy 바인딩으로만 만든다. 문자열을 이어 붙여 SQL을 만들지 않는다.
 
