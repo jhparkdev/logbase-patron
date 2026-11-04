@@ -26,6 +26,13 @@ RUN_ID = re.compile(
     r"(?<![0-9a-f-])[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}(?![0-9a-f-])",
     re.IGNORECASE,
 )
+# 따옴표 안 글은 Prompt·입력 텍스트처럼 넣을 내용이다. 그 안의 "사용량" 같은 단어를 요청 의도로 읽지 않는다.
+QUOTED = re.compile(r"\"[^\"]*\"|'[^']*'|“[^”]*”|‘[^’]*’|「[^」]*」|『[^』]*』")
+
+
+def intent_text(text: str) -> str:
+    """범위를 판단할 문장. 따옴표로 감싼 내용을 뺀다. 실행 ID는 원문에서 따로 읽는다."""
+    return QUOTED.sub(" ", text)
 
 
 @dataclass(frozen=True)
@@ -56,7 +63,8 @@ def _explicit(text: str) -> str | None:
 
 
 def request_scope(request: AssistantChatRequest) -> RequestScope:
-    text = request.messages[-1].content
+    original = request.messages[-1].content
+    text = intent_text(original)
     if re.search(
         r"(?:예산|구독료).*(?:변경해|바꿔|설정해|등록해|저장해|수정해|늘려|줄여|올려|내려)",
         text,
@@ -113,7 +121,7 @@ def request_scope(request: AssistantChatRequest) -> RequestScope:
     if domain is None:
         for previous in reversed(request.messages[:-1]):
             if previous.role == "user" and (
-                candidate := _explicit(previous.content)
+                candidate := _explicit(intent_text(previous.content))
             ) in {"customer", "internal", "simulation"}:
                 domain = candidate
                 break
@@ -137,7 +145,7 @@ def request_scope(request: AssistantChatRequest) -> RequestScope:
     ):
         detail = bool(
             re.search(
-                r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", text, re.IGNORECASE
+                r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", original, re.IGNORECASE
             )
         )
         return RequestScope(
@@ -158,9 +166,10 @@ def request_scope(request: AssistantChatRequest) -> RequestScope:
 
 
 def _comparison_scope(request: AssistantChatRequest) -> RequestScope | None:
-    text = request.messages[-1].content
+    original = request.messages[-1].content
+    text = intent_text(original)
     context = request.page_context
-    ids = set(RUN_ID.findall(text.lower()))
+    ids = set(RUN_ID.findall(original.lower()))
     simulation_page = context and context.page in {"simulator", "simulation_history"}
     if (
         CUSTOMER.search(text)
