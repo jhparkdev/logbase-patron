@@ -29,8 +29,9 @@ export function PeriodField({
   };
 
   return (
-    <fieldset className="min-w-0">
-      <legend className="mb-1.5 text-label font-medium text-grey-700">
+    <fieldset className="flex min-w-0 items-center gap-2">
+      {/* legend는 띄워야(float) 테두리 위가 아니라 칸 옆 한 줄에 놓인다. */}
+      <legend className="float-left text-label font-medium text-grey-700">
         {label}
       </legend>
       <div className="flex items-center gap-2">

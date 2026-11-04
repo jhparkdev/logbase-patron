@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.budget_policy import BudgetStatus
+from app.services.budget_policy import WARNING_PCT, BudgetStatus
 from app.services.project_budgets import project_budget_rows
 from app.services.project_detail import project_detail
 from tests.db_helpers import Factory
@@ -205,6 +205,46 @@ async def test_예산은_적용_기간_안의_달에만_보인다(
 
     assert detail is not None
     assert (detail.budget.monthly_amount_usd is not None) is applies
+
+
+@pytest.mark.parametrize(
+    ("offset", "expected"),
+    [
+        (Decimal("-0.01"), BudgetStatus.NORMAL),
+        (Decimal(0), BudgetStatus.WARNING),
+        (Decimal("0.01"), BudgetStatus.WARNING),
+    ],
+    ids=["기준 바로 전", "기준과 같음", "기준 바로 후"],
+)
+async def test_예산_현황은_상태_판단에_쓴_주의_기준을_함께_준다(
+    db_session: AsyncSession,
+    factory: Factory,
+    offset: Decimal,
+    expected: BudgetStatus,
+) -> None:
+    project = await factory.project()
+    project_id = project["project_id"]
+    # 예산을 100달러로 두면 사용액이 곧 사용률(%)이다
+    await factory.budget(project_id=project_id, monthly_amount_usd=Decimal(100))
+    await internal_call(factory, project_id=project_id, cost_usd=WARNING_PCT + offset)
+
+    detail = await project_detail(db_session, project_id, OCT)
+
+    assert detail is not None
+    assert detail.budget.warning_threshold_pct == WARNING_PCT
+    assert detail.budget.status == expected
+
+
+async def test_예산이_없어도_주의_기준을_준다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    project = await factory.project()
+
+    detail = await project_detail(db_session, project["project_id"], OCT)
+
+    assert detail is not None
+    assert detail.budget.status == BudgetStatus.UNSET
+    assert detail.budget.warning_threshold_pct == WARNING_PCT
 
 
 async def test_표의_한_행과_사용액_상태가_같다(

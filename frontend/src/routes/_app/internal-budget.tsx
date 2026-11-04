@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useDeferredValue } from "react";
 import {
+  commandCodeUsageQuery,
   internalSummaryQuery,
   projectRowsOptions,
   requestRowsOptions,
@@ -20,6 +21,7 @@ import {
   filterFormValues,
   filterSearchParams,
 } from "../../features/internal-budget/lib/search";
+import { BudgetStatusNotice } from "../../shared/components/budget/BudgetStatusNotice";
 import { DataBlock } from "../../shared/components/ui/DataBlock";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 import { RefreshingBar } from "../../shared/components/ui/RefreshingBar";
@@ -41,6 +43,7 @@ export const Route = createFileRoute("/_app/internal-budget")({
     }
     if (deps.view === undefined) {
       void queryClient.prefetchQuery(internalSummaryQuery(deps));
+      void queryClient.prefetchQuery(commandCodeUsageQuery);
     }
   },
   component: InternalBudgetPage,
@@ -61,6 +64,7 @@ function InternalBudgetPage() {
         detail: undefined,
         subscription: undefined,
       }),
+      resetScroll: false,
     });
 
   return (
@@ -79,6 +83,20 @@ function InternalBudgetPage() {
           })
         }
       />
+      {search.budgetStatus && (
+        <BudgetStatusNotice
+          status={search.budgetStatus}
+          onClear={() =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                budgetStatus: undefined,
+                page: undefined,
+              }),
+            })
+          }
+        />
+      )}
       {search.view === undefined ? (
         <>
           <div className="relative">
@@ -112,7 +130,6 @@ function InternalBudgetPage() {
       {search.subscription !== undefined && (
         <SubscriptionPanel
           subscription={search.subscription}
-          search={shown}
           month={month}
           onClose={closePanel}
         />

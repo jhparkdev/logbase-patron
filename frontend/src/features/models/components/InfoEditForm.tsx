@@ -50,7 +50,7 @@ export function InfoEditForm({
       onSubmit={handleSubmit((values) =>
         save.mutate({ [field]: values.value }, { onSuccess: onDone }),
       )}
-      className="col-span-2 flex flex-col gap-3"
+      className="flex flex-col gap-3"
     >
       {save.isError && (
         <FormError error={save.error} fallback={SAVE_FAILED_MESSAGE} />

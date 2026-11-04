@@ -51,6 +51,11 @@ const BUDGET_STATUS_BADGE = {
   UNSET: { label: "미설정", tone: "grey" },
 } as const;
 
+export const budgetStatusSchema = z.custom<Schemas["BudgetStatus"]>(
+  (value) =>
+    typeof value === "string" && Object.hasOwn(BUDGET_STATUS_BADGE, value),
+);
+
 export function budgetStatusBadge(status: Schemas["BudgetStatus"]) {
   return BUDGET_STATUS_BADGE[status];
 }
@@ -61,4 +66,33 @@ export function amountForInput(amount: string | null): string {
     return "";
   }
   return amount.includes(".") ? amount.replace(/\.?0+$/, "") : amount;
+}
+
+/** 요약 카드의 남은 예산 줄. 예산이 없으면 두지 않고, 넘었으면 음수 대신 초과 금액으로 보여 준다. */
+export function remainingBudget(remaining: string | null) {
+  if (remaining === null) {
+    return undefined;
+  }
+  return remaining.startsWith("-")
+    ? { label: "초과 금액", amount: remaining.slice(1), over: true }
+    : { label: "남은 예산", amount: remaining, over: false };
+}
+
+const FULL_PERCENT = 100;
+
+/** 서비스가 고객·프로젝트 예산에서 차지하는 비중. 글자는 실제 비중, 막대는 100%에서 멈춘다. */
+export function serviceBudgetShare(sharePct: string | null): {
+  label: string;
+  percent?: number;
+  width?: number;
+} {
+  if (sharePct === null) {
+    return { label: "예산 미설정" };
+  }
+  const percent = Math.round(Number(sharePct));
+  return {
+    label: `예산의 ${percent}%`,
+    percent,
+    width: Math.min(percent, FULL_PERCENT),
+  };
 }

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.schemas.simulation import ReasoningEffort
+from app.services.model_registry import stored_reasoning_efforts
 
 TEMPERATURE_PARAMETER = "temperature"
 REASONING_PARAMETER = "reasoning"
@@ -26,17 +27,43 @@ class ModelParameterUnsupportedError(ValueError):
         self.parameters = parameters
 
 
-def parameter_support(supported_parameters: Collection[str]) -> ParameterSupport:
-    """OpenRouter 가 알려 준 지원 파라미터에서 받을 수 있는 설정을 판단한다.
+def parameter_support(
+    supported_parameters: Collection[str],
+    openrouter_metadata: Mapping[str, Any] | None = None,
+) -> ParameterSupport:
+    """OpenRouter 가 알려 준 지원 파라미터와 등록 때 저장한 모델 정보에서 받을 수 있는 설정을 판단한다.
 
-    강도별 지원 범위는 이 목록만으로 알 수 없어 reasoning 이 있으면 모든 값을 받는 것으로 본다.
-    강도별 판단이 생기면 이 함수만 바꾼다.
+    reasoning 이 있으면 저장된 강도 목록(stored_reasoning_efforts)을 쓰고, 저장된 정보가 없으면
+    (목록 저장 전에 등록된 모델 등) 모든 값을 받는 것으로 본다. 모델 응답(model_common)과 같은 규칙이다.
     """
+    stored = stored_reasoning_efforts(openrouter_metadata)
     return ParameterSupport(
         temperature=TEMPERATURE_PARAMETER in supported_parameters,
         reasoning_efforts=(
-            tuple(ReasoningEffort)
+            (tuple(ReasoningEffort) if stored is None else stored)
             if REASONING_PARAMETER in supported_parameters
+            else ()
+        ),
+    )
+
+
+def narrow_to_provider(
+    support: ParameterSupport, provider_parameters: Collection[str] | None
+) -> ParameterSupport:
+    """모델이 받는 설정 중 고른 서버 업체도 받는 것만 남긴다.
+
+    업체가 temperature 나 reasoning 을 받지 않으면 OpenRouter 가 오류 없이 그 값을 버리므로
+    접수에서 미리 걸러야 한다. 업체 목록을 읽지 못하면 OpenRouter 가 빈 목록을 주므로,
+    None 과 빈 목록은 모두 모름으로 보고 모델 단위 판단을 그대로 쓴다.
+    """
+    if not provider_parameters:
+        return support
+    return ParameterSupport(
+        temperature=support.temperature
+        and TEMPERATURE_PARAMETER in provider_parameters,
+        reasoning_efforts=(
+            support.reasoning_efforts
+            if REASONING_PARAMETER in provider_parameters
             else ()
         ),
     )

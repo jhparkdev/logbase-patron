@@ -155,7 +155,7 @@ export function SimulationResults({
         }
         onClose={() => setOpened(undefined)}
       >
-        <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-grey-50 p-4 text-body-sm">
+        <pre className="max-h-96 overflow-auto whitespace-pre-wrap text-wrap rounded-lg bg-grey-50 p-4 text-body-sm">
           {opened?.slot.response}
         </pre>
       </SimulatorDialog>

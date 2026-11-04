@@ -25,6 +25,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     monkeypatch.delenv("SESSION_COOKIE_SECURE", raising=False)
     monkeypatch.delenv("ALLOWED_ORIGIN", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("COMMAND_CODE_API_KEYS", raising=False)
     return monkeypatch
 
 
@@ -154,3 +155,121 @@ def test_database_password_is_hidden_in_repr(clean_env: pytest.MonkeyPatch) -> N
 
     assert "dev-secret" not in repr(settings)
     assert "dev-secret" not in str(settings)
+
+
+COMMAND_CODE_KEYS_JSON = (
+    '{"COMMAND_CODE_KEY_HONG": "cc-hong-test-only", "COMMAND_CODE_KEY_KIM": "cc-kim"}'
+)
+
+
+def test_command_code_api_keys_default_to_empty(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """Key를 하나도 넣지 않아도 앱은 뜬다. 그때는 모든 구성원이 Key 없음으로 보인다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.delenv("COMMAND_CODE_API_KEYS", raising=False)
+
+    assert Settings(_env_file=None).command_code_api_keys == {}
+
+
+def test_reads_command_code_api_keys_from_one_json_variable(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """환경변수 하나(JSON)에 구성원 Key 이름 → Key 원문을 여러 개 담는다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", COMMAND_CODE_KEYS_JSON)
+
+    keys = Settings(_env_file=None).command_code_api_keys
+
+    assert set(keys) == {"COMMAND_CODE_KEY_HONG", "COMMAND_CODE_KEY_KIM"}
+    assert keys["COMMAND_CODE_KEY_HONG"].get_secret_value() == "cc-hong-test-only"
+
+
+def test_command_code_api_keys_are_hidden_in_repr(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """설정 객체를 출력하거나 로그에 남겨도 Command Code Key가 보이지 않는다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", COMMAND_CODE_KEYS_JSON)
+
+    settings = Settings(_env_file=None)
+
+    assert "cc-hong-test-only" not in repr(settings)
+    assert "cc-hong-test-only" not in str(settings)
+
+
+def test_reads_command_code_api_keys_from_env_file(
+    clean_env: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """로컬에서는 .env의 한 줄로 넣는다."""
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        f"DATABASE_URL={DEV_URL}\nCOMMAND_CODE_API_KEYS={COMMAND_CODE_KEYS_JSON}\n",
+        encoding="utf-8",
+    )
+
+    keys = Settings(_env_file=env_file).command_code_api_keys
+
+    assert keys["COMMAND_CODE_KEY_KIM"].get_secret_value() == "cc-kim"
+
+
+def test_broken_command_code_api_keys_json_stops_startup(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """JSON이 깨졌는데 조용히 빈 값으로 넘어가면 원인을 찾기 어려워 시작할 때 멈춘다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", "{not json")
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+@pytest.mark.parametrize(
+    "broken",
+    ['{"COMMAND_CODE_KEY_A": "cc-secret-mark"', '["cc-secret-mark"]'],
+)
+def test_startup_error_for_broken_command_code_api_keys_hides_the_value(
+    clean_env: pytest.MonkeyPatch, broken: str
+) -> None:
+    """깨진 값을 알리는 오류 문구에 Key로 보이는 글자가 섞여 나오지 않는다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", broken)
+
+    with pytest.raises(ValidationError) as error:
+        Settings(_env_file=None)
+
+    assert "cc-secret-mark" not in str(error.value)
+    assert "cc-secret-mark" not in repr(error.value)
+
+
+@pytest.mark.parametrize("empty", ["", "   "])
+def test_empty_command_code_api_keys_means_no_keys(
+    clean_env: pytest.MonkeyPatch, empty: str
+) -> None:
+    """.env.example를 그대로 복사해 값이 빈 채로 두어도 앱이 뜬다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", empty)
+
+    assert Settings(_env_file=None).command_code_api_keys == {}
+
+
+def test_empty_command_code_api_keys_line_in_env_file_means_no_keys(
+    clean_env: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        f"DATABASE_URL={DEV_URL}\nCOMMAND_CODE_API_KEYS=\n", encoding="utf-8"
+    )
+
+    assert Settings(_env_file=env_file).command_code_api_keys == {}
+
+
+@pytest.mark.parametrize("not_a_map", ["[]", '"text"', "1", "null"])
+def test_command_code_api_keys_must_be_a_json_object(
+    clean_env: pytest.MonkeyPatch, not_a_map: str
+) -> None:
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("COMMAND_CODE_API_KEYS", not_a_map)
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

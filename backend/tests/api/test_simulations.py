@@ -18,12 +18,14 @@ from app.models import (
     AIRequest,
     AIRequestPayload,
     CostStatus,
+    ModelRegistry,
     ModelStatus,
     RequestStatus,
     SimulationResult,
     SimulationRun,
     SimulationStatus,
 )
+from app.openrouter.lookup_result import EndpointInfo
 from app.services.simulation_manager import SimulationManager
 from app.services.simulation_ports import SimulationDeps
 from app.services.simulation_recorders import ScopedRequestRecorder
@@ -178,6 +180,30 @@ async def test_an_unregistered_model_is_refused(
     response = await client.post(CREATE, json=body)
 
     assert (response.status_code, response.json()["code"]) == (422, "MODEL_NOT_FOUND")
+    assert manager.jobs == []
+
+
+@pytest.mark.usefixtures("poc_setup", "signed_in")
+async def test_a_setting_the_chosen_provider_does_not_take_is_refused(
+    client: AsyncClient,
+    manager: FakeManager,
+    db_session: AsyncSession,
+    models: list[int],
+    endpoints: dict[str, list[EndpointInfo]],
+) -> None:
+    second = await db_session.get_one(ModelRegistry, models[1])
+    endpoints[second.openrouter_model_id] = [
+        EndpointInfo(provider_name="DekaLLM", supported_parameters=["max_tokens"])
+    ]
+    body = create_body(models)
+    body["models"][1]["execution_config"] = {"temperature": 0.2}
+
+    response = await client.post(CREATE, json=body)
+
+    assert (response.status_code, response.json()["code"]) == (
+        422,
+        "MODEL_PARAMETER_NOT_SUPPORTED",
+    )
     assert manager.jobs == []
 
 

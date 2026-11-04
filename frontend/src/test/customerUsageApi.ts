@@ -65,6 +65,7 @@ const OVER_BUDGET: Schemas["BudgetUsage"] = {
   remaining_usd: "-2.10",
   unknown_cost_count: 2,
   status: "OVER",
+  warning_threshold_pct: "80",
 };
 
 const UNSET_BUDGET: Schemas["BudgetUsage"] = {
@@ -77,6 +78,7 @@ const UNSET_BUDGET: Schemas["BudgetUsage"] = {
   remaining_usd: null,
   unknown_cost_count: 0,
   status: "UNSET",
+  warning_threshold_pct: "80",
 };
 
 const CUSTOMER_ROW: Schemas["CustomerUsageRow"] = {
@@ -165,6 +167,7 @@ export const DETAIL: Schemas["CustomerUsageDetail"] = {
       call_count: 1000,
       confirmed_cost_usd: "2.10",
       estimated_cost_usd: "10.00",
+      total_cost_usd: "12.10",
       unknown_cost_count: 2,
       budget_share_pct: "121.00",
     },

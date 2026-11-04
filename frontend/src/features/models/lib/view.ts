@@ -7,6 +7,9 @@ type ConnectionTestStatus = components["schemas"]["ConnectionTestStatus"];
 type ProviderRead = components["schemas"]["ProviderRead"];
 type ConnectionTestResult = components["schemas"]["ConnectionTestResult"];
 
+/** "YYYY-MM-DD"의 글자 수 */
+const DATE_LENGTH = 10;
+
 const STATUS_BADGES = {
   TESTING: { tone: "blue", label: "검증 중" },
   ACTIVE: { tone: "green", label: "사용 중" },
@@ -103,17 +106,41 @@ export function testCostView({
   };
 }
 
-// TESTING으로 돌아가는 상태 변경은 없음. 가능 여부(24시간 안의 성공 테스트 등)는 서버가 판단
+// TESTING으로 돌아가는 상태 변경은 없음. 가능 여부(최근 성공 테스트 유무 등)는 서버가 판단
 export type ChangeableStatus = Exclude<ModelStatus, "TESTING">;
 
-const CHANGEABLE_STATUSES = [
-  "ACTIVE",
-  "INACTIVE",
-] as const satisfies readonly ChangeableStatus[];
+// 서버 문구 대신 쓰는 거절 안내. 서버가 검사하는 시간 조건을 화면 문구에 적지 않기로 한 결정(P-03)
+const STATUS_CHANGE_ERROR_MESSAGES: Partial<Record<string, string>> = {
+  TEST_NOT_PASSED:
+    "성공한 연결 테스트가 있어야 사용 시작할 수 있어요. 연결 테스트를 먼저 실행해 주세요.",
+};
 
-/** 상태 변경 버튼으로 보여 줄 상태. 현재 상태는 뺌 */
-export function statusChangeTargets(current: ModelStatus): ChangeableStatus[] {
-  return CHANGEABLE_STATUSES.filter((status) => status !== current);
+/** 상태 변경 거절 문구. 우리 문구가 있는 코드만 바꾸고, 나머지는 서버 문구 그대로 */
+export function statusChangeErrorMessage(
+  code: string | undefined,
+  serverMessage: string,
+): string {
+  return (code && STATUS_CHANGE_ERROR_MESSAGES[code]) || serverMessage;
+}
+
+/** 상태 전환 칸 세 개. 검증 중으로는 돌아갈 수 없고 현재 상태는 다시 고를 수 없다 */
+export function statusSegments(current: ModelStatus) {
+  return MODEL_STATUSES.map((status) => ({
+    status,
+    ...STATUS_BADGES[status],
+    selected: status === current,
+    disabled: status === "TESTING" || status === current,
+  }));
+}
+
+/** 상태 칸 아래 안내. 누를 수 있는 칸마다 누르면 무슨 일이 생기는지 */
+export function statusNotices(current: ModelStatus) {
+  return statusSegments(current)
+    .filter((segment) => !segment.disabled && segment.status !== "TESTING")
+    .map((segment) => ({
+      label: segment.label,
+      hint: STATUS_CHANGES[segment.status as ChangeableStatus].hint,
+    }));
 }
 
 const STATUS_CHANGES = {
@@ -137,4 +164,11 @@ const NONE_LABEL = "없음";
 /** 시각이 없으면 빈칸 대신 없음, 있으면 KST */
 export function timeOrNone(utc: string | null): string {
   return utc === null ? NONE_LABEL : formatKstDateTime(utc);
+}
+
+/** OpenRouter에 올라온 날. 모르면 null(보여 주지 않음) */
+export function releasedLabel(createdAt: string | null): string | null {
+  return createdAt === null
+    ? null
+    : `${formatKstDateTime(createdAt).slice(0, DATE_LENGTH)} 출시`;
 }

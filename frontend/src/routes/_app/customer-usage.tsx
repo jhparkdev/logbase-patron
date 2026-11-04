@@ -19,6 +19,7 @@ import {
   filterFormValues,
   filterSearchParams,
 } from "../../features/customer-usage/lib/search";
+import { BudgetStatusNotice } from "../../shared/components/budget/BudgetStatusNotice";
 import { DataBlock } from "../../shared/components/ui/DataBlock";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 import { RefreshingBar } from "../../shared/components/ui/RefreshingBar";
@@ -68,6 +69,20 @@ function CustomerUsagePage() {
           })
         }
       />
+      {search.budgetStatus && (
+        <BudgetStatusNotice
+          status={search.budgetStatus}
+          onClear={() =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                budgetStatus: undefined,
+                page: undefined,
+              }),
+            })
+          }
+        />
+      )}
       {view === undefined ? (
         <>
           <div className="relative">
@@ -101,7 +116,10 @@ function CustomerUsagePage() {
           customerId={detail}
           budgetMonth={budgetMonth}
           onClose={() =>
-            navigate({ search: (prev) => ({ ...prev, detail: undefined }) })
+            navigate({
+              search: (prev) => ({ ...prev, detail: undefined }),
+              resetScroll: false,
+            })
           }
         />
       )}

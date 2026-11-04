@@ -1,4 +1,7 @@
-"""P-01 집계 테스트. 경계값은 만든 행으로, 합계는 Mock 기대값(Mock_예상합계값_v0.6)으로 검증한다."""
+"""P-01 집계 테스트. 경계값은 만든 행으로, 합계는 seed 기대값으로 검증한다.
+
+seed 기대값은 집계 코드를 거치지 않고 생성기(app.mock_data)가 만든 행을 직접 더해 구했다.
+"""
 
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -17,7 +20,7 @@ from app.schemas.usage import (
 )
 from app.services import aggregation
 from app.services.aggregation import UsageFilter, change_pct, previous_period
-from app.services.budget_policy import BudgetStatus
+from app.services.budget_policy import WARNING_PCT, BudgetStatus
 from app.services.simulation_period import DateRange
 from tests.db_helpers import Factory
 
@@ -28,6 +31,29 @@ OCTOBER_1ST = date(2026, 10, 1)
 KST_OCTOBER_START = datetime(2026, 9, 30, 15, tzinfo=UTC)
 NOVEMBER_START = datetime(2026, 10, 31, 15, tzinfo=UTC)
 ONE_MICROSECOND = timedelta(microseconds=1)
+
+
+async def test_budget_status_filter_is_applied_before_total_and_pagination(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    for amount in ("1", "101", "20"):
+        customer = await factory.customer()
+        await factory.budget(
+            scope_type="CUSTOMER",
+            customer_id=customer["customer_id"],
+            monthly_amount_usd=Decimal(100),
+        )
+        await customer_call(
+            factory, customer_id=customer["customer_id"], **confirmed(amount)
+        )
+    page = await aggregation.list_customer_rows(
+        db_session, OCTOBER_FILTER, CustomerRowsQuery(budget_status="OVER", page_size=1)
+    )
+    assert page.total == 1
+    assert len(page.items) == 1
+    assert page.items[0].budget.status == BudgetStatus.OVER
+
+
 IN_OCTOBER = datetime(2026, 10, 10, 3, tzinfo=UTC)
 LATE_PAGE_SIZE = 100
 
@@ -104,12 +130,12 @@ async def test_summary_matches_the_mock_totals_for_october(
 ) -> None:
     summary = await aggregation.summarize(db_session, OCTOBER_FILTER)
 
-    assert summary.call_count == 415
-    assert summary.success_count == 380
-    assert six_places(summary.confirmed_cost_usd) == Decimal("2.412117")
-    assert six_places(summary.estimated_cost_usd) == Decimal("0.044372")
-    assert summary.unknown_cost_count == 35
-    assert summary.input_tokens + summary.output_tokens == 1_196_551
+    assert summary.call_count == 1461
+    assert summary.success_count == 1416
+    assert six_places(summary.confirmed_cost_usd) == Decimal("6.997544")
+    assert six_places(summary.estimated_cost_usd) == Decimal("0.070391")
+    assert summary.unknown_cost_count == 42
+    assert summary.input_tokens + summary.output_tokens == 5_184_779
 
 
 @pytest.mark.usefixtures("seeded")
@@ -131,9 +157,12 @@ async def test_customer_rows_match_the_mock_totals_by_customer(
 
     by_name = {name: (t[0], six_places(t[1]), t[2]) for name, t in totals.items()}
     assert by_name == {
-        "가상고객A (패션 쇼핑몰)": (281, Decimal("2.269524"), 25),
-        "가상고객B (가전 유통)": (132, Decimal("0.186856"), 10),
-        None: (2, Decimal("0.000108"), 0),
+        "로웰린 스튜디오": (623, Decimal("4.193431"), 20),
+        "에이븐전자몰": (313, Decimal("0.259847"), 8),
+        "뮤렌 코스메틱": (322, Decimal("2.383118"), 7),
+        "솔레담 푸드": (137, Decimal("0.028476"), 7),
+        "모뉴하우스": (54, Decimal("0.043043"), 0),
+        None: (12, Decimal("0.160021"), 0),
     }
 
 
@@ -143,18 +172,26 @@ async def test_customer_budgets_match_the_mock_budget_table(
 ) -> None:
     over = await aggregation.customer_detail(db_session, 1, OCTOBER_1ST)
     normal = await aggregation.customer_detail(db_session, 2, OCTOBER_1ST)
+    warning = await aggregation.customer_detail(db_session, 3, OCTOBER_1ST)
+    unset = await aggregation.customer_detail(db_session, 5, OCTOBER_1ST)
 
     assert over is not None
     assert normal is not None
+    assert warning is not None
+    assert unset is not None
     assert over.budget.status == BudgetStatus.OVER
-    assert one_place(over.budget.usage_pct) == Decimal("115.2")
-    assert one_place(over.budget.confirmed_usage_pct) == Decimal("113.0")
-    assert six_places(over.budget.remaining_usd) == Decimal("-0.299524")
-    assert over.budget.unknown_cost_count == 25
+    assert one_place(over.budget.usage_pct) == Decimal("110.4")
+    assert one_place(over.budget.confirmed_usage_pct) == Decimal("108.8")
+    assert six_places(over.budget.remaining_usd) == Decimal("-0.393431")
+    assert over.budget.unknown_cost_count == 20
     assert normal.budget.status == BudgetStatus.NORMAL
-    assert one_place(normal.budget.usage_pct) == Decimal("55.0")
-    assert one_place(normal.budget.confirmed_usage_pct) == Decimal("54.9")
-    assert normal.budget.unknown_cost_count == 10
+    assert one_place(normal.budget.usage_pct) == Decimal("52.0")
+    assert one_place(normal.budget.confirmed_usage_pct) == Decimal("51.7")
+    assert normal.budget.unknown_cost_count == 8
+    assert warning.budget.status == BudgetStatus.WARNING
+    assert one_place(warning.budget.usage_pct) == Decimal("88.3")
+    assert six_places(warning.budget.remaining_usd) == Decimal("0.316882")
+    assert unset.budget.status == BudgetStatus.UNSET
 
 
 @pytest.mark.usefixtures("seeded")
@@ -164,8 +201,8 @@ async def test_customer_budget_for_september_uses_only_september_usage(
     detail = await aggregation.customer_detail(db_session, 1, date(2026, 9, 1))
 
     assert detail is not None
-    assert six_places(detail.budget.used_usd) == Decimal("0.498354")
-    assert one_place(detail.budget.usage_pct) == Decimal("25.3")
+    assert six_places(detail.budget.used_usd) == Decimal("2.904613")
+    assert one_place(detail.budget.usage_pct) == Decimal("76.4")
 
 
 @pytest.mark.usefixtures("seeded")
@@ -919,6 +956,96 @@ async def test_detail_without_budget_has_no_share(
     assert detail is not None
     assert detail.services[0].budget_share_pct is None
     assert detail.budget.effective_from_month is None
+
+
+async def test_detail_service_total_adds_confirmed_and_estimated_but_not_unknown(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    customer = await factory.customer()
+    service = await factory.service()
+    same = {"customer_id": customer["customer_id"], "service_id": service["service_id"]}
+    await customer_call(factory, **same, **confirmed("2"))
+    await customer_call(factory, **same, **await estimated(factory, "3"))
+    await customer_call(factory, **same)
+
+    detail = await aggregation.customer_detail(
+        db_session, customer["customer_id"], OCTOBER_1ST
+    )
+
+    assert detail is not None
+    [usage] = detail.services
+    assert usage.total_cost_usd == Decimal(5)
+    assert usage.unknown_cost_count == 1
+
+
+async def test_detail_service_totals_add_up_to_the_budget_usage(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    customer = await factory.customer()
+    customer_id = customer["customer_id"]
+    for name, amount in (("가 서비스", "1.5"), ("나 서비스", "2.25")):
+        service = await factory.service(name=name)
+        await customer_call(
+            factory,
+            customer_id=customer_id,
+            service_id=service["service_id"],
+            **confirmed(amount),
+        )
+        await customer_call(
+            factory,
+            customer_id=customer_id,
+            service_id=service["service_id"],
+            **await estimated(factory, amount),
+        )
+
+    detail = await aggregation.customer_detail(db_session, customer_id, OCTOBER_1ST)
+
+    assert detail is not None
+    services_total = sum((s.total_cost_usd for s in detail.services), Decimal(0))
+    assert services_total == detail.budget.used_usd == Decimal("7.5")
+
+
+@pytest.mark.parametrize(
+    ("offset", "expected"),
+    [
+        (Decimal("-0.01"), BudgetStatus.NORMAL),
+        (Decimal(0), BudgetStatus.WARNING),
+        (Decimal("0.01"), BudgetStatus.WARNING),
+    ],
+    ids=["기준 바로 전", "기준과 같음", "기준 바로 후"],
+)
+async def test_detail_budget_sends_the_warning_threshold_its_status_uses(
+    db_session: AsyncSession, factory: Factory, offset: Decimal, expected: BudgetStatus
+) -> None:
+    customer = await factory.customer()
+    customer_id = customer["customer_id"]
+    # 예산을 100달러로 두면 사용액이 곧 사용률(%)이다
+    await factory.budget(
+        scope_type="CUSTOMER", customer_id=customer_id, monthly_amount_usd=Decimal(100)
+    )
+    await customer_call(
+        factory, customer_id=customer_id, **confirmed(str(WARNING_PCT + offset))
+    )
+
+    detail = await aggregation.customer_detail(db_session, customer_id, OCTOBER_1ST)
+
+    assert detail is not None
+    assert detail.budget.warning_threshold_pct == WARNING_PCT
+    assert detail.budget.status == expected
+
+
+async def test_detail_without_budget_still_sends_the_warning_threshold(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    customer = await factory.customer()
+
+    detail = await aggregation.customer_detail(
+        db_session, customer["customer_id"], OCTOBER_1ST
+    )
+
+    assert detail is not None
+    assert detail.budget.status == BudgetStatus.UNSET
+    assert detail.budget.warning_threshold_pct == WARNING_PCT
 
 
 async def test_detail_of_an_unknown_customer_is_none(db_session: AsyncSession) -> None:

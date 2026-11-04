@@ -10,6 +10,7 @@ import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
 import { IMAGE_LIMITS, type ImageLimits } from "../lib/limits";
 import type { ModelChoice, ScenarioChoice } from "../lib/presentation";
 import { AdvancedSettings } from "./AdvancedSettings";
+import { AssistantSimulatorBridge } from "./AssistantSimulatorBridge";
 import { ComparisonConfirmationDialog } from "./ComparisonConfirmationDialog";
 import { InputFields } from "./InputFields";
 import { ModelSelection } from "./ModelSelection";
@@ -53,6 +54,13 @@ export function SimulatorPage({
   return (
     <>
       <PageHeader title="AI 모델 시뮬레이터" />
+      <AssistantSimulatorBridge
+        form={workflow.form}
+        choices={choices}
+        scenarios={scenarios}
+        busy={workflow.busy || !!workflow.pendingDraft}
+        onApplied={workflow.setAdvancedOpen}
+      />
       {!onRun && (
         <Notice
           title="비교 실행을 준비하고 있습니다"

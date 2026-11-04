@@ -18,6 +18,7 @@ from pydantic import (
 
 from app.models import CostStatus, ErrorType, RequestStatus
 from app.schemas.models import MAX_MODEL_ID, MAX_PAGE, SortOrder
+from app.schemas.plain_decimal import PlainDecimal
 from app.services.budget_policy import BudgetStatus
 
 # 전체보기 한 페이지 개수. 기본값은 화면의 PAGE_SIZE와 같다
@@ -112,6 +113,7 @@ class _RowsQuery(UsageFilterQuery):
 
 class CustomerRowsQuery(_RowsQuery):
     sort: CustomerRowSort = CustomerRowSort.CONFIRMED
+    budget_status: BudgetStatus | None = None
 
 
 class RequestRowsQuery(_RowsQuery):
@@ -149,21 +151,21 @@ class UsageSummary(BaseModel):
     timeout_count: int
     input_tokens: int
     output_tokens: int
-    confirmed_cost_usd: Decimal
-    estimated_cost_usd: Decimal
+    confirmed_cost_usd: PlainDecimal
+    estimated_cost_usd: PlainDecimal
     unknown_cost_count: int
-    task_change_pct: Decimal | None
-    call_change_pct: Decimal | None
-    confirmed_cost_change_pct: Decimal | None
-    estimated_cost_change_pct: Decimal | None
+    task_change_pct: PlainDecimal | None
+    call_change_pct: PlainDecimal | None
+    confirmed_cost_change_pct: PlainDecimal | None
+    estimated_cost_change_pct: PlainDecimal | None
 
 
 class UsageTrendPoint(BaseModel):
     date: date
     task_count: int
     call_count: int
-    confirmed_cost_usd: Decimal
-    estimated_cost_usd: Decimal
+    confirmed_cost_usd: PlainDecimal
+    estimated_cost_usd: PlainDecimal
     unknown_cost_count: int
 
 
@@ -177,14 +179,15 @@ class BudgetUsage(BaseModel):
     """그 달의 고객 예산 현황. 서비스·모델 필터와 관계없이 고객 전체 사용액으로 계산한다."""
 
     month: Month
-    monthly_amount_usd: Decimal | None  # 예산이 없으면 null
+    monthly_amount_usd: PlainDecimal | None  # 예산이 없으면 null
     effective_from_month: Month | None
-    used_usd: Decimal  # 확정 + 추정
-    usage_pct: Decimal | None  # 추정 포함. 상태는 이 값으로 판단한다
-    confirmed_usage_pct: Decimal | None
-    remaining_usd: Decimal | None
+    used_usd: PlainDecimal  # 확정 + 추정
+    usage_pct: PlainDecimal | None  # 추정 포함. 상태는 이 값으로 판단한다
+    confirmed_usage_pct: PlainDecimal | None
+    remaining_usd: PlainDecimal | None
     unknown_cost_count: int  # 사용액에 반영되지 않은 호출 수
     status: BudgetStatus
+    warning_threshold_pct: PlainDecimal  # 상태 판단에 쓰는 WARNING 기준 사용률
 
 
 class CustomerUsageRow(BaseModel):
@@ -196,8 +199,8 @@ class CustomerUsageRow(BaseModel):
     service_name: str
     task_count: int
     call_count: int
-    confirmed_cost_usd: Decimal
-    estimated_cost_usd: Decimal
+    confirmed_cost_usd: PlainDecimal
+    estimated_cost_usd: PlainDecimal
     unknown_cost_count: int
     budget: BudgetUsage
 
@@ -221,7 +224,7 @@ class CustomerRequestRow(BaseModel):
     task_type: str | None
     task_type_label: str | None  # 화면에 보여 줄 이름. 작업이 없으면 null
     tokens: int | None  # 입력 + 출력. 어느 쪽이든 모르면 null
-    cost_usd: Decimal | None
+    cost_usd: PlainDecimal | None
     cost_status: CostStatus
     status: RequestStatus
     error_type: ErrorType | None
@@ -241,10 +244,11 @@ class CustomerServiceUsage(BaseModel):
     service_name: str
     task_count: int
     call_count: int
-    confirmed_cost_usd: Decimal
-    estimated_cost_usd: Decimal
+    confirmed_cost_usd: PlainDecimal
+    estimated_cost_usd: PlainDecimal
+    total_cost_usd: PlainDecimal  # 확정 + 추정. 미확인은 금액을 모르므로 건수로만 센다
     unknown_cost_count: int
-    budget_share_pct: Decimal | None  # 예산이 없으면 null
+    budget_share_pct: PlainDecimal | None  # 예산이 없으면 null
 
 
 class CustomerUsageDetail(BaseModel):
@@ -255,8 +259,8 @@ class CustomerUsageDetail(BaseModel):
     month: Month
     task_count: int
     call_count: int
-    confirmed_cost_usd: Decimal
-    estimated_cost_usd: Decimal
+    confirmed_cost_usd: PlainDecimal
+    estimated_cost_usd: PlainDecimal
     unknown_cost_count: int
     budget: BudgetUsage
     services: list[CustomerServiceUsage]
@@ -276,6 +280,6 @@ class CustomerBudgetSave(BaseModel):
 class CustomerBudgetRead(BaseModel):
     budget_id: int
     customer_id: int
-    monthly_amount_usd: Decimal
+    monthly_amount_usd: PlainDecimal
     effective_from_month: Month
     effective_to_month: Month | None

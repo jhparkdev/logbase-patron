@@ -70,6 +70,20 @@ async def read_options(session: SessionDep) -> SubscriptionOptions:
     )
 
 
+@router.get("/{subscription_id}", responses=DETAIL_ERRORS)
+async def read_subscription(
+    subscription_id: SubscriptionIdPath, session: SessionDep
+) -> SubscriptionRow:
+    row = await subscriptions.get_subscription(session, subscription_id)
+    if row is None:
+        raise ApiError(
+            status.HTTP_404_NOT_FOUND,
+            ErrorCode.NOT_FOUND,
+            SUBSCRIPTION_NOT_FOUND_MESSAGE,
+        )
+    return row
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,

@@ -161,6 +161,7 @@ export const PROJECT_DETAIL: Schemas["ProjectUsageDetail"] = {
     remaining_usd: "1579.500000000000",
     unknown_cost_count: 2,
     status: "NORMAL",
+    warning_threshold_pct: "80",
   },
   services: [],
   subscriptions: [],
@@ -170,6 +171,35 @@ export const SUBSCRIPTION_OPTIONS: Schemas["SubscriptionOptions"] = {
   projects: [
     { project_id: 1, name: "사내 챗봇 구축" },
     { project_id: 2, name: "문서 요약" },
+  ],
+};
+
+export const PROJECT_CREATED: Schemas["ProjectRead"] = {
+  project_id: 3,
+  project_code: "PRJ-3",
+  name: "신규 프로젝트",
+  project_type: "INTERNAL_DEV",
+};
+
+export const MEMBER_USAGE: Schemas["CommandCodeUsageList"] = {
+  items: [
+    {
+      member_name: "홍길동",
+      status: "OK",
+      used_credits: "27.6518301021",
+      request_count: 2379,
+      input_tokens: 816632167,
+      output_tokens: 1987270,
+      remaining_credits: "62.3745912155",
+      period_start: "2026-10-20T02:04:33Z",
+      period_end: "2026-11-20T02:04:33Z",
+      fetched_at: "2026-11-03T01:00:00Z",
+    },
+    {
+      member_name: "김철수",
+      status: "KEY_MISSING",
+      fetched_at: "2026-11-03T01:00:00Z",
+    },
   ],
 };
 
@@ -194,15 +224,19 @@ const DEFAULT_REPLIES = {
   subscriptions: ok(SUBSCRIPTIONS),
   subscriptionOptions: ok(SUBSCRIPTION_OPTIONS),
   subscriptionCreate: { status: 201, body: SUBSCRIPTIONS.items[0] },
+  subscription: ok(SUBSCRIPTIONS.items[1]),
   subscriptionUpdate: ok(SUBSCRIPTIONS.items[0]),
   detail: ok(PROJECT_DETAIL),
   budget: ok(SAVED_BUDGET),
+  projectCreate: { status: 201, body: PROJECT_CREATED },
+  commandCode: ok(MEMBER_USAGE),
 };
 
 /** 경로 끝부분별 응답을 바꾼다. 예: { summary: { status: 500, body: {} } } */
 type Replies = Partial<Record<keyof typeof DEFAULT_REPLIES, Reply>>;
 
 const SUBSCRIPTIONS_PATH = "/api/subscriptions";
+const PROJECTS_PATH = "/api/projects";
 const SUBSCRIPTION_PATH = /^\/api\/subscriptions\/\d+$/;
 const PROJECT_DETAIL_PATH = /^projects\/\d+$/;
 const PROJECT_BUDGET_PATH = /^projects\/\d+\/budget$/;
@@ -217,8 +251,11 @@ function blockOf(
   if (pathname === `${SUBSCRIPTIONS_PATH}/options`) {
     return "subscriptionOptions";
   }
+  if (pathname === PROJECTS_PATH) {
+    return "projectCreate";
+  }
   if (SUBSCRIPTION_PATH.test(pathname)) {
-    return "subscriptionUpdate";
+    return method === "GET" ? "subscription" : "subscriptionUpdate";
   }
   const last = pathname.slice(BASE.length + 1);
   if (PROJECT_DETAIL_PATH.test(last)) {
@@ -226,6 +263,9 @@ function blockOf(
   }
   if (PROJECT_BUDGET_PATH.test(last)) {
     return "budget";
+  }
+  if (last === "command-code") {
+    return "commandCode";
   }
   if (last in DEFAULT_REPLIES) {
     return last as keyof typeof DEFAULT_REPLIES;

@@ -22,30 +22,36 @@ from app.models import APIKey, User, UserSession
 from app.services import usage_catalog
 from tests.db_helpers import Factory
 
-# 시드를 넣은 뒤 테이블별 행 수 (설계 v0.6 mock 데이터 기준)
+# 데이터 요약 시나리오에 구조화 조건을 더한 시각(KST 2026-11-02 17:00)
+SCENARIO_CHANGED_AT = datetime(2026, 11, 2, 8, tzinfo=UTC)
+
+# 시드를 넣은 뒤 테이블별 행 수 (python -m app.mock_data 가 만든 seed 기준)
 EXPECTED_ROWS = {
-    "customers": 2,
+    "customers": 6,
     "projects": 3,
-    "users": 2,
+    "users": 6,
     "services": 5,
-    "api_keys": 5,
+    "api_keys": 17,
+    "command_code_keys": 0,
     "user_sessions": 0,
-    "models": 5,
-    "model_prices": 9,
-    "tasks": 165,
+    "models": 15,
+    "user_model_favorites": 10,
+    "model_prices": 15,
+    "tasks": 2468,
     "test_scenarios": 5,
-    "simulation_runs": 12,
-    "ai_requests": 799,
-    "ai_request_payloads": 33,
-    "input_assets": 2,
-    "cost_adjustments": 10,
-    "simulation_run_assets": 2,
-    "simulation_results": 33,
-    "budgets": 5,
-    "subscription_costs": 4,
-    "key_usage_snapshots": 2,
-    "usage_reconciliations": 2,
-    "change_logs": 5,
+    "simulation_runs": 46,
+    "ai_requests": 4753,
+    "ai_request_payloads": 172,
+    "input_assets": 0,
+    "output_assets": 0,
+    "cost_adjustments": 116,
+    "simulation_run_assets": 0,
+    "simulation_results": 132,
+    "budgets": 9,
+    "subscription_costs": 12,
+    "key_usage_snapshots": 5,
+    "usage_reconciliations": 4,
+    "change_logs": 44,
 }
 
 
@@ -126,18 +132,42 @@ async def test_data_summary_scenario_asks_for_structured_output(
 async def test_past_data_summary_runs_keep_the_conditions_they_ran_with(
     db_session: AsyncSession,
 ) -> None:
-    """실행에는 당시 값을 복사해 두므로 시나리오를 고쳐도 과거 실행의 조건은 그대로다."""
+    """실행에는 당시 값을 복사해 두므로, 시나리오를 고치기 전 실행에는 Schema가 없고 뒤 실행에는 있다."""
     await cli.apply_seed(await db_session.connection())
 
-    runs_with_schema = await db_session.scalar(
+    rows = (
+        await db_session.execute(
+            text(
+                "SELECT run.requested_at < :changed_at AS before_change, "
+                "count(*) FILTER (WHERE run.json_schema IS NOT NULL) AS with_schema, "
+                "count(*) AS total "
+                "FROM simulation_runs AS run JOIN test_scenarios USING (scenario_id) "
+                "WHERE scenario_code = 'DATA_SUMMARY' GROUP BY 1"
+            ),
+            {"changed_at": SCENARIO_CHANGED_AT},
+        )
+    ).all()
+    by_period = {row.before_change: (row.with_schema, row.total) for row in rows}
+
+    assert by_period[True][0] == 0 and by_period[True][1] > 0
+    assert by_period[False][0] == by_period[False][1] > 0
+
+
+async def test_seed_refuses_a_database_with_the_previous_mock_data(
+    db_session: AsyncSession,
+) -> None:
+    """v0.6 mock이 남은 DB에 새 seed를 겹쳐 넣지 않는다. 고정 ID가 겹치고 집계가 섞이기 때문이다."""
+    await db_session.execute(
         text(
-            "SELECT count(*) FROM simulation_runs AS run "
-            "JOIN test_scenarios USING (scenario_id) "
-            "WHERE scenario_code = 'DATA_SUMMARY' AND run.json_schema IS NOT NULL"
+            "INSERT INTO customers (customer_code, name, is_mock) "
+            "VALUES ('CUST-A', '가상고객A (패션 쇼핑몰)', true)"
         )
     )
 
-    assert runs_with_schema == 0
+    with pytest.raises(cli.LegacySeedError):
+        await cli.apply_seed(await db_session.connection())
+
+    assert await db_session.scalar(text("SELECT count(*) FROM ai_requests")) == 0
 
 
 async def test_ids_after_seed_do_not_collide(db_session: AsyncSession) -> None:
@@ -221,6 +251,21 @@ USER_COMMANDS = [
     ["user-deactivate", "--email", "admin@example.test"],
     ["session-cleanup"],
 ]
+
+
+def test_cli_explains_how_to_reset_when_old_mock_data_remains(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    async def legacy_seed() -> bool:
+        raise cli.LegacySeedError
+
+    monkeypatch.setattr(cli, "current_app_env", lambda: "development")
+    monkeypatch.setattr(cli, "run_seed", legacy_seed)
+
+    exit_code = cli.main(["seed"])
+
+    assert exit_code == 1
+    assert "초기화" in capsys.readouterr().err
 
 
 @pytest.fixture

@@ -99,7 +99,8 @@ class ModelSelectionRequest(BaseModel):
     execution_provider: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1)
     ]
-    # 이 칸에만 적용할 설정. 정하지 않은 항목은 실행 공통 설정을 따른다
+    # 이 칸에만 적용할 설정. 정하지 않은 항목은 실행 공통 설정을 따르고,
+    # 공통 설정이 꺼져 있으면 모델 기본값을 쓴다
     execution_config: ExecutionConfig = Field(default_factory=ExecutionConfig)
 
 
@@ -128,7 +129,9 @@ class SimulationCreateRequest(BaseModel):
     prompt_text: Annotated[str, Field(pattern=r"\S", max_length=MAX_TEXT_LENGTH)]
     input_text: Annotated[str, Field(max_length=MAX_TEXT_LENGTH)] | None = None
     json_schema: JsonSchemaDocument | None = None  # 없으면 Schema 검증은 "미적용"
-    execution_config: ExecutionConfig = Field(default_factory=ExecutionConfig)
+    # 실행 공통 설정. null 이면 공통 설정을 끈 것이라 시나리오 기본값도 쓰지 않고,
+    # 칸마다 정한 값만 보낸다. 보내지 않으면 빈 공통 설정(켬)으로 본다
+    execution_config: ExecutionConfig | None = Field(default_factory=ExecutionConfig)
     routing_policy: RoutingPolicy = Field(default_factory=RoutingPolicy)
     models: ModelSelections
     # 먼저 올려 둔 이미지(POST /simulations/images 의 asset_id). 순서가 곧 모델에 보내는 순서다.
@@ -150,7 +153,11 @@ class SimulationCreateRequest(BaseModel):
         if self.json_schema is not None:
             raise ValueError("이미지 생성 실행에는 JSON Schema 를 보낼 수 없다")
         configs = [self.execution_config, *(m.execution_config for m in self.models)]
-        if any(config.model_dump(exclude_none=True) for config in configs):
+        if any(
+            config.model_dump(exclude_none=True)
+            for config in configs
+            if config is not None
+        ):
             raise ValueError("이미지 생성 실행에는 텍스트 실행 설정을 보낼 수 없다")
         return self
 

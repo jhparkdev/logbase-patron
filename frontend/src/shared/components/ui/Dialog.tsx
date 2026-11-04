@@ -1,6 +1,10 @@
 import { type ReactNode, useEffect, useId, useRef } from "react";
 import { Button } from "./Button";
 
+// 열릴 때 살짝 작은 상태에서 또렷해지며 커지고 배경이 어두워진다. 규격은 docs/design/tokens.md "모션"
+const OPEN_MOTION_CLASS =
+  "motion-safe:transition-[opacity,scale] motion-safe:duration-150 motion-safe:ease-out motion-safe:starting:open:scale-95 motion-safe:starting:open:opacity-0 motion-safe:backdrop:transition-colors motion-safe:backdrop:duration-150 motion-safe:starting:open:backdrop:bg-grey-900/0";
+
 export function Dialog({
   open,
   title,
@@ -39,7 +43,7 @@ export function Dialog({
         event.stopPropagation();
         onClose();
       }}
-      className="fixed inset-0 m-auto max-h-4/5 w-3/4 max-w-4xl overflow-hidden rounded-2xl bg-white p-6 text-grey-900 shadow-xl backdrop:bg-grey-900/40 open:flex open:flex-col"
+      className={`fixed inset-0 m-auto max-h-4/5 w-3/4 max-w-4xl overflow-hidden rounded-2xl bg-white p-6 text-grey-900 shadow-xl backdrop:bg-grey-900/40 open:flex open:flex-col ${OPEN_MOTION_CLASS}`}
     >
       <div
         className={

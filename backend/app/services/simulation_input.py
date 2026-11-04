@@ -137,14 +137,17 @@ def compute_input_hash(prompt_text: str, input_text: str | None) -> str:
 
 
 def resolve_execution_config(
-    requested: Mapping[str, Any], scenario_default: Mapping[str, Any] | None
+    requested: Mapping[str, Any] | None, scenario_default: Mapping[str, Any] | None
 ) -> dict[str, Any]:
     """실제로 보낼 실행 설정. 기록(simulation_runs·ai_requests)에도 이 값이 그대로 남는다.
 
     요청에 없는 설정은 시나리오 기본값으로 채우고, 요청에 있는 값이 항목별로 우선한다.
     최대 토큰은 call_model 이 반드시 받으므로 아무도 정하지 않으면 기본값을 쓴다.
     temperature 와 reasoning_effort 는 아무도 정하지 않으면 담지 않고 모델 기본값에 맡긴다.
+    requested 가 None 이면 공통 설정을 끈 것이라 시나리오 기본값도 쓰지 않는다.
     """
+    if requested is None:
+        return {"max_tokens": DEFAULT_MAX_TOKENS}
     return _sent_only(
         {"max_tokens": DEFAULT_MAX_TOKENS, **(scenario_default or {}), **requested}
     )

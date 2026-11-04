@@ -73,7 +73,9 @@ class DbSimulationLookup:
                 status=ModelStatus(model.status),
                 supports_images=IMAGE_MODALITY in model.input_modalities,
                 generates_images=IMAGE_MODALITY in model.output_modalities,
-                parameter_support=parameter_support(model.supported_parameters),
+                parameter_support=parameter_support(
+                    model.supported_parameters, model.openrouter_metadata
+                ),
             )
             for model in rows
         }

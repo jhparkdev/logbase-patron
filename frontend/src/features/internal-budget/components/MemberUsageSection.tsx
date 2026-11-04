@@ -1,9 +1,16 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { Badge } from "../../../shared/components/ui/Badge";
+import { DataBlock } from "../../../shared/components/ui/DataBlock";
+import { DataTable } from "../../../shared/components/ui/DataTable";
 import { Result } from "../../../shared/components/ui/Result";
-import { PendingTable } from "./PendingTable";
+import { TableSkeleton } from "../../../shared/components/ui/TableSkeleton";
+import { commandCodeUsageQuery } from "../api/budget";
+import { MEMBER_USAGE_COLUMNS } from "./memberUsageColumns";
 
 const TITLE = "구성원별 Command Code 사용량";
+/** 불러오는 동안 보여 줄 회색 행 수 */
+const LOADING_ROWS = 2;
 
 /**
  * 구독료 관리 카드 안의 구성원 키별 Command Code 크레딧 사용량.
@@ -24,24 +31,31 @@ export function MemberUsageSection() {
           구독에 포함된 크레딧 사용량이라 비용 합계에는 넣지 않아요.
         </p>
       </header>
-      <PendingTable
-        caption={TITLE}
-        columns={[
-          { key: "member", header: "구성원" },
-          { key: "credit", header: "사용 크레딧 (USD)", align: "right" },
-          { key: "requests", header: "요청 수", align: "right" },
-          { key: "input", header: "입력 Token", align: "right" },
-          { key: "output", header: "출력 Token", align: "right" },
-          { key: "remaining", header: "남은 크레딧 (USD)", align: "right" },
-          { key: "billing", header: "결제 기간" },
-        ]}
-        empty={
-          <Result
-            title="등록된 구성원 키가 없어요"
-            description="구성원의 Command Code 키가 등록되면 사용량이 보여요."
-          />
-        }
-      />
+      <DataBlock
+        fallback={<TableSkeleton rows={LOADING_ROWS} />}
+        errorTitle="구성원 사용량을 불러오지 못했어요"
+        resetKey={JSON.stringify(commandCodeUsageQuery.queryKey)}
+      >
+        <MemberUsageRows />
+      </DataBlock>
     </section>
+  );
+}
+
+function MemberUsageRows() {
+  const { data } = useSuspenseQuery(commandCodeUsageQuery);
+  return (
+    <DataTable
+      caption={TITLE}
+      columns={MEMBER_USAGE_COLUMNS}
+      rows={data.items}
+      rowKey={(row) => row.member_name}
+      empty={
+        <Result
+          title="등록된 구성원 키가 없어요"
+          description="구성원의 Command Code 키가 등록되면 사용량이 보여요."
+        />
+      }
+    />
   );
 }

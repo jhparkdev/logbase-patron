@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import { stubModelsApi } from "../../test/modelsApi";
 import { renderAt, routeMatch } from "../../test/renderAt";
@@ -43,6 +49,18 @@ test("머리글을 누르면 정렬 조건이 주소에 남는다", async () => 
 
   fireEvent.click(screen.getByRole("button", { name: /Model ID/ }));
   await waitFor(() => expect(sortStateOf("Model ID")).toBe("descending"));
+});
+
+test("머리글을 눌러 정렬해도 화면을 맨 위로 올리지 않는다", async () => {
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  renderAt("/models");
+  await screen.findByRole("table", { name: "등록된 AI 모델" });
+  scrollTo.mockClear();
+
+  fireEvent.click(screen.getByRole("button", { name: /Model ID/ }));
+  await waitFor(() => expect(sortStateOf("Model ID")).toBe("ascending"));
+
+  expect(scrollTo).not.toHaveBeenCalled();
 });
 
 test("허용하지 않는 정렬 값은 무시한다", async () => {
@@ -129,4 +147,18 @@ test("Esc를 누르면 패널이 닫힌다", async () => {
   fireEvent(panel, new Event("cancel", { cancelable: true }));
 
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+test("표의 모델명으로 패널을 열고 닫아도 화면을 맨 위로 올리지 않는다", async () => {
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  renderAt("/models");
+  const table = await screen.findByRole("table", { name: "등록된 AI 모델" });
+  scrollTo.mockClear();
+
+  fireEvent.click(within(table).getByRole("link", { name: "GPT-4o mini" }));
+  await screen.findByRole("dialog", { name: "GPT-4o mini" });
+  fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+  expect(scrollTo).not.toHaveBeenCalled();
 });
