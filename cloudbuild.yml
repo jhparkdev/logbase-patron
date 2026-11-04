@@ -1,0 +1,143 @@
+# Cloud Build 배포 설정. 브랜치에 병합되면 Cloud Build 트리거가 이 파일로 실행한다.
+# 순서: 값 확인 → 두 이미지 빌드(병렬) → 푸시 → 마이그레이션 Job → backend 배포 → frontend 배포.
+# 어느 단계든 실패하면 뒤 단계는 실행되지 않는다. 마이그레이션이 실패하면 배포도 멈춘다.
+#
+# 개발과 운영이 이 파일 하나를 함께 쓴다. 아래 기본값은 개발(dev) 기준이고,
+# 운영 트리거에서는 _APP_ENV, 서비스·Job 이름, Secret, 실행 계정 값을 바꿔 넣는다.
+# 비밀값은 이 파일에 적지 않는다. Secret 이름과 버전만 적고, 값은 Cloud Run이 실행 중에 읽는다.
+#
+# _DEPLOY_ENABLED=false(기본): 이미지 빌드·푸시까지만 하고 성공으로 끝낸다. Cloud SQL·Secret이 준비되기 전 검증용.
+# _DEPLOY_ENABLED=true: 마이그레이션 Job → backend → frontend 배포까지 한다. 배포할 트리거에서 true로 바꾼다.
+
+substitutions:
+  _REGION: asia-northeast3
+  _DEPLOY_ENABLED: "false"
+  # Artifact Registry 저장소 이름. 관리자가 만든 이름(GitHub 변수 PATRON_GCP_ARTIFACT_REGISTRY)을 트리거에 넣는다.
+  _AR_REPO: ""
+  _APP_ENV: development
+  _BACKEND_SERVICE: patron-backend-dev
+  _FRONTEND_SERVICE: patron-frontend-dev
+  _MIGRATE_JOB: patron-migrate-dev
+  _BACKEND_SA: patron-backend-run@patron-512508.iam.gserviceaccount.com
+  _FRONTEND_SA: patron-frontend-run@patron-512508.iam.gserviceaccount.com
+  _CLOUDSQL_INSTANCE: patron-512508:asia-northeast3:patron-db
+  # Secret은 공식 문서 권장대로 버전 번호를 고정한다. 값을 바꾸면 새 버전을 만들고 여기 번호를 올린다.
+  _DB_SECRET: database-url-dev:2
+  _OPENROUTER_SECRET: openrouter-key-dev:1
+  # 구성원별 Command Code Key JSON. 구성원·Key를 바꾸면 Secret 새 버전을 만들고 여기 번호를 올린다.
+  _COMMAND_CODE_SECRET: command-code-api-keys-dev:1
+  # 기록 수신 API(X-Patron-Ingest-Token)의 토큰. 값을 바꾸면 새 버전을 만들고 여기 번호를 올린 뒤 보내는 쪽 값도 바꾼다.
+  _INGEST_SECRET: ingest-token-dev:1
+  # 시뮬레이터 이미지 GCS 버킷. 비우면 backend가 컨테이너 임시 디스크에 저장해 재시작 때 파일이 사라지므로 배포에서는 꼭 넣는다.
+  _IMAGE_BUCKET: logb-patron-images-dev
+
+steps:
+  # 필수 값이 비어 있거나 모드 값이 틀리면 잘못된 설정으로 진행하지 않도록 바로 멈춘다.
+  - id: check-substitutions
+    name: bash
+    args:
+      - -c
+      - |
+        test -n "${_AR_REPO}" || { echo "_AR_REPO가 비어 있습니다. 트리거의 대체 변수에 저장소 이름을 넣으세요."; exit 1; }
+        case "${_DEPLOY_ENABLED}" in
+          true) echo "배포 모드: 마이그레이션과 배포까지 실행합니다." ;;
+          false) echo "빌드만 하는 모드: 마이그레이션과 배포를 건너뜁니다." ;;
+          *) echo "_DEPLOY_ENABLED에는 true 또는 false만 넣을 수 있습니다."; exit 1 ;;
+        esac
+
+  # Dockerfile이 RUN --mount(BuildKit 기능)를 쓰므로 BuildKit을 켠다.
+  - id: build-backend
+    name: gcr.io/cloud-builders/docker
+    env: [DOCKER_BUILDKIT=1]
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend:$COMMIT_SHA
+      - backend
+    waitFor: [check-substitutions]
+
+  - id: build-frontend
+    name: gcr.io/cloud-builders/docker
+    env: [DOCKER_BUILDKIT=1]
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/frontend:$COMMIT_SHA
+      - frontend
+    waitFor: [check-substitutions]
+
+  # 배포 단계가 이미지를 가져가야 하므로 images 필드(빌드 끝에 푸시)가 아니라 여기서 바로 푸시한다.
+  - id: push-backend
+    name: gcr.io/cloud-builders/docker
+    args: [push, "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend:$COMMIT_SHA"]
+    waitFor: [build-backend]
+
+  - id: push-frontend
+    name: gcr.io/cloud-builders/docker
+    args: [push, "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/frontend:$COMMIT_SHA"]
+    waitFor: [build-frontend]
+  
+  # 마이그레이션은 앱 시작 때가 아니라 배포 전에 Job으로 한 번 실행한다(backend/CLAUDE.md).
+  # --wait는 Job이 끝날 때까지 기다리고, 실패하면 이 단계도 실패한다. 재시도는 하지 않는다.
+  - id: migrate
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -euc
+      - |
+        if [ "${_DEPLOY_ENABLED}" != "true" ]; then echo "건너뜀: 마이그레이션 (빌드만 하는 모드)"; exit 0; fi
+        gcloud run jobs deploy "${_MIGRATE_JOB}" \
+          --image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend:$COMMIT_SHA" \
+          --region="${_REGION}" \
+          --service-account="${_BACKEND_SA}" \
+          --set-cloudsql-instances="${_CLOUDSQL_INSTANCE}" \
+          --set-secrets="DATABASE_URL=${_DB_SECRET}" \
+          --command=alembic \
+          --args=upgrade,head \
+          --max-retries=0 \
+          --wait
+    waitFor: [push-backend, push-frontend]
+
+  # 백그라운드 시뮬레이션이 인스턴스 1대를 전제하므로 최대 1대, CPU 상시 할당으로 띄운다(backend/CLAUDE.md).
+  # ALLOWED_ORIGIN은 Cloud Run의 고정 주소 형식(https://서비스-프로젝트번호.리전.run.app)으로 계산한다.
+  # nginx가 인증 토큰 없이 backend를 부르므로 backend도 호출자 IAM 검사를 끈다. /api는 앱의 로그인 세션이 막는다.
+  - id: deploy-backend
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -euc
+      - |
+        if [ "${_DEPLOY_ENABLED}" != "true" ]; then echo "건너뜀: backend 배포 (빌드만 하는 모드)"; exit 0; fi
+        gcloud run deploy "${_BACKEND_SERVICE}" \
+          --image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend:$COMMIT_SHA" \
+          --region="${_REGION}" \
+          --service-account="${_BACKEND_SA}" \
+          --set-cloudsql-instances="${_CLOUDSQL_INSTANCE}" \
+          --set-secrets="DATABASE_URL=${_DB_SECRET},OPENROUTER_API_KEY=${_OPENROUTER_SECRET},COMMAND_CODE_API_KEYS=${_COMMAND_CODE_SECRET},INGEST_TOKEN=${_INGEST_SECRET}" \
+          --set-env-vars="APP_ENV=${_APP_ENV},ALLOWED_ORIGIN=https://${_FRONTEND_SERVICE}-$PROJECT_NUMBER.${_REGION}.run.app,IMAGE_STORAGE_BUCKET=${_IMAGE_BUCKET}" \
+          --max-instances=1 \
+          --no-cpu-throttling \
+          --no-invoker-iam-check
+    waitFor: [migrate]
+
+  # nginx.conf.template의 BACKEND_URL(전체 주소)과 BACKEND_HOST(호스트명만)를 넣는다.
+  - id: deploy-frontend
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -euc
+      - |
+        if [ "${_DEPLOY_ENABLED}" != "true" ]; then echo "건너뜀: frontend 배포 (빌드만 하는 모드)"; exit 0; fi
+        gcloud run deploy "${_FRONTEND_SERVICE}" \
+          --image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/frontend:$COMMIT_SHA" \
+          --region="${_REGION}" \
+          --service-account="${_FRONTEND_SA}" \
+          --set-env-vars="BACKEND_URL=https://${_BACKEND_SERVICE}-$PROJECT_NUMBER.${_REGION}.run.app,BACKEND_HOST=${_BACKEND_SERVICE}-$PROJECT_NUMBER.${_REGION}.run.app" \
+          --no-invoker-iam-check
+    waitFor: [deploy-backend]
+
+# 사용자 지정 서비스 계정(patron-deployer)으로 실행하면 로그 위치를 빌드 설정에 적어야 한다.
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s

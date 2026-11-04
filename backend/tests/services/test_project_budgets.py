@@ -283,6 +283,23 @@ async def test_사용액은_그_달의_API_비용과_귀속_구독료를_더한�
     assert by_id[other["project_id"]].status == UNSET
 
 
+async def test_AI_도우미_호출은_프로젝트_사용액에_넣는다(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    project = await factory.project()
+    await internal_call(
+        factory,
+        project_id=project["project_id"],
+        usage_origin="ASSISTANT",
+        cost_usd=Decimal(7),
+    )
+
+    rows = await project_budget_rows(db_session, OCT)
+
+    result = next(item for item in rows if item.project_id == project["project_id"])
+    assert result.used_usd == Decimal(7)
+
+
 async def test_고객_사용은_프로젝트_사용액에_넣지_않는다(
     db_session: AsyncSession, factory: Factory
 ) -> None:

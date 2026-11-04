@@ -44,6 +44,8 @@ function stub(overrides: Record<string, Reply> = {}) {
     if (key === "GET /api/scenarios") return { status: 200, body: SCENARIOS };
     if (path.endsWith("/execution-providers"))
       return { status: 200, body: EXECUTION_PROVIDERS };
+    if (path.endsWith("/execution-providers/ranking"))
+      return { status: 200, body: { items: [], excluded: [] } };
     if (key === "GET /api/simulations/images/limits")
       return {
         status: 200,

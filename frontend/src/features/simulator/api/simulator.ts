@@ -71,6 +71,33 @@ export function executionProvidersOptions(modelId: number) {
   });
 }
 
+/** 가장 싼 업체를 가리는 데 쓰는 가정이다. 모델 관리 화면의 추천과 같은 값이다. 캐시는 쓰지 않는다고 본다. */
+const RANKING_INPUT_TOKENS = 1000;
+const RANKING_OUTPUT_TOKENS = 500;
+const RANKING_CACHE_HIT_RATIO = "0";
+
+/** 모델의 서버 업체를 예상 비용이 싼 순서로 받는다. 서버가 이미 정렬해 주므로 첫 업체가 가장 싸다. */
+export function providerRankingOptions(modelId: number) {
+  return queryOptions({
+    queryKey: [ROOT_KEY, "provider-ranking", modelId],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/models/{model_id}/execution-providers/ranking", {
+          params: {
+            path: { model_id: modelId },
+            query: {
+              input_tokens: RANKING_INPUT_TOKENS,
+              output_tokens: RANKING_OUTPUT_TOKENS,
+              cache_hit_ratio: RANKING_CACHE_HIT_RATIO,
+            },
+          },
+        }),
+      ),
+    staleTime: PROVIDERS_STALE_TIME_MS,
+    retry: false,
+  });
+}
+
 export const imageLimitsQuery = queryOptions({
   queryKey: [ROOT_KEY, "image-limits"],
   queryFn: async () => unwrap(await api.GET("/api/simulations/images/limits")),

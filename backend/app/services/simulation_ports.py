@@ -28,6 +28,7 @@ from app.models import (
     ValidationStatus,
 )
 from app.openrouter.image_result import GeneratedImage, ImageCallResult
+from app.openrouter.lookup_result import EndpointInfo
 from app.openrouter.result import CallResult
 from app.schemas.simulation_output import OutputType
 from app.services.model_parameters import ParameterSupport
@@ -369,6 +370,12 @@ class ProviderParameterLookup(Protocol):
         self, openrouter_model_id: str
     ) -> Mapping[str, Sequence[str]] | None:
         """업체 이름별 설정 이름 목록. 읽지 못하면 None 이다."""
+        ...
+
+    async def provider_endpoints(
+        self, openrouter_model_id: str
+    ) -> Sequence[EndpointInfo] | None:
+        """모델을 처리하는 서버 업체와 단가·상태. 읽지 못하면 None 이다."""
         ...
 
 

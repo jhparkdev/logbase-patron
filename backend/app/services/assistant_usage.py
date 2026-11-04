@@ -34,6 +34,23 @@ from app.services.simulation_period import (
     resolve_period,
 )
 
+MIN_YEAR, MAX_YEAR = 2000, 2100
+MAX_RECENT_DAYS = 366
+# 이전 질문의 이름은 사용량을 물은 질문에서 나왔을 때만 조회 대상으로 잇는다. 모델 가격 질문은 제외한다.
+USAGE_REQUEST = re.compile(r"호출|사용량|예산|비용|지출|구독|청구")
+PRICE_REQUEST = re.compile(r"가격|단가")
+DATE_RANGE_IN_MONTH = re.compile(
+    r"(?:(\d{4})\s*년\s*)?(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*(?:부터|에서|~|-)\s*(\d{1,2})\s*일"
+)
+NUMERIC_DATE = re.compile(r"(?<![\d.])(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?![\d.])")
+KOREAN_DATE = re.compile(r"(?:(\d{4})\s*년\s*)?(\d{1,2})\s*월\s*(\d{1,2})\s*일")
+SLASH_DATE = re.compile(r"(?<![\d/])(\d{1,2})/(\d{1,2})(?![\d/])")
+# 해석하지 못한 기간 표현을 화면 기간으로 바꿔 답하지 않도록 사용자 확인을 요청한다.
+UNSUPPORTED_PERIOD = re.compile(
+    r"(?:지난|저번|이번|다음)\s*주|금주|올해|금년|작년|재작년|지난\s*해|분기|반기"
+    r"|\d+\s*(?:개월|주간?|년간)|\d{4}\s*년|그제|그저께|내일|모레"
+)
+
 
 class UsageQueryError(ValueError):
     """조회 대상이나 조건을 사용자가 명확히 지정해야 한다."""
@@ -160,6 +177,54 @@ def entity_id(
     return candidate
 
 
+def _dates(found: list[tuple[str, ...]], today: date) -> list[date]:
+    dates = [
+        date(int(year or today.year), int(month), int(day))
+        for year, month, day in found
+    ]
+    if len(dates) > 2 or any(not MIN_YEAR <= day.year <= MAX_YEAR for day in dates):
+        raise ValueError
+    return dates
+
+
+def _text_period(text: str, today: date) -> DateRange | None:
+    """사용자 문장에 적힌 기간만 해석한다. 잘못된 날짜는 ValueError다."""
+    if re.search(r"이번\s*달|이달", text):
+        return DateRange(today.replace(day=1), today)
+    if re.search(r"지난\s*달|저번\s*달", text):
+        end = today.replace(day=1) - timedelta(days=1)
+        return DateRange(end.replace(day=1), end)
+    if re.search(r"오늘", text):
+        return DateRange(today, today)
+    if re.search(r"어제", text):
+        yesterday = today - timedelta(days=1)
+        return DateRange(yesterday, yesterday)
+    if recent := re.search(r"최근\s*(\d+)\s*일", text):
+        days = int(recent[1])
+        if not 1 <= days <= MAX_RECENT_DAYS:
+            raise ValueError
+        return resolve_period(today - timedelta(days=days - 1), today, today)
+    if same_month := DATE_RANGE_IN_MONTH.search(text):
+        year, month, first, last = same_month.groups()
+        start, end = _dates([(year, month, first), (year, month, last)], today)
+        return resolve_period(start, end, today)
+    for pattern in (NUMERIC_DATE, KOREAN_DATE):
+        if found := pattern.findall(text):
+            dates = _dates(found, today)
+            return resolve_period(dates[0], dates[-1], today)
+    if found := SLASH_DATE.findall(text):
+        dates = _dates([("", month, day) for month, day in found], today)
+        return resolve_period(dates[0], dates[-1], today)
+    if month := re.search(r"(?:(\d{4})\s*년\s*)?(\d{1,2})\s*월", text):
+        year, number = int(month[1] or today.year), int(month[2])
+        if not MIN_YEAR <= year <= MAX_YEAR:
+            raise ValueError
+        return DateRange(
+            date(year, number, 1), date(year, number, monthrange(year, number)[1])
+        )
+    return None
+
+
 def usage_period(
     query: CustomerUsageToolQuery | InternalUsageToolQuery,
     context: AssistantPageContext | None,
@@ -172,49 +237,24 @@ def usage_period(
     try:
         # 모델 인자는 먼저 검증하되, 사용자가 말하지 않은 기간으로 조건을 바꾸지 않는다.
         resolve_period(query.start_date, query.end_date, today)
-        if re.search(r"이번\s*달|이달", text):
-            return DateRange(today.replace(day=1), today)
-        if re.search(r"지난\s*달|저번\s*달", text):
-            end = today.replace(day=1) - timedelta(days=1)
-            return DateRange(end.replace(day=1), end)
-        if re.search(r"오늘", text):
-            return DateRange(today, today)
-        if recent := re.search(r"최근\s*(\d+)\s*일", text):
-            days = int(recent[1])
-            if not 1 <= days <= 366:
-                raise ValueError
-            return resolve_period(today - timedelta(days=days - 1), today, today)
-        explicit_dates = re.findall(r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)", text)
-        if not explicit_dates:
-            explicit_dates = re.findall(
-                r"(?:(\d{4})\s*년\s*)?(\d{1,2})\s*월\s*(\d{1,2})\s*일", text
-            )
-        if explicit_dates:
-            dates = [
-                date(int(year or today.year), int(month), int(day))
-                for year, month, day in explicit_dates
-            ]
-            if len(dates) > 2 or any(not 2000 <= day.year <= 2100 for day in dates):
-                raise ValueError
-            return resolve_period(dates[0], dates[-1], today)
-        if month := re.search(r"(?:(\d{4})\s*년\s*)?(\d{1,2})\s*월", text):
-            year, number = int(month[1] or today.year), int(month[2])
-            if not 2000 <= year <= 2100:
-                raise ValueError
-            return DateRange(
-                date(year, number, 1), date(year, number, monthrange(year, number)[1])
-            )
-        if context and context.start_date:
-            return DateRange(context.start_date, context.end_date)
-        return (
-            DateRange(today.replace(day=1), today)
-            if internal
-            else resolve_period(None, None, today)
-        )
+        period = _text_period(text, today)
     except (ValueError, InvalidPeriodError) as error:
         raise UsageQueryError(
             "조회 기간은 유효한 시작일과 종료일로, 최대 366일 이내로 지정해 주세요. 예: 2026-10-01부터 2026-10-31까지."
         ) from error
+    if period is not None:
+        return period
+    if UNSUPPORTED_PERIOD.search(text):
+        raise UsageQueryError(
+            "요청한 기간 표현을 해석하지 못했어요. 이번 달, 지난달, 최근 N일, 10월, 2026-10-01부터 2026-10-31까지처럼 지정해 주세요."
+        )
+    if context and context.start_date and context.end_date:
+        return DateRange(context.start_date, context.end_date)
+    return (
+        DateRange(today.replace(day=1), today)
+        if internal
+        else resolve_period(None, None, today)
+    )
 
 
 class AssistantUsage:
@@ -230,7 +270,11 @@ class AssistantUsage:
         self.now = now
         self.context = context
         self.text = request_text
-        self.previous = previous
+        self.previous = tuple(
+            text
+            for text in previous
+            if USAGE_REQUEST.search(text) and not PRICE_REQUEST.search(text)
+        )
 
     def section(
         self, query: UsageToolOptions, context: AssistantPageContext | None

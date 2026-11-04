@@ -2,6 +2,7 @@ import { Badge } from "../../../shared/components/ui/Badge";
 import { Button } from "../../../shared/components/ui/Button";
 import { Skeleton } from "../../../shared/components/ui/Skeleton";
 import type { SlotView } from "../lib/presentation";
+import { OutputImages } from "./OutputImages";
 import { CostValue, durationLabel, ExecutionStatus } from "./ResultValues";
 
 const VALIDATION_TONE: Record<string, "green" | "red" | "grey"> = {
@@ -139,15 +140,25 @@ export function ResponseCards({
               {slot.comparisonNote}
             </p>
           )}
-          <ResponseBody slot={slot} expanded={expanded} />
-          <div className="flex flex-wrap gap-1.5">
-            <Badge tone={VALIDATION_TONE[slot.jsonValidation] ?? "grey"}>
-              {`JSON ${slot.jsonValidation}`}
-            </Badge>
-            <Badge tone={VALIDATION_TONE[slot.schemaValidation] ?? "grey"}>
-              {`Schema ${slot.schemaValidation}`}
-            </Badge>
-          </div>
+          {slot.images ? (
+            <OutputImages
+              name={slot.name}
+              images={slot.images}
+              ongoing={!!slot.status.ongoing}
+            />
+          ) : (
+            <>
+              <ResponseBody slot={slot} expanded={expanded} />
+              <div className="flex flex-wrap gap-1.5">
+                <Badge tone={VALIDATION_TONE[slot.jsonValidation] ?? "grey"}>
+                  {`JSON ${slot.jsonValidation}`}
+                </Badge>
+                <Badge tone={VALIDATION_TONE[slot.schemaValidation] ?? "grey"}>
+                  {`Schema ${slot.schemaValidation}`}
+                </Badge>
+              </div>
+            </>
+          )}
           {slot.errorMessage && (
             <p className="rounded-lg bg-danger-weak p-3 text-body-sm text-red-600">
               {slot.errorMessage}
@@ -159,15 +170,17 @@ export function ResponseCards({
             </p>
           )}
           <div className="mt-auto flex flex-wrap gap-2 pt-1">
-            <Button
-              variant="secondary"
-              size="sm"
-              aria-label={`${slot.name} · ${slot.provider} 전체 응답 보기`}
-              disabled={slot.response === null}
-              onClick={() => onOpen(slot)}
-            >
-              전체 응답 보기
-            </Button>
+            {!slot.images && (
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label={`${slot.name} · ${slot.provider} 전체 응답 보기`}
+                disabled={slot.response === null}
+                onClick={() => onOpen(slot)}
+              >
+                전체 응답 보기
+              </Button>
+            )}
             {slot.status.ongoing && (
               <Button
                 variant="secondary"

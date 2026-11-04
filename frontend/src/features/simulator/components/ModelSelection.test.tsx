@@ -228,3 +228,78 @@ test("카탈로그 준비 전에는 검색을 막고 유실된 복원 모델은 
   fireEvent.click(within(dialog).getByRole("button", { name: "선택 적용" }));
   expect(screen.queryByRole("dialog")).toBeNull();
 });
+
+test("가장 싼 업체에는 실제 업체 이름 옆에 최저가 배지를 붙인다", () => {
+  const catalog: ModelChoice[] = [
+    { ...choices[0], provider: "DeepInfra", cheapest: true },
+    { ...choices[1], key: "model-0:other", provider: "Io Net" },
+  ];
+  render(<Form catalog={catalog} />);
+  const dialog = openPicker();
+  const cheapestRow = within(dialog)
+    .getByRole("checkbox", { name: "같은 모델 · DeepInfra" })
+    .closest("tr");
+  const otherRow = within(dialog)
+    .getByRole("checkbox", { name: "같은 모델 · Io Net" })
+    .closest("tr");
+  expect(
+    within(cheapestRow as HTMLElement).getByText("DeepInfra"),
+  ).toBeDefined();
+  expect(within(cheapestRow as HTMLElement).getByText("최저가")).toBeDefined();
+  expect(within(otherRow as HTMLElement).queryByText("최저가")).toBeNull();
+});
+
+function ImageOutputForm({ selections }: { selections: string[] }) {
+  const form = useForm<SimulatorFormValues>({
+    defaultValues: createDefaultValues({
+      outputType: "IMAGE",
+      comparisons: createComparisons(selections),
+    }),
+  });
+  return (
+    <FormProvider {...form}>
+      <form>
+        <ModelSelection
+          choices={choices.map((item, index) => ({
+            ...item,
+            generatesImages: index === 1,
+          }))}
+          unavailable={false}
+          settings={<p>공통 설정 영역</p>}
+        />
+      </form>
+    </FormProvider>
+  );
+}
+
+test("이미지 출력이면 보내지 않는 공통 설정·모델별 설정·복제를 숨긴다", () => {
+  render(<ImageOutputForm selections={[choices[1].key]} />);
+  const [card] = screen.getAllByRole("listitem");
+  expect(screen.queryByText("공통 설정 영역")).toBeNull();
+  expect(screen.queryByText(/모델 카드의 설정이 실제로 전송돼요/)).toBeNull();
+  expect(within(card).queryByText("Temperature")).toBeNull();
+  expect(within(card).queryByText("모델별 설정")).toBeNull();
+  expect(within(card).queryByText("공통")).toBeNull();
+  expect(
+    within(card).queryByRole("button", { name: /다른 설정으로 비교/ }),
+  ).toBeNull();
+  expect(within(card).queryByText("JSON")).toBeNull();
+  expect(within(card).getByText("이미지")).toBeDefined();
+  expect(within(card).getByText("단가 USD/1M")).toBeDefined();
+  expect(within(card).getByRole("button", { name: /제거/ })).toBeDefined();
+});
+
+test("이미지 출력이면 이미지를 만드는 모델만 고르게 하고 이미 고른 다른 모델 카드에 경고한다", () => {
+  render(<ImageOutputForm selections={[choices[2].key]} />);
+  expect(
+    screen.getByText(
+      "이미지를 만들지 못해요. 출력 형식을 텍스트로 바꾸거나 모델을 바꿔 주세요.",
+    ),
+  ).toBeDefined();
+  const dialog = openPicker();
+  expect(within(dialog).queryByText("JSON")).toBeNull();
+  const options = within(dialog).getAllByRole("checkbox");
+  expect(options.map((option) => option.getAttribute("aria-label"))).toEqual([
+    `${choices[1].name} · ${choices[1].provider}`,
+  ]);
+});

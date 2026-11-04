@@ -8,6 +8,8 @@
     uv --directory backend run python -m app.cli session-cleanup
     uv --directory backend run python -m app.cli customer-create --customer-code CUST-X --name 고객
     uv --directory backend run python -m app.cli service-create --service-code SVC-X --name 서비스
+    uv --directory backend run python -m app.cli provider-prices-sync    # 서버 업체별 단가를 가격 이력에 저장 (주기 실행용)
+    uv --directory backend run python -m app.cli new-models-check        # 새 모델을 기록하고 기본 모델과 비교 (주기 실행용)
     uv --directory backend run python -m app.cli key-register --display-name "고객 Key" --secret-ref CUSTOMER_API_KEY --customer-code CUST-X --service-code SVC-X --environment PROD
 """
 
@@ -18,6 +20,7 @@ import warnings
 from datetime import UTC, datetime
 from getpass import GetPassWarning, getpass
 
+import httpx
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -26,10 +29,20 @@ from app.config import get_settings
 from app.db import get_engine, get_sessionmaker
 from app.mock_data.sql import SEED_FILE
 from app.models import KeyEnvironment, ServiceType
+from app.openrouter.client import OpenRouterClient
 from app.schemas.auth import PASSWORD_MAX_LENGTH
-from app.services import command_code_keys, usage_catalog, users
+from app.services import (
+    command_code_keys,
+    model_discovery,
+    provider_price_sync,
+    usage_catalog,
+    users,
+)
+from app.services.openrouter_catalog import OpenRouterUnavailableError
 
 PRODUCTION_ENV = "production"
+PRICE_SYNC_COMMAND = "provider-prices-sync"
+NEW_MODELS_COMMAND = "new-models-check"
 CATALOG_COMMANDS = (
     "customer-create",
     "service-create",
@@ -143,6 +156,14 @@ def make_parser() -> argparse.ArgumentParser:
     key.add_argument(
         "--environment", choices=[item.value for item in KeyEnvironment], required=True
     )
+    price_sync = commands.add_parser(
+        PRICE_SYNC_COMMAND,
+        help="사용 중인 모델의 서버 업체별 단가를 가격 이력에 저장한다 (바뀐 것만 새 행)",
+    )
+    new_models = commands.add_parser(
+        NEW_MODELS_COMMAND,
+        help="새로 올라온 모델을 기록하고 기본 모델과 같은 시나리오로 비교한다",
+    )
     # 원문 대신 환경변수 이름만 받는다. 줄임말 해석 때문에 원문이 넘어가지 않게 한다.
     member_key = commands.add_parser(
         "command-code-key-register",
@@ -165,6 +186,8 @@ def make_parser() -> argparse.ArgumentParser:
         service,
         key,
         member_key,
+        price_sync,
+        new_models,
     ):
         command.add_argument(
             "--confirm-production",
@@ -239,6 +262,38 @@ async def run_catalog_command(args: argparse.Namespace) -> None:
             print(f"구성원 등록 완료 (id={member.command_code_key_id})")
 
 
+async def run_price_sync() -> provider_price_sync.SyncSummary:
+    """OpenRouter의 업체 목록은 공개 API라 Key 없이 부른다."""
+    async with httpx.AsyncClient() as http_client:
+        client = OpenRouterClient(http_client=http_client, api_key="")
+        async with get_sessionmaker()() as session:
+            return await provider_price_sync.sync_provider_prices(
+                session, client.get_model_endpoints, now=datetime.now(UTC)
+            )
+
+
+async def run_new_models_check() -> model_discovery.DiscoverySummary:
+    settings = get_settings()
+    key = settings.openrouter_api_key
+    if settings.new_model_compare_enabled and key is None:
+        raise CommandRefusedError("비교 호출에는 OPENROUTER_API_KEY가 필요합니다.")
+    async with httpx.AsyncClient() as http_client:
+        client = OpenRouterClient(
+            http_client=http_client, api_key=key.get_secret_value() if key else ""
+        )
+        async with get_sessionmaker()() as session:
+            return await model_discovery.run_discovery(
+                session,
+                fetch_models=client.list_models,
+                call_model=client.call_model,
+                now=datetime.now(UTC),
+                config=model_discovery.DiscoveryConfig(
+                    daily_cap_usd=settings.new_model_daily_cap_usd,
+                    compare_enabled=settings.new_model_compare_enabled,
+                ),
+            )
+
+
 def main(argv: list[str] | None = None) -> int:
     """명령줄 진입점. 성공하면 0, 거부되면 1을 돌려준다."""
     args = make_parser().parse_args(argv)
@@ -251,6 +306,24 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "seed":
             applied = asyncio.run(run_seed(), loop_factory=asyncio.SelectorEventLoop)
             print("seed 적용 완료" if applied else "이미 seed가 적용되어 있어 건너뜀")
+        elif args.command == PRICE_SYNC_COMMAND:
+            summary = asyncio.run(
+                run_price_sync(), loop_factory=asyncio.SelectorEventLoop
+            )
+            print(
+                f"업체 단가 저장 완료: 모델 {summary.models}개, 추가 {summary.added}, "
+                f"변경 {summary.changed}, 그대로 {summary.unchanged}, "
+                f"단가 없는 업체 {summary.skipped_providers}, "
+                f"받지 못한 모델 {summary.failed_models}"
+            )
+        elif args.command == NEW_MODELS_COMMAND:
+            found = asyncio.run(
+                run_new_models_check(), loop_factory=asyncio.SelectorEventLoop
+            )
+            print(
+                f"새 모델 {found.recorded}개 기록, 비교 {found.compared}, "
+                f"넘어감 {found.skipped}, 실패 {found.failed}, 대기 {found.pending}"
+            )
         elif args.command in CATALOG_COMMANDS:
             asyncio.run(
                 run_catalog_command(args), loop_factory=asyncio.SelectorEventLoop
@@ -266,6 +339,7 @@ def main(argv: list[str] | None = None) -> int:
         LegacySeedError,
         users.UserCommandError,
         usage_catalog.CatalogCommandError,
+        OpenRouterUnavailableError,
     ) as error:
         print(error, file=sys.stderr)
         return 1

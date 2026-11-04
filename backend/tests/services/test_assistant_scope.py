@@ -1,3 +1,7 @@
+from uuid import UUID
+
+import pytest
+
 from app.schemas.assistant import AssistantChatRequest, AssistantPageContext
 from app.services.assistant_scope import request_scope
 
@@ -46,6 +50,8 @@ def test_model_queries_and_follow_up_settings_require_their_own_tools() -> None:
     for question in (
         "현재 선택할 수 있는 모델과 서버 업체를 알려줘",
         "등록된 모델 목록을 알려줘",
+        "사용 가능한 모델 몇 개야?",
+        "등록된 모델 수는?",
     ):
         models = request_scope(request(question, "customer_usage"))
         assert models.requires_lookup
@@ -79,6 +85,25 @@ def test_explicit_scope_overrides_current_page_and_setup_is_still_available() ->
     )
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "이 실행 ID의 결과를 요약해줘: 00000000-0000-4000-8000-000000000001",
+        "최근 시뮬레이션 이력을 보여줘",
+        "등록된 모델 목록을 알려줘",
+        "JSON 스키마를 추천해줘",
+        "안녕",
+    ],
+)
+def test_read_only_requests_on_p04_cannot_prepare_settings(text: str) -> None:
+    body = AssistantChatRequest(
+        messages=[{"role": "user", "content": text}],
+        simulator={},
+        page_context=AssistantPageContext(page="simulator"),
+    )
+    assert "prepare_simulator_settings" not in request_scope(body).allowed_tools
+
+
 def test_ambiguous_calls_and_mixed_domains_require_clarification() -> None:
     assert request_scope(request("최근 API 호출을 알려줘")).clarification
     assert request_scope(
@@ -99,3 +124,81 @@ def test_follow_up_can_reuse_the_previous_explicit_domain_off_dashboard() -> Non
         page_context=AssistantPageContext(page="models"),
     )
     assert request_scope(body).allowed_tools == {"get_customer_usage"}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "선택한 실행의 결과를 비교해줘",
+        "어떤 모델이 더 빠르고 저렴했어?",
+        "모델별 입력 출력 토큰 차이를 알려줘",
+        "JSON 검증 결과를 비교해줘",
+        "비교해줘",
+        "어느 모델이 더 빨랐어?",
+        "최저 비용 모델을 알려줘",
+        "가장 응답시간이 짧은 모델은?",
+        "모델별 비용과 응답시간을 알려줘",
+    ],
+)
+def test_selected_run_comparisons_use_the_server_selected_id(text: str) -> None:
+    run_id = UUID("00000000-0000-4000-8000-000000000001")
+    body = request(text, "simulation_history")
+    body.page_context.simulation_id = run_id
+    scope = request_scope(body)
+    assert scope.comparison_id == run_id
+    assert scope.allowed_tools == {"get_simulation"}
+
+
+def test_comparison_requires_one_explicit_or_selected_run() -> None:
+    assert request_scope(request("시뮬레이션 결과를 정량 비교해줘")).clarification
+    ids = "00000000-0000-4000-8000-000000000001 00000000-0000-4000-8000-000000000002"
+    assert request_scope(request(f"두 실행의 결과 비교: {ids}")).clarification
+    explicit = request_scope(
+        request(f"실행 결과 비교: {ids.split()[0]}", "customer_usage")
+    )
+    assert str(explicit.comparison_id) == ids.split()[0]
+
+
+def test_catalog_recommendations_are_not_reinterpreted_as_past_run_rankings() -> None:
+    body = request("가장 저렴한 모델을 추천해줘", "simulator")
+    body.page_context.simulation_id = UUID("00000000-0000-4000-8000-000000000001")
+    assert request_scope(body).comparison_id is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        (
+            "시뮬레이터를 세팅해줘. 모델은 가장 많이 사용 된 3개, provider가 여럿이라면 "
+            "가장 저렴한 것으로 선택해줘. 이미지는 없고, 'LOGBASE Patron 서비스를 "
+            "간단하게 소개해줘' 라는 프롬프트를 입력할거야"
+        ),
+        "가장 저렴한 업체로 선택해줘",
+        "가장 빠른 모델 두 개를 지정해줘",
+        "시뮬레이터 세팅해줘. Prompt는 '소개해줘'로 입력해줘",
+    ],
+)
+def test_settings_requests_with_ranking_words_are_not_run_comparisons(
+    text: str,
+) -> None:
+    body = AssistantChatRequest(
+        messages=[{"role": "user", "content": text}],
+        simulator={},
+        page_context=AssistantPageContext(
+            page="simulator", simulation_id="00000000-0000-4000-8000-000000000001"
+        ),
+    )
+    scope = request_scope(body)
+    assert scope.comparison_id is None
+    assert scope.clarification is None
+    assert scope.required_tool == "prepare_simulator_settings"
+
+
+def test_comparison_does_not_override_customer_scope_or_settings() -> None:
+    assert request_scope(
+        request("고객 모델별 비용을 비교해줘", "simulation_history")
+    ).allowed_tools == {"get_customer_usage"}
+    assert (
+        request_scope(request("토큰을 2048로 바꿔줘", "simulator")).required_tool
+        == "prepare_simulator_settings"
+    )

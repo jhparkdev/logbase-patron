@@ -97,12 +97,16 @@ export function resolvedSettings(
 /** 실행을 누르기 전에 카드에서 바로 보여 줄 충돌. 차단 여부는 selectionIssues가 따로 정한다. */
 export function cardWarnings(
   choice: ModelChoice | undefined,
-  input: { hasImages: boolean; hasSchema: boolean },
+  input: { hasImages: boolean; hasSchema: boolean; imageOutput?: boolean },
 ): string[] {
   if (!choice) return ["고를 수 없는 모델이에요. 모델을 다시 골라 주세요."];
   if (!choice.selectable)
     return [choice.unavailableReason ?? "지금은 고를 수 없는 모델이에요."];
   const warnings: string[] = [];
+  if (input.imageOutput && !choice.generatesImages)
+    warnings.push(
+      "이미지를 만들지 못해요. 출력 형식을 텍스트로 바꾸거나 모델을 바꿔 주세요.",
+    );
   if (input.hasImages && !choice.supportsImages)
     warnings.push(
       "이미지 입력을 지원하지 않아요. 이미지를 빼거나 모델을 바꿔 주세요.",

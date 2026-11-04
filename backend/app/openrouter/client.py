@@ -158,8 +158,10 @@ class OpenRouterClient:
         cancel: asyncio.Event | None = None,
         stream: bool = False,
         on_generation_id: GenerationIdCallback | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        deny_data_collection: bool = False,
     ) -> CallResult:
-        """모델을 호출하고 결과를 돌려준다. 실패해도 예외를 던지지 않는다.
+        """모델을 호출하고 결과를 돌려준다. 호출이 실패해도 예외를 던지지 않는다.
 
         cancel 신호가 켜지면 호출을 멈추고 CANCELLED 결과를 돌려준다.
         신호가 없으면(None) 취소하지 않는다.
@@ -172,7 +174,13 @@ class OpenRouterClient:
         시간이 아니라 호출 전체의 제한 시간이다. on_generation_id는 스트리밍일 때만
         쓰이며, 호출 ID를 처음 알게 된 순간(응답 헤더 또는 첫 조각) 한 번 불린다.
         끝나기 전에 끊기거나 취소돼도 ID를 저장해 둘 수 있게 하기 위해서다.
+
+        tools를 주면 모델이 도구 호출을 결과의 tool_calls로 돌려줄 수 있다. 스트리밍 응답은
+        도구 호출을 읽지 않으므로 함께 쓰면 요청을 보내기 전에 ValueError를 낸다.
+        deny_data_collection은 요청 데이터를 수집하지 않는 업체로만 보내게 한다.
         """
+        if stream and tools:
+            raise ValueError("스트리밍 호출에는 도구를 함께 보낼 수 없다")
         started_at = self._clock()
         request_body = build_request_body(
             model_id=model_id,
@@ -184,6 +192,8 @@ class OpenRouterClient:
             stream=stream,
             temperature=temperature,
             reasoning_effort=reasoning_effort,
+            tools=tools,
+            deny_data_collection=deny_data_collection,
         )
 
         if cancel is not None and cancel.is_set():

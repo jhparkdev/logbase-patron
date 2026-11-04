@@ -210,3 +210,36 @@ test("입력을 구할 수 없는 실행은 복원하지 않는다", () => {
     ).kind,
   ).toBe("missing");
 });
+
+test("이미지 생성 실행은 출력 형식과 이미지 옵션을 되돌려 다시 이미지로 실행한다", () => {
+  const draft = {
+    ...RERUN_DRAFT,
+    test_type: "CUSTOM" as const,
+    scenario_id: null,
+    json_schema: null,
+    execution_config: {},
+    models: RERUN_DRAFT.models.map((model) => ({
+      ...model,
+      execution_config: {},
+    })),
+    output_type: "IMAGE" as const,
+    image_config: { n: 2, quality: "high" as const },
+  };
+  const values = toRerunValues(draft);
+  expect(values).toMatchObject({
+    outputType: "IMAGE",
+    imageCount: "2",
+    imageQuality: "high",
+  });
+  const request = toCreateRequest(simulatorFormSchema.parse(values), []);
+  expect(request).toMatchObject({
+    output_type: "IMAGE",
+    image_config: { n: 2, quality: "high" },
+  });
+});
+
+test("이미지 옵션 없이 실행한 이미지 생성은 빈 옵션으로 되돌린다", () => {
+  expect(
+    toRerunValues({ ...RERUN_DRAFT, output_type: "IMAGE", image_config: null }),
+  ).toMatchObject({ outputType: "IMAGE", imageCount: "", imageQuality: "" });
+});

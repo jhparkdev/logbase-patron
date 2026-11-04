@@ -10,6 +10,7 @@ from typing import Any
 
 from app.models import ModelStatus, RequestStatus, SimulationStatus
 from app.openrouter.image_result import GeneratedImage, ImageCallResult
+from app.openrouter.lookup_result import EndpointInfo
 from app.openrouter.result import CallResult, CallStatus, CostSource, CostStatus
 from app.schemas.simulation import ReasoningEffort
 from app.schemas.simulation_output import OutputType
@@ -433,12 +434,20 @@ class FakeProviderParameters:
     def __init__(self) -> None:
         self.by_model: dict[str, dict[str, list[str]]] = {}
         self.asked: list[str] = []
+        self.endpoints_by_model: dict[str, list[EndpointInfo]] = {}
+        self.asked_endpoints: list[str] = []
 
     async def provider_parameters(
         self, openrouter_model_id: str
     ) -> Mapping[str, Sequence[str]] | None:
         self.asked.append(openrouter_model_id)
         return self.by_model.get(openrouter_model_id)
+
+    async def provider_endpoints(
+        self, openrouter_model_id: str
+    ) -> Sequence[EndpointInfo] | None:
+        self.asked_endpoints.append(openrouter_model_id)
+        return self.endpoints_by_model.get(openrouter_model_id)
 
 
 class FakeImageFiles:

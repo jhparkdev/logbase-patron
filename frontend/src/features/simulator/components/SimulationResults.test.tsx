@@ -307,3 +307,66 @@ test("실행이 끝나면 성공한 칸 중 최단·최저를 표에 표시하�
   expect(screen.queryByText("최단")).toBeNull();
   expect(screen.getByText(/2개 중 2개/)).toBeDefined();
 });
+
+test("이미지 출력 칸은 텍스트 응답과 JSON·Schema 배지 대신 결과 이미지를 보여 준다", () => {
+  render(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: run([
+          slot({
+            response: null,
+            images: [
+              {
+                key: "a",
+                url: "/api/simulations/output-images/a",
+                mimeType: "image/png",
+              },
+              {
+                key: "b",
+                url: "/api/simulations/output-images/b",
+                mimeType: "image/jpeg",
+              },
+            ],
+          }),
+          slot({
+            key: "slot-2",
+            name: "둘째 모델",
+            response: null,
+            images: [],
+          }),
+        ]),
+      }}
+    />,
+  );
+  const [first, second] = screen.getAllByRole("article");
+  const images = within(first).getAllByRole("img");
+  expect(images.map((image) => image.getAttribute("src"))).toEqual([
+    "/api/simulations/output-images/a",
+    "/api/simulations/output-images/b",
+  ]);
+  expect(images[0].getAttribute("alt")).toBe("테스트 모델 결과 이미지 1");
+  expect(within(first).queryByText(/JSON /)).toBeNull();
+  expect(within(first).queryByText("아직 응답을 받지 못했어요.")).toBeNull();
+  expect(within(second).getByText("받은 이미지가 없어요.")).toBeDefined();
+});
+
+test("이미지 출력 칸이 진행 중이면 이미지 자리를 기다리는 모양으로 둔다", () => {
+  render(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: run([
+          slot({
+            status: { label: "진행 중", tone: "grey", ongoing: true },
+            response: null,
+            images: [],
+          }),
+        ]),
+      }}
+    />,
+  );
+  const [card] = screen.getAllByRole("article");
+  expect(within(card).getByText("이미지를 기다리고 있어요")).toBeDefined();
+  expect(within(card).queryByText("받은 이미지가 없어요.")).toBeNull();
+});

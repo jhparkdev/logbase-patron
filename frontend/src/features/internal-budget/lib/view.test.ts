@@ -11,6 +11,7 @@ describe("originLabel", () => {
     ["SIMULATION", "시뮬레이션"],
     ["SYSTEM_TEST", "연결 테스트"],
     ["CUSTOMER_SERVICE", "고객 사용"],
+    ["ASSISTANT", "AI 도우미"],
   ] as const)("%s는 %s로 보여 준다", (origin, label) => {
     expect(originLabel(origin)).toBe(label);
   });

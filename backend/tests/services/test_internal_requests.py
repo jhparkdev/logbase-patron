@@ -27,17 +27,18 @@ def query(**values: object) -> InternalRequestsQuery:
 async def test_내부_출처_호출만_나오고_고객_호출은_나오지_않는다(
     db_session: AsyncSession, factory: Factory
 ) -> None:
-    for origin in ("INTERNAL_DEVELOPMENT", "SIMULATION", "SYSTEM_TEST"):
+    for origin in ("INTERNAL_DEVELOPMENT", "SIMULATION", "SYSTEM_TEST", "ASSISTANT"):
         await internal_call(factory, usage_origin=origin)
     await internal_call(factory, usage_origin="CUSTOMER_SERVICE")
 
     page = await list_requests(db_session, PERIOD, query(sort="requestedAt"))
 
-    assert page.total == 3
+    assert page.total == 4
     assert {row.usage_origin for row in page.items} == {
         UsageOrigin.INTERNAL_DEVELOPMENT,
         UsageOrigin.SIMULATION,
         UsageOrigin.SYSTEM_TEST,
+        UsageOrigin.ASSISTANT,
     }
 
 
