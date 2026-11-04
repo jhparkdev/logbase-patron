@@ -34,10 +34,13 @@ export function SupportTags({
   choice,
   hasImages = false,
   hasSchema = false,
+  showSchema = true,
 }: {
   choice: ModelChoice;
   hasImages?: boolean;
   hasSchema?: boolean;
+  // 이미지 생성 실행은 Schema를 보내지 않아 JSON 지원 여부가 의미 없다
+  showSchema?: boolean;
 }) {
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -46,11 +49,13 @@ export function SupportTags({
         supported={choice.supportsImages}
         conflict={hasImages}
       />
-      <SupportTag
-        label="JSON"
-        supported={supportsStructuredOutput(choice)}
-        conflict={hasSchema}
-      />
+      {showSchema && (
+        <SupportTag
+          label="JSON"
+          supported={supportsStructuredOutput(choice)}
+          conflict={hasSchema}
+        />
+      )}
     </div>
   );
 }

@@ -228,3 +228,27 @@ test("공통 설정 안내는 잠김, 끔, 켬을 구분한다", () => {
   );
   expect(commonSettingsNote(true, false)).toContain("그 항목만 빼고");
 });
+
+test("이미지 출력이면 이미지를 못 만드는 모델을 막고 보내지 않는 텍스트 설정·Schema는 검사하지 않는다", () => {
+  const painter: ModelChoice = {
+    ...model,
+    key: "painter:provider",
+    name: "그림 모델",
+    generatesImages: true,
+  };
+  const imageDraft = (keys: string[]) =>
+    simulatorFormSchema.parse({
+      ...createDefaultValues(),
+      prompt: "사과",
+      outputType: "IMAGE",
+      jsonSchema: '{"type":"object"}',
+      comparisons: createComparisons(keys),
+    });
+  const all = [painter, { ...painter, key: "p2:provider" }, model];
+  expect(
+    selectionIssues(imageDraft([painter.key, "p2:provider"]), all, []),
+  ).toEqual([]);
+  expect(
+    selectionIssues(imageDraft([painter.key, model.key]), all, []),
+  ).toEqual(["테스트 모델은 이미지를 만들지 못해요."]);
+});

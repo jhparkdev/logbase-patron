@@ -30,6 +30,7 @@ export function ModelComparisonCard({
   scenario,
   hasImages,
   hasSchema,
+  imageOutput = false,
   count,
   onRemove,
   onDuplicate,
@@ -41,12 +42,13 @@ export function ModelComparisonCard({
   scenario?: ScenarioChoice;
   hasImages: boolean;
   hasSchema: boolean;
+  imageOutput?: boolean;
   count: number;
   onRemove: () => void;
   onDuplicate: () => void;
 }) {
   const number = index + 1;
-  const warnings = cardWarnings(choice, { hasImages, hasSchema });
+  const warnings = cardWarnings(choice, { hasImages, hasSchema, imageOutput });
   const settings = resolvedSettings(
     comparison,
     common,
@@ -70,15 +72,18 @@ export function ModelComparisonCard({
             {choice && <span>{choice.provider}</span>}
           </div>
         </div>
-        <Badge tone={custom ? "blue" : "grey"}>
-          {custom ? "개별" : "공통"}
-        </Badge>
+        {!imageOutput && (
+          <Badge tone={custom ? "blue" : "grey"}>
+            {custom ? "개별" : "공통"}
+          </Badge>
+        )}
       </div>
       {choice && (
         <SupportTags
           choice={choice}
           hasImages={hasImages}
           hasSchema={hasSchema}
+          showSchema={!imageOutput}
         />
       )}
       {warnings.map((warning) => (
@@ -87,14 +92,16 @@ export function ModelComparisonCard({
         </p>
       ))}
       <dl className="flex flex-col gap-1 border-t border-grey-100 pt-2.5 text-caption">
-        {settings.map((setting) => (
-          <div key={setting.key} className="flex justify-between gap-2">
-            <dt className="text-grey-600">{setting.label}</dt>
-            <dd className={`tabular-nums ${VALUE_CLASS[setting.source]}`}>
-              {setting.value}
-            </dd>
-          </div>
-        ))}
+        {/* 이미지 생성 실행에는 텍스트 설정을 보내지 않아 단가만 남긴다 */}
+        {!imageOutput &&
+          settings.map((setting) => (
+            <div key={setting.key} className="flex justify-between gap-2">
+              <dt className="text-grey-600">{setting.label}</dt>
+              <dd className={`tabular-nums ${VALUE_CLASS[setting.source]}`}>
+                {setting.value}
+              </dd>
+            </div>
+          ))}
         <div className="mt-1 flex items-center justify-between gap-2">
           <dt className="text-grey-600">단가 USD/1M</dt>
           <dd className="tabular-nums">
@@ -102,22 +109,25 @@ export function ModelComparisonCard({
           </dd>
         </div>
       </dl>
-      <ComparisonSettings index={index} choice={choice} />
+      {!imageOutput && <ComparisonSettings index={index} choice={choice} />}
       <div className="mt-auto flex items-center gap-1.5 pt-1">
-        <Button
-          size="sm"
-          variant="secondary"
-          title="같은 모델을 다른 설정으로 한 번 더 비교해요"
-          aria-label={`비교 모델 ${number} 다른 설정으로 비교`}
-          disabled={
-            count >= MODEL_LIMITS.max ||
-            !choice?.selectable ||
-            !choice.tuningParameters?.length
-          }
-          onClick={onDuplicate}
-        >
-          복제
-        </Button>
+        {/* 이미지 옵션은 모든 칸이 같아 복제하면 같은 비교가 되므로 숨긴다 */}
+        {!imageOutput && (
+          <Button
+            size="sm"
+            variant="secondary"
+            title="같은 모델을 다른 설정으로 한 번 더 비교해요"
+            aria-label={`비교 모델 ${number} 다른 설정으로 비교`}
+            disabled={
+              count >= MODEL_LIMITS.max ||
+              !choice?.selectable ||
+              !choice.tuningParameters?.length
+            }
+            onClick={onDuplicate}
+          >
+            복제
+          </Button>
+        )}
         <Button
           size="sm"
           variant="secondary"
