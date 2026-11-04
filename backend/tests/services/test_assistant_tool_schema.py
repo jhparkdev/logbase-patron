@@ -29,3 +29,25 @@ def test_history_page_size_is_fixed_and_not_a_model_argument() -> None:
     schema = parameters_for("list_simulations", HistoryQuery)
     assert "page_size" not in schema["properties"]
     assert HistoryQuery().page_size == 5
+
+
+def test_model_selection_schema_is_pinned_so_shared_contract_changes_are_reviewed() -> (
+    None
+):
+    """모델 칸 형식은 시뮬레이터 계약(ModelSelectionRequest)에서 온다. 그쪽이 바뀌면 도우미가 받는
+    값도 조용히 바뀌므로, 이 테스트를 고치기 전에 validate_patch가 새 값을 처리하는지 확인한다."""
+    schema = parameters_for("prepare_simulator_settings", SimulatorPatch)
+    item = schema["properties"]["models"]["items"]
+    assert set(item["properties"]) == {
+        "model_id",
+        "execution_provider",
+        "execution_config",
+    }
+    assert item["required"] == ["model_id", "execution_provider"]
+    provider = item["properties"]["execution_provider"]
+    assert [branch.get("enum") for branch in provider["anyOf"]] == [
+        None,
+        ["AUTO_CHEAPEST"],
+    ]
+    assert "AUTO_CHEAPEST" in provider["description"]
+    assert "최대 출력 토큰" in provider["description"]
