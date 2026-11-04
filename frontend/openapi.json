@@ -1611,6 +1611,53 @@
         }
       }
     },
+    "/api/models/openrouter/discoveries": {
+      "get": {
+        "tags": [
+          "models",
+          "models"
+        ],
+        "summary": "List Model Discoveries",
+        "description": "새 모델과 기본 모델의 비교 결과. 모델 관리 화면의 신규 모델 알림에 쓴다.",
+        "operationId": "list_model_discoveries_api_models_openrouter_discoveries_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDiscoveriesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/models/{model_id}/execution-providers": {
       "get": {
         "tags": [
@@ -5569,6 +5616,17 @@
         "title": "CustomerUsageRow",
         "description": "고객 × 서비스 한 행. 고객을 알 수 없는 호출은 customer_id가 null인 미분류 행으로 모은다."
       },
+      "DiscoveryStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "COMPARED",
+          "SKIPPED",
+          "FAILED"
+        ],
+        "title": "DiscoveryStatus",
+        "description": "새 모델 비교 진행 상태."
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -6504,6 +6562,169 @@
         ],
         "title": "ModelDetailRead",
         "description": "상세 패널용. 목록의 한 줄에 활성화·비활성화·마지막 성공 테스트 시각이 더해진다."
+      },
+      "ModelDiscoveriesResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelDiscoveryRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ModelDiscoveriesResponse"
+      },
+      "ModelDiscoveryRead": {
+        "properties": {
+          "openrouter_model_id": {
+            "type": "string",
+            "title": "Openrouter Model Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "discovered_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Discovered At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DiscoveryStatus"
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkipReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "base_model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Model Name"
+          },
+          "new_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Cost Usd"
+          },
+          "base_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Cost Usd"
+          },
+          "new_latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Latency Ms"
+          },
+          "base_latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Latency Ms"
+          },
+          "cost_change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Change Pct"
+          },
+          "latency_change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Change Pct"
+          },
+          "cheaper": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheaper"
+          },
+          "faster": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faster"
+          }
+        },
+        "type": "object",
+        "required": [
+          "openrouter_model_id",
+          "name",
+          "discovered_at",
+          "status",
+          "skip_reason",
+          "base_model_name",
+          "new_cost_usd",
+          "base_cost_usd",
+          "new_latency_ms",
+          "base_latency_ms",
+          "cost_change_pct",
+          "latency_change_pct",
+          "cheaper",
+          "faster"
+        ],
+        "title": "ModelDiscoveryRead"
       },
       "ModelErrorCode": {
         "type": "string",
@@ -9303,6 +9524,15 @@
         "additionalProperties": false,
         "type": "object",
         "title": "SimulatorState"
+      },
+      "SkipReason": {
+        "type": "string",
+        "enum": [
+          "INITIAL",
+          "PRICE_TOO_HIGH"
+        ],
+        "title": "SkipReason",
+        "description": "새 모델을 비교하지 않고 넘어간 이유."
       },
       "SortDirection": {
         "type": "string",

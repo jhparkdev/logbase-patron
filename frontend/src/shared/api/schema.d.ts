@@ -379,6 +379,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/openrouter/discoveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Model Discoveries
+         * @description 새 모델과 기본 모델의 비교 결과. 모델 관리 화면의 신규 모델 알림에 쓴다.
+         */
+        get: operations["list_model_discoveries_api_models_openrouter_discoveries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{model_id}/execution-providers": {
         parameters: {
             query?: never;
@@ -1263,6 +1283,12 @@ export interface components {
             budget: components["schemas"]["BudgetUsage"];
         };
         /**
+         * DiscoveryStatus
+         * @description 새 모델 비교 진행 상태.
+         * @enum {string}
+         */
+        DiscoveryStatus: "PENDING" | "COMPARED" | "SKIPPED" | "FAILED";
+        /**
          * ErrorCode
          * @description 오류 응답 코드. 프론트엔드는 OpenAPI enum으로 받아 코드별로 화면 처리를 나눈다.
          * @enum {string}
@@ -1594,6 +1620,43 @@ export interface components {
             deactivated_at: string | null;
             /** Last Success Test At */
             last_success_test_at: string | null;
+        };
+        /** ModelDiscoveriesResponse */
+        ModelDiscoveriesResponse: {
+            /** Items */
+            items: components["schemas"]["ModelDiscoveryRead"][];
+        };
+        /** ModelDiscoveryRead */
+        ModelDiscoveryRead: {
+            /** Openrouter Model Id */
+            openrouter_model_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Discovered At
+             * Format: date-time
+             */
+            discovered_at: string;
+            status: components["schemas"]["DiscoveryStatus"];
+            skip_reason: components["schemas"]["SkipReason"] | null;
+            /** Base Model Name */
+            base_model_name: string | null;
+            /** New Cost Usd */
+            new_cost_usd: string | null;
+            /** Base Cost Usd */
+            base_cost_usd: string | null;
+            /** New Latency Ms */
+            new_latency_ms: number | null;
+            /** Base Latency Ms */
+            base_latency_ms: number | null;
+            /** Cost Change Pct */
+            cost_change_pct: string | null;
+            /** Latency Change Pct */
+            latency_change_pct: string | null;
+            /** Cheaper */
+            cheaper: boolean | null;
+            /** Faster */
+            faster: boolean | null;
         };
         /**
          * ModelErrorCode
@@ -2573,6 +2636,12 @@ export interface components {
              */
             has_images: boolean;
         };
+        /**
+         * SkipReason
+         * @description 새 모델을 비교하지 않고 넘어간 이유.
+         * @enum {string}
+         */
+        SkipReason: "INITIAL" | "PRICE_TOO_HIGH";
         /**
          * SortDirection
          * @enum {string}
@@ -3887,6 +3956,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelErrorResponse"];
+                };
+            };
+        };
+    };
+    list_model_discoveries_api_models_openrouter_discoveries_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDiscoveriesResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
