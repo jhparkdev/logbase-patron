@@ -392,7 +392,14 @@ test.each(["unsupported", "unknown", "low-only"])(
     expect(screen.queryByRole("alert")).toBeNull();
     const [first, second] = within(dialog).getAllByRole("listitem");
     expect(first.textContent).toContain("추론 강도: high");
-    expect(second.textContent?.includes("추론 강도")).toBe(kind === "unknown");
+    expect(second.textContent?.includes("추론 강도: high")).toBe(
+      kind === "unknown",
+    );
+    // 빠진 칸에만 공통 설정이 적용되지 않는다는 안내가 붙는다
+    expect(first.textContent).not.toContain("받지 않아");
+    expect(second.textContent?.includes("추론 강도를 받지 않아")).toBe(
+      kind !== "unknown",
+    );
     fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
     await waitFor(() => expect(onRun).toHaveBeenCalledOnce());
   },

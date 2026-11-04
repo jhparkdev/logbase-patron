@@ -3,6 +3,7 @@ import type { SimulatorDraft } from "../lib/form";
 import { PARAMETER_LABELS, type ParameterKey } from "../lib/parameters";
 import {
   appliedSettings,
+  droppedSettingsNote,
   type ModelChoice,
   type ScenarioChoice,
 } from "../lib/presentation";
@@ -56,6 +57,9 @@ export function ComparisonConfirmationDialog({
           )
             .filter((key) => settings[key] !== undefined)
             .map((key) => `${PARAMETER_LABELS[key]}: ${settings[key]}`);
+          const note = choice
+            ? droppedSettingsNote(comparison, draft, choice, scenario)
+            : undefined;
           return (
             <li
               key={comparison.comparisonId}
@@ -67,6 +71,9 @@ export function ComparisonConfirmationDialog({
               <p className="mt-1 text-caption text-grey-600">
                 요청 설정: {labels.length ? labels.join(" · ") : "기본값 사용"}
               </p>
+              {note && (
+                <p className="mt-1 text-caption text-grey-600">{note}</p>
+              )}
             </li>
           );
         })}

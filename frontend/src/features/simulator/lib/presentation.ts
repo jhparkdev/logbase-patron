@@ -143,6 +143,41 @@ export function appliedSettings(
   );
 }
 
+const HANGUL_SYLLABLE_START = 0xac00;
+const HANGUL_SYLLABLE_COUNT = 11172;
+const FINAL_CONSONANT_KINDS = 28;
+
+// 마지막 글자에 받침이 있으면 "을", 없으면 "를". 영문 항목명(Temperature)은 받침 없는 발음이라 "를"이다.
+function objectParticle(word: string) {
+  const offset = word.charCodeAt(word.length - 1) - HANGUL_SYLLABLE_START;
+  const hasFinal =
+    offset >= 0 &&
+    offset < HANGUL_SYLLABLE_COUNT &&
+    offset % FINAL_CONSONANT_KINDS !== 0;
+  return hasFinal ? "을" : "를";
+}
+
+/** 공통 설정에서 물려받았지만 이 모델이 받지 않아 빠지는 항목 안내. 빠지는 항목이 없으면 undefined. */
+export function droppedSettingsNote(
+  comparison: ComparisonDraft,
+  draft: SimulatorDraft,
+  choice: ModelChoice,
+  scenario?: ScenarioChoice,
+) {
+  const requested = requestedSettings(
+    comparison,
+    commonSettings(draft),
+    scenario?.defaults,
+  );
+  const applied = appliedSettings(comparison, draft, choice, scenario);
+  const labels = SETTING_KEYS.filter(
+    (key) => requested[key] !== undefined && applied[key] === undefined,
+  ).map((key) => PARAMETER_LABELS[key]);
+  if (!labels.length) return undefined;
+  const names = labels.join(", ");
+  return `이 모델은 ${names}${objectParticle(names)} 받지 않아 공통 설정 값 대신 모델 기본값으로 실행합니다.`;
+}
+
 /** 비교 항목 머리글 오른쪽에 쓰는 설정 상태 이름. */
 export function comparisonModeLabel(
   mode: "shared" | "custom",

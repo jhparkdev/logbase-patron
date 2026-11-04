@@ -5,6 +5,7 @@ import {
   appliedSettings,
   commonSettingsNote,
   comparisonModeLabel,
+  droppedSettingsNote,
   type ModelChoice,
   type ScenarioChoice,
   selectionIssues,
@@ -166,6 +167,39 @@ test("허용 목록에 없는 공통 effort는 빼고, 직접 고른 값은 그�
   expect(appliedSettings(values.comparisons[0], values, lowOnly)).toEqual({
     reasoningEffort: "high",
   });
+});
+
+// 확인창에서 공통 설정이 적용되지 않는 칸을 알린다. 빠진 항목이 없으면 안내하지 않는다.
+test("받지 못해 빠지는 공통 설정 항목이 있는 칸만 안내한다", () => {
+  const values = scenarioDraft(true);
+  const [first, second] = values.comparisons;
+  expect(droppedSettingsNote(first, values, nemo, scenario)).toBe(
+    "이 모델은 Temperature를 받지 않아 공통 설정 값 대신 모델 기본값으로 실행합니다.",
+  );
+  expect(
+    droppedSettingsNote(second, values, supporting, scenario),
+  ).toBeUndefined();
+});
+
+test("공통 설정이 꺼져 있으면 물려받는 값이 없어 안내하지 않는다", () => {
+  const values = scenarioDraft(false);
+  expect(
+    droppedSettingsNote(values.comparisons[0], values, nemo, scenario),
+  ).toBeUndefined();
+});
+
+test("빠지는 항목이 여럿이면 모두 이름으로 알린다", () => {
+  const values = simulatorFormSchema.parse({
+    ...createDefaultValues(),
+    prompt: "작업",
+    commonEnabled: true,
+    temperature: "0.5",
+    reasoningEffort: "high",
+    comparisons: createComparisons([nemo.key, supporting.key]),
+  });
+  expect(droppedSettingsNote(values.comparisons[0], values, nemo)).toBe(
+    "이 모델은 Temperature, 추론 강도를 받지 않아 공통 설정 값 대신 모델 기본값으로 실행합니다.",
+  );
 });
 
 test("비활성·사라진 모델과 시나리오를 실행 전에 차단한다", () => {
