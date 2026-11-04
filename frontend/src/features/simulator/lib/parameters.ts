@@ -32,7 +32,7 @@ export function parameterIssue(
   if (parameter.kind === "choice")
     return parameter.options.some((option) => option.value === value)
       ? undefined
-      : `지원하는 ${label} 값을 선택하시기 바랍니다.`;
+      : `지원하는 ${label} 값을 골라 주세요.`;
   if (
     typeof value !== "number" ||
     !Number.isFinite(value) ||
@@ -40,5 +40,5 @@ export function parameterIssue(
     value > parameter.max ||
     (parameter.key === "maxTokens" && !Number.isSafeInteger(value))
   )
-    return `${label} 값은 ${parameter.min}~${parameter.max} 범위${parameter.key === "maxTokens" ? "의 정수" : "의 숫자"}로 입력하시기 바랍니다.`;
+    return `${label} 값은 ${parameter.min}~${parameter.max} 범위${parameter.key === "maxTokens" ? "의 정수" : "의 숫자"}로 입력해 주세요.`;
 }

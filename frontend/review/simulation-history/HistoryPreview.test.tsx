@@ -217,9 +217,7 @@ test("기존 12개 실행을 표시하고 상세에서 당시 원문과 모델�
   );
   expect(dialog.getByText(/린넨 셔츠 원피스/)).toBeDefined();
   expect(dialog.getByText("당시 입력과 설정")).toBeDefined();
-  expect(
-    dialog.getByRole("heading", { name: "시뮬레이션 결과 요약" }),
-  ).toBeDefined();
+  expect(dialog.getByRole("heading", { name: "비교 결과" })).toBeDefined();
   expect(fetch).not.toHaveBeenCalled();
   fetch.mockRestore();
 });
@@ -240,7 +238,7 @@ test("다시 준비하면 원문은 URL에 넣지 않고 P-04 폼으로 복원�
   ).toContain("린넨 셔츠 원피스");
   expect(router.state.location.search).toMatchObject({ rerun: runKey });
   expect(router.state.location.href).not.toContain("린넨");
-  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
   expect(
     screen.getByRole("button", { name: "비교 실행" }).hasAttribute("disabled"),
   ).toBe(true);

@@ -113,12 +113,19 @@ async function chooseTwoProviders() {
   fireEvent.click(screen.getByRole("button", { name: "선택 적용" }));
 }
 
+/** 이미지 칩을 켜야 파일 입력이 나온다. */
+function imageInput() {
+  const chip = screen.getByRole("button", { name: /^이미지/ });
+  if (chip.getAttribute("aria-pressed") !== "true") fireEvent.click(chip);
+  return screen.getByLabelText("이미지 파일 추가");
+}
+
 async function confirmRun() {
   const run = screen.getByRole("button", { name: "비교 실행" });
   await waitFor(() => expect(run.hasAttribute("disabled")).toBe(false));
   fireEvent.click(run);
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
 }
@@ -162,7 +169,7 @@ test("서버 업체를 받지 못한 모델은 고를 수 없게 안내하고 �
   expect(
     await screen.findByRole("checkbox", { name: "Mistral Nemo · DeepInfra" }),
   ).toBeDefined();
-  expect(screen.getByText("서버 업체를 확인할 수 없습니다")).toBeDefined();
+  expect(screen.getByText("서버 업체를 확인할 수 없어요")).toBeDefined();
 });
 
 test("모델 목록 조회 실패와 다시 시도를 구분한다", async () => {
@@ -174,7 +181,7 @@ test("모델 목록 조회 실패와 다시 시도를 구분한다", async () =>
   });
   renderAt("/simulator");
   expect(
-    await screen.findByText("모델 목록을 불러오지 못했습니다"),
+    await screen.findByText("모델 목록을 불러오지 못했어요"),
   ).toBeDefined();
   expect(screen.getByRole("button", { name: "다시 시도" })).toBeDefined();
 });
@@ -208,7 +215,7 @@ test("이미지를 먼저 올리고 받은 ID로 실행을 접수한다", async 
   const api = stub();
   renderAt("/simulator");
   await chooseTwoProviders();
-  fireEvent.change(screen.getByLabelText(/이미지 \(선택사항\)/), {
+  fireEvent.change(imageInput(), {
     target: { files: [new File(["image"], "a.png", { type: "image/png" })] },
   });
   await confirmRun();
@@ -232,7 +239,7 @@ test("이미지 업로드에 실패하면 실행을 접수하지 않고 서버 �
   });
   renderAt("/simulator");
   await chooseTwoProviders();
-  fireEvent.change(screen.getByLabelText(/이미지 \(선택사항\)/), {
+  fireEvent.change(imageInput(), {
     target: { files: [new File(["image"], "a.png", { type: "image/png" })] },
   });
   await confirmRun();
@@ -353,17 +360,15 @@ test("지금 고를 수 없는 업체는 비우고 안내한다", async () => {
   });
   renderAt(`/simulator?sourceRun=${RUN_ID}`);
   expect(
-    await screen.findByText(/현재 선택할 수 없는 모델의 비교 칸을 비웠습니다/),
+    await screen.findByText(/지금 고를 수 없는 모델의 비교 칸을 비웠어요/),
   ).toBeDefined();
 });
 
 /** 시나리오 목록을 다 받아야 기본 시나리오를 고를 수 있다. */
 async function chooseScenarioMode() {
-  const option = await screen.findByRole("option", { name: "기본 시나리오" });
+  const option = await screen.findByRole("radio", { name: "기본 시나리오" });
   await waitFor(() => expect(option.hasAttribute("disabled")).toBe(false));
-  fireEvent.change(screen.getByLabelText("테스트 유형"), {
-    target: { value: "scenario" },
-  });
+  fireEvent.click(option);
 }
 
 test("활성 시나리오만 요청하고, 고르면 Prompt를 채워 시나리오 실행으로 접수한다", async () => {
@@ -404,7 +409,7 @@ test("시나리오 목록을 받지 못해도 직접 작성 실행은 할 수 �
   await chooseTwoProviders();
   expect(
     screen
-      .getByRole("option", { name: "기본 시나리오" })
+      .getByRole("radio", { name: "기본 시나리오" })
       .hasAttribute("disabled"),
   ).toBe(true);
   expect(screen.getByRole("button", { name: "비교 실행" })).toBeDefined();
@@ -427,8 +432,9 @@ test("시나리오 실행의 재실행은 시나리오를 그대로 복원해 �
   const prompt = await screen.findByLabelText("Prompt");
   expect((prompt as HTMLTextAreaElement).value).toBe("과거 Prompt 원문");
   expect(
-    (screen.getByLabelText("테스트 유형") as HTMLSelectElement).value,
-  ).toBe("scenario");
+    (screen.getByRole("radio", { name: "기본 시나리오" }) as HTMLInputElement)
+      .checked,
+  ).toBe(true);
   expect((screen.getByLabelText("시나리오") as HTMLSelectElement).value).toBe(
     "3",
   );
@@ -465,7 +471,7 @@ test("시나리오 목록을 받지 못하면 재실행을 직접 작성으로 �
   stub(overrides);
   renderAt(`/simulator?sourceRun=${RUN_ID}`);
   expect(
-    await screen.findByText("재실행 조건을 불러오지 못했습니다"),
+    await screen.findByText("재실행 조건을 불러오지 못했어요"),
   ).toBeDefined();
   expect(screen.queryByLabelText("Prompt")).toBeNull();
   delete overrides["GET /api/scenarios"];
@@ -485,6 +491,6 @@ test("없는 재실행 원본은 찾을 수 없다고 안내한다", async () =>
   });
   renderAt(`/simulator?sourceRun=${RUN_ID}`);
   expect(
-    await screen.findByText("재실행할 입력을 찾을 수 없습니다"),
+    await screen.findByText("재실행할 입력을 찾을 수 없어요"),
   ).toBeDefined();
 });

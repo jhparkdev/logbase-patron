@@ -36,22 +36,22 @@ export function emptyCatalogMessage(
 ) {
   if (favoritesOnly && favorites.kind === "ready" && !favorites.keys.length)
     return {
-      title: "아직 즐겨찾기한 모델이 없습니다",
+      title: "아직 즐겨찾기한 모델이 없어요",
       description:
-        "전체 모델에서 별 버튼을 눌러 자주 쓰는 모델을 모아 볼 수 있습니다.",
+        "전체 모델에서 별 버튼을 눌러 자주 쓰는 모델을 모아 볼 수 있어요.",
     };
   if (query)
     return {
-      title: "검색 결과가 없습니다",
-      description: "다른 모델명이나 Provider로 검색하시기 바랍니다.",
+      title: "검색 결과가 없어요",
+      description: "다른 모델명이나 Provider로 검색해 보세요.",
     };
   return favoritesOnly
     ? {
-        title: "현재 목록에 즐겨찾기한 모델이 없습니다",
-        description: "전체 모델에서 모델 목록을 확인하시기 바랍니다.",
+        title: "지금 목록에 즐겨찾기한 모델이 없어요",
+        description: "전체 모델에서 모델 목록을 확인해 주세요.",
       }
     : {
-        title: "선택할 수 있는 모델이 없습니다",
-        description: "AI 모델 관리에서 모델 목록을 확인하시기 바랍니다.",
+        title: "고를 수 있는 모델이 없어요",
+        description: "AI 모델 관리에서 모델 목록을 확인해 주세요.",
       };
 }

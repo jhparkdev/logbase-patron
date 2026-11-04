@@ -125,9 +125,7 @@ test("상세를 열면 당시 입력과 모델별 결과를 조회해 표시한�
   );
   expect(await dialog.findByText("과거 Prompt 원문")).toBeDefined();
   expect(dialog.getByText("Nova Micro · Amazon")).toBeDefined();
-  expect(
-    dialog.getByRole("heading", { name: "시뮬레이션 결과 요약" }),
-  ).toBeDefined();
+  expect(dialog.getByRole("heading", { name: "비교 결과" })).toBeDefined();
   expect(dialog.getByText("모델 응답 원문")).toBeDefined();
   // 공통 값(0.3)과 다른 모델별 값을 구분해 보여 준다
   expect(dialog.getByText("공통 Temperature").nextSibling?.textContent).toBe(
@@ -220,9 +218,7 @@ test("다시 준비하면 원본 ID만 전달하고 시나리오 실행도 복�
   await waitFor(() =>
     expect(router.state.location.search).toMatchObject({ sourceRun: RUN_ID }),
   );
-  expect(
-    await screen.findByText("과거 실행 조건을 불러왔습니다"),
-  ).toBeDefined();
+  expect(await screen.findByText("과거 실행 조건을 불러왔어요")).toBeDefined();
   expect((screen.getByLabelText("시나리오") as HTMLSelectElement).value).toBe(
     "3",
   );
@@ -235,7 +231,7 @@ test("복원할 수 없는 재실행 주소에서 새 조건으로 돌아갈 수
   });
   const router = show(`/simulator?sourceRun=${RUN_ID}`);
   expect(
-    await screen.findByText("재실행할 입력을 찾을 수 없습니다"),
+    await screen.findByText("재실행할 입력을 찾을 수 없어요"),
   ).toBeDefined();
   expect(screen.queryByLabelText("Prompt")).toBeNull();
   fireEvent.click(screen.getByRole("link", { name: "새 조건으로 준비하기" }));

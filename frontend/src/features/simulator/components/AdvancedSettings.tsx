@@ -44,7 +44,7 @@ export function AdvancedSettings({
     resetField("reasoningEffort", { defaultValue: "" });
   };
   return (
-    <section className="border-t border-grey-100 py-4">
+    <section className="rounded-xl border border-grey-200 px-4 py-3">
       <button
         type="button"
         onClick={onToggle}
@@ -59,14 +59,14 @@ export function AdvancedSettings({
         </span>
       </button>
       <p id={`${panelId}-help`} className="mt-2 text-caption text-grey-600">
-        비교할 모든 모델에 함께 사용할 Temperature, 최대 출력 토큰, 추론
-        강도(effort)를 지정합니다. 모델별로 값을 지정한 항목에는 모델별 설정이
-        우선 적용됩니다.
+        비교할 모든 모델에 같이 쓸 Temperature, 최대 출력 토큰, 추론
+        강도(effort)를 정해요. 모델 카드에서 따로 정한 항목은 그 값이
+        우선이에요.
       </p>
       <div id={panelId} hidden={!open} className="pt-4">
         <p className="mb-4 text-caption text-grey-600">
-          공통값을 비워 두면 선택한 시나리오의 기본값을 사용합니다. 시나리오
-          기본값도 없으면 모델 기본값을 사용합니다.
+          공통값을 비워 두면 고른 시나리오의 기본값을 써요. 시나리오 기본값도
+          없으면 모델 기본값을 써요.
         </p>
         <div className="grid grid-cols-2 gap-6">
           <div>
@@ -120,7 +120,7 @@ export function AdvancedSettings({
               id="sim-temperature-help"
               className="mt-1 text-caption text-grey-600"
             >
-              비워두면 기본값을 사용합니다. 낮을수록 일관된 답변을 생성합니다.
+              비워 두면 기본값을 써요. 낮을수록 답이 일정해요.
             </p>
             <p
               id="sim-temperature-error"
@@ -152,7 +152,7 @@ export function AdvancedSettings({
               id="sim-max-tokens-help"
               className="mt-2 text-caption text-grey-600"
             >
-              비워두면 기본값을 사용합니다. 모델에 따라 허용량이 다릅니다.
+              비워 두면 기본값을 써요. 모델마다 허용량이 달라요.
             </p>
             <p
               id="sim-max-tokens-error"
@@ -175,7 +175,7 @@ export function AdvancedSettings({
         )}
         <div className="mt-3 flex items-center justify-between">
           <p className="text-caption text-grey-600">
-            Provider는 고정하고 자동 대체는 사용하지 않습니다.
+            Provider는 고정하고 자동 대체는 쓰지 않아요.
           </p>
           <Button size="sm" variant="secondary" onClick={reset}>
             기본 설정으로
