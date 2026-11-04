@@ -115,6 +115,9 @@ export function rerunSnapshot(key: string) {
   });
 }
 
+const previewTotalCost = (key: string) =>
+  dbMock.runs.find((run) => run.key === key)?.totalCost ?? null;
+
 // 개발 예시에서만 12건 스냅샷을 검색·정렬한다. 서비스 화면은 서버가 준 순서를 유지한다.
 export function selectPreviewRows(search: HistorySearch): HistoryRow[] {
   const rows = historyRows.filter((row) => {
@@ -152,6 +155,19 @@ export function selectPreviewRows(search: HistorySearch): HistoryRow[] {
       case "costStatus":
         result = a.cost.checkStatus.localeCompare(b.cost.checkStatus);
         break;
+      case "totalCost": {
+        // 예시 금액은 모두 같은 자릿수의 문자열이라 문자열 순서가 금액 순서와 같다.
+        // 서버처럼 금액을 모르는 실행은 방향과 관계없이 맨 뒤에 둔다.
+        const left = previewTotalCost(a.key);
+        const right = previewTotalCost(b.key);
+        if (left === null || right === null) {
+          if (left !== right) return left === null ? 1 : -1;
+          result = 0;
+          break;
+        }
+        result = left.localeCompare(right);
+        break;
+      }
     }
     return (
       (result || a.key.localeCompare(b.key)) *

@@ -6,7 +6,7 @@ import { PAGE_SIZE } from "../../../shared/lib/pagination";
 const DAY_MS = 86_400_000;
 const DEFAULT_DAYS = 30;
 export const HISTORY_MAX_DAYS = 366;
-// 서버 허용 목록(HistorySortColumn)에 있는 값만 둔다. 총 비용은 서버가 정렬하지 않는다.
+// 서버 허용 목록(HistorySortColumn)에 있는 값만 둔다.
 export const HISTORY_SORTS = [
   "requestedAt",
   "id",
@@ -14,6 +14,7 @@ export const HISTORY_SORTS = [
   "modelCount",
   "status",
   "costStatus",
+  "totalCost",
 ] as const satisfies readonly components["schemas"]["HistorySortColumn"][];
 export const HISTORY_STATUSES = [
   "all",
