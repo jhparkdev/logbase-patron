@@ -10,11 +10,13 @@ from typing import Annotated
 
 import httpx
 from fastapi import Depends, FastAPI
+from google.cloud import storage
 from pydantic import SecretStr
 
 from app.api.deps import NowDep, SettingsDep
 from app.db import get_sessionmaker
 from app.openrouter.client import OpenRouterClient
+from app.services.gcs_image_storage import Bucket, GcsImageStorage
 from app.services.image_storage import ImageStorage, LocalImageStorage
 from app.services.simulation_cancel_service import CancelDeps
 from app.services.simulation_image_source import StorageImageSource
@@ -54,12 +56,25 @@ def get_cancel_registry() -> CancelRegistry:
     return CancelRegistry()
 
 
-def get_image_storage(settings: SettingsDep) -> ImageStorage:
-    """이미지 저장소. 지금은 로컬 폴더이고, GCS 를 쓰게 되면 여기서 설정에 따라 바꿔 끼운다.
+@lru_cache
+def _gcs_bucket(name: str) -> Bucket:
+    # 클라이언트는 연결을 들고 있으므로 버킷마다 하나만 만들어 재사용한다
+    return storage.Client().bucket(name)
 
-    테스트는 app.dependency_overrides 로 임시 폴더를 쓰는 저장소로 바꿔 끼운다.
-    """
-    return LocalImageStorage(settings.image_storage_dir)
+
+def build_image_storage(directory: Path, bucket_name: str | None) -> ImageStorage:
+    """버킷 이름이 있으면 GCS, 없으면 로컬 폴더."""
+    # 값만 지운 줄(IMAGE_STORAGE_BUCKET=)은 빈 문자열로 읽히므로 없는 것과 같이 본다
+    if bucket_name:
+        return GcsImageStorage(_gcs_bucket(bucket_name))
+    return LocalImageStorage(directory)
+
+
+def get_image_storage(settings: SettingsDep) -> ImageStorage:
+    """이미지 저장소. 테스트는 app.dependency_overrides 로 임시 폴더를 쓰는 저장소로 바꿔 끼운다."""
+    return build_image_storage(
+        settings.image_storage_dir, settings.image_storage_bucket
+    )
 
 
 ImageStorageDep = Annotated[ImageStorage, Depends(get_image_storage)]
@@ -70,17 +85,21 @@ def get_simulation_manager(settings: SettingsDep) -> SimulationManager:
 
     테스트는 app.dependency_overrides 로 바꿔 끼운다.
     """
-    return _shared_manager(settings.openrouter_api_key, settings.image_storage_dir)
+    return _shared_manager(
+        settings.openrouter_api_key,
+        settings.image_storage_dir,
+        settings.image_storage_bucket,
+    )
 
 
 @lru_cache
 def _shared_manager(
-    api_key: SecretStr | None, image_storage_dir: Path
+    api_key: SecretStr | None, image_storage_dir: Path, image_storage_bucket: str | None
 ) -> SimulationManager:
     """프로세스에 하나만 둔다. 모델 호출기가 연결되어야 만들어진다."""
     sessions = get_sessionmaker()
     client = get_openrouter_client(api_key)
-    storage = LocalImageStorage(image_storage_dir)
+    storage = build_image_storage(image_storage_dir, image_storage_bucket)
     return SimulationManager(
         SimulationDeps(
             caller=client.call_model,

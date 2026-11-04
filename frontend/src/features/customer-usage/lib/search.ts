@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { budgetStatusSchema } from "../../../shared/lib/budget";
 import { PAGE_SIZE } from "../../../shared/lib/pagination";
 import {
   type Period,
@@ -63,6 +64,7 @@ export const customerUsageSearchSchema = z
     customer: positiveId,
     service: positiveId,
     model: positiveId,
+    budgetStatus: budgetStatusSchema.optional().catch(undefined),
     customersSort: z.enum(CUSTOMER_SORTS).optional().catch(undefined),
     customersOrder: z.enum(ORDERS).optional().catch(undefined),
     requestsSort: z.enum(REQUEST_SORTS).optional().catch(undefined),
@@ -164,6 +166,7 @@ export function customerRowsQuery(search: CustomerUsageSearch) {
     ...listQuery(search, "customers"),
     sort: search.customersSort ?? "confirmed",
     order: customerSortOf(search).direction,
+    ...(search.budgetStatus ? { budget_status: search.budgetStatus } : {}),
   };
 }
 
