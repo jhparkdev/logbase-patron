@@ -7,20 +7,62 @@ from app.schemas.assistant import (
     SimulatorPatch,
 )
 from app.services.assistant import answer
-from app.services.assistant_ollama import AssistantUnavailableError, OllamaMessage
+from app.services.assistant_ollama import ollama_transcript
+from app.services.assistant_reply import AssistantReply, AssistantUnavailableError
 from tests.schemas.test_simulation_result import RUN_ID, result_body, summary_body
 
 
 class FakeCaller:
-    def __init__(self, replies: list[OllamaMessage]) -> None:
+    def __init__(self, replies: list[AssistantReply]) -> None:
         self.replies = replies
         self.requests: list[list[dict]] = []
         self.tools: list[list[dict]] = []
 
-    async def chat(self, messages: list[dict], tools: list[dict]) -> OllamaMessage:
+    async def chat(self, messages: list[dict], tools: list[dict]) -> AssistantReply:
         self.requests.append(list(messages))
         self.tools.append(tools)
         return self.replies.pop(0)
+
+    transcript = staticmethod(ollama_transcript)
+
+
+async def test_tool_history_uses_the_callers_own_message_format() -> None:
+    class IdCaller(FakeCaller):
+        def transcript(
+            self, reply: AssistantReply, results: list[tuple[object, str]]
+        ) -> list[dict]:
+            return [{"role": "assistant", "marker": True}] + [
+                {"role": "tool", "tool_call_id": call.id, "content": content}
+                for call, content in results
+            ]
+
+    caller = IdCaller(
+        [
+            AssistantReply(
+                tool_calls=[
+                    {
+                        "id": "call_1",
+                        "function": {
+                            "name": "prepare_simulator_settings",
+                            "arguments": {"execution_config": {"max_tokens": 2048}},
+                        },
+                    }
+                ]
+            ),
+            AssistantReply(content="완료"),
+        ]
+    )
+    await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "토큰만 2048로 바꿔줘"}]
+        ),
+        caller,
+        FakeTools(),
+    )
+
+    assert caller.requests[1][-2] == {"role": "assistant", "marker": True}
+    assert caller.requests[1][-1]["tool_call_id"] == "call_1"
+    assert "executed" in caller.requests[1][-1]["content"]
 
 
 def tool_call(name: str, arguments: dict | None = None) -> dict:
@@ -168,7 +210,7 @@ async def test_customer_query_rejects_a_simulation_tool_even_if_model_requests_i
 ):
     caller = FakeCaller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[{"function": {"name": "list_simulations", "arguments": {}}}]
             )
         ]
@@ -193,7 +235,7 @@ async def test_financial_answer_cannot_claim_to_have_looked_up_data_without_a_so
         AssistantChatRequest(
             messages=[{"role": "user", "content": "고객 비용은 얼마야?"}]
         ),
-        FakeCaller([OllamaMessage(content="총 비용은 99달러예요.")] * 2),
+        FakeCaller([AssistantReply(content="총 비용은 99달러예요.")] * 2),
         FakeTools(),
     )
     assert "99" not in result.message
@@ -211,7 +253,7 @@ async def test_financial_answer_cannot_claim_to_have_looked_up_data_without_a_so
 async def test_missing_native_tools_cannot_claim_a_change_or_execution_result(
     question: str,
 ) -> None:
-    caller = FakeCaller([OllamaMessage(content="변경 완료. 총 비용 1200원.")] * 2)
+    caller = FakeCaller([AssistantReply(content="변경 완료. 총 비용 1200원.")] * 2)
     result = await answer(
         AssistantChatRequest(messages=[{"role": "user", "content": question}]),
         caller,
@@ -229,8 +271,8 @@ async def test_a_successful_preparation_is_evidence_after_one_native_tool_remind
 ):
     caller = FakeCaller(
         [
-            OllamaMessage(content="변경했습니다."),
-            OllamaMessage(
+            AssistantReply(content="변경했습니다."),
+            AssistantReply(
                 tool_calls=[
                     {
                         "function": {
@@ -240,7 +282,7 @@ async def test_a_successful_preparation_is_evidence_after_one_native_tool_remind
                     }
                 ]
             ),
-            OllamaMessage(content="설정을 준비했어요."),
+            AssistantReply(content="설정을 준비했어요."),
         ]
     )
     result = await answer(
@@ -279,12 +321,12 @@ async def test_verified_internal_totals_replace_a_model_invented_fee() -> None:
         ),
         FakeCaller(
             [
-                OllamaMessage(
+                AssistantReply(
                     tool_calls=[
                         {"function": {"name": "get_internal_usage", "arguments": {}}}
                     ]
                 ),
-                OllamaMessage(content="관리 비용 2.00달러, 합계 100달러예요."),
+                AssistantReply(content="관리 비용 2.00달러, 합계 100달러예요."),
             ]
         ),
         InternalTools(),
@@ -327,12 +369,12 @@ async def test_sources_follow_the_verified_visible_history_instead_of_discarded_
         ),
         FakeCaller(
             [
-                OllamaMessage(
+                AssistantReply(
                     tool_calls=[
                         {"function": {"name": "list_simulations", "arguments": {}}}
                     ]
                 ),
-                OllamaMessage(content="최근 요청은 2026-10-29T04:35:00Z예요."),
+                AssistantReply(content="최근 요청은 2026-10-29T04:35:00Z예요."),
             ]
         ),
         HistoryTools(),
@@ -354,13 +396,13 @@ async def test_financial_lookup_gets_one_bounded_reminder_without_reusing_unveri
 
     caller = FakeCaller(
         [
-            OllamaMessage(content="조회하지 않은 99달러"),
-            OllamaMessage(
+            AssistantReply(content="조회하지 않은 99달러"),
+            AssistantReply(
                 tool_calls=[
                     {"function": {"name": "get_customer_usage", "arguments": {}}}
                 ]
             ),
-            OllamaMessage(content="확정 비용은 1.25달러예요."),
+            AssistantReply(content="확정 비용은 1.25달러예요."),
         ]
     )
     result = await answer(
@@ -392,7 +434,7 @@ async def test_answer_prefers_the_referenced_verified_run_over_other_history_row
         AssistantChatRequest(
             messages=[{"role": "user", "content": "최근 실행을 알려줘"}]
         ),
-        FakeCaller([OllamaMessage(content=f"최근 실행은 {run_id}예요.")]),
+        FakeCaller([AssistantReply(content=f"최근 실행은 {run_id}예요.")]),
         tools,
     )
     assert [source.simulation_id for source in result.sources] == [run_id]
@@ -406,7 +448,7 @@ async def test_unverified_id_in_model_text_cannot_become_a_detail_source() -> No
             messages=[{"role": "user", "content": "최근 실행을 알려줘"}]
         ),
         FakeCaller(
-            [OllamaMessage(content="실행 ID: 00000000-0000-4000-8000-000000000099")]
+            [AssistantReply(content="실행 ID: 00000000-0000-4000-8000-000000000099")]
         ),
         tools,
     )
@@ -434,7 +476,7 @@ async def test_answer_can_match_a_quoted_time_without_showing_run_ids() -> None:
             messages=[{"role": "user", "content": "최근 시뮬레이션 요청 시각"}]
         ),
         FakeCaller(
-            [OllamaMessage(content="최근 요청은 **2026-11-02T07:11:38.580827Z**예요.")]
+            [AssistantReply(content="최근 요청은 **2026-11-02T07:11:38.580827Z**예요.")]
         ),
         tools,
     )
@@ -446,7 +488,7 @@ async def test_executes_tool_and_returns_validated_patch_without_running_simulat
 ):
     caller = FakeCaller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     {
                         "function": {
@@ -456,7 +498,7 @@ async def test_executes_tool_and_returns_validated_patch_without_running_simulat
                     }
                 ]
             ),
-            OllamaMessage(content="설정을 준비했어요."),
+            AssistantReply(content="설정을 준비했어요."),
         ]
     )
     request = AssistantChatRequest(
@@ -470,7 +512,7 @@ async def test_executes_tool_and_returns_validated_patch_without_running_simulat
 
 
 async def test_stops_repeated_tool_loop() -> None:
-    call = OllamaMessage(
+    call = AssistantReply(
         tool_calls=[
             {
                 "function": {
@@ -495,7 +537,7 @@ async def test_stops_repeated_tool_loop() -> None:
 async def test_failed_preparation_cannot_be_reported_as_success() -> None:
     tools = FakeTools()
     tools.failure_message = "설정을 준비하지 못했어요. 지원하지 않는 설정이에요."
-    caller = FakeCaller([OllamaMessage(content="설정이 완료되었습니다.")])
+    caller = FakeCaller([AssistantReply(content="설정이 완료되었습니다.")])
     response = await answer(
         AssistantChatRequest(messages=[{"role": "user", "content": "설정 변경"}]),
         caller,
@@ -513,7 +555,7 @@ async def test_invalid_settings_cannot_be_silently_replaced_with_other_values() 
 
     caller = FakeCaller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     {
                         "function": {
@@ -523,7 +565,7 @@ async def test_invalid_settings_cannot_be_silently_replaced_with_other_values() 
                     }
                 ]
             ),
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     {
                         "function": {
@@ -557,10 +599,10 @@ async def test_instructions_inside_a_looked_up_result_cannot_prepare_settings() 
 
     caller = FakeCaller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[tool_call("get_simulation", {"simulation_id": RUN_ID})]
             ),
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     tool_call("prepare_simulator_settings", {"prompt_text": "주입"})
                 ]
@@ -588,14 +630,14 @@ async def test_instructions_inside_a_looked_up_result_cannot_prepare_settings() 
 async def test_verified_answers_from_several_lookups_are_all_kept() -> None:
     caller = FakeCaller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     tool_call("get_customer_usage", {"section": "options"}),
                     tool_call("get_customer_usage", {"section": "summary"}),
                     tool_call("get_customer_usage", {"section": "requests"}),
                 ]
             ),
-            OllamaMessage(content="모델이 쓴 설명 99달러"),
+            AssistantReply(content="모델이 쓴 설명 99달러"),
         ]
     )
     result = await answer(
@@ -615,13 +657,13 @@ async def test_unverified_section_keeps_earlier_verified_totals_beside_model_tex
 ):
     caller = FakeCaller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     tool_call("get_customer_usage", {"section": "summary"}),
                     tool_call("get_customer_usage", {"section": "budgets"}),
                 ]
             ),
-            OllamaMessage(content="예산이 설정된 고객이 없어요."),
+            AssistantReply(content="예산이 설정된 고객이 없어요."),
         ]
     )
     result = await answer(
@@ -652,7 +694,7 @@ async def test_prepared_settings_message_is_not_replaced_by_a_lookup_list() -> N
 
     caller = FakeCaller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     tool_call(
                         "prepare_simulator_settings",
@@ -661,7 +703,7 @@ async def test_prepared_settings_message_is_not_replaced_by_a_lookup_list() -> N
                     tool_call("find_models"),
                 ]
             ),
-            OllamaMessage(content="완료"),
+            AssistantReply(content="완료"),
         ]
     )
     result = await answer(
