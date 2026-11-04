@@ -2652,10 +2652,10 @@ export interface components {
         };
         /**
          * UsageOrigin
-         * @description 호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트)를 섞지 않는다.
+         * @description 호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트·AI 도우미)를 섞지 않는다.
          * @enum {string}
          */
-        UsageOrigin: "CUSTOMER_SERVICE" | "INTERNAL_DEVELOPMENT" | "SIMULATION" | "SYSTEM_TEST";
+        UsageOrigin: "CUSTOMER_SERVICE" | "INTERNAL_DEVELOPMENT" | "SIMULATION" | "SYSTEM_TEST" | "ASSISTANT";
         /**
          * UsageRecordCreate
          * @description 호출 한 건의 기록. 같은 request_id 로 다시 보내도 한 번만 저장된다.

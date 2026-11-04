@@ -9461,10 +9461,11 @@
           "CUSTOMER_SERVICE",
           "INTERNAL_DEVELOPMENT",
           "SIMULATION",
-          "SYSTEM_TEST"
+          "SYSTEM_TEST",
+          "ASSISTANT"
         ],
         "title": "UsageOrigin",
-        "description": "호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트)를 섞지 않는다."
+        "description": "호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트·AI 도우미)를 섞지 않는다."
       },
       "UsageRecordCreate": {
         "properties": {
