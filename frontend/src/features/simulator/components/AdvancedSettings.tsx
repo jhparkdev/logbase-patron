@@ -53,7 +53,7 @@ export function AdvancedSettings({
     resetField("reasoningEffort", { defaultValue: "" });
   };
   return (
-    <section className="border-t border-grey-100 py-4">
+    <section className="rounded-xl border border-grey-200 px-4 py-3">
       <button
         type="button"
         onClick={onToggle}
@@ -174,7 +174,7 @@ export function AdvancedSettings({
                 id="sim-temperature-help"
                 className="mt-1 text-caption text-grey-600"
               >
-                비워두면 기본값을 사용합니다. 낮을수록 일관된 답변을 생성합니다.
+                비워 두면 기본값을 써요. 낮을수록 답이 일정해요.
               </p>
               <p
                 id="sim-temperature-error"
@@ -206,7 +206,7 @@ export function AdvancedSettings({
                 id="sim-max-tokens-help"
                 className="mt-2 text-caption text-grey-600"
               >
-                비워두면 기본값을 사용합니다. 모델에 따라 허용량이 다릅니다.
+                비워 두면 기본값을 써요. 모델마다 허용량이 달라요.
               </p>
               <p
                 id="sim-max-tokens-error"
@@ -220,15 +220,15 @@ export function AdvancedSettings({
           <div className="mt-4">
             <CommonEffortField choices={choices} />
           </div>
-          <div className="mt-3 flex justify-end">
-            <Button size="sm" variant="secondary" onClick={reset}>
-              기본 설정으로
-            </Button>
-          </div>
         </fieldset>
-        <p className="mt-3 text-caption text-grey-600">
-          Provider는 고정하고 자동 대체는 사용하지 않습니다.
-        </p>
+        <div className="mt-3 flex items-center justify-between">
+          <p className="text-caption text-grey-600">
+            Provider는 고정하고 자동 대체는 쓰지 않아요.
+          </p>
+          <Button size="sm" variant="secondary" onClick={reset}>
+            기본 설정으로
+          </Button>
+        </div>
       </div>
     </section>
   );

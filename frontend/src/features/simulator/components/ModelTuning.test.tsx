@@ -127,9 +127,9 @@ test("같은 대상을 복제한 뒤 다른 설정으로 제출하고 항목 ID�
   });
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
-  expect(within(dialog).getByText(/Temperature: 0.7/)).toBeDefined();
+  expect(within(dialog).getByText(/Temperature 0.7/)).toBeDefined();
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   await waitFor(() => expect(onRun).toHaveBeenCalledOnce());
   const submitted = onRun.mock.calls[0][0].comparisons;
@@ -169,7 +169,7 @@ test("설정을 바꾸지 않은 복제 항목은 확인창에 진행하지 않�
     target: { value: "0.30" },
   });
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
-  expect(await screen.findByText(/동일한 요청 설정/)).toBeDefined();
+  expect(await screen.findByText(/요청 설정이 같은/)).toBeDefined();
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(onRun).not.toHaveBeenCalled();
 });
@@ -215,7 +215,7 @@ test("앞 항목을 제거해도 남은 항목의 ID·설정을 유지하고 카
   ).toBe("0.8");
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   await waitFor(() => expect(onRun).toHaveBeenCalledOnce());
@@ -236,7 +236,7 @@ test("카탈로그 선택 제한은 서로 다른 모델 수가 아닌 복제를
     />,
   );
   fireEvent.click(screen.getByRole("checkbox", { name: "모델 C · p" }));
-  expect(screen.getByText("선택한 비교 항목 4/4개")).toBeDefined();
+  expect(screen.getByText("선택 4 / 4")).toBeDefined();
   expect(
     screen
       .getByRole("checkbox", { name: "모델 D · p" })
@@ -260,7 +260,7 @@ test("확인창이 열린 뒤 지원 범위가 바뀌면 실행을 막고 다시
   );
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   const updated = choices.map((choice) => ({
     ...choice,
@@ -301,9 +301,9 @@ test("한 모델을 먼저 고른 뒤 복제해 같은 대상의 설정 비교�
   });
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
-  expect(within(dialog).getByText("요청 설정: Temperature: 0")).toBeDefined();
+  expect(within(dialog).getByText("Temperature 0")).toBeDefined();
 });
 
 test("공통 effort는 접었다 펴도 보존하고, 모델별 설정을 켜면 공통값 없이 개별값만 확인·제출한다", async () => {
@@ -327,11 +327,11 @@ test("공통 effort는 접었다 펴도 보존하고, 모델별 설정을 켜면
   });
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   // 모델별 설정을 켜는 순간 공통 설정이 꺼지므로 공통 effort(high)는 어느 칸에도 가지 않는다.
-  expect(within(dialog).queryByText(/추론 강도: high/)).toBeNull();
-  expect(within(dialog).getByText(/추론 강도: low/)).toBeDefined();
+  expect(within(dialog).queryByText(/추론 강도 high/)).toBeNull();
+  expect(within(dialog).getByText(/추론 강도 low/)).toBeDefined();
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   await waitFor(() => expect(onRun).toHaveBeenCalledOnce());
   expect(onRun.mock.calls[0][0]).toMatchObject({
@@ -387,12 +387,12 @@ test.each(["unsupported", "unknown", "low-only"])(
     });
     fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
     const dialog = await screen.findByRole("dialog", {
-      name: "비교를 실행합니다",
+      name: "비교를 실행할까요?",
     });
     expect(screen.queryByRole("alert")).toBeNull();
     const [first, second] = within(dialog).getAllByRole("listitem");
-    expect(first.textContent).toContain("추론 강도: high");
-    expect(second.textContent?.includes("추론 강도: high")).toBe(
+    expect(first.textContent).toContain("추론 강도 high");
+    expect(second.textContent?.includes("추론 강도 high")).toBe(
       kind === "unknown",
     );
     // 빠진 칸에만 공통 설정이 적용되지 않는다는 안내가 붙는다
@@ -442,7 +442,7 @@ test("확인 중 effort 선택지 정보가 사라져도 공통 effort는 서버
   );
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   page.rerender(
     <SimulatorPage

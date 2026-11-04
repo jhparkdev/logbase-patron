@@ -62,8 +62,11 @@ class Settings(BaseSettings):
         default_factory=dict
     )
     # 시뮬레이터 이미지를 두는 로컬 폴더. 개발용이다(Cloud Run 의 디스크는 임시라서 배포에서는
-    # GCS 저장소로 바꿀 예정). DB 에는 이 폴더 안의 상대 경로와 해시만 남는다.
+    # 아래 GCS 버킷을 쓴다). DB 에는 이 폴더 안의 상대 경로와 해시만 남는다.
     image_storage_dir: Path = DEFAULT_IMAGE_STORAGE_DIR
+    # 시뮬레이터 이미지를 둘 GCS 버킷 이름. 있으면 로컬 폴더 대신 이 버킷을 쓴다.
+    # 인증은 Cloud Run 서비스 계정의 기본 자격증명이라 키 값은 받지 않는다.
+    image_storage_bucket: str | None = None
 
     @field_validator("command_code_api_keys", mode="before")
     @classmethod

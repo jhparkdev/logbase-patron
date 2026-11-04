@@ -10,7 +10,7 @@ export function RunSummary({ run }: { run: RunView }) {
     (run.confirmedCost !== null || run.estimatedCost !== null);
   return (
     <div>
-      <div className="grid grid-cols-1 gap-3 @min-[32rem]:grid-cols-2 @min-[48rem]:grid-cols-3 @min-[96rem]:grid-cols-6">
+      <div className="grid grid-cols-3 gap-3">
         <StatCard
           label="전체 상태"
           value={run.status.label}

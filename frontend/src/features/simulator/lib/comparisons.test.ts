@@ -52,7 +52,7 @@ function draft(secondTemperature = "0.7") {
 test("같은 모델·Provider라도 요청 설정이 다르면 비교하고 숫자 표기만 다른 중복은 막는다", () => {
   expect(selectionIssues(draft(), [choice], [])).toEqual([]);
   expect(selectionIssues(draft("0.30"), [choice], []).join(" ")).toContain(
-    "동일한 요청 설정",
+    "요청 설정이 같은",
   );
 });
 

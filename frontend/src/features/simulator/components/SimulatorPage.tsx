@@ -1,10 +1,12 @@
-import { FormProvider } from "react-hook-form";
+import { useState } from "react";
+import { FormProvider, useWatch } from "react-hook-form";
 import { Button } from "../../../shared/components/ui/Button";
 import { Notice } from "../../../shared/components/ui/Notice";
 import { PageHeader } from "../../../shared/components/ui/PageHeader";
 import { Result } from "../../../shared/components/ui/Result";
 import { Skeleton } from "../../../shared/components/ui/Skeleton";
 import { useSimulatorForm } from "../hooks/useSimulatorForm";
+import { inputSummary, runBlockReason } from "../lib/card-view";
 import type { ModelFavoritesView } from "../lib/favorites";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
 import { IMAGE_LIMITS, type ImageLimits } from "../lib/limits";
@@ -14,6 +16,8 @@ import { AssistantSimulatorBridge } from "./AssistantSimulatorBridge";
 import { ComparisonConfirmationDialog } from "./ComparisonConfirmationDialog";
 import { InputFields } from "./InputFields";
 import { ModelSelection } from "./ModelSelection";
+import { RunBar } from "./RunBar";
+import { RunConditionSummary } from "./RunConditionSummary";
 import {
   SimulationResults,
   type SimulationResultsProps,
@@ -43,17 +47,69 @@ export function SimulatorPage({
   ...resultProps
 }: SimulatorPageProps) {
   const state = catalogState ?? (choices.length ? "ready" : "unavailable");
+  const running = view.kind === "ready" && !!view.run.status.ongoing;
+  // 이 화면에서 실행한 뒤에만 폼을 요약으로 접어 결과를 위로 올린다. 조건을 고치려면 다시 펼친다.
+  // 주소로 결과만 열었을 때는 폼이 비어 있으므로 접지 않는다.
+  const [editing, setEditing] = useState(true);
   const workflow = useSimulatorForm({
     choices,
     scenarios,
-    onRun,
+    onRun:
+      onRun &&
+      (async (draft) => {
+        await onRun(draft);
+        setEditing(false);
+      }),
     initialValues,
     imageLimits,
-    running: view.kind === "ready" && !!view.run.status.ongoing,
+    running,
   });
+  const [prompt, text, files, existingAssetIds, jsonSchema, comparisons] =
+    useWatch({
+      control: workflow.form.control,
+      name: [
+        "prompt",
+        "text",
+        "files",
+        "existingAssetIds",
+        "jsonSchema",
+        "comparisons",
+      ],
+    });
+  const collapsed = view.kind === "ready" && !editing && prompt.trim() !== "";
+  const modelCount = comparisons.filter((item) => item.modelKey).length;
+  const notice =
+    state === "loading" ? (
+      <div>
+        <p role="status" className="mb-3 text-body-sm text-grey-600">
+          모델 목록을 불러오고 있어요
+        </p>
+        <Skeleton className="h-12 w-full" />
+      </div>
+    ) : state === "error" ? (
+      <Result
+        title="모델 목록을 불러오지 못했어요"
+        description="잠시 후 다시 시도해 주세요."
+        action={
+          onRetryCatalog && (
+            <Button variant="secondary" onClick={onRetryCatalog}>
+              다시 시도
+            </Button>
+          )
+        }
+      />
+    ) : state === "ready" && !choices.some((item) => item.selectable) ? (
+      <Result
+        title="고를 수 있는 모델이 없어요"
+        description="AI 모델 관리에서 활성 모델을 확인해 주세요."
+      />
+    ) : undefined;
   return (
     <>
-      <PageHeader title="AI 모델 시뮬레이터" />
+      <PageHeader
+        title="AI 모델 시뮬레이터"
+        description="같은 Prompt와 입력으로 모델 2~4개를 한 번에 비교해요."
+      />
       <AssistantSimulatorBridge
         form={workflow.form}
         choices={choices}
@@ -63,81 +119,64 @@ export function SimulatorPage({
       />
       {!onRun && (
         <Notice
-          title="비교 실행을 준비하고 있습니다"
-          description="입력과 설정을 편집할 수 있습니다. 실행 기능이 준비되면 모델을 선택해 비교할 수 있습니다."
+          title="비교 실행을 준비하고 있어요"
+          description="입력과 설정은 편집할 수 있어요. 실행 기능이 준비되면 모델을 골라 비교할 수 있어요."
         />
       )}
       <FormProvider {...workflow.form}>
         <form
           noValidate
           onSubmit={workflow.submit}
-          className="rounded-2xl bg-white p-6"
+          className="flex flex-col gap-6"
         >
-          <fieldset disabled={workflow.busy || !!workflow.pendingDraft}>
+          <fieldset
+            disabled={workflow.busy || !!workflow.pendingDraft}
+            className="flex min-w-0 flex-col gap-6"
+          >
             <legend className="sr-only">시뮬레이션 입력 및 비교 설정</legend>
-            <InputFields scenarios={scenarios} imageLimits={imageLimits} />
-            <AdvancedSettings
-              choices={choices}
-              open={workflow.advancedOpen}
-              onToggle={() => workflow.setAdvancedOpen(!workflow.advancedOpen)}
-              scenario={workflow.selectedScenario}
-            />
-            {state === "loading" && (
-              <div className="border-t border-grey-100 py-4">
-                <p role="status" className="mb-3 text-body-sm text-grey-600">
-                  모델 목록을 불러오고 있습니다
-                </p>
-                <Skeleton className="h-12 w-full" />
-              </div>
-            )}
-            {state === "error" && (
-              <Result
-                title="모델 목록을 불러오지 못했습니다"
-                description="잠시 후 다시 시도하시기 바랍니다."
-                action={
-                  onRetryCatalog && (
-                    <Button variant="secondary" onClick={onRetryCatalog}>
-                      다시 시도
-                    </Button>
-                  )
-                }
+            {collapsed ? (
+              <RunConditionSummary
+                scenarios={scenarios}
+                running={running}
+                onEdit={() => setEditing(true)}
               />
+            ) : (
+              <>
+                <InputFields scenarios={scenarios} imageLimits={imageLimits} />
+                <ModelSelection
+                  choices={choices}
+                  scenarios={scenarios}
+                  unavailable={state !== "ready"}
+                  favorites={favorites}
+                  settings={
+                    <AdvancedSettings
+                      choices={choices}
+                      open={workflow.advancedOpen}
+                      onToggle={() =>
+                        workflow.setAdvancedOpen(!workflow.advancedOpen)
+                      }
+                      scenario={workflow.selectedScenario}
+                    />
+                  }
+                  notice={notice}
+                />
+                <RunBar
+                  summary={inputSummary({
+                    prompt,
+                    text,
+                    imageCount: files.length + existingAssetIds.length,
+                    jsonSchema,
+                  })}
+                  modelCount={modelCount}
+                  reason={
+                    state === "ready" ? runBlockReason(modelCount) : undefined
+                  }
+                  issues={workflow.issues}
+                  disabled={!workflow.canRun || state !== "ready"}
+                  submitting={workflow.submitting}
+                />
+              </>
             )}
-            {state === "ready" && !choices.some((item) => item.selectable) && (
-              <Result
-                title="선택할 수 있는 모델이 없습니다"
-                description="AI 모델 관리에서 활성 모델을 확인하시기 바랍니다."
-              />
-            )}
-            <ModelSelection
-              choices={choices}
-              unavailable={state !== "ready"}
-              favorites={favorites}
-            />
-            {workflow.issues.length > 0 && (
-              <div
-                role="alert"
-                className="mt-4 rounded-lg bg-danger-weak p-3 text-body-sm text-red-600"
-              >
-                <ul className="list-inside list-disc">
-                  {workflow.issues.map((issue) => (
-                    <li key={issue}>{issue}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <div className="mt-5 flex items-center justify-between gap-4">
-              <p className="text-caption text-grey-600">
-                같은 Prompt와 입력으로 비교합니다. 실행 전 비용 발생 여부를
-                확인하시기 바랍니다.
-              </p>
-              <Button
-                type="submit"
-                disabled={!workflow.canRun || state !== "ready"}
-              >
-                {workflow.submitting ? "실행 요청 중" : "비교 실행"}
-              </Button>
-            </div>
           </fieldset>
         </form>
       </FormProvider>

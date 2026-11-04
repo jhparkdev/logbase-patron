@@ -70,16 +70,12 @@ test("모델 이름으로 이미지·파라미터 지원을 추측하지 않는�
   };
   values.jsonSchema = "{}";
   const issues = selectionIssues(values, choices(), []);
-  expect(issues).toContain("테스트 모델은 이미지 입력을 지원하지 않습니다.");
+  expect(issues).toContain("테스트 모델은 이미지 입력을 지원하지 않아요.");
+  expect(issues).toContain("테스트 모델은 Temperature 지정을 지원하지 않아요.");
   expect(issues).toContain(
-    "테스트 모델은 Temperature 지정을 지원하지 않습니다.",
+    "테스트 모델은 최대 출력 토큰 지정을 지원하지 않아요.",
   );
-  expect(issues).toContain(
-    "테스트 모델은 최대 출력 토큰 지정을 지원하지 않습니다.",
-  );
-  expect(issues).toContain(
-    "테스트 모델은 구조화 출력 설정을 지원하지 않습니다.",
-  );
+  expect(issues).toContain("테스트 모델은 구조화 출력 설정을 지원하지 않아요.");
 });
 
 test("시나리오 기본 Temperature를 받지 못하는 모델은 공통 켬·끔 모두 막지 않는다", () => {
@@ -102,7 +98,7 @@ test("받지 못하는 모델의 모델별 설정에 직접 넣은 Temperature�
     reasoningEffort: undefined,
   };
   expect(selectionIssues(values, [nemo, supporting], [scenario])).toContain(
-    "Mistral Nemo은 Temperature 지정을 지원하지 않습니다.",
+    "Mistral Nemo은 Temperature 지정을 지원하지 않아요.",
   );
 });
 
@@ -115,8 +111,8 @@ test("받지 못해 빠지는 항목을 뺀 값으로 같은 요청 설정인지
     comparisons: createComparisons([nemo.key, nemo.key]),
   });
   const issues = selectionIssues(values, [nemo], []).join(" ");
-  expect(issues).toContain("동일한 요청 설정");
-  expect(issues).not.toContain("지원하지 않습니다");
+  expect(issues).toContain("요청 설정이 같은");
+  expect(issues).not.toContain("지원하지 않아요");
 });
 
 // 확인창과 실행 전 검사가 같은 값을 쓰도록, 칸마다 서버가 실제로 보낼 설정을 계산한다.
@@ -174,7 +170,7 @@ test("받지 못해 빠지는 공통 설정 항목이 있는 칸만 안내한다
   const values = scenarioDraft(true);
   const [first, second] = values.comparisons;
   expect(droppedSettingsNote(first, values, nemo, scenario)).toBe(
-    "이 모델은 Temperature를 받지 않아 공통 설정 값 대신 모델 기본값으로 실행합니다.",
+    "이 모델은 Temperature를 받지 않아 공통 설정 값 대신 모델 기본값으로 실행해요.",
   );
   expect(
     droppedSettingsNote(second, values, supporting, scenario),
@@ -198,23 +194,21 @@ test("빠지는 항목이 여럿이면 모두 이름으로 알린다", () => {
     comparisons: createComparisons([nemo.key, supporting.key]),
   });
   expect(droppedSettingsNote(values.comparisons[0], values, nemo)).toBe(
-    "이 모델은 Temperature, 추론 강도를 받지 않아 공통 설정 값 대신 모델 기본값으로 실행합니다.",
+    "이 모델은 Temperature, 추론 강도를 받지 않아 공통 설정 값 대신 모델 기본값으로 실행해요.",
   );
 });
 
 test("비활성·사라진 모델과 시나리오를 실행 전에 차단한다", () => {
   expect(
     selectionIssues(draft(), [{ ...model, selectable: false }], []),
-  ).toContain(
-    "선택할 수 없는 모델이 있습니다. 모델을 다시 선택하시기 바랍니다.",
-  );
+  ).toContain("고를 수 없는 모델이 있어요. 모델을 다시 골라 주세요.");
   expect(
     selectionIssues(
       { ...draft(), mode: "scenario", scenarioKey: "gone" },
       choices(),
       [],
     ),
-  ).toContain("시나리오를 다시 선택하시기 바랍니다.");
+  ).toContain("시나리오를 다시 골라 주세요.");
 });
 
 test("기본 설정은 지원하지 않는 파라미터를 명시적으로 전달하지 않는다", () => {
