@@ -83,6 +83,7 @@ export function ModelComparisonCard({
           choice={choice}
           hasImages={hasImages}
           hasSchema={hasSchema}
+          showSchema={!imageOutput}
         />
       )}
       {warnings.map((warning) => (

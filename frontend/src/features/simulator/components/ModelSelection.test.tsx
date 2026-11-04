@@ -263,6 +263,8 @@ test("이미지 출력이면 보내지 않는 공통 설정·모델별 설정·�
   expect(
     within(card).queryByRole("button", { name: /다른 설정으로 비교/ }),
   ).toBeNull();
+  expect(within(card).queryByText("JSON")).toBeNull();
+  expect(within(card).getByText("이미지")).toBeDefined();
   expect(within(card).getByText("단가 USD/1M")).toBeDefined();
   expect(within(card).getByRole("button", { name: /제거/ })).toBeDefined();
 });
@@ -275,6 +277,7 @@ test("이미지 출력이면 이미지를 만드는 모델만 고르게 하고 �
     ),
   ).toBeDefined();
   const dialog = openPicker();
+  expect(within(dialog).queryByText("JSON")).toBeNull();
   const options = within(dialog).getAllByRole("checkbox");
   expect(options.map((option) => option.getAttribute("aria-label"))).toEqual([
     `${choices[1].name} · ${choices[1].provider}`,

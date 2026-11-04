@@ -224,6 +224,7 @@ export function ModelSelection({
           unavailable={unavailable}
           favorites={favorites}
           imagesAttached={hasImages}
+          imageOutput={imageOutput}
           onClose={() => setPickerOpen(false)}
           onApply={apply}
         />
