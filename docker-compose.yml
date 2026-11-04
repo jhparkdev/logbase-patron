@@ -43,8 +43,8 @@ services:
       # 개발용 Key만 .env에 넣는다. 비어 있으면 시뮬레이션 접수만 거절되고 앱은 뜬다.
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
 
-      # 로컬 이미지 업로드 기능
-      UPLOAD_DIR: /app/uploads
+      # 시뮬레이터 이미지 저장 폴더(app/config.py의 image_storage_dir). 아래 volumes로 호스트에 남겨 재시작해도 유지한다.
+      IMAGE_STORAGE_DIR: /app/uploads
     
     volumes:
       - ./backend/uploads:/app/uploads
