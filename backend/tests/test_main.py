@@ -14,6 +14,9 @@ from app.main import API_PREFIX
 
 # 로그인 없이 호출할 수 있는 라우트. 여기에 추가하려면 CLAUDE.md의 예외(로그인·health·기록 API)인지 확인한다.
 PUBLIC_ROUTES = {("GET", "/api/health"), ("POST", "/api/auth/login")}
+# 기록 API는 브라우저가 아니라 고객 서비스가 부르고 쿠키를 쓰지 않는다. Origin 검사 대신 수신 토큰으로
+# 확인한다(CLAUDE.md). 여기에 추가하려면 같은 이유인지 확인하고, 토큰 검사가 있는지 시험한다.
+INGEST_ROUTES = {("POST", "/api/usage-records")}
 STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 FOREIGN_ORIGIN = "https://evil.example"
 PATH_PARAMETER = re.compile(r"\{[^}]+\}")
@@ -59,7 +62,7 @@ async def test_state_changing_routes_reject_foreign_origin(
     targets = [
         (method, path)
         for method, path in api_routes(app)
-        if method in STATE_CHANGING_METHODS
+        if method in STATE_CHANGING_METHODS and (method, path) not in INGEST_ROUTES
     ]
     assert targets
 
@@ -69,6 +72,20 @@ async def test_state_changing_routes_reject_foreign_origin(
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN, (method, path)
         assert response.json()["code"] == "ORIGIN_NOT_ALLOWED"
+
+
+async def test_ingest_routes_check_the_token_instead_of_origin(
+    app: FastAPI, client: AsyncClient
+) -> None:
+    """기록 API는 Origin 검사를 하지 않는 대신, 토큰이 없으면 Origin과 관계없이 401이다."""
+    assert INGEST_ROUTES <= set(api_routes(app))
+
+    for method, path in INGEST_ROUTES:
+        response = await client.request(
+            method, path, json={}, headers={"Origin": FOREIGN_ORIGIN}
+        )
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED, (method, path)
+        assert response.json()["code"] == "UNAUTHENTICATED"
 
 
 async def test_state_changing_request_without_origin_is_rejected(

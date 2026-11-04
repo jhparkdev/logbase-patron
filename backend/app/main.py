@@ -18,6 +18,7 @@ from app.api import (
     simulations,
     subscriptions,
     usage,
+    usage_records,
 )
 from app.api.deps import require_allowed_origin
 from app.api.errors import install_error_handlers
@@ -54,6 +55,9 @@ def create_app() -> FastAPI:
         app.include_router(router, prefix=API_PREFIX, dependencies=[origin_check])
     for router in PROTECTED_ROUTERS:
         app.include_router(router, prefix=API_PREFIX, dependencies=[origin_check])
+    # 기록 수신 API는 브라우저가 아니라 고객 서비스가 부른다. Origin 헤더도 쿠키도 없어서
+    # Origin 검사와 로그인 검사를 하지 않고, 수신 토큰 헤더로만 확인한다(라우터 안에서).
+    app.include_router(usage_records.router, prefix=API_PREFIX)
     return app
 
 
