@@ -11,17 +11,21 @@ from datetime import UTC, datetime
 
 from pydantic import JsonValue
 from sqlalchemy import insert, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     AIRequest,
     AIRequestPayload,
     APIKey,
+    CallPurpose,
     CostSource,
     CostStatus,
+    DataSource,
     RequestStatus,
+    UsageOrigin,
 )
-from app.services.request_records import PendingRequest, RequestResult
+from app.services.request_records import FinishedCall, PendingRequest, RequestResult
 
 _FINISHED_STATUSES = (
     RequestStatus.SUCCESS,
@@ -184,6 +188,61 @@ async def save_payload(
             response_text=response_text,
         )
     )
+
+
+async def record_finished_call(session: AsyncSession, call: FinishedCall) -> bool:
+    """이미 끝난 고객 서비스 호출을 한 번에 저장한다. 같은 요청 ID가 이미 있으면 저장하지 않고 False.
+
+    PENDING을 거치지 않는다. 비용은 성공한 호출에 OpenRouter가 알려 준 값이 있을 때만 확정이고,
+    그 밖에는 미확인(NULL)이다. 고객 호출이라 프로젝트와 실행자는 없다. commit은 호출자가 한다.
+    """
+    cost_known = call.status == RequestStatus.SUCCESS and call.cost_usd is not None
+    statement = (
+        pg_insert(AIRequest)
+        .values(
+            request_id=call.request_id,
+            usage_origin=UsageOrigin.CUSTOMER_SERVICE,
+            call_purpose=CallPurpose.OTHER,
+            attempt_no=1,
+            key_id=call.key_id,
+            customer_id=call.customer_id,
+            project_id=None,
+            executed_by=None,
+            service_id=call.service_id,
+            task_id=call.task_id,
+            model_id=call.model_id,
+            requested_model=call.requested_model,
+            actual_model=call.actual_model,
+            actual_provider=call.actual_provider,
+            routing_policy={},
+            execution_config={},
+            status=call.status,
+            error_type=call.error_type,
+            http_status=call.http_status,
+            finish_reason=call.finish_reason,
+            requested_at=_as_utc(call.requested_at),
+            completed_at=(
+                None if call.completed_at is None else _as_utc(call.completed_at)
+            ),
+            latency_ms=call.latency_ms,
+            external_generation_id=call.external_generation_id,
+            input_tokens=call.input_tokens,
+            output_tokens=call.output_tokens,
+            cached_tokens=call.cached_tokens,
+            reasoning_tokens=call.reasoning_tokens,
+            cost_usd=call.cost_usd if cost_known else None,
+            cost_status=CostStatus.CONFIRMED if cost_known else CostStatus.UNKNOWN,
+            cost_source=CostSource.API_RESPONSE if cost_known else None,
+            cost_confirmed_at=(
+                _as_utc(call.completed_at or call.requested_at) if cost_known else None
+            ),
+            data_source=DataSource.LIVE,
+        )
+        # 요청 ID뿐 아니라 OpenRouter 응답 id 충돌도 예외 없이 건너뛴다. 어느 쪽인지는 호출자가 구분한다
+        .on_conflict_do_nothing()
+        .returning(AIRequest.request_id)
+    )
+    return (await session.execute(statement)).scalar_one_or_none() is not None
 
 
 def _as_utc(now: datetime) -> datetime:

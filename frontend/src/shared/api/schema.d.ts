@@ -821,6 +821,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/usage-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Usage Record
+         * @description 호출 기록 한 건을 저장한다. 같은 request_id 로 다시 보내면 200으로 답하고 저장하지 않는다.
+         */
+        post: operations["create_usage_record_api_usage_records_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2636,6 +2656,77 @@ export interface components {
          * @enum {string}
          */
         UsageOrigin: "CUSTOMER_SERVICE" | "INTERNAL_DEVELOPMENT" | "SIMULATION" | "SYSTEM_TEST";
+        /**
+         * UsageRecordCreate
+         * @description 호출 한 건의 기록. 같은 request_id 로 다시 보내도 한 번만 저장된다.
+         */
+        UsageRecordCreate: {
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /** Openrouter Generation Id */
+            openrouter_generation_id?: string | null;
+            /** Key Id */
+            key_id: number;
+            /** Customer Code */
+            customer_code: string;
+            /** Task Ref */
+            task_ref: string;
+            /** Task Type */
+            task_type: string;
+            /** Model */
+            model: string;
+            /** Actual Model */
+            actual_model?: string | null;
+            /** Actual Provider */
+            actual_provider?: string | null;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Latency Ms */
+            latency_ms?: number | null;
+            status: components["schemas"]["UsageRecordStatus"];
+            error_type?: components["schemas"]["ErrorType"] | null;
+            /** Http Status */
+            http_status?: number | null;
+            /** Finish Reason */
+            finish_reason?: string | null;
+            /** Input Tokens */
+            input_tokens?: number | null;
+            /** Output Tokens */
+            output_tokens?: number | null;
+            /** Cached Tokens */
+            cached_tokens?: number | null;
+            /** Reasoning Tokens */
+            reasoning_tokens?: number | null;
+            /** Cost Usd */
+            cost_usd?: number | string | null;
+        };
+        /**
+         * UsageRecordReceipt
+         * @description 받은 기록을 어떻게 처리했는지만 알린다. 기록 내용은 돌려주지 않는다.
+         */
+        UsageRecordReceipt: {
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /** Stored */
+            stored: boolean;
+        };
+        /**
+         * UsageRecordStatus
+         * @description 호출의 최종 결과. 진행 중이거나 취소된 호출은 보내지 않는다.
+         * @enum {string}
+         */
+        UsageRecordStatus: "SUCCESS" | "FAILED" | "TIMEOUT";
         /**
          * UsageSummary
          * @description 요약 카드. *_change_pct는 직전 동일 길이 기간 대비 증감률이고 비교할 값이 0이면 null이다.
@@ -4924,6 +5015,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SimulationRequestErrorResponse"];
+                };
+            };
+        };
+    };
+    create_usage_record_api_usage_records_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Patron-Ingest-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsageRecordCreate"];
+            };
+        };
+        responses: {
+            /** @description 같은 요청 ID가 이미 저장되어 있어 새로 저장하지 않았다. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageRecordReceipt"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageRecordReceipt"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

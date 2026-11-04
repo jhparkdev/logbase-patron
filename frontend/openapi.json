@@ -4013,6 +4013,96 @@
           }
         }
       }
+    },
+    "/api/usage-records": {
+      "post": {
+        "tags": [
+          "usage-records"
+        ],
+        "summary": "Create Usage Record",
+        "description": "호출 기록 한 건을 저장한다. 같은 request_id 로 다시 보내면 200으로 답하고 저장하지 않는다.",
+        "operationId": "create_usage_record_api_usage_records_post",
+        "parameters": [
+          {
+            "name": "X-Patron-Ingest-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Patron-Ingest-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsageRecordCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageRecordReceipt"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "같은 요청 ID가 이미 저장되어 있어 새로 저장하지 않았다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageRecordReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -9375,6 +9465,258 @@
         ],
         "title": "UsageOrigin",
         "description": "호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트)를 섞지 않는다."
+      },
+      "UsageRecordCreate": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "openrouter_generation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openrouter Generation Id"
+          },
+          "key_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Key Id"
+          },
+          "customer_code": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Customer Code"
+          },
+          "task_ref": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Ref"
+          },
+          "task_type": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Type"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model"
+          },
+          "actual_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Model"
+          },
+          "actual_provider": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Provider"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UsageRecordStatus"
+          },
+          "error_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 599.0,
+                "minimum": 100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "cached_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Tokens"
+          },
+          "reasoning_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Tokens"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "key_id",
+          "customer_code",
+          "task_ref",
+          "task_type",
+          "model",
+          "requested_at",
+          "status"
+        ],
+        "title": "UsageRecordCreate",
+        "description": "호출 한 건의 기록. 같은 request_id 로 다시 보내도 한 번만 저장된다."
+      },
+      "UsageRecordReceipt": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "stored": {
+            "type": "boolean",
+            "title": "Stored"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "stored"
+        ],
+        "title": "UsageRecordReceipt",
+        "description": "받은 기록을 어떻게 처리했는지만 알린다. 기록 내용은 돌려주지 않는다."
+      },
+      "UsageRecordStatus": {
+        "type": "string",
+        "enum": [
+          "SUCCESS",
+          "FAILED",
+          "TIMEOUT"
+        ],
+        "title": "UsageRecordStatus",
+        "description": "호출의 최종 결과. 진행 중이거나 취소된 호출은 보내지 않는다."
       },
       "UsageSummary": {
         "properties": {
