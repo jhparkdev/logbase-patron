@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.openrouter.lookup_result import EndpointInfo
 from app.schemas.assistant import SimulatorState
-from app.services.assistant_tools import AssistantTools
+from app.services.assistant_tools import AssistantTools, tool_definitions
 from tests.api.model_helpers import FakeEndpointCatalog
 from tests.db_helpers import T0, Factory
 
@@ -277,3 +277,9 @@ async def test_prepared_patch_stores_the_real_provider_instead_of_auto_cheapest(
     ]
     assert tools.patch is not None and tools.patch.models is not None
     assert {item.execution_provider for item in tools.patch.models} == {"업체A"}
+
+
+def test_preparation_tool_asks_for_every_change_in_one_call() -> None:
+    """준비에 성공하면 그 응답으로 끝나므로, 나눠 보낸 뒤쪽 변경은 반영할 기회가 없다."""
+    [definition] = tool_definitions(frozenset({"prepare_simulator_settings"}))
+    assert "한 번의 호출" in definition["function"]["description"]

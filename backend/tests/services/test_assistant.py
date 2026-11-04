@@ -42,10 +42,7 @@ async def test_tool_history_uses_the_callers_own_message_format() -> None:
                 tool_calls=[
                     {
                         "id": "call_1",
-                        "function": {
-                            "name": "prepare_simulator_settings",
-                            "arguments": {"execution_config": {"max_tokens": 2048}},
-                        },
+                        "function": {"name": "find_models", "arguments": {}},
                     }
                 ]
             ),
@@ -54,15 +51,15 @@ async def test_tool_history_uses_the_callers_own_message_format() -> None:
     )
     await answer(
         AssistantChatRequest(
-            messages=[{"role": "user", "content": "토큰만 2048로 바꿔줘"}]
+            messages=[{"role": "user", "content": "등록된 모델 목록을 알려줘"}]
         ),
         caller,
-        FakeTools(),
+        ModelLookupTools(),
     )
 
     assert caller.requests[1][-2] == {"role": "assistant", "marker": True}
     assert caller.requests[1][-1]["tool_call_id"] == "call_1"
-    assert "executed" in caller.requests[1][-1]["content"]
+    assert "items" in caller.requests[1][-1]["content"]
 
 
 def tool_call(name: str, arguments: dict | None = None) -> dict:
@@ -282,7 +279,6 @@ async def test_a_successful_preparation_is_evidence_after_one_native_tool_remind
                     }
                 ]
             ),
-            AssistantReply(content="설정을 준비했어요."),
         ]
     )
     result = await answer(
@@ -293,7 +289,7 @@ async def test_a_successful_preparation_is_evidence_after_one_native_tool_remind
         FakeTools(),
     )
     assert result.patch.execution_config.max_tokens == 2048
-    assert len(caller.requests) == 3
+    assert len(caller.requests) == 2
 
 
 async def test_verified_internal_totals_replace_a_model_invented_fee() -> None:
@@ -498,7 +494,6 @@ async def test_executes_tool_and_returns_validated_patch_without_running_simulat
                     }
                 ]
             ),
-            AssistantReply(content="설정을 준비했어요."),
         ]
     )
     request = AssistantChatRequest(
@@ -506,30 +501,21 @@ async def test_executes_tool_and_returns_validated_patch_without_running_simulat
     )
     result = await answer(request, caller, FakeTools())
     assert result.patch.execution_config.max_tokens == 2048
-    assert caller.requests[1][-1]["role"] == "tool"
-    assert "executed" in caller.requests[1][-1]["content"]
+    assert result.message == PREPARED_MESSAGE
     assert caller.requests[0][0]["role"] == "system"
 
 
 async def test_stops_repeated_tool_loop() -> None:
-    call = AssistantReply(
-        tool_calls=[
-            {
-                "function": {
-                    "name": "prepare_simulator_settings",
-                    "arguments": {"execution_config": {"max_tokens": 10}},
-                }
-            }
-        ]
-    )
+    # 준비에 성공하면 바로 끝나므로 반복은 조회 도구로 확인한다.
+    call = AssistantReply(tool_calls=[tool_call("find_models")])
     caller = FakeCaller([call] * 5)
     with pytest.raises(AssistantUnavailableError):
         await answer(
             AssistantChatRequest(
-                messages=[{"role": "user", "content": "토큰을 10으로 바꿔줘"}]
+                messages=[{"role": "user", "content": "등록된 모델 목록을 알려줘"}]
             ),
             caller,
-            FakeTools(),
+            ModelLookupTools(),
         )
     assert len(caller.requests) <= 4
 
@@ -677,20 +663,24 @@ async def test_unverified_section_keeps_earlier_verified_totals_beside_model_tex
     assert "예산이 설정된 고객이 없어요." in result.message
 
 
+class ModelLookupTools(FakeTools):
+    """모델 조회와 설정 준비를 흉내 낸다."""
+
+    async def execute(self, name: str, arguments: dict) -> dict:
+        if name == "find_models":
+            self.sources.append(AssistantSource(title="등록 모델", kind="models"))
+            return {
+                "view": "providers",
+                "q": None,
+                "items": [{"name": "모델 1", "creator": "vendor", "providers": []}],
+                "total": 1,
+                "page": 1,
+                "page_size": 5,
+            }
+        return await super().execute(name, arguments)
+
+
 async def test_prepared_settings_message_is_not_replaced_by_a_lookup_list() -> None:
-    class ModelThenPrepareTools(FakeTools):
-        async def execute(self, name: str, arguments: dict) -> dict:
-            if name == "find_models":
-                self.sources.append(AssistantSource(title="등록 모델", kind="models"))
-                return {
-                    "view": "providers",
-                    "q": None,
-                    "items": [{"name": "모델 1", "creator": "vendor", "providers": []}],
-                    "total": 1,
-                    "page": 1,
-                    "page_size": 5,
-                }
-            return await super().execute(name, arguments)
 
     caller = FakeCaller(
         [
@@ -711,7 +701,83 @@ async def test_prepared_settings_message_is_not_replaced_by_a_lookup_list() -> N
             messages=[{"role": "user", "content": "최대 출력 토큰을 2048로 바꿔줘"}]
         ),
         caller,
-        ModelThenPrepareTools(),
+        ModelLookupTools(),
     )
     assert result.patch is not None
     assert result.message == "요청한 설정을 준비했어요. 비교 실행은 시작하지 않았어요."
+
+
+PREPARED_MESSAGE = "요청한 설정을 준비했어요. 비교 실행은 시작하지 않았어요."
+
+
+async def test_successful_preparation_returns_without_another_model_call() -> None:
+    """준비가 끝나면 최종 문구는 서버가 정하므로 모델을 다시 부르지 않는다. 질문마다 왕복 하나를 줄인다."""
+    caller = FakeCaller(
+        [
+            AssistantReply(
+                tool_calls=[
+                    tool_call(
+                        "prepare_simulator_settings",
+                        {"execution_config": {"max_tokens": 2048}},
+                    )
+                ]
+            )
+        ]
+    )
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "최대 출력 토큰을 2048로 바꿔줘"}]
+        ),
+        caller,
+        FakeTools(),
+    )
+    assert len(caller.requests) == 1
+    assert result.patch is not None
+    assert result.patch.execution_config.max_tokens == 2048
+    assert result.message == PREPARED_MESSAGE
+
+
+async def test_unchanged_preparation_also_returns_without_another_model_call() -> None:
+    class UnchangedTools(FakeTools):
+        async def execute(self, name: str, arguments: dict) -> dict:
+            return {"prepared": False, "unchanged": True, "message": "같아요"}
+
+    caller = FakeCaller(
+        [AssistantReply(tool_calls=[tool_call("prepare_simulator_settings", {})])]
+    )
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "최대 출력 토큰을 2048로 바꿔줘"}]
+        ),
+        caller,
+        UnchangedTools(),
+    )
+    assert len(caller.requests) == 1
+    assert result.patch is None
+    assert result.message == "요청한 설정이 이미 같아요."
+
+
+async def test_model_lookup_before_preparation_still_gets_its_own_round() -> None:
+    caller = FakeCaller(
+        [
+            AssistantReply(tool_calls=[tool_call("find_models")]),
+            AssistantReply(
+                tool_calls=[
+                    tool_call(
+                        "prepare_simulator_settings",
+                        {"execution_config": {"max_tokens": 2048}},
+                    )
+                ]
+            ),
+        ]
+    )
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "최대 출력 토큰을 2048로 바꿔줘"}]
+        ),
+        caller,
+        ModelLookupTools(),
+    )
+    assert len(caller.requests) == 2
+    assert result.patch is not None
+    assert result.message == PREPARED_MESSAGE
