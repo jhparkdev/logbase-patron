@@ -197,6 +197,82 @@ async def test_temperature와_reasoning_effort를_주지_않으면_요청에_없
     assert "reasoning" not in body
 
 
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "find_models",
+            "description": "등록 모델을 조회한다",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    }
+]
+TOOL_CALL_BODY_TEXT = json.dumps(
+    {
+        "id": "gen-tool123",
+        "model": MODEL_ID,
+        "provider": "DekaLLM",
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_abc123",
+                            "type": "function",
+                            "function": {
+                                "name": "find_models",
+                                "arguments": '{"q": "claude"}',
+                            },
+                        }
+                    ],
+                },
+                "finish_reason": "tool_calls",
+            }
+        ],
+        "usage": {"prompt_tokens": 120, "completion_tokens": 9, "cost": 2.1e-05},
+    }
+)
+
+
+async def test_도구와_데이터_수집_거부를_요청에_담고_도구_호출을_돌려준다(
+    make_client: ClientFactory,
+) -> None:
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, text=TOOL_CALL_BODY_TEXT)
+
+    result = await call(make_client(handler), tools=TOOLS, deny_data_collection=True)
+
+    body = json.loads(captured[0].content)
+    assert body["tools"] == TOOLS
+    assert body["tool_choice"] == "auto"
+    assert body["provider"]["data_collection"] == "deny"
+    assert result.status == CallStatus.SUCCESS
+    assert result.cost_status == CostStatus.CONFIRMED
+    assert [(item.name, item.arguments) for item in result.tool_calls] == [
+        ("find_models", {"q": "claude"})
+    ]
+
+
+async def test_스트리밍에는_도구를_함께_보낼_수_없고_요청도_보내지_않는다(
+    make_client: ClientFactory,
+) -> None:
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return respond_success(request)
+
+    with pytest.raises(ValueError):
+        await call(make_client(handler), tools=TOOLS, stream=True)
+
+    assert captured == []
+
+
 # ---------------------------------------------------------------
 # HTTP 오류 응답: 예외를 던지지 않고 실패 결과로 돌려준다
 # ---------------------------------------------------------------

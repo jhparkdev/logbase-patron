@@ -1,3 +1,5 @@
+import pytest
+
 from app.openrouter.request import build_request_body
 
 MESSAGES = [{"role": "user", "content": "안녕"}]
@@ -126,3 +128,56 @@ def test_온도와_추론_설정만으로는_require_parameters를_켜지_않는
     )
 
     assert "require_parameters" not in body["provider"]
+
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "find_models",
+            "description": "등록 모델을 조회한다",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    }
+]
+
+
+def test_도구를_주면_tools와_자동_선택과_require_parameters를_보낸다() -> None:
+    body = build_request_body(
+        model_id=MODEL_ID, messages=MESSAGES, max_tokens=100, tools=TOOLS
+    )
+
+    assert body["tools"] == TOOLS
+    assert body["tool_choice"] == "auto"
+    # 도구 호출을 지원하지 않는 업체가 도구를 무시하고 답하지 않게 한다.
+    assert body["provider"]["require_parameters"] is True
+
+
+@pytest.mark.parametrize("tools", [None, []])
+def test_도구가_없으면_tools와_tool_choice를_보내지_않는다(
+    tools: list[dict[str, object]] | None,
+) -> None:
+    body = build_request_body(
+        model_id=MODEL_ID, messages=MESSAGES, max_tokens=100, tools=tools
+    )
+
+    assert "tools" not in body
+    assert "tool_choice" not in body
+    assert "require_parameters" not in body["provider"]
+
+
+def test_데이터_수집_거부를_켜면_provider에_deny를_담는다() -> None:
+    body = build_request_body(
+        model_id=MODEL_ID,
+        messages=MESSAGES,
+        max_tokens=100,
+        deny_data_collection=True,
+    )
+
+    assert body["provider"]["data_collection"] == "deny"
+
+
+def test_데이터_수집_거부는_기본으로_보내지_않는다() -> None:
+    body = build_request_body(model_id=MODEL_ID, messages=MESSAGES, max_tokens=100)
+
+    assert "data_collection" not in body["provider"]

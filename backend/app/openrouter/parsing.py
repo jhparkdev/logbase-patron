@@ -17,8 +17,11 @@ from app.openrouter.result import (
     CallStatus,
     CostSource,
     CostStatus,
+    ToolCall,
     elapsed_ms,
 )
+
+FUNCTION_TOOL_TYPE = "function"
 
 
 def loads_decimal(text: str) -> Any:
@@ -51,6 +54,48 @@ def _get_first_choice(body: dict[str, Any]) -> dict[str, Any]:
     if isinstance(choices, list) and choices and isinstance(choices[0], dict):
         return choices[0]
     return {}
+
+
+def _tool_call(item: Any) -> ToolCall | None:
+    """도구 호출 하나를 읽는다. 모양이 하나라도 틀리면 None."""
+    if not isinstance(item, dict):
+        return None
+    function = item.get("function")
+    if not isinstance(function, dict):
+        return None
+    call_id = get_str(item, "id")
+    name = get_str(function, "name")
+    arguments = function.get("arguments")
+    if (
+        not call_id
+        or not name
+        or item.get("type", FUNCTION_TOOL_TYPE) != FUNCTION_TOOL_TYPE
+        or not isinstance(arguments, str)
+    ):
+        return None
+    # 인자가 없는 도구는 빈 문자열로 올 수 있다.
+    if not arguments.strip():
+        return ToolCall(id=call_id, name=name, arguments={})
+    try:
+        parsed = json.loads(arguments)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return ToolCall(id=call_id, name=name, arguments=parsed)
+
+
+def parse_tool_calls(message: dict[str, Any]) -> tuple[ToolCall, ...] | None:
+    """message.tool_calls를 읽는다. 없으면 빈 튜플, 형식이 틀리면 None."""
+    raw = message.get("tool_calls")
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        return None
+    calls = [_tool_call(item) for item in raw]
+    if any(call is None for call in calls):
+        return None
+    return tuple(call for call in calls if call is not None)
 
 
 def get_cost(usage: dict[str, Any]) -> Decimal | None:
@@ -105,10 +150,13 @@ def build_result_from_chat_body(
         "latency_ms": elapsed_ms(started_at, finished_at),
     }
 
-    # 본문, 실제 모델, 토큰 수 중 하나라도 없으면 성공으로 보지 않는다.
+    # 본문(또는 도구 호출), 실제 모델, 토큰 수 중 하나라도 없으면 성공으로 보지 않는다.
+    # 형식이 틀린 도구 호출도 실행할 수 없으므로 실패로 본다.
+    tool_calls = parse_tool_calls(message)
     has_content = content is not None and content.strip() != ""
     is_valid = (
-        has_content
+        tool_calls is not None
+        and (has_content or bool(tool_calls))
         and bool(actual_model)
         and prompt_tokens is not None
         and completion_tokens is not None
@@ -121,6 +169,7 @@ def build_result_from_chat_body(
             error_message=USER_MESSAGES[ErrorType.INVALID_RESPONSE],
             cost_status=CostStatus.UNKNOWN,
         )
+    common_fields["tool_calls"] = tool_calls
 
     cost = get_cost(usage)
     if cost is None:

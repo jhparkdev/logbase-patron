@@ -26,6 +26,7 @@ INTERNAL_ORIGINS = (
     UsageOrigin.INTERNAL_DEVELOPMENT.value,
     UsageOrigin.SIMULATION.value,
     UsageOrigin.SYSTEM_TEST.value,
+    UsageOrigin.ASSISTANT.value,
 )
 
 
