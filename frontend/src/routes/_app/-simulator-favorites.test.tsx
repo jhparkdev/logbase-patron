@@ -68,6 +68,8 @@ function stub(overrides: Record<string, Reply> = {}) {
         body: { items: [ACTIVE_MODEL], page: 1, page_size: 100, total: 1 },
       };
     if (key === "GET /api/scenarios") return { status: 200, body: SCENARIOS };
+    if (path.endsWith("/execution-providers/ranking"))
+      return { status: 200, body: { items: [], excluded: [] } };
     if (path.endsWith("/execution-providers"))
       return { status: 200, body: EXECUTION_PROVIDERS };
     if (key === "GET /api/simulations/images/limits")
