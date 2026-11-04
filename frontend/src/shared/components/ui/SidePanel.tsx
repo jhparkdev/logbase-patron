@@ -48,7 +48,10 @@ export function SidePanel({ title, onClose, children }: SidePanelProps) {
             <Icon src={closeIcon} className="size-3" />
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        {/* relative: 안쪽 sr-only(absolute) 글자가 패널 밖을 늘려 빈 여백이 생기지 않게 이 상자 안에 가둔다 */}
+        <div className="relative flex-1 overflow-y-auto px-6 py-5">
+          {children}
+        </div>
       </div>
     </dialog>
   );
