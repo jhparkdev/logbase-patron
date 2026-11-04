@@ -1,4 +1,9 @@
-import { requestedSettings } from "./comparisons";
+import {
+  type ComparisonDraft,
+  commonSettings,
+  type RequestedSettings,
+  requestedSettings,
+} from "./comparisons";
 import type { SimulatorDraft } from "./form";
 import {
   PARAMETER_LABELS,
@@ -91,6 +96,71 @@ export type ResultSort = {
   direction: "asc" | "desc";
 };
 
+const SETTING_KEYS = ["temperature", "maxTokens", "reasoningEffort"] as const;
+type SettingKey = (typeof SETTING_KEYS)[number];
+
+function isDirect(comparison: ComparisonDraft, key: SettingKey) {
+  return (
+    comparison.settings.mode === "custom" &&
+    comparison.settings[key] !== undefined
+  );
+}
+
+// 공통값·시나리오 기본값에서 물려받은 값을 이 칸의 모델이 받는가. 받지 못하면 서버가 이 칸에서만 뺀다.
+function acceptsInherited(
+  choice: ModelChoice,
+  key: SettingKey,
+  value: number | string,
+) {
+  const parameter = choice.tuningParameters?.find((item) => item.key === key);
+  // 선택지를 화면이 모르면 서버 판단에 맡긴다(받으면 보내고, 아니면 뺀다).
+  if (!parameter)
+    return choice.supportedParameters.includes(PARAMETER_NAMES[key]);
+  // 추론 강도는 허용 목록에 없는 값도 서버가 뺀다. 숫자 항목은 범위를 벗어나도 그대로 보내므로 남겨 두고 검사에서 막는다.
+  return parameter.kind === "number" || !parameterIssue(parameter, value);
+}
+
+/** 칸에 서버가 실제로 보낼 설정. 확인창과 실행 전 검사가 같은 값을 보도록 한 곳에서 계산한다. */
+export function appliedSettings(
+  comparison: ComparisonDraft,
+  draft: SimulatorDraft,
+  choice: ModelChoice,
+  scenario?: ScenarioChoice,
+): RequestedSettings {
+  const settings = requestedSettings(
+    comparison,
+    commonSettings(draft),
+    scenario?.defaults,
+  );
+  return Object.fromEntries(
+    SETTING_KEYS.flatMap((key) => {
+      const value = settings[key];
+      if (value === undefined) return [];
+      return isDirect(comparison, key) || acceptsInherited(choice, key, value)
+        ? [[key, value]]
+        : [];
+    }),
+  );
+}
+
+/** 비교 항목 머리글 오른쪽에 쓰는 설정 상태 이름. */
+export function comparisonModeLabel(
+  mode: "shared" | "custom",
+  commonEnabled: boolean,
+) {
+  if (mode === "custom") return "개별 지정";
+  return commonEnabled ? "공통 설정" : "기본값";
+}
+
+/** 공통 설정 체크박스 아래 안내. 잠김을 먼저 알린다. */
+export function commonSettingsNote(enabled: boolean, locked: boolean) {
+  if (locked && !enabled)
+    return "모델별 설정을 쓰는 비교 항목이 있어 켤 수 없어요. 모든 항목에서 모델별 설정을 해제하면 켤 수 있어요.";
+  if (!enabled)
+    return "꺼 두면 공통값과 시나리오 기본값을 쓰지 않아요. 각 모델은 모델별 설정에 넣은 값만 쓰고, 나머지는 기본값으로 실행해요.";
+  return "비워 둔 항목은 시나리오를 골랐다면 그 기본값을, 없으면 모델 기본값을 써요. 받지 못하는 모델에서는 그 항목만 빼고 실행해요.";
+}
+
 export function selectionIssues(
   draft: SimulatorDraft,
   choices: ModelChoice[],
@@ -117,45 +187,33 @@ export function selectionIssues(
     }
     if (hasImages && !choice.supportsImages)
       issues.push(`${choice.name}은 이미지 입력을 지원하지 않습니다.`);
-    const settings = requestedSettings(comparison, draft, scenario?.defaults);
-    for (const key of [
-      "temperature",
-      "maxTokens",
-      "reasoningEffort",
-    ] as const) {
+    const settings = appliedSettings(comparison, draft, choice, scenario);
+    for (const key of SETTING_KEYS) {
       const value = settings[key];
       if (value === undefined) continue;
       const parameter = choice.tuningParameters?.find(
         (item) => item.key === key,
       );
-      if (
-        !parameter &&
-        !choice.supportedParameters.includes(PARAMETER_NAMES[key])
-      )
-        issues.push(
-          `${choice.name}은 ${PARAMETER_LABELS[key]} 지정을 지원하지 않습니다.`,
-        );
-      if (
-        comparison.settings.mode === "custom" &&
-        comparison.settings[key] !== undefined &&
-        !parameter
-      )
-        issues.push(
-          `${choice.name}의 모델별 설정 지원 정보를 확인할 수 없습니다.`,
-        );
-      if (
-        key === "reasoningEffort" &&
-        !parameter &&
-        choice.supportedParameters.includes(PARAMETER_NAMES[key])
-      )
-        issues.push(
-          `${choice.name}의 추론 강도 지원 선택지를 확인할 수 없습니다. 모델을 다시 선택하거나 추론 강도 설정을 해제하시기 바랍니다.`,
-        );
+      // 모델별 설정에 직접 넣은 값은 서버가 거절하므로 실행 전에 막는다.
+      if (isDirect(comparison, key)) {
+        if (
+          !parameter &&
+          !choice.supportedParameters.includes(PARAMETER_NAMES[key])
+        )
+          issues.push(
+            `${choice.name}은 ${PARAMETER_LABELS[key]} 지정을 지원하지 않습니다.`,
+          );
+        if (!parameter)
+          issues.push(
+            `${choice.name}의 모델별 설정 지원 정보를 확인할 수 없습니다.`,
+          );
+      }
       if (parameter) {
         const issue = parameterIssue(parameter, value);
         if (issue) issues.push(`${choice.name}: ${issue}`);
       }
     }
+    // 서버가 실제로 보내는 값끼리 비교한다.
     const fingerprint = JSON.stringify([comparison.modelKey, settings]);
     if (seen.has(fingerprint))
       issues.push(

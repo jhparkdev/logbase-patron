@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
 import { Button } from "../../../shared/components/ui/Button";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
-import type { ModelChoice } from "../lib/presentation";
+import { comparisonModeLabel, type ModelChoice } from "../lib/presentation";
 import { TuningParameterField } from "./TuningParameterField";
 
 export function ComparisonSettings({
@@ -23,6 +23,7 @@ export function ComparisonSettings({
     control,
     name: `comparisons.${index}.settings.mode`,
   });
+  const commonEnabled = useWatch({ control, name: "commonEnabled" }) === true;
   const [open, setOpen] = useState(mode === "custom");
   const settingsErrors = errors.comparisons?.[index]?.settings;
   const parameters = choice?.tuningParameters ?? [];
@@ -55,7 +56,7 @@ export function ComparisonSettings({
       >
         <span aria-hidden="true">{open ? "▾" : "▸"}</span>모델별 설정
         <span className="ml-auto font-normal text-grey-600">
-          {mode === "custom" ? "개별 지정" : "공통 설정"}
+          {comparisonModeLabel(mode, commonEnabled)}
         </span>
       </button>
       <div id={panelId} hidden={!open}>
@@ -76,9 +77,12 @@ export function ComparisonSettings({
                   checked={field.value === "custom"}
                   disabled={!parameters.length}
                   onBlur={field.onBlur}
-                  onChange={(event) =>
-                    field.onChange(event.target.checked ? "custom" : "shared")
-                  }
+                  onChange={(event) => {
+                    field.onChange(event.target.checked ? "custom" : "shared");
+                    // 모델별 설정과 공통 설정은 함께 쓰지 않는다. 해제해도 공통 설정을 다시 켜지는 않는다.
+                    if (event.target.checked)
+                      setValue("commonEnabled", false, { shouldDirty: true });
+                  }}
                   className="size-4 accent-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 />
               )}
@@ -87,7 +91,7 @@ export function ComparisonSettings({
           </label>
           <p className="mt-2 text-caption text-grey-600">
             {parameters.length
-              ? "비워 둔 항목은 위 ‘공통 설정’의 값을 사용합니다. 공통값도 없으면 시나리오 기본값, 모델 기본값 순으로 사용합니다."
+              ? "모델별 설정을 쓰면 공통 설정은 꺼져요. 비워 둔 항목은 기본값으로 실행해요."
               : "모델별 설정 지원 정보를 확인할 수 없습니다. 위 ‘공통 설정’에서 값을 지정하거나 모델을 다시 선택하시기 바랍니다."}
           </p>
           {mode === "custom" && parameters.length > 0 && (

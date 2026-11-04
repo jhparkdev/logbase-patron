@@ -1,8 +1,11 @@
 import { Button } from "../../../shared/components/ui/Button";
-import { requestedSettings } from "../lib/comparisons";
 import type { SimulatorDraft } from "../lib/form";
 import { PARAMETER_LABELS, type ParameterKey } from "../lib/parameters";
-import type { ModelChoice, ScenarioChoice } from "../lib/presentation";
+import {
+  appliedSettings,
+  type ModelChoice,
+  type ScenarioChoice,
+} from "../lib/presentation";
 import { SimulatorDialog } from "./SimulatorDialog";
 
 export function ComparisonConfirmationDialog({
@@ -44,11 +47,10 @@ export function ComparisonConfirmationDialog({
           const choice = choices.find(
             (item) => item.key === comparison.modelKey,
           );
-          const settings = requestedSettings(
-            comparison,
-            draft,
-            scenario?.defaults,
-          );
+          // 공통 끔과 받지 못해 빠지는 항목을 반영한, 실제로 보낼 값을 보여 준다.
+          const settings = choice
+            ? appliedSettings(comparison, draft, choice, scenario)
+            : {};
           const labels = (
             ["temperature", "maxTokens", "reasoningEffort"] as ParameterKey[]
           )

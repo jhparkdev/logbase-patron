@@ -27,6 +27,7 @@ export function ModelSelection({
   const {
     control,
     getValues,
+    setValue,
     trigger: validate,
     formState: { errors },
   } = useFormContext<SimulatorFormValues, unknown, SimulatorDraft>();
@@ -61,6 +62,8 @@ export function ModelSelection({
       ...(source.settings.mode === "custom" ? source.settings : copy.settings),
       mode: "custom",
     };
+    // 복제 칸은 모델별 설정이라, 체크박스로 켤 때와 같이 공통 설정을 끈다.
+    setValue("commonEnabled", false, { shouldDirty: true });
     append(copy, { shouldFocus: false });
   };
   return (

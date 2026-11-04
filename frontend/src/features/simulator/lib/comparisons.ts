@@ -71,21 +71,56 @@ export function createComparison(
   };
 }
 
+/**
+ * 공통 설정을 켰을 때만 공통값을 돌려준다.
+ * null은 공통 끔이며 요청의 execution_config: null과 같은 뜻이다.
+ */
+export function commonSettings(
+  draft: RequestedSettings & { commonEnabled: boolean },
+): RequestedSettings | null {
+  if (!draft.commonEnabled) return null;
+  return {
+    temperature: draft.temperature,
+    maxTokens: draft.maxTokens,
+    reasoningEffort: draft.reasoningEffort,
+  };
+}
+
+/**
+ * 칸 하나에 요청할 설정을 모델별 지정값, 공통값, 시나리오 기본값 순으로 정한다.
+ * common이 null(공통 끔)이면 서버와 같이 공통값과 시나리오 기본값을 물려주지 않는다.
+ */
 export function requestedSettings(
   comparison: ComparisonDraft,
-  common: RequestedSettings,
+  common: RequestedSettings | null,
   scenario: RequestedSettings = {},
 ): RequestedSettings {
   const own: RequestedSettings =
     comparison.settings.mode === "custom" ? comparison.settings : {};
+  const inherited: RequestedSettings =
+    common === null
+      ? {}
+      : {
+          temperature: common.temperature ?? scenario.temperature,
+          maxTokens: common.maxTokens ?? scenario.maxTokens,
+          reasoningEffort: common.reasoningEffort ?? scenario.reasoningEffort,
+        };
   const values = {
-    temperature: own.temperature ?? common.temperature ?? scenario.temperature,
-    maxTokens: own.maxTokens ?? common.maxTokens ?? scenario.maxTokens,
-    reasoningEffort:
-      own.reasoningEffort ?? common.reasoningEffort ?? scenario.reasoningEffort,
+    temperature: own.temperature ?? inherited.temperature,
+    maxTokens: own.maxTokens ?? inherited.maxTokens,
+    reasoningEffort: own.reasoningEffort ?? inherited.reasoningEffort,
   };
   return Object.fromEntries(
     Object.entries(values).filter(([, value]) => value !== undefined),
+  );
+}
+
+/** 모델별 설정을 켠 칸이 하나라도 있으면 공통 설정을 켤 수 없다. */
+export function hasCustomComparison(
+  comparisons: readonly { settings: { mode: string } }[],
+) {
+  return comparisons.some(
+    (comparison) => comparison.settings.mode === "custom",
   );
 }
 

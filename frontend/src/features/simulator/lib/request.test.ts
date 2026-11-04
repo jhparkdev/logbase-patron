@@ -16,13 +16,13 @@ function draft(overrides: Parameters<typeof createDefaultValues>[0] = {}) {
   );
 }
 
-test("직접 작성 실행을 API 요청으로 바꾼다", () => {
+test("직접 작성 실행을 API 요청으로 바꾼다. 공통 설정은 처음에 꺼져 있어 null을 보낸다", () => {
   expect(toCreateRequest(draft(), [])).toEqual({
     test_type: "CUSTOM",
     prompt_text: "원문을 보존해 주세요. ",
     input_text: null,
     json_schema: null,
-    execution_config: {},
+    execution_config: null,
     models: [
       { model_id: 2, execution_provider: "DeepInfra", execution_config: {} },
       { model_id: 3, execution_provider: "DekaLLM", execution_config: {} },
@@ -32,9 +32,16 @@ test("직접 작성 실행을 API 요청으로 바꾼다", () => {
   });
 });
 
+test("공통 설정을 켜면 값이 비어 있어도 공통 설정 객체를 보낸다", () => {
+  expect(
+    toCreateRequest(draft({ commonEnabled: true }), []).execution_config,
+  ).toEqual({});
+});
+
 test("공통 설정과 입력, Schema, 이미지, 재실행 원본을 함께 보낸다", () => {
   const request = toCreateRequest(
     draft({
+      commonEnabled: true,
       text: "입력",
       jsonSchema: '{"type":"object"}',
       temperature: "0",
@@ -62,6 +69,7 @@ test("칸에 직접 넣은 설정만 그 칸의 설정으로 보낸다", () => {
   const [first, second] = createComparisons(["2:DeepInfra", "2:DekaLLM"]);
   const request = toCreateRequest(
     draft({
+      commonEnabled: true,
       temperature: "0.5",
       comparisons: [
         first,
@@ -79,6 +87,34 @@ test("칸에 직접 넣은 설정만 그 칸의 설정으로 보낸다", () => {
     [],
   );
   expect(request.execution_config).toEqual({ temperature: 0.5 });
+  expect(request.models.map((model) => model.execution_config)).toEqual([
+    {},
+    { temperature: 0.9 },
+  ]);
+});
+
+test("공통 끔이면 공통값이 남아 있어도 null을 보내고 칸에는 직접 넣은 값만 보낸다", () => {
+  const [first, second] = createComparisons(["2:DeepInfra", "2:DekaLLM"]);
+  const request = toCreateRequest(
+    draft({
+      temperature: "0.5",
+      maxTokens: "512",
+      comparisons: [
+        first,
+        {
+          ...second,
+          settings: {
+            mode: "custom",
+            temperature: "0.9",
+            maxTokens: "",
+            reasoningEffort: "",
+          },
+        },
+      ],
+    }),
+    [],
+  );
+  expect(request.execution_config).toBeNull();
   expect(request.models.map((model) => model.execution_config)).toEqual([
     {},
     { temperature: 0.9 },
