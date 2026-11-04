@@ -3,7 +3,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ModelStatus
+from app.openrouter.lookup_result import EndpointInfo
 from app.schemas.assistant import SimulatorPatch, SimulatorState
+from app.schemas.simulation import AutoProvider
+from app.services.auto_provider import cheapest_provider, estimate_input_tokens
 from app.services.execution_provider_catalog import EndpointCatalog
 from app.services.model_detail import get_model
 from app.services.model_parameters import (
@@ -11,6 +14,8 @@ from app.services.model_parameters import (
     parameter_support,
     unsupported_parameters,
 )
+from app.services.provider_ranking import Workload
+from app.services.simulation_input import build_prompt_text
 from app.services.simulation_lookup import DbSimulationLookup
 from app.services.simulation_validation import (
     ModelSelection,
@@ -36,13 +41,36 @@ def merge_settings(current: SimulatorState, patch: SimulatorPatch) -> SimulatorS
     return SimulatorState.model_validate({**current.model_dump(), **changes})
 
 
+def _cheapest_name(
+    endpoints: list[EndpointInfo], prompt_text: str, max_tokens: int | None
+) -> str:
+    """시뮬레이터 접수와 같은 기준으로 가장 싼 업체를 고른다. 화면은 실제 업체 이름만 고를 수 있다."""
+    if max_tokens is None:
+        raise InvalidSettingsError(
+            "최대 출력 토큰을 정하면 가장 싼 서버 업체를 고를 수 있어요."
+        )
+    name = cheapest_provider(
+        endpoints,
+        Workload(
+            input_tokens=estimate_input_tokens(prompt_text), output_tokens=max_tokens
+        ),
+    )
+    if name is None:
+        raise InvalidSettingsError(
+            "가장 싼 서버 업체를 정할 수 없어요. 서버 업체를 직접 지정해 주세요."
+        )
+    return name
+
+
 async def validate_patch(
     session: AsyncSession,
     catalog: EndpointCatalog,
     current: SimulatorState,
     patch: SimulatorPatch,
-) -> None:
+) -> SimulatorPatch:
+    """검증한 초안을 돌려준다. 가장 싼 업체 자동 칸은 실제 업체 이름으로 바꾼다."""
     state = merge_settings(current, patch)
+    prompt_text = build_prompt_text(state.prompt_text, state.input_text)
     defaults = {}
     effective_schema = state.json_schema
     if state.scenario_id:
@@ -54,6 +82,7 @@ async def validate_patch(
             effective_schema = scenario.default_json_schema
     common = {**defaults, **state.execution_config.model_dump(exclude_none=True)}
     selections = []
+    resolved_models = []
     for selected in state.models:
         item = await get_model(session, selected.model_id)
         if item is None or item.model.status != ModelStatus.ACTIVE:
@@ -62,6 +91,18 @@ async def validate_patch(
             )
         model = item.model
         endpoints = await catalog.get(model.openrouter_model_id)
+        effective = {
+            **common,
+            **selected.execution_config.model_dump(exclude_none=True),
+        }
+        if selected.execution_provider == AutoProvider.AUTO_CHEAPEST:
+            selected = selected.model_copy(
+                update={
+                    "execution_provider": _cheapest_name(
+                        endpoints, prompt_text, effective.get("max_tokens")
+                    )
+                }
+            )
         endpoint = next(
             (
                 entry
@@ -76,10 +117,6 @@ async def validate_patch(
             parameter_support(model.supported_parameters, model.openrouter_metadata),
             endpoint.supported_parameters,
         )
-        effective = {
-            **common,
-            **selected.execution_config.model_dump(exclude_none=True),
-        }
         if unsupported_parameters(support, effective):
             raise InvalidSettingsError(
                 "선택한 모델 또는 서버 업체가 요청한 설정을 지원하지 않아요."
@@ -99,6 +136,7 @@ async def validate_patch(
         selections.append(
             ModelSelection(selected.model_id, selected.execution_provider, effective)
         )
+        resolved_models.append(selected)
     # 아직 모델을 고르지 않은 입력 초안도 편집할 수 있다.
     if selections:
         try:
@@ -107,3 +145,7 @@ async def validate_patch(
             raise InvalidSettingsError(
                 "비교 항목은 서로 다른 조건으로 2~4개 선택해 주세요."
             ) from error
+    # 모델 목록을 바꾸지 않는 초안은 화면의 현재 선택을 그대로 둔다.
+    if patch.models is None:
+        return patch
+    return patch.model_copy(update={"models": resolved_models})

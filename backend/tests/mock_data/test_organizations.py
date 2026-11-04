@@ -3,6 +3,7 @@
 from app.mock_data import organizations
 from app.mock_data.period import PERIOD_END, PERIOD_START
 from app.models import ProjectType, ServiceType
+from app.services.assistant_records import ASSISTANT_SERVICE_CODE
 from app.services.model_test import TEST_SERVICE_CODE
 from app.services.simulation_lookup import (
     SIMULATOR_PROJECT_CODE,
@@ -60,4 +61,5 @@ def test_codes_the_app_looks_up_exist_with_the_expected_types() -> None:
 
     assert services[SIMULATOR_SERVICE_CODE] == ServiceType.PATRON
     assert services[TEST_SERVICE_CODE] == ServiceType.PATRON
+    assert services[ASSISTANT_SERVICE_CODE] == ServiceType.PATRON
     assert projects[SIMULATOR_PROJECT_CODE] == ProjectType.POC

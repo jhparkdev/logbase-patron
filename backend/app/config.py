@@ -4,9 +4,9 @@ import json
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # 명령을 저장소 루트와 backend/ 어디서 실행해도 루트의 .env를 읽게 한다.
@@ -57,8 +57,14 @@ class Settings(BaseSettings):
     new_model_compare_enabled: bool = False
     # 최근 24시간 동안 새 모델 비교 호출에 쓸 수 있는 비용 상한(USD)
     new_model_daily_cap_usd: Decimal = Decimal(1)
-    # 로컬 에이전트 실험은 명시적으로 켠 환경에서만 제공한다.
+    # AI 도우미는 명시적으로 켠 환경에서만 제공한다.
     assistant_enabled: bool = False
+    # 로컬 개발은 Ollama, 배포는 OpenRouter다. OpenRouter는 위의 OPENROUTER_API_KEY(시뮬레이터와 같은 Key)를 쓴다.
+    assistant_provider: Literal["ollama", "openrouter"] = "ollama"
+    # OpenRouter 모델 ID. 예: anthropic/claude-haiku-5.5
+    assistant_model: str | None = None
+    # 도우미가 하루(KST)에 쓸 수 있는 확정·추정 비용 합계. Key 한도를 시뮬레이터와 함께 쓰므로 따로 막는다.
+    assistant_daily_limit_usd: Decimal = Field(default=Decimal(1), gt=0)
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen3.5:4b"
     ollama_context_length: int = Field(default=8192, ge=4096, le=32768)
@@ -83,6 +89,17 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return json.loads(value) if value.strip() else {}
         return value
+
+    @model_validator(mode="after")
+    def _require_openrouter_assistant_model(self) -> Self:
+        """OpenRouter 도우미를 켰는데 모델이 없으면 요청마다 실패하지 않도록 시작할 때 멈춘다."""
+        if (
+            self.assistant_enabled
+            and self.assistant_provider == "openrouter"
+            and not self.assistant_model
+        ):
+            raise ValueError("ASSISTANT_MODEL 이 필요하다")
+        return self
 
 
 @lru_cache

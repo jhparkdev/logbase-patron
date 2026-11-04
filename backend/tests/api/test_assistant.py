@@ -4,28 +4,35 @@ from decimal import Decimal
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
+from pydantic import SecretStr
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import security
-from app.api.assistant import get_assistant_caller
+from app.api.assistant_deps import get_assistant_caller, get_assistant_model_call
 from app.api.model_deps import get_endpoint_catalog
 from app.config import get_settings
 from app.models import AIRequest, SimulationRun, User
 from app.openrouter.lookup_result import EndpointInfo
-from app.services.assistant_ollama import OllamaMessage
+from app.openrouter.result import CallResult, ToolCall
+from app.services.assistant_ollama import ollama_transcript
+from app.services.assistant_records import ASSISTANT_SERVICE_CODE
+from app.services.assistant_reply import AssistantReply
 from tests.api.model_helpers import FakeEndpointCatalog
+from tests.connection_helpers import success
 from tests.db_helpers import T0, Factory
 
 
 class Caller:
-    def __init__(self, messages: list[OllamaMessage]) -> None:
+    def __init__(self, messages: list[AssistantReply]) -> None:
         self.messages = messages
         self.calls = 0
 
-    async def chat(self, messages: list[dict], tools: list[dict]) -> OllamaMessage:
+    async def chat(self, messages: list[dict], tools: list[dict]) -> AssistantReply:
         self.calls += 1
         return self.messages.pop(0)
+
+    transcript = staticmethod(ollama_transcript)
 
 
 @pytest.mark.parametrize(
@@ -63,12 +70,12 @@ async def test_model_answers_match_question_and_only_fetch_endpoints_when_needed
     app.dependency_overrides[get_endpoint_catalog] = lambda: catalog
     app.dependency_overrides[get_assistant_caller] = lambda: Caller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     {"function": {"name": "find_models", "arguments": arguments}}
                 ]
             ),
-            OllamaMessage(content="모델은 99개이고 잘못된 업체를 사용해요."),
+            AssistantReply(content="모델은 99개이고 잘못된 업체를 사용해요."),
         ]
     )
     response = await client.post(
@@ -186,10 +193,10 @@ async def test_history_answer_returns_a_verified_run_detail_source(
     run_id = str(run["simulation_id"])
     app.dependency_overrides[get_assistant_caller] = lambda: Caller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[{"function": {"name": "list_simulations", "arguments": {}}}]
             ),
-            OllamaMessage(content=f"최근 실행은 {run_id}예요."),
+            AssistantReply(content=f"최근 실행은 {run_id}예요."),
         ]
     )
     result = await client.post(
@@ -221,7 +228,7 @@ async def test_customer_usage_uses_real_session_and_the_applied_page_filters(
     )
     app.dependency_overrides[get_assistant_caller] = lambda: Caller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     {
                         "function": {
@@ -231,7 +238,7 @@ async def test_customer_usage_uses_real_session_and_the_applied_page_filters(
                     }
                 ]
             ),
-            OllamaMessage(content="선택한 고객의 조회 결과예요."),
+            AssistantReply(content="선택한 고객의 조회 결과예요."),
         ]
     )
     body = {
@@ -259,7 +266,7 @@ async def test_customer_request_cannot_use_a_model_requested_simulation_tool(
     await authenticate(client, factory)
     caller = Caller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[{"function": {"name": "list_simulations", "arguments": {}}}]
             )
         ]
@@ -350,6 +357,49 @@ async def test_settings_revalidation_checks_provider_support_and_preserves_omitt
     assert response.json() == {"execution_config": {"max_tokens": 512}}
 
 
+async def test_settings_revalidation_returns_the_real_provider_for_auto_cheapest(
+    app: FastAPI, client: AsyncClient, factory: Factory
+) -> None:
+    """화면은 돌려받은 초안을 그대로 적용하므로 자동 선택 값이 아니라 실제 업체 이름을 받아야 한다."""
+    await authenticate(client, factory)
+    settings = app.dependency_overrides[get_settings]().model_copy(
+        update={"assistant_enabled": True}
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    models = [
+        await factory.model(status="ACTIVE", supported_parameters=["max_tokens"])
+        for _ in range(2)
+    ]
+    app.dependency_overrides[get_endpoint_catalog] = lambda: FakeEndpointCatalog(
+        [
+            EndpointInfo(
+                provider_name="Test",
+                supported_parameters=["max_tokens"],
+                pricing={
+                    "prompt": Decimal("0.000001"),
+                    "completion": Decimal("0.000002"),
+                },
+            )
+        ]
+    )
+    selections = [
+        {"model_id": model["model_id"], "execution_provider": "AUTO_CHEAPEST"}
+        for model in models
+    ]
+    body = {
+        "simulator": {"execution_config": {"max_tokens": 512}},
+        "patch": {"models": selections},
+    }
+
+    response = await client.post("/api/assistant/settings/validate", json=body)
+
+    assert response.status_code == 200
+    assert [item["execution_provider"] for item in response.json()["models"]] == [
+        "Test",
+        "Test",
+    ]
+
+
 async def test_disabled_assistant_never_calls_ollama(
     client: AsyncClient, factory: Factory
 ) -> None:
@@ -369,7 +419,7 @@ async def test_validated_patch_does_not_create_execution_records(
     await authenticate(client, factory)
     caller = Caller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     {
                         "function": {
@@ -379,7 +429,7 @@ async def test_validated_patch_does_not_create_execution_records(
                     }
                 ]
             ),
-            OllamaMessage(content="최대 출력 토큰 설정을 준비했어요."),
+            AssistantReply(content="최대 출력 토큰 설정을 준비했어요."),
         ]
     )
     app.dependency_overrides[get_assistant_caller] = lambda: caller
@@ -428,7 +478,7 @@ async def test_rejected_settings_do_not_escape_as_patch(
     )
     caller = Caller(
         [
-            OllamaMessage(
+            AssistantReply(
                 tool_calls=[
                     {
                         "function": {
@@ -438,7 +488,7 @@ async def test_rejected_settings_do_not_escape_as_patch(
                     }
                 ]
             ),
-            OllamaMessage(content="설정을 적용할 수 없어요."),
+            AssistantReply(content="설정을 적용할 수 없어요."),
         ]
     )
     app.dependency_overrides[get_assistant_caller] = lambda: caller
@@ -456,3 +506,168 @@ async def test_rejected_settings_do_not_escape_as_patch(
     )
     assert response.status_code == 200
     assert response.json()["patch"] is None
+
+
+OPENROUTER_MODEL = "vendor/assistant-model"
+
+
+def use_openrouter(app: FastAPI, **updates: object) -> None:
+    settings = app.dependency_overrides[get_settings]().model_copy(
+        update={
+            "assistant_enabled": True,
+            "assistant_provider": "openrouter",
+            "assistant_model": OPENROUTER_MODEL,
+            "openrouter_api_key": SecretStr("sk-or-test-only-not-a-real-key"),
+            **updates,
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_endpoint_catalog] = lambda: FakeEndpointCatalog([])
+
+
+async def assistant_context(factory: Factory) -> None:
+    project = await factory.project(project_code="PRJ-PATRON-POC", project_type="POC")
+    await factory.api_key(
+        project_id=project["project_id"], secret_ref="OPENROUTER_KEY_POC"
+    )
+    await factory.service(service_code=ASSISTANT_SERVICE_CODE, service_type="PATRON")
+
+
+class ModelCall:
+    """call_model 대신 정해 둔 결과를 차례로 돌려주고 받은 인자를 기록한다."""
+
+    def __init__(self, results: list[CallResult]) -> None:
+        self.results = results
+        self.calls: list[dict] = []
+
+    async def __call__(self, **kwargs: object) -> CallResult:
+        self.calls.append(kwargs)
+        return self.results.pop(0)
+
+
+def model_lookup_then_text() -> ModelCall:
+    return ModelCall(
+        [
+            success(
+                requested_model=OPENROUTER_MODEL,
+                content=None,
+                finish_reason="tool_calls",
+                tool_calls=(ToolCall(id="call_1", name="find_models", arguments={}),),
+            ),
+            success(
+                requested_model=OPENROUTER_MODEL,
+                generation_id="gen-test-2",
+                content="모델은 99개예요.",
+            ),
+        ]
+    )
+
+
+async def test_openrouter_chat_records_every_model_call_as_assistant_usage(
+    app: FastAPI, client: AsyncClient, factory: Factory, db_session: AsyncSession
+) -> None:
+    await authenticate(client, factory)
+    await assistant_context(factory)
+    await factory.model(status="ACTIVE", display_name="활성 모델")
+    use_openrouter(app)
+    model_call = model_lookup_then_text()
+    app.dependency_overrides[get_assistant_model_call] = lambda: model_call
+
+    response = await client.post(
+        "/api/assistant/chat",
+        json={"messages": [{"role": "user", "content": "등록된 모델 목록을 알려줘"}]},
+    )
+
+    assert response.status_code == 200
+    assert "99" not in response.json()["message"]
+    rows = (
+        await db_session.scalars(
+            select(AIRequest).where(AIRequest.usage_origin == "ASSISTANT")
+        )
+    ).all()
+    assert len(rows) == 2
+    assert {row.status for row in rows} == {"SUCCESS"}
+    tool_message = model_call.calls[1]["messages"][-1]
+    assert tool_message["role"] == "tool"
+    assert tool_message["tool_call_id"] == "call_1"
+
+
+async def test_openrouter_chat_without_cost_target_does_not_call_the_model(
+    app: FastAPI, client: AsyncClient, factory: Factory, db_session: AsyncSession
+) -> None:
+    await authenticate(client, factory)
+    use_openrouter(app)
+    model_call = model_lookup_then_text()
+    app.dependency_overrides[get_assistant_model_call] = lambda: model_call
+
+    response = await client.post(
+        "/api/assistant/chat",
+        json={"messages": [{"role": "user", "content": "등록된 모델 목록을 알려줘"}]},
+    )
+
+    assert response.status_code == 503
+    assert model_call.calls == []
+    assert await db_session.scalar(select(func.count()).select_from(AIRequest)) == 0
+
+
+async def test_openrouter_chat_without_a_key_is_unavailable(
+    app: FastAPI, client: AsyncClient, factory: Factory
+) -> None:
+    await authenticate(client, factory)
+    await assistant_context(factory)
+    use_openrouter(app, openrouter_api_key=None)
+
+    response = await client.post(
+        "/api/assistant/chat",
+        json={"messages": [{"role": "user", "content": "등록된 모델 목록을 알려줘"}]},
+    )
+
+    assert response.status_code == 503
+    assert "sk-or" not in response.text
+
+
+async def test_daily_limit_stops_openrouter_chat_before_any_call(
+    app: FastAPI, client: AsyncClient, factory: Factory, db_session: AsyncSession
+) -> None:
+    await authenticate(client, factory)
+    await assistant_context(factory)
+    use_openrouter(app, assistant_daily_limit_usd=Decimal(1))
+    await factory.ai_request(
+        usage_origin="ASSISTANT",
+        requested_at=T0,
+        status="SUCCESS",
+        cost_status="CONFIRMED",
+        cost_usd=Decimal(1),
+        cost_source="API_RESPONSE",
+    )
+    model_call = model_lookup_then_text()
+    app.dependency_overrides[get_assistant_model_call] = lambda: model_call
+
+    response = await client.post(
+        "/api/assistant/chat",
+        json={"messages": [{"role": "user", "content": "등록된 모델 목록을 알려줘"}]},
+    )
+
+    assert response.status_code == 429
+    assert "한도" in response.json()["message"]
+    assert model_call.calls == []
+
+
+async def test_a_reply_cut_off_by_the_output_limit_asks_to_split_the_request(
+    app: FastAPI, client: AsyncClient, factory: Factory
+) -> None:
+    await authenticate(client, factory)
+    await assistant_context(factory)
+    use_openrouter(app)
+    model_call = ModelCall(
+        [success(requested_model=OPENROUTER_MODEL, finish_reason="length")]
+    )
+    app.dependency_overrides[get_assistant_model_call] = lambda: model_call
+
+    response = await client.post(
+        "/api/assistant/chat",
+        json={"messages": [{"role": "user", "content": "등록된 모델 목록을 알려줘"}]},
+    )
+
+    assert response.status_code == 503
+    assert "나눠" in response.json()["message"]

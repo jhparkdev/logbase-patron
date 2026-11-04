@@ -1,7 +1,12 @@
 import httpx
 import pytest
 
-from app.services.assistant_ollama import AssistantUnavailableError, OllamaCaller
+from app.services.assistant_ollama import OllamaCaller, ollama_transcript
+from app.services.assistant_reply import (
+    AssistantReply,
+    AssistantReplyTruncatedError,
+    AssistantUnavailableError,
+)
 
 
 async def test_native_tool_call_and_no_cloud_credentials() -> None:
@@ -50,4 +55,35 @@ async def test_rejects_incomplete_or_invalid_response(body: dict) -> None:
         transport=httpx.MockTransport(lambda _: httpx.Response(200, json=body)),
     ) as client:
         with pytest.raises(AssistantUnavailableError):
+            await OllamaCaller(client, "test", 8192).chat([], [])
+
+
+def test_ollama_transcript_names_each_tool_result_by_tool_name() -> None:
+    reply = AssistantReply(
+        tool_calls=[{"function": {"name": "find_models", "arguments": {"q": "a"}}}]
+    )
+
+    history = ollama_transcript(reply, [(reply.tool_calls[0], '{"total": 1}')])
+
+    assert history == [
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {"function": {"name": "find_models", "arguments": {"q": "a"}}}
+            ],
+        },
+        {"role": "tool", "tool_name": "find_models", "content": '{"total": 1}'},
+    ]
+
+
+async def test_an_ollama_reply_cut_at_the_length_limit_is_reported_as_too_long() -> (
+    None
+):
+    body = {"done": True, "done_reason": "length", "message": {"content": "partial"}}
+    async with httpx.AsyncClient(
+        base_url="http://localhost",
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=body)),
+    ) as client:
+        with pytest.raises(AssistantReplyTruncatedError):
             await OllamaCaller(client, "test", 8192).chat([], [])

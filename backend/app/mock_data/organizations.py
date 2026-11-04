@@ -10,6 +10,7 @@ from datetime import datetime
 from app.mock_data.period import PERIOD_START, kst
 from app.mock_data.rows import Row
 from app.models import ProjectType, ServiceType
+from app.services.assistant_records import ASSISTANT_SERVICE_CODE
 from app.services.model_test import TEST_SERVICE_CODE
 from app.services.simulation_lookup import (
     SIMULATOR_PROJECT_CODE,
@@ -86,6 +87,7 @@ SERVICES = (
     MockService(3, INTERNAL_TOOL, "내부 개발 도구", ServiceType.INTERNAL),
     MockService(4, SIMULATOR_SERVICE_CODE, "모델 비교 시뮬레이터", ServiceType.PATRON),
     MockService(5, TEST_SERVICE_CODE, "모델 연결 테스트", ServiceType.PATRON),
+    MockService(6, ASSISTANT_SERVICE_CODE, "AI 도우미", ServiceType.PATRON),
 )
 
 PROJECTS = (

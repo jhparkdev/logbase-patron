@@ -33,7 +33,8 @@ INSERT INTO services (service_id, service_code, name, service_type, is_active, i
   (2, 'FLIPPAGE', 'FlipPage', 'CUSTOMER_FACING', true, true),
   (3, 'INTERNAL_TOOL', '내부 개발 도구', 'INTERNAL', true, true),
   (4, 'PATRON_SIMULATOR', '모델 비교 시뮬레이터', 'PATRON', true, true),
-  (5, 'PATRON_MODEL_TEST', '모델 연결 테스트', 'PATRON', true, true);
+  (5, 'PATRON_MODEL_TEST', '모델 연결 테스트', 'PATRON', true, true),
+  (6, 'PATRON_ASSISTANT', 'AI 도우미', 'PATRON', true, true);
 
 INSERT INTO api_keys (key_id, display_name, secret_ref, key_fingerprint, workspace_ref, owner_type, customer_id, project_id, service_id, environment, status, limit_usd, limit_reset_period, is_mock, last_used_at) OVERRIDING SYSTEM VALUE VALUES
   (1, 'PoC 전용 Key', 'OPENROUTER_KEY_POC', NULL, NULL, 'PROJECT', NULL, 3, NULL, 'TEST', 'ACTIVE', 50, 'NONE', false, '2026-11-04 14:20:01+09:00'),

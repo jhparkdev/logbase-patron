@@ -33,7 +33,7 @@ EXPECTED_ROWS = {
     "customers": 6,
     "projects": 3,
     "users": 6,
-    "services": 5,
+    "services": 6,
     "api_keys": 17,
     "command_code_keys": 0,
     "user_sessions": 0,

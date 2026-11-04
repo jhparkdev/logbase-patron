@@ -1,7 +1,7 @@
 """명시적으로 공개한 읽기 도구와 시뮬레이터 설정 초안 도구."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -30,11 +30,23 @@ from app.services.model_parameters import parameter_support
 from app.services.openrouter_catalog import OpenRouterUnavailableError
 from app.services.simulation_period import InvalidPeriodError
 
+ModelSort = Literal["name", "recent", "price"]
+# 도구의 정렬 이름 → 모델 목록 서비스(model_list)의 정렬 컬럼과 내림차순 여부.
+MODEL_SORTS: dict[ModelSort, tuple[str, bool]] = {
+    "name": ("display_name", False),
+    "recent": ("created_at", True),
+    "price": ("price_input", False),
+}
+
 
 class FindModels(BaseModel):
     model_config = ConfigDict(extra="forbid")
     q: str | None = Field(default=None, max_length=100)
     page: int = Field(default=1, ge=1, le=100)
+    sort: ModelSort = Field(
+        default="name",
+        description="name=이름순, recent=이 콘솔에 최근 등록한 순, price=입력 단가 낮은순",
+    )
 
 
 class HistoryQuery(SimulationHistoryQuery):
@@ -56,7 +68,7 @@ TOOL_SCHEMAS: dict[str, tuple[str, type[BaseModel]]] = {
         InternalUsageToolQuery,
     ),
     "find_models": (
-        "등록된 사용 중 모델을 조회한다. 검색어는 사용자가 지정한 모델명 또는 ID 일부이며 전체 모델 질문에는 q를 생략한다. 개수 질문은 전체 개수만 반환한다. 목록은 한 번에 5개이며 업체는 명시적으로 요청하거나 모델 선택에 필요할 때만 조회한다. 다음 페이지는 page를 늘리고 검색어를 유지한다.",
+        "등록된 사용 중 모델을 조회한다. 검색어는 사용자가 지정한 모델명 또는 ID 일부이며 전체 모델 질문에는 q를 생략한다. 개수 질문은 전체 개수만 반환한다. 목록은 한 번에 5개이며 업체는 명시적으로 요청하거나 모델 선택에 필요할 때만 조회한다. 가장 최근에 등록한 모델은 sort=recent, 저렴한 모델은 sort=price로 찾는다. 다음 페이지는 page를 늘리고 검색어와 정렬을 유지한다.",
         FindModels,
     ),
     "list_simulations": (
@@ -159,15 +171,14 @@ class AssistantTools:
                         "unchanged": True,
                         "message": "요청한 설정이 이미 같아요.",
                     }
-                await validate_patch(
+                self.patch = await validate_patch(
                     self.session, self.catalog, self.current, candidate
                 )
-                self.patch = candidate
                 self.failure_message = None
                 return {
                     "prepared": True,
                     "executed": False,
-                    "changes": candidate.model_dump(mode="json", exclude_unset=True),
+                    "changes": self.patch.model_dump(mode="json", exclude_unset=True),
                 }
             if isinstance(parsed, FindModels):
                 return await self.find_models(parsed)
@@ -286,8 +297,8 @@ class AssistantTools:
             model_id=None,
             provider=None,
             statuses=[ModelStatus.ACTIVE],
-            sort="display_name",
-            descending=False,
+            sort=MODEL_SORTS[query.sort][0],
+            descending=MODEL_SORTS[query.sort][1],
             page=query.page,
             page_size=5,
         )
@@ -312,11 +323,9 @@ class AssistantTools:
                     "input_modalities": model.input_modalities,
                     "supported_parameters": model.supported_parameters,
                     "reasoning_efforts": list(support.reasoning_efforts),
+                    # 업체별 지원 파라미터는 설정 준비 때 서버가 다시 검증한다. 목록이 길어 모델 문맥만 차지하므로 이름만 준다.
                     "providers": [
-                        {
-                            "execution_provider": endpoint.provider_name,
-                            "supported_parameters": endpoint.supported_parameters,
-                        }
+                        {"execution_provider": endpoint.provider_name}
                         for endpoint in endpoints
                     ],
                     "price": (
@@ -343,6 +352,7 @@ class AssistantTools:
         return {
             "view": self.model_view,
             "q": query.q,
+            "sort": query.sort,
             "items": items,
             "total": page.total,
             "page": query.page,

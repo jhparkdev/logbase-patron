@@ -68,6 +68,14 @@ def parameters_for(name: str, model: type[BaseModel]) -> dict[str, Any]:
             "description": "표준 JSON Schema 문서. type, properties, required를 포함한다. 출력 예시 데이터가 아니다. 변경할 때만 보낸다.",
         }
         properties["models"]["type"] = "array"
+        # 업체가 수십 곳인 모델도 있어 이름을 옮겨 적다 틀리기 쉽다. 정하지 않은 업체는 서버가 고른다.
+        properties["models"]["items"]["properties"]["execution_provider"][
+            "description"
+        ] = (
+            "사용자가 업체 이름을 말하지 않았으면 AUTO_CHEAPEST를 보낸다. 서버가 가장 싼 실제 업체로 바꾸며, "
+            "공통 또는 모델별 최대 출력 토큰이 있어야 한다. 업체 이름을 말했으면 find_models 결과의 "
+            "execution_provider 값을 그대로 쓴다."
+        )
         for field_schema in properties.values():
             field_schema["description"] = (
                 field_schema.get("description", "")

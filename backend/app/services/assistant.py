@@ -15,7 +15,11 @@ from app.schemas.assistant import (
 from app.schemas.simulation_result import SimulationDetailResponse
 from app.services.assistant_answers import intermediate_result, verified_answer
 from app.services.assistant_comparison import compare_simulation
-from app.services.assistant_ollama import AssistantUnavailableError, OllamaMessage
+from app.services.assistant_reply import (
+    AssistantReply,
+    AssistantUnavailableError,
+    ToolCall,
+)
 from app.services.assistant_scope import request_scope
 from app.services.assistant_tools import tool_definitions
 from app.services.simulation_period import kst_today
@@ -65,7 +69,12 @@ requested_at은 요청 시각이다. completed_at이 없으면 완료 시각으�
 class ChatCaller(Protocol):
     async def chat(
         self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
-    ) -> OllamaMessage: ...
+    ) -> AssistantReply: ...
+
+    # 모델 서비스마다 도구 요청과 결과를 대화에 붙이는 형식이 달라 호출부가 정한다.
+    def transcript(
+        self, reply: AssistantReply, results: list[tuple[ToolCall, str]]
+    ) -> list[dict[str, Any]]: ...
 
 
 class ToolExecutor(Protocol):
@@ -241,7 +250,7 @@ async def answer(
         calls += len(reply.tool_calls)
         if calls > MAX_TOOL_CALLS:
             raise AssistantUnavailableError
-        messages.append(reply.model_dump(exclude_none=True))
+        results: list[tuple[ToolCall, str]] = []
         for call in reply.tool_calls:
             if call.function.name not in scope.allowed_tools:
                 return AssistantChatResponse(
@@ -272,11 +281,6 @@ async def answer(
                     needs_model_text = True
                 elif text not in verified_parts:
                     verified_parts.append(text)
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_name": call.function.name,
-                    "content": json.dumps(result, ensure_ascii=False),
-                }
-            )
+            results.append((call, json.dumps(result, ensure_ascii=False)))
+        messages.extend(caller.transcript(reply, results))
     raise AssistantUnavailableError

@@ -1,7 +1,7 @@
 import type { components } from "../../../shared/api/schema";
 import type { AssistantPatch } from "../../../shared/lib/assistant";
 import { choiceKey, parseChoiceKey } from "./catalog";
-import { createComparison } from "./comparisons";
+import { createComparison, hasCustomComparison } from "./comparisons";
 import {
   type SimulatorFormValues,
   simulatorFormSchema,
@@ -23,11 +23,22 @@ export function simulatorRevision(values: SimulatorFormValues) {
   });
 }
 
+/** 공통값을 실제 값으로 바꾸는 패치인지. 값을 지우기만 하는 패치는 공통 설정을 켜지 않는다. */
+function setsCommonValue(patch: AssistantPatch) {
+  return Object.values(patch.execution_config ?? {}).some(
+    (value) => value != null,
+  );
+}
+
 export function applyAssistantPatch(
   current: SimulatorFormValues,
   patch: AssistantPatch,
 ): SimulatorFormValues {
-  const next = { ...current };
+  const turningOn = setsCommonValue(patch) && !current.commonEnabled;
+  // 꺼진 동안 칸에 남은 값이 함께 켜지면 요청하지 않은 설정까지 실행에 들어가므로 비운다.
+  const next = turningOn
+    ? { ...current, temperature: "", maxTokens: "", reasoningEffort: "" }
+    : { ...current };
   if ("prompt_text" in patch) next.prompt = patch.prompt_text ?? "";
   if ("input_text" in patch) next.text = patch.input_text ?? "";
   if ("json_schema" in patch)
@@ -58,17 +69,26 @@ export function applyAssistantPatch(
         reasoningEffort: item.execution_config?.reasoning_effort ?? "",
       },
     }));
+  // 실행은 공통 설정을 켰을 때만 공통값을 쓴다(request.ts). 바꾼 값이 실제로 쓰이도록 함께 켠다.
+  // 화면과 같이 모델별 설정과는 함께 쓰지 않는다. 둘이 겹치면 assistantPatchIssue가 거절한다.
+  if (setsCommonValue(patch)) next.commonEnabled = true;
+  else if (hasCustomComparison(next.comparisons)) next.commonEnabled = false;
   return next;
 }
 
 export function simulatorAssistantState(
   values: SimulatorFormValues,
 ): Schemas["SimulatorState"] {
-  const temperature = simulatorFormSchema.shape.temperature.parse(
-    values.temperature,
-  );
-  const maxTokens = simulatorFormSchema.shape.maxTokens.parse(values.maxTokens);
-  const effort = values.reasoningEffort;
+  // 꺼진 공통값은 실행에 쓰이지 않으므로 도우미에게도 비어 있는 것으로 보여 준다.
+  const common: Schemas["ExecutionConfig"] = values.commonEnabled
+    ? {
+        temperature: simulatorFormSchema.shape.temperature.parse(
+          values.temperature,
+        ),
+        max_tokens: simulatorFormSchema.shape.maxTokens.parse(values.maxTokens),
+        reasoning_effort: parseEffort(values.reasoningEffort),
+      }
+    : {};
   const models = values.comparisons
     .filter((item) => item.modelKey)
     .map((item) => {
@@ -94,11 +114,7 @@ export function simulatorAssistantState(
     json_schema: values.jsonSchema.trim()
       ? JSON.parse(values.jsonSchema)
       : null,
-    execution_config: {
-      temperature,
-      max_tokens: maxTokens,
-      reasoning_effort: parseEffort(effort),
-    },
+    execution_config: common,
     models,
     scenario_id: values.mode === "scenario" ? Number(values.scenarioKey) : null,
     has_images: values.files.length + values.existingAssetIds.length > 0,
@@ -126,6 +142,8 @@ export function assistantPatchIssue(
   choices: ModelChoice[],
   scenarios: ScenarioChoice[],
 ) {
+  if (values.commonEnabled && hasCustomComparison(values.comparisons))
+    return "모델별 설정을 쓰는 비교 항목이 있어 공통 설정을 바꿀 수 없어요. 모델별 설정을 해제한 뒤 다시 요청해 주세요.";
   if (
     values.comparisons.length &&
     values.comparisons.some(

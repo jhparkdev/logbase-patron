@@ -1,5 +1,9 @@
+from datetime import timedelta
+from decimal import Decimal
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.openrouter.lookup_result import EndpointInfo
 from app.schemas.assistant import SimulatorState
 from app.services.assistant_tools import AssistantTools
 from tests.api.model_helpers import FakeEndpointCatalog
@@ -147,3 +151,129 @@ async def test_a_corrected_setting_can_return_to_the_original_value(
     result = await tools.execute("prepare_simulator_settings", {"max_tokens": 512})
     assert result["unchanged"] is True
     assert tools.patch is None
+
+
+def list_tools(
+    session: AsyncSession, text: str = "등록된 모델 목록을 알려줘"
+) -> AssistantTools:
+    return AssistantTools(session, FakeEndpointCatalog([]), T0, None, request_text=text)
+
+
+async def test_recent_sort_lists_the_latest_registered_models_first(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    older = await factory.model(status="ACTIVE", display_name="가 모델", created_at=T0)
+    newer = await factory.model(
+        status="ACTIVE", display_name="나 모델", created_at=T0 + timedelta(days=1)
+    )
+
+    result = await list_tools(db_session).execute("find_models", {"sort": "recent"})
+
+    assert [item["model_id"] for item in result["items"]] == [
+        newer["model_id"],
+        older["model_id"],
+    ]
+    assert result["sort"] == "recent"
+
+
+async def test_price_sort_lists_the_lowest_input_price_first_and_unknown_last(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    models = {}
+    for name, price in (("가", "0.000002"), ("나", None), ("다", "0.0000001")):
+        model = await factory.model(status="ACTIVE", display_name=f"{name} 모델")
+        await factory.model_price(
+            model_id=model["model_id"],
+            price_status="KNOWN" if price else "UNKNOWN",
+            input_price_per_token=Decimal(price) if price else None,
+            output_price_per_token=Decimal(price) if price else None,
+        )
+        models[name] = model["model_id"]
+
+    result = await list_tools(db_session).execute("find_models", {"sort": "price"})
+
+    assert [item["model_id"] for item in result["items"]] == [
+        models["다"],
+        models["가"],
+        models["나"],
+    ]
+
+
+async def test_default_sort_stays_by_name(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await factory.model(status="ACTIVE", display_name="나 모델", created_at=T0)
+    await factory.model(
+        status="ACTIVE", display_name="가 모델", created_at=T0 + timedelta(days=1)
+    )
+
+    result = await list_tools(db_session).execute("find_models", {})
+
+    assert [item["name"] for item in result["items"]] == ["가 모델", "나 모델"]
+    assert result["sort"] == "name"
+
+
+async def test_unknown_sort_is_rejected_as_invalid_tool_input(
+    db_session: AsyncSession,
+) -> None:
+    result = await list_tools(db_session).execute("find_models", {"sort": "popular"})
+
+    assert "error" in result
+
+
+async def test_provider_lists_carry_only_names_to_keep_the_model_context_small(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    """업체별 지원 파라미터는 설정을 준비할 때 서버가 다시 검증하므로 모델에게 보내지 않는다."""
+    await factory.model(status="ACTIVE")
+    catalog = FakeEndpointCatalog(
+        [EndpointInfo(provider_name="업체A", supported_parameters=["tools", "seed"])]
+    )
+    tools = AssistantTools(
+        db_session, catalog, T0, None, request_text="모델의 실행 업체를 알려줘"
+    )
+
+    result = await tools.execute("find_models", {})
+
+    assert result["items"][0]["providers"] == [{"execution_provider": "업체A"}]
+
+
+async def test_prepared_patch_stores_the_real_provider_instead_of_auto_cheapest(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    models = [
+        await factory.model(status="ACTIVE", supported_parameters=["max_tokens"])
+        for _ in range(2)
+    ]
+    catalog = FakeEndpointCatalog(
+        [
+            EndpointInfo(
+                provider_name="업체A",
+                supported_parameters=["max_tokens"],
+                pricing={
+                    "prompt": Decimal("0.000001"),
+                    "completion": Decimal("0.000002"),
+                },
+            )
+        ]
+    )
+    tools = AssistantTools(db_session, catalog, T0, None)
+
+    result = await tools.execute(
+        "prepare_simulator_settings",
+        {
+            "max_tokens": 1024,
+            "models": [
+                {"model_id": model["model_id"], "execution_provider": "AUTO_CHEAPEST"}
+                for model in models
+            ],
+        },
+    )
+
+    assert result["prepared"] is True
+    assert [item["execution_provider"] for item in result["changes"]["models"]] == [
+        "업체A",
+        "업체A",
+    ]
+    assert tools.patch is not None and tools.patch.models is not None
+    assert {item.execution_provider for item in tools.patch.models} == {"업체A"}

@@ -29,6 +29,14 @@ substitutions:
   _INGEST_SECRET: ingest-token-dev:1
   # 시뮬레이터 이미지 GCS 버킷. 비우면 backend가 컨테이너 임시 디스크에 저장해 재시작 때 파일이 사라지므로 배포에서는 꼭 넣는다.
   _IMAGE_BUCKET: logb-patron-images-dev
+  # AI 도우미. 배포에는 Ollama가 없으므로 OpenRouter로 부르고, 위 _OPENROUTER_SECRET(시뮬레이터와 같은 Key)를 쓴다.
+  # 호출마다 비용이 기록되며, DB에 PATRON_ASSISTANT 서비스가 없으면 도우미 요청은 503으로 막힌다.
+  # 운영 트리거에서 검증 전까지 끄려면 _ASSISTANT_ENABLED를 "false"로 바꾼다.
+  _ASSISTANT_ENABLED: "true"
+  # OpenRouter 모델 ID(제공사/모델). 도구 호출을 지원해야 한다.
+  _ASSISTANT_MODEL: anthropic/claude-haiku-5.5
+  # 하루(KST) 도우미 비용 한도(USD). Key 한도를 시뮬레이터와 함께 쓰므로 따로 막는다.
+  _ASSISTANT_DAILY_LIMIT_USD: "1"
 
 steps:
   # 필수 값이 비어 있거나 모드 값이 틀리면 잘못된 설정으로 진행하지 않도록 바로 멈춘다.
@@ -42,6 +50,12 @@ steps:
           true) echo "배포 모드: 마이그레이션과 배포까지 실행합니다." ;;
           false) echo "빌드만 하는 모드: 마이그레이션과 배포를 건너뜁니다." ;;
           *) echo "_DEPLOY_ENABLED에는 true 또는 false만 넣을 수 있습니다."; exit 1 ;;
+        esac
+        # 도우미를 켰는데 모델이 비어 있으면 backend가 시작하지 못하므로 마이그레이션 전에 멈춘다.
+        case "${_ASSISTANT_ENABLED}" in
+          true) test -n "${_ASSISTANT_MODEL}" || { echo "_ASSISTANT_ENABLED=true이면 _ASSISTANT_MODEL이 필요합니다."; exit 1; } ;;
+          false) ;;
+          *) echo "_ASSISTANT_ENABLED에는 true 또는 false만 넣을 수 있습니다."; exit 1 ;;
         esac
 
   # Dockerfile이 RUN --mount(BuildKit 기능)를 쓰므로 BuildKit을 켠다.
@@ -113,7 +127,7 @@ steps:
           --service-account="${_BACKEND_SA}" \
           --set-cloudsql-instances="${_CLOUDSQL_INSTANCE}" \
           --set-secrets="DATABASE_URL=${_DB_SECRET},OPENROUTER_API_KEY=${_OPENROUTER_SECRET},COMMAND_CODE_API_KEYS=${_COMMAND_CODE_SECRET},INGEST_TOKEN=${_INGEST_SECRET}" \
-          --set-env-vars="APP_ENV=${_APP_ENV},ALLOWED_ORIGIN=https://${_FRONTEND_SERVICE}-$PROJECT_NUMBER.${_REGION}.run.app,IMAGE_STORAGE_BUCKET=${_IMAGE_BUCKET}" \
+          --set-env-vars="APP_ENV=${_APP_ENV},ALLOWED_ORIGIN=https://${_FRONTEND_SERVICE}-$PROJECT_NUMBER.${_REGION}.run.app,IMAGE_STORAGE_BUCKET=${_IMAGE_BUCKET},ASSISTANT_ENABLED=${_ASSISTANT_ENABLED},ASSISTANT_PROVIDER=openrouter,ASSISTANT_MODEL=${_ASSISTANT_MODEL},ASSISTANT_DAILY_LIMIT_USD=${_ASSISTANT_DAILY_LIMIT_USD}" \
           --max-instances=1 \
           --no-cpu-throttling \
           --no-invoker-iam-check

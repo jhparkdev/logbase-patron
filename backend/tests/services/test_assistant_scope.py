@@ -202,3 +202,45 @@ def test_comparison_does_not_override_customer_scope_or_settings() -> None:
         request_scope(request("토큰을 2048로 바꿔줘", "simulator")).required_tool
         == "prepare_simulator_settings"
     )
+
+
+SETUP_WITH_QUOTED_USAGE_WORDS = (
+    "최근 등록된 모델 2개로 비교 모델을 설정하고 각각 실행 업체도 지정해줘. "
+    '공통 최대 출력 토큰은 1024로 설정하고, Prompt는 "LOGBASE Patron 서비스를 세 줄로 '
+    '소개해줘"로, 입력 텍스트는 "Patron은 AI 사용량과 비용을 관리하는 관리자 콘솔이다"로 '
+    "바꿔줘."
+)
+
+
+@pytest.mark.parametrize("page", ["customer_usage", "simulator"])
+def test_quoted_prompt_or_input_text_is_content_not_the_request_intent(
+    page: str,
+) -> None:
+    body = AssistantChatRequest(
+        messages=[{"role": "user", "content": SETUP_WITH_QUOTED_USAGE_WORDS}],
+        simulator={} if page == "simulator" else None,
+        page_context=AssistantPageContext(page=page),
+    )
+
+    scope = request_scope(body)
+
+    assert scope.clarification is None
+    assert scope.required_tool == "prepare_simulator_settings"
+    assert "get_customer_usage" not in scope.allowed_tools
+
+
+@pytest.mark.parametrize("quote", ['"{}"', "'{}'", "“{}”", "‘{}’", "「{}」"])
+def test_each_quote_style_is_treated_as_content(quote: str) -> None:
+    text = f"Prompt를 {quote.format('고객 사용량을 요약해줘')}로 바꿔줘"
+
+    scope = request_scope(request(text, "customer_usage"))
+
+    assert scope.required_tool == "prepare_simulator_settings"
+
+
+def test_a_quoted_run_id_is_still_read_for_comparison() -> None:
+    run_id = "00000000-0000-4000-8000-000000000001"
+
+    scope = request_scope(request(f"실행 결과 비교: '{run_id}'", "customer_usage"))
+
+    assert str(scope.comparison_id) == run_id

@@ -3,33 +3,33 @@
 from typing import Any
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ValidationError
 
-
-class AssistantUnavailableError(Exception):
-    pass
-
-
-class ToolFunction(BaseModel):
-    name: str = Field(min_length=1, max_length=80)
-    arguments: dict[str, Any]
-
-
-class ToolCall(BaseModel):
-    function: ToolFunction
-
-
-class OllamaMessage(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    role: str = "assistant"
-    content: str = Field(default="", max_length=12000)
-    tool_calls: list[ToolCall] = Field(default_factory=list, max_length=4)
+from app.services.assistant_reply import (
+    AssistantReply,
+    AssistantReplyTruncatedError,
+    AssistantUnavailableError,
+    ToolCall,
+)
 
 
 class OllamaReply(BaseModel):
-    message: OllamaMessage
+    message: AssistantReply
     done: bool
     done_reason: str | None = None
+
+
+def ollama_transcript(
+    reply: AssistantReply, results: list[tuple[ToolCall, str]]
+) -> list[dict[str, Any]]:
+    """Ollama 채팅 API 형식으로 모델의 도구 요청과 도구 결과를 대화에 붙인다."""
+    return [
+        reply.model_dump(exclude_none=True),
+        *(
+            {"role": "tool", "tool_name": call.function.name, "content": content}
+            for call, content in results
+        ),
+    ]
 
 
 class OllamaCaller:
@@ -40,9 +40,11 @@ class OllamaCaller:
         self.model = model
         self.context_length = context_length
 
+    transcript = staticmethod(ollama_transcript)
+
     async def chat(
         self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
-    ) -> OllamaMessage:
+    ) -> AssistantReply:
         try:
             response = await self.client.post(
                 "/api/chat",
@@ -63,7 +65,9 @@ class OllamaCaller:
             if len(response.content) > 100_000:
                 raise AssistantUnavailableError
             reply = OllamaReply.model_validate(response.json())
-            if not reply.done or reply.done_reason == "length":
+            if reply.done_reason == "length":
+                raise AssistantReplyTruncatedError
+            if not reply.done:
                 raise AssistantUnavailableError
             if reply.message.role != "assistant":
                 raise AssistantUnavailableError

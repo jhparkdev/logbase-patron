@@ -1,5 +1,6 @@
 """app/config.py 테스트. 실제 .env 대신 테스트가 정한 환경변수·임시 파일만 읽게 한다."""
 
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,13 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     monkeypatch.delenv("ALLOWED_ORIGIN", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("COMMAND_CODE_API_KEYS", raising=False)
+    for name in (
+        "ASSISTANT_ENABLED",
+        "ASSISTANT_PROVIDER",
+        "ASSISTANT_MODEL",
+        "ASSISTANT_DAILY_LIMIT_USD",
+    ):
+        monkeypatch.delenv(name, raising=False)
     return monkeypatch
 
 
@@ -270,6 +278,65 @@ def test_command_code_api_keys_must_be_a_json_object(
 ) -> None:
     clean_env.setenv("DATABASE_URL", DEV_URL)
     clean_env.setenv("COMMAND_CODE_API_KEYS", not_a_map)
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+def test_assistant_defaults_keep_local_ollama_and_a_daily_limit(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+
+    settings = Settings(_env_file=None)
+
+    assert settings.assistant_enabled is False
+    assert settings.assistant_provider == "ollama"
+    assert settings.assistant_model is None
+    assert settings.assistant_daily_limit_usd == Decimal(1)
+
+
+def test_reads_openrouter_assistant_settings_from_environment(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("ASSISTANT_ENABLED", "true")
+    clean_env.setenv("ASSISTANT_PROVIDER", "openrouter")
+    clean_env.setenv("ASSISTANT_MODEL", "anthropic/claude-haiku-5.5")
+    clean_env.setenv("ASSISTANT_DAILY_LIMIT_USD", "2.5")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.assistant_provider == "openrouter"
+    assert settings.assistant_model == "anthropic/claude-haiku-5.5"
+    assert settings.assistant_daily_limit_usd == Decimal("2.5")
+
+
+def test_enabled_openrouter_assistant_requires_a_model(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """모델 이름이 없으면 요청마다 실패하는 대신 시작할 때 멈춘다."""
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv("ASSISTANT_ENABLED", "true")
+    clean_env.setenv("ASSISTANT_PROVIDER", "openrouter")
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("ASSISTANT_PROVIDER", "openai"),
+        ("ASSISTANT_DAILY_LIMIT_USD", "0"),
+        ("ASSISTANT_DAILY_LIMIT_USD", "-1"),
+    ],
+)
+def test_rejects_unknown_assistant_provider_or_non_positive_limit(
+    clean_env: pytest.MonkeyPatch, name: str, value: str
+) -> None:
+    clean_env.setenv("DATABASE_URL", DEV_URL)
+    clean_env.setenv(name, value)
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
