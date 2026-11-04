@@ -1,4 +1,4 @@
-"""/api/model-favorites 테스트. 첫 활성 계정의 모델+Provider 즐겨찾기 계약을 확인한다."""
+"""/api/model-favorites 테스트. 로그인한 계정의 모델+Provider 즐겨찾기 계약을 확인한다."""
 
 from typing import Any
 
@@ -41,22 +41,11 @@ async def new_model_id(factory: Factory) -> int:
     return int((await factory.model())["model_id"])
 
 
-async def test_every_route_works_without_a_login_session(
+async def test_every_route_refuses_a_request_without_a_session(
     client: AsyncClient, factory: Factory
 ) -> None:
-    # 팀 결정으로 로그인 검사를 하지 않는다. 즐겨찾기는 첫 활성 계정의 것으로 다룬다
+    # 활성 계정이 있어도 세션이 없으면 거절한다. 계정이 없어서 거절되는 경우와 구분한다
     await make_user(factory)
-    model_id = await new_model_id(factory)
-
-    assert (await add(client, model_id, PROVIDER)).status_code == 201
-    assert await listed(client) == [(model_id, PROVIDER)]
-    assert (await remove(client, model_id, PROVIDER)).status_code == 204
-    assert await listed(client) == []
-
-
-async def test_without_an_active_account_every_route_is_refused(
-    client: AsyncClient, factory: Factory
-) -> None:
     model_id = await new_model_id(factory)
 
     for response in (
@@ -182,16 +171,38 @@ async def test_removing_a_favorite_that_does_not_exist_is_not_an_error(
     assert (await remove(client, MISSING_MODEL_ID, PROVIDER)).status_code == 204
 
 
-async def test_favorites_belong_to_the_first_active_account_whoever_is_logged_in(
+async def test_favorites_belong_to_the_signed_in_account(
     client: AsyncClient, factory: Factory, signed_in: dict[str, Any]
 ) -> None:
-    # 지금은 계정 하나만 쓰므로 누가 로그인했든 같은 즐겨찾기를 본다
+    # 먼저 만든 계정(signed_in)이 아니라 로그인한 계정의 것으로 저장하고, 계정마다 따로 본다
+    first_model_id = await new_model_id(factory)
+    await add(client, first_model_id, PROVIDER)
+    other = await make_user(factory)
+    assert (await log_in(client, other["email"])).status_code == 200
+
+    assert await listed(client) == []
+    other_model_id = await new_model_id(factory)
+    await add(client, other_model_id, PROVIDER)
+
+    assert await listed(client) == [(other_model_id, PROVIDER)]
+    owners = await factory.session.scalars(
+        select(UserModelFavorite.user_id).where(
+            UserModelFavorite.model_id == other_model_id
+        )
+    )
+    assert owners.all() == [other["user_id"]]
+
+
+async def test_removing_with_another_account_leaves_the_owners_favorite(
+    client: AsyncClient, factory: Factory, signed_in: dict[str, Any]
+) -> None:
     model_id = await new_model_id(factory)
     await add(client, model_id, PROVIDER)
     other = await make_user(factory)
     assert (await log_in(client, other["email"])).status_code == 200
 
-    assert await listed(client) == [(model_id, PROVIDER)]
+    assert (await remove(client, model_id, PROVIDER)).status_code == 204
+
     owners = await factory.session.scalars(
         select(UserModelFavorite.user_id).where(UserModelFavorite.model_id == model_id)
     )
