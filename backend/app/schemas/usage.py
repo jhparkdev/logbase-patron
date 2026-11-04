@@ -113,6 +113,7 @@ class _RowsQuery(UsageFilterQuery):
 
 class CustomerRowsQuery(_RowsQuery):
     sort: CustomerRowSort = CustomerRowSort.CONFIRMED
+    budget_status: BudgetStatus | None = None
 
 
 class RequestRowsQuery(_RowsQuery):

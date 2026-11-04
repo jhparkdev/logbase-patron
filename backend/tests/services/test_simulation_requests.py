@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
@@ -135,6 +136,37 @@ async def test_a_failure_keeps_its_user_message_and_http_status(
     )
 
     assert await finish_with_details(db_session, request_id, record)
+
+    row = await saved(db_session, request_id)
+    assert (row.error_message, row.http_status) == ("잠시 후 다시 시도", 429)
+
+
+@dataclass(frozen=True)
+class OtherCallDetails:
+    """시뮬레이터 칸 결과가 아닌 호출(예: 연결 테스트)이 넘기는 종료 부가 정보."""
+
+    status: RequestStatus
+    error_message: str | None = None
+    http_status: int | None = None
+    finish_reason: str | None = None
+    cached_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    reasoning_tokens: int | None = None
+
+
+async def test_details_from_a_call_other_than_a_simulation_slot_are_saved(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    # 연결 테스트도 record_finished 다음에 같은 함수로 HTTP 상태와 문구를 남길 수 있어야 한다
+    request_id = await running(factory, db_session)
+    assert await record_finished(
+        db_session, request_id, to_slot_record(failed(R.FAILED), None), END
+    )
+
+    details = OtherCallDetails(
+        status=R.FAILED, error_message="잠시 후 다시 시도", http_status=429
+    )
+    assert await save_finish_details(db_session, request_id, details)
 
     row = await saved(db_session, request_id)
     assert (row.error_message, row.http_status) == ("잠시 후 다시 시도", 429)

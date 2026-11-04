@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { components } from "../../../shared/api/schema";
-import { budgetMonthOf } from "../../../shared/lib/budget";
+import { budgetMonthOf, budgetStatusSchema } from "../../../shared/lib/budget";
 import { PAGE_SIZE } from "../../../shared/lib/pagination";
 import {
   currentMonthPeriod,
@@ -67,6 +67,7 @@ export const budgetSearchSchema = z
     /** 조회 조건. 없으면 전체다. 상세 패널의 "이 프로젝트 사용 내역 보기"도 project를 건다. */
     project: positiveInt,
     model: positiveInt,
+    budgetStatus: budgetStatusSchema.optional().catch(undefined),
     /** 상세 패널을 연 프로젝트 번호(projects.project_id). 요약 화면과 전체보기 어디서든 연다. */
     detail: positiveInt,
     /** "new"면 구독료 등록 패널, 번호면 그 구독료의 수정 패널을 연다. */
@@ -197,6 +198,7 @@ export function projectRowsQuery(search: BudgetSearch) {
     month: budgetMonthOf(search),
     project_id: search.project,
     model_id: search.model,
+    ...(search.budgetStatus ? { budget_status: search.budgetStatus } : {}),
     ...listPageQuery(search, "projects"),
     ...(sort && order ? { sort, order } : {}),
   };

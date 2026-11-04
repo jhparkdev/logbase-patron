@@ -117,6 +117,13 @@ describe("customerUsageSearchSchema 조회 조건", () => {
 });
 
 describe("API 조회 조건", () => {
+  test("예산 목록 상태를 URL에서 검증하고 조회 API에 전달한다", () => {
+    const filtered = parse({ ...PERIOD, budgetStatus: "OVER" });
+    expect(customerRowsQuery(filtered).budget_status).toBe("OVER");
+    expect(
+      parse({ ...PERIOD, budgetStatus: "arbitrary" }).budgetStatus,
+    ).toBeUndefined();
+  });
   test("기간과 고른 번호를 API 이름으로 바꾼다", () => {
     expect(usageFilterQuery(parse({ ...PERIOD, customer: 1 }))).toEqual({
       start_date: PERIOD.from,

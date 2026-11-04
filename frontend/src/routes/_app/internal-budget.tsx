@@ -21,6 +21,7 @@ import {
   filterFormValues,
   filterSearchParams,
 } from "../../features/internal-budget/lib/search";
+import { BudgetStatusNotice } from "../../shared/components/budget/BudgetStatusNotice";
 import { DataBlock } from "../../shared/components/ui/DataBlock";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
 import { RefreshingBar } from "../../shared/components/ui/RefreshingBar";
@@ -82,6 +83,20 @@ function InternalBudgetPage() {
           })
         }
       />
+      {search.budgetStatus && (
+        <BudgetStatusNotice
+          status={search.budgetStatus}
+          onClear={() =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                budgetStatus: undefined,
+                page: undefined,
+              }),
+            })
+          }
+        />
+      )}
       {search.view === undefined ? (
         <>
           <div className="relative">

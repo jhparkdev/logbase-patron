@@ -1,4 +1,4 @@
-"""services/requests.py 가 채우지 못하는 시뮬레이터 호출 이력 쓰기.
+"""services/requests.py 가 채우지 못하는 호출 이력 쓰기. 시뮬레이터에서 시작했다.
 
 생성·시작·종료·취소·원문 저장은 requests.py 가 맡는다. 여기에는 그 함수가 받지 않는 값과
 서버 재시작 복구만 둔다. ai_requests 에 쓰는 문이 늘지 않도록 requests.py 로 옮길 수 있는 것은 옮긴다.
@@ -10,7 +10,7 @@ commit 하지 않는다. 트랜잭션은 부르는 쪽이 정한다.
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy import func, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,14 +18,41 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import AIRequest, ErrorType, RequestStatus
 from app.openrouter.errors import USER_MESSAGES
 from app.openrouter.errors import ErrorType as CallErrorType
-from app.services.simulation_ports import SlotRecord
 
 _OPEN = (RequestStatus.PENDING, RequestStatus.RUNNING)
 _UNFINISHED_ERROR_MESSAGE = USER_MESSAGES[CallErrorType.UNKNOWN_ERROR]
 
 
+class FinishDetails(Protocol):
+    """record_finished 가 받지 않는 종료 부가 정보의 모양.
+
+    시뮬레이터 칸 결과(SlotRecord)가 이 모양이다. 연결 테스트처럼 다른 호출도 같은 값을 넘기면 된다.
+    """
+
+    @property
+    def status(self) -> RequestStatus: ...
+
+    @property
+    def error_message(self) -> str | None: ...
+
+    @property
+    def http_status(self) -> int | None: ...
+
+    @property
+    def finish_reason(self) -> str | None: ...
+
+    @property
+    def cached_tokens(self) -> int | None: ...
+
+    @property
+    def cache_write_tokens(self) -> int | None: ...
+
+    @property
+    def reasoning_tokens(self) -> int | None: ...
+
+
 async def save_finish_details(
-    session: AsyncSession, request_id: uuid.UUID, record: SlotRecord
+    session: AsyncSession, request_id: uuid.UUID, record: FinishDetails
 ) -> bool:
     """requests.record_finished 가 받지 않는 종료 부가 정보를 같은 호출 이력에 더한다.
 

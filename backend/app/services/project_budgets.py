@@ -181,6 +181,8 @@ async def list_project_budgets(
     rows = await project_budget_rows(
         session, query.month, query.project_id, query.model_id
     )
+    if query.budget_status is not None:
+        rows = [row for row in rows if row.status == query.budget_status]
     return ProjectBudgetPage(
         items=page_rows(rows, query),
         total=len(rows),

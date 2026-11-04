@@ -1,7 +1,6 @@
 """이미지 파일 저장소. DB 에는 이 저장소의 키(경로)만 남기고 파일 내용은 여기에 둔다.
 
-지금은 로컬 폴더 구현만 있다. GCS 를 쓰게 되면 같은 ImageStorage 모양으로 구현을 하나 더 만들어
-설정에서 바꿔 끼운다. 키는 버킷·폴더 이름 없이 'simulator/<asset_id>.png' 같은 상대 경로라서
+로컬 폴더 구현은 여기에, GCS 구현은 gcs_image_storage.py 에 있고 설정에서 바꿔 끼운다. 키는 버킷·폴더 이름 없이 'simulator/<asset_id>.png' 같은 상대 경로라서
 어느 구현에서도 같은 값을 쓴다.
 """
 
@@ -30,6 +29,20 @@ class ImageStorage(Protocol):
         ...
 
 
+def check_key(key: str) -> None:
+    """모든 구현이 같은 키 규칙을 쓴다. 저장소를 바꿔 끼워도 같은 기록을 받아야 하기 때문이다."""
+    parts = key.replace("\\", "/").split("/")
+    if (
+        not key
+        or "\x00" in key
+        or "\\" in key
+        or key.startswith("/")
+        or ":" in parts[0]
+        or ".." in parts
+    ):
+        raise UnsafeStorageKeyError
+
+
 class LocalImageStorage:
     """로컬 폴더에 저장한다. 개발과 테스트용이다. Cloud Run 의 디스크는 임시라서 배포에는 쓰지 않는다."""
 
@@ -38,16 +51,7 @@ class LocalImageStorage:
 
     def _resolve(self, key: str) -> Path:
         # 문자열 검사로 빠른 거절, 해석된 실제 경로 검사로 심볼릭 링크 우회까지 막는다
-        parts = key.replace("\\", "/").split("/")
-        if (
-            not key
-            or "\x00" in key
-            or "\\" in key
-            or key.startswith("/")
-            or ":" in parts[0]
-            or ".." in parts
-        ):
-            raise UnsafeStorageKeyError
+        check_key(key)
         root = self._root.resolve()
         path = (root / key).resolve()
         if not path.is_relative_to(root):
