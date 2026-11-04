@@ -130,6 +130,22 @@ test("Schema와 입력이 없던 실행은 빈 칸으로 되돌리고 이미지�
   ).toMatchObject({ text: "", jsonSchema: "", existingAssetIds: [assetId] });
 });
 
+test("기존 이미지의 원래 파일 이름을 ID별로 되돌리고, 이름이 없던 이미지는 넣지 않는다", () => {
+  const named = "01a1611f-3e80-73c5-a130-3efa5a1f7700";
+  const unnamed = "01a1611f-3e80-73c5-a130-3efa5a1f7701";
+  const image = { mime_type: "image/png", file_size_bytes: 5 };
+  expect(
+    toRerunValues({
+      ...custom,
+      asset_ids: [named, unnamed],
+      images: [
+        { ...image, asset_id: named, original_filename: "receipt.png" },
+        { ...image, asset_id: unnamed, original_filename: null },
+      ],
+    }).existingImageNames,
+  ).toEqual({ [named]: "receipt.png" });
+});
+
 const ready = {
   draft: custom,
   catalogReady: true,

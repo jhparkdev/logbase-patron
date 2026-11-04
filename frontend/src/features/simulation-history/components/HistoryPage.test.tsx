@@ -225,19 +225,17 @@ test("서버가 준 순서를 유지하며 서버가 지원하는 열의 정렬 
     "모델 수",
     "실행 상태",
     "비용 상태",
+    "총 비용 (USD)",
   ]) {
     fireEvent.click(screen.getByRole("button", { name: `${label} 정렬` }));
   }
-  expect(onSearch).toHaveBeenCalledTimes(6);
+  expect(onSearch).toHaveBeenCalledTimes(7);
   expect(onSearch).toHaveBeenLastCalledWith(
-    expect.objectContaining({ sort: "costStatus", direction: "asc" }),
+    expect.objectContaining({ sort: "totalCost", direction: "asc" }),
   );
   expect(
-    screen.getByRole("columnheader", { name: "총 비용 (USD)" }),
-  ).toBeDefined();
-  expect(
-    screen.queryByRole("button", { name: "총 비용 (USD) 정렬" }),
-  ).toBeNull();
+    screen.getByRole("columnheader", { name: /총 비용 \(USD\)/ }),
+  ).toHaveProperty("ariaSort", "none");
   expect(within(rows[1]).getByText("추정 포함")).toBeDefined();
   expect(within(rows[1]).getByText("미확인 1건 미반영")).toBeDefined();
 });

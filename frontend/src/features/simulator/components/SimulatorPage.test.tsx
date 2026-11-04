@@ -454,15 +454,15 @@ test("이미지 개수 초과 시 기존 선택을 보존하고 제거·재선�
   expect(screen.getByText("first.png")).toBeDefined();
   expect(screen.getByText("second.png")).toBeDefined();
   expect(screen.queryByText("third.png")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "이미지 2 제거" }));
+  fireEvent.click(screen.getByRole("button", { name: "second.png 제거" }));
   expect(screen.queryByRole("alert")).toBeNull();
   fireEvent.change(chooser, {
     target: { files: [png("third.png"), png("fourth.png"), png("fifth.png")] },
   });
   expect(await screen.findByText("fifth.png")).toBeDefined();
-  expect(
-    screen.getAllByRole("button", { name: /이미지 \d 제거/ }),
-  ).toHaveLength(4);
+  expect(screen.getAllByRole("button", { name: /\.png 제거$/ })).toHaveLength(
+    4,
+  );
 });
 
 test.each(["prompt", "text"] as const)(
