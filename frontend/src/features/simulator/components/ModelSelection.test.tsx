@@ -228,3 +228,39 @@ test("카탈로그 준비 전에는 검색을 막고 유실된 복원 모델은 
   fireEvent.click(within(dialog).getByRole("button", { name: "선택 적용" }));
   expect(screen.queryByRole("dialog")).toBeNull();
 });
+
+function ImageOutputForm({ selections }: { selections: string[] }) {
+  const form = useForm<SimulatorFormValues>({
+    defaultValues: createDefaultValues({
+      outputType: "IMAGE",
+      comparisons: createComparisons(selections),
+    }),
+  });
+  return (
+    <FormProvider {...form}>
+      <form>
+        <ModelSelection
+          choices={choices.map((item, index) => ({
+            ...item,
+            generatesImages: index === 1,
+          }))}
+          unavailable={false}
+        />
+      </form>
+    </FormProvider>
+  );
+}
+
+test("이미지 출력이면 이미지를 만드는 모델만 고르게 하고 이미 고른 다른 모델 카드에 경고한다", () => {
+  render(<ImageOutputForm selections={[choices[2].key]} />);
+  expect(
+    screen.getByText(
+      "이미지를 만들지 못해요. 출력 형식을 텍스트로 바꾸거나 모델을 바꿔 주세요.",
+    ),
+  ).toBeDefined();
+  const dialog = openPicker();
+  const options = within(dialog).getAllByRole("checkbox");
+  expect(options.map((option) => option.getAttribute("aria-label"))).toEqual([
+    `${choices[1].name} · ${choices[1].provider}`,
+  ]);
+});

@@ -13,6 +13,7 @@ import {
 import type { ModelFavoritesView } from "../lib/favorites";
 import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
 import { MODEL_LIMITS } from "../lib/limits";
+import { choicesForOutput } from "../lib/output";
 import type { ModelChoice, ScenarioChoice } from "../lib/presentation";
 import { FieldError } from "./InputFields";
 import { ModelComparisonCard } from "./ModelComparisonCard";
@@ -62,6 +63,7 @@ export function ModelSelection({
     temperature,
     maxTokens,
     reasoningEffort,
+    outputType,
   ] = useWatch({
     control,
     name: [
@@ -74,10 +76,13 @@ export function ModelSelection({
       "temperature",
       "maxTokens",
       "reasoningEffort",
+      "outputType",
     ],
   });
   const hasImages = files.length + existingAssetIds.length > 0;
-  const hasSchema = jsonSchema.trim().length > 0;
+  const imageOutput = outputType === "IMAGE";
+  // 이미지 생성 실행에는 Schema를 보내지 않으므로 Schema 지원 여부로 경고하지 않는다
+  const hasSchema = !imageOutput && jsonSchema.trim().length > 0;
   const scenario =
     mode === "scenario"
       ? scenarios.find((item) => item.key === scenarioKey)
@@ -178,6 +183,7 @@ export function ModelSelection({
                 scenario={scenario}
                 hasImages={hasImages}
                 hasSchema={hasSchema}
+                imageOutput={imageOutput}
                 count={comparisons.length}
                 onRemove={() => remove(index)}
                 onDuplicate={() => duplicate(index)}
@@ -207,7 +213,7 @@ export function ModelSelection({
       />
       {pickerOpen && (
         <ModelPickerDialog
-          choices={choices}
+          choices={choicesForOutput(choices, outputType ?? "TEXT")}
           selections={comparisons.map((item) => item.modelKey)}
           counts={comparisonCounts(comparisons)}
           unavailable={unavailable}

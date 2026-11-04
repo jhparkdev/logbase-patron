@@ -30,6 +30,7 @@ export function ModelComparisonCard({
   scenario,
   hasImages,
   hasSchema,
+  imageOutput = false,
   count,
   onRemove,
   onDuplicate,
@@ -41,12 +42,13 @@ export function ModelComparisonCard({
   scenario?: ScenarioChoice;
   hasImages: boolean;
   hasSchema: boolean;
+  imageOutput?: boolean;
   count: number;
   onRemove: () => void;
   onDuplicate: () => void;
 }) {
   const number = index + 1;
-  const warnings = cardWarnings(choice, { hasImages, hasSchema });
+  const warnings = cardWarnings(choice, { hasImages, hasSchema, imageOutput });
   const settings = resolvedSettings(
     comparison,
     common,

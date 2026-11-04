@@ -10,6 +10,7 @@ type Model = Pick<
   | "display_name"
   | "provider"
   | "input_modalities"
+  | "output_modalities"
   | "temperature_supported"
   | "reasoning_efforts"
   | "supports_json_schema"
@@ -89,6 +90,7 @@ export function toModelChoices(
     name: model.display_name,
     creator: model.provider,
     supportsImages: model.input_modalities.includes(IMAGE_MODALITY),
+    generatesImages: model.output_modalities.includes(IMAGE_MODALITY),
     tuningParameters: parameters,
     supportedParameters: [
       ...parameters.map((parameter) => PARAMETER_NAMES[parameter.key]),
