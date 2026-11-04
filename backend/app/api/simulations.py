@@ -3,9 +3,9 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 
-from app.api.deps import DevUserDep, NowDep
+from app.api.deps import CurrentUserDep, NowDep, get_current_user
 from app.api.model_deps import EndpointCatalogDep
 from app.api.simulation_deps import (
     CancelDepsDep,
@@ -60,11 +60,14 @@ _ORIGIN_REFUSED: dict[int | str, dict[str, Any]] = {
     status.HTTP_403_FORBIDDEN: {"model": OriginNotAllowedResponse}
 }
 
+# main.py 는 팀 결정으로 라우터 단위 로그인 검사를 하지 않는다. Prompt·결과·업로드 이미지가
+# 그대로 노출되지 않게 이 라우터(아래에 붙는 이미지 라우터 포함)에서 직접 세션을 요구한다.
 router = APIRouter(
     prefix="/simulations",
     tags=["simulations"],
     route_class=SimulationRoute,
     lifespan=recovery_lifespan,
+    dependencies=[Depends(get_current_user)],
 )
 
 
@@ -81,7 +84,7 @@ async def create_simulation_run(
     body: SimulationCreateRequest,
     request: Request,
     response: Response,
-    user: DevUserDep,
+    user: CurrentUserDep,
     session: SessionDep,
     now: NowDep,
     manager: SimulationManagerDep,
