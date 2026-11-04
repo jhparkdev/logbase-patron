@@ -1691,3 +1691,73 @@ async def test_referenced_rows_cannot_be_deleted(
         ),
         constraint=constraint,
     )
+
+
+async def test_model_discovery_starts_pending_and_is_unique_per_model(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    found = await factory.model_discovery(openrouter_model_id="vendor/new-model")
+
+    assert found["status"] == "PENDING"
+    await expect_rejected(
+        db_session,
+        factory.model_discovery(openrouter_model_id="vendor/new-model"),
+        constraint="model_discoveries_openrouter_model_id_key",
+    )
+
+
+@pytest.mark.parametrize("model_id", ["", " vendor/model", "vendor/model "])
+async def test_model_discovery_rejects_a_blank_or_untrimmed_model_id(
+    factory: Factory, db_session: AsyncSession, model_id: str
+) -> None:
+    await expect_rejected(
+        db_session,
+        factory.model_discovery(openrouter_model_id=model_id),
+        constraint="model_discoveries_openrouter_model_id_check",
+    )
+
+
+async def test_model_discovery_skip_reason_only_for_skipped(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    await factory.model_discovery(status="SKIPPED", skip_reason="PRICE_TOO_HIGH")
+
+    for values in (
+        {"status": "SKIPPED"},
+        {"status": "PENDING", "skip_reason": "PRICE_TOO_HIGH"},
+    ):
+        await expect_rejected(
+            db_session,
+            factory.model_discovery(**values),
+            constraint="ck_model_discoveries_skip_reason",
+        )
+
+
+async def test_model_discovery_compared_needs_time_and_base_model(
+    factory: Factory, db_session: AsyncSession
+) -> None:
+    base = await factory.model()
+    await factory.model_discovery(
+        status="COMPARED", compared_at=T0, base_model_id=base["model_id"]
+    )
+
+    for missing in ({"compared_at": None}, {"base_model_id": None}):
+        values = {"compared_at": T0, "base_model_id": base["model_id"]} | missing
+        await expect_rejected(
+            db_session,
+            factory.model_discovery(status="COMPARED", **values),
+            constraint="ck_model_discoveries_compared",
+        )
+
+
+@pytest.mark.parametrize(
+    "column", ["new_cost_usd", "base_cost_usd", "new_latency_ms", "base_latency_ms"]
+)
+async def test_model_discovery_rejects_negative_cost_and_latency(
+    factory: Factory, db_session: AsyncSession, column: str
+) -> None:
+    await expect_rejected(
+        db_session,
+        factory.model_discovery(**{column: -1}),
+        constraint=f"model_discoveries_{column}_check",
+    )
