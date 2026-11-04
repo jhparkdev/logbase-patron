@@ -27,6 +27,25 @@ OVER = BudgetStatus.OVER
 UNSET = BudgetStatus.UNSET
 
 
+async def test_budget_status_filter_is_applied_before_total_and_pagination(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    for amount in ("1", "101", "20"):
+        project = await factory.project()
+        await factory.budget(
+            project_id=project["project_id"], monthly_amount_usd=Decimal(100)
+        )
+        await internal_call(
+            factory, project_id=project["project_id"], cost_usd=Decimal(amount)
+        )
+    page = await list_project_budgets(
+        db_session, ProjectRowsQuery(month=OCT, budget_status="OVER", page_size=1)
+    )
+    assert page.total == 1
+    assert len(page.items) == 1
+    assert page.items[0].status == OVER
+
+
 def row(
     project_id: int,
     name: str,

@@ -31,6 +31,29 @@ OCTOBER_1ST = date(2026, 10, 1)
 KST_OCTOBER_START = datetime(2026, 9, 30, 15, tzinfo=UTC)
 NOVEMBER_START = datetime(2026, 10, 31, 15, tzinfo=UTC)
 ONE_MICROSECOND = timedelta(microseconds=1)
+
+
+async def test_budget_status_filter_is_applied_before_total_and_pagination(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    for amount in ("1", "101", "20"):
+        customer = await factory.customer()
+        await factory.budget(
+            scope_type="CUSTOMER",
+            customer_id=customer["customer_id"],
+            monthly_amount_usd=Decimal(100),
+        )
+        await customer_call(
+            factory, customer_id=customer["customer_id"], **confirmed(amount)
+        )
+    page = await aggregation.list_customer_rows(
+        db_session, OCTOBER_FILTER, CustomerRowsQuery(budget_status="OVER", page_size=1)
+    )
+    assert page.total == 1
+    assert len(page.items) == 1
+    assert page.items[0].budget.status == BudgetStatus.OVER
+
+
 IN_OCTOBER = datetime(2026, 10, 10, 3, tzinfo=UTC)
 LATE_PAGE_SIZE = 100
 

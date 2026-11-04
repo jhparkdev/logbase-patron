@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     # OpenRouter Key 원문. 로컬에서는 작업할 때만 넣고 끝나면 지우므로 없어도 앱은 뜬다.
     # 없으면 비교 실행 접수만 거절한다(app/api/simulation_deps.py).
     openrouter_api_key: SecretStr | None = None
+    # 로컬 에이전트 실험은 명시적으로 켠 환경에서만 제공한다.
+    assistant_enabled: bool = False
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "qwen3.5:4b"
+    ollama_context_length: int = Field(default=8192, ge=4096, le=32768)
     # 구성원별 Command Code Key 원문. DB의 secret_ref → Key 원문을 JSON 한 줄로 받는다.
     # 예: COMMAND_CODE_API_KEYS={"COMMAND_CODE_KEY_HONG": "..."}. 비어 있어도 앱은 뜨고,
     # Key가 없는 구성원은 사용량 표에서 "Key 없음"으로 보인다. JSON이 깨졌으면 시작할 때 멈춘다.

@@ -385,6 +385,8 @@ async def list_customer_rows(
         )
         for group in groups
     ]
+    if query.budget_status is not None:
+        items = [item for item in items if item.budget.status == query.budget_status]
     return CustomerUsagePage(
         items=_customer_page(items, query),
         total=len(items),
