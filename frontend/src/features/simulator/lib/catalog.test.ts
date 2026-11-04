@@ -9,7 +9,6 @@ test("모델 하나를 서버 업체마다 고를 수 있는 항목으로 나눈
   expect(choices.map((choice) => choice.key)).toEqual([
     "3:DeepInfra",
     "3:Io Net",
-    "3:AUTO_CHEAPEST",
   ]);
   expect(choices[0]).toMatchObject({
     name: "GPT-4o mini",
@@ -123,23 +122,52 @@ test.each(["", "abc", "3:", ":DeepInfra", "a:DeepInfra"])(
   },
 );
 
-test("서버 업체를 알면 맨 끝에 가장 싼 업체 자동 항목을 더한다", () => {
-  const choices = toModelChoices(MODEL_ROW, { providers: ["DeepInfra"] });
-  const auto = choices[choices.length - 1];
-  expect(auto).toMatchObject({
-    key: choiceKey(MODEL_ROW.model_id, "AUTO_CHEAPEST"),
-    provider: "가장 싼 업체 자동",
-    name: "GPT-4o mini",
-    selectable: true,
+test("가장 싼 업체는 실제 업체 이름 그대로 맨 위에 두고 최저가로 표시한다", () => {
+  const choices = toModelChoices(MODEL_ROW, {
+    providers: ["DeepInfra", "Io Net", "Novita"],
+    cheapest: "Io Net",
   });
-  expect(auto.tuningParameters).toEqual(choices[0].tuningParameters);
-  expect(parseChoiceKey(auto.key)).toEqual({
+  expect(choices.map((choice) => choice.provider)).toEqual([
+    "Io Net",
+    "DeepInfra",
+    "Novita",
+  ]);
+  expect(choices.map((choice) => choice.cheapest ?? false)).toEqual([
+    true,
+    false,
+    false,
+  ]);
+  // 고르면 다른 업체와 똑같이 그 업체를 지정해 실행한다
+  expect(parseChoiceKey(choices[0].key)).toEqual({
     model_id: MODEL_ROW.model_id,
-    execution_provider: "AUTO_CHEAPEST",
+    execution_provider: "Io Net",
   });
 });
 
-test("서버 업체를 모르면 자동 항목도 만들지 않는다", () => {
+test.each([
+  ["순위를 받지 못했다", undefined],
+  ["순위의 업체가 목록에 없다", "Unknown"],
+])("%s면 순서를 바꾸지 않고 표시도 하지 않는다", (_name, cheapest) => {
+  const choices = toModelChoices(MODEL_ROW, {
+    providers: ["DeepInfra", "Io Net"],
+    cheapest,
+  });
+  expect(choices.map((choice) => choice.provider)).toEqual([
+    "DeepInfra",
+    "Io Net",
+  ]);
+  expect(choices.some((choice) => choice.cheapest)).toBe(false);
+});
+
+test("업체가 하나뿐이면 최저가로 표시하지 않는다", () => {
+  const [only] = toModelChoices(MODEL_ROW, {
+    providers: ["DeepInfra"],
+    cheapest: "DeepInfra",
+  });
+  expect(only.cheapest).toBeFalsy();
+});
+
+test("서버 업체를 모르면 최저가 표시도 하지 않는다", () => {
   const failed = toModelChoices(MODEL_ROW, { failed: true });
   const empty = toModelChoices(MODEL_ROW, { providers: [] });
   for (const choices of [failed, empty]) {

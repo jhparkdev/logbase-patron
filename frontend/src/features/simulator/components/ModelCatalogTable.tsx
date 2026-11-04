@@ -88,7 +88,14 @@ export function ModelCatalogTable({
                     </p>
                   )}
                 </th>
-                <td className="p-3 text-grey-700">{choice.provider}</td>
+                <td className="p-3 text-grey-700">
+                  {choice.provider}
+                  {choice.cheapest && (
+                    <div className="mt-1">
+                      <Badge tone="green">최저가</Badge>
+                    </div>
+                  )}
+                </td>
                 <td className="p-3">
                   <SupportTags choice={choice} />
                 </td>
