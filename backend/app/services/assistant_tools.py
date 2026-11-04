@@ -80,7 +80,7 @@ TOOL_SCHEMAS: dict[str, tuple[str, type[BaseModel]]] = {
         DetailQuery,
     ),
     "prepare_simulator_settings": (
-        'P04 설정에서 요청한 항목만 변경한다. 공통값은 max_tokens, temperature, reasoning_effort를 직접 보낸다. 예: {"max_tokens":2048}. 해제: {"temperature":null}. 다른 항목은 생략한다. 모델 변경 시 find_models의 ID와 Provider를 사용한다. 필요한 조회를 마친 뒤 요청한 변경 항목을 모두 한 번의 호출에 담는다. 준비에 성공하면 응답이 끝나 이후 호출은 반영되지 않는다. 실행하지 않는다.',
+        'P04 설정에서 요청한 항목만 변경한다. 공통값은 max_tokens, temperature, reasoning_effort를 직접 보낸다. 예: {"max_tokens":2048}. 해제: {"temperature":null}. 다른 항목은 생략한다. 모델 변경 시 find_models의 ID와 Provider를 사용한다. 실행하지 않는다.',
         SimulatorPatch,
     ),
 }

@@ -282,14 +282,5 @@ async def answer(
                 elif text not in verified_parts:
                     verified_parts.append(text)
             results.append((call, json.dumps(result, ensure_ascii=False)))
-        # 준비가 끝나면 최종 문구는 서버가 정하므로 모델을 다시 부르지 않는다. 대신 이후 왕복에서
-        # 설정을 더 보탤 수 없으므로 도구 설명이 변경 항목을 한 번에 담도록 안내한다.
-        if preparation_message is not None:
-            final_message = executor.failure_message or preparation_message
-            return AssistantChatResponse(
-                message=final_message,
-                patch=executor.patch,
-                sources=response_sources(executor.sources, final_message),
-            )
         messages.extend(caller.transcript(reply, results))
     raise AssistantUnavailableError
