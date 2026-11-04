@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from getpass import GetPassWarning
 
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -644,3 +645,19 @@ def test_new_models_check_requires_production_confirmation_before_db(
     assert new_models_checks == []
     assert cli.main([*NEW_MODELS_ARGS, "--confirm-production"]) == 0
     assert new_models_checks == ["run"]
+
+
+@pytest.mark.parametrize("key", [None, SecretStr(""), SecretStr("   ")])
+def test_new_models_check_refuses_to_compare_without_a_key(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    key: SecretStr | None,
+) -> None:
+    settings = cli.get_settings().model_copy(
+        update={"new_model_compare_enabled": True, "openrouter_api_key": key}
+    )
+    monkeypatch.setattr(cli, "get_settings", lambda: settings)
+    monkeypatch.setattr(cli, "current_app_env", lambda: "development")
+
+    assert cli.main(NEW_MODELS_ARGS) == 1
+    assert "OPENROUTER_API_KEY" in capsys.readouterr().err
