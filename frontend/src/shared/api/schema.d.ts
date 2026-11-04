@@ -3321,7 +3321,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3350,7 +3352,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -3403,7 +3407,9 @@ export interface operations {
             path: {
                 simulation_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3443,7 +3449,9 @@ export interface operations {
             path: {
                 simulation_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3483,7 +3491,9 @@ export interface operations {
             path: {
                 simulation_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3533,7 +3543,9 @@ export interface operations {
                 simulation_id: string;
                 slot_no: number;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3580,7 +3592,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -3640,7 +3654,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3653,6 +3669,15 @@ export interface operations {
                     "application/json": components["schemas"]["ImageLimits"];
                 };
             };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationRequestErrorResponse"];
+                };
+            };
         };
     };
     download_simulation_image_api_simulations_images__asset_id__get: {
@@ -3662,7 +3687,9 @@ export interface operations {
             path: {
                 asset_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -3704,7 +3731,9 @@ export interface operations {
             path: {
                 output_asset_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -5211,7 +5240,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                patron_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {

@@ -483,6 +483,24 @@
         "summary": "Create Simulation Run",
         "description": "비교 실행을 접수하고 바로 돌려준다. 모델 호출은 응답 뒤 백그라운드에서 진행한다.",
         "operationId": "create_simulation_run_api_simulations_post",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -683,6 +701,22 @@
               ],
               "title": "Simulation Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -726,6 +760,22 @@
               "type": "string",
               "format": "uuid",
               "title": "Simulation Id"
+            }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
             }
           }
         ],
@@ -781,6 +831,22 @@
               "format": "uuid",
               "title": "Simulation Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -834,6 +900,22 @@
               "type": "string",
               "format": "uuid",
               "title": "Simulation Id"
+            }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
             }
           }
         ],
@@ -908,6 +990,22 @@
               "type": "integer",
               "title": "Slot No"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -963,15 +1061,33 @@
         "summary": "Upload Simulation Image",
         "description": "이미지 한 장을 올린다. 파일은 저장소에 두고 DB 에는 경로·해시만 남긴다.",
         "operationId": "upload_simulation_image_api_simulations_images_post",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_upload_simulation_image_api_simulations_images_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -985,44 +1101,44 @@
             }
           },
           "403": {
-            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OriginNotAllowedResponse"
                 }
               }
-            }
+            },
+            "description": "Forbidden"
           },
           "413": {
-            "description": "Content Too Large",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SimulationErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Content Too Large"
           },
           "415": {
-            "description": "Unsupported Media Type",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SimulationErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unsupported Media Type"
           },
           "422": {
-            "description": "Unprocessable Content",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SimulationRequestErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -1036,6 +1152,24 @@
         "summary": "Read Image Limits",
         "description": "이미지 입력 한도. 화면이 숫자를 따로 정하지 않고 이 값을 쓴다.",
         "operationId": "read_image_limits_api_simulations_images_limits_get",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1046,6 +1180,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationRequestErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -1068,6 +1212,22 @@
               "type": "string",
               "format": "uuid",
               "title": "Asset Id"
+            }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
             }
           }
         ],
@@ -1121,6 +1281,22 @@
               "type": "string",
               "format": "uuid",
               "title": "Output Asset Id"
+            }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
             }
           }
         ],
@@ -4168,6 +4344,22 @@
               "type": "boolean",
               "default": false,
               "title": "Include Inactive"
+            }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
             }
           }
         ],
