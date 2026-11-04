@@ -4,12 +4,15 @@ import {
   RUN_ID,
   SCENARIO,
 } from "../../../test/simulationHistoryApi";
+import { simulatorFormSchema } from "./form";
+import { toCreateRequest } from "./request";
 import { rerunRestoreView, toRerunValues } from "./rerun-draft";
 
 const custom = {
   ...RERUN_DRAFT,
   test_type: "CUSTOM" as const,
   scenario_id: null,
+  output_type: "TEXT" as const,
 };
 
 test("과거 입력과 공통 설정, 모델 칸을 폼 값으로 되돌린다", () => {
@@ -19,6 +22,7 @@ test("과거 입력과 공통 설정, 모델 칸을 폼 값으로 되돌린다",
     prompt: "과거 Prompt 원문",
     text: "저장한 입력",
     jsonSchema: JSON.stringify({ type: "object" }, null, 2),
+    commonEnabled: false,
     temperature: "0.3",
     maxTokens: "512",
     reasoningEffort: "",
@@ -29,7 +33,7 @@ test("과거 입력과 공통 설정, 모델 칸을 폼 값으로 되돌린다",
   ]);
 });
 
-test("공통 설정과 같은 칸은 공통을 따르고 다른 칸만 칸 설정으로 되돌린다", () => {
+test("텍스트 실행은 공통 설정을 끄고 칸마다 실제 적용값을 개별 지정으로 되돌린다", () => {
   const [first, second] = custom.models;
   const values = toRerunValues({
     ...custom,
@@ -45,13 +49,73 @@ test("공통 설정과 같은 칸은 공통을 따르고 다른 칸만 칸 설�
       },
     ],
   });
-  expect(values.comparisons?.[0].settings.mode).toBe("shared");
-  expect(values.comparisons?.[1].settings).toEqual({
-    mode: "custom",
-    temperature: "0",
-    maxTokens: "512",
-    reasoningEffort: "low",
+  expect(values.commonEnabled).toBe(false);
+  expect(values.comparisons?.map((item) => item.settings)).toEqual([
+    {
+      mode: "custom",
+      temperature: "0.3",
+      maxTokens: "512",
+      reasoningEffort: "",
+    },
+    {
+      mode: "custom",
+      temperature: "0",
+      maxTokens: "512",
+      reasoningEffort: "low",
+    },
+  ]);
+});
+
+test("적용값이 없던 칸은 기본값을 따르게 둔다", () => {
+  const [first, second] = custom.models;
+  const values = toRerunValues({
+    ...custom,
+    models: [
+      { ...first, execution_config: {} },
+      { ...second, execution_config: { temperature: 0.3 } },
+    ],
   });
+  expect(values.comparisons?.map((item) => item.settings.mode)).toEqual([
+    "shared",
+    "custom",
+  ]);
+});
+
+test("복원한 값으로 다시 만든 요청은 원래 실행의 칸별 적용값과 같다", () => {
+  const [first, second] = custom.models;
+  const original = {
+    ...custom,
+    models: [
+      { ...first, execution_config: { temperature: 0.3, max_tokens: 512 } },
+      {
+        ...second,
+        execution_config: {
+          temperature: 0,
+          max_tokens: 512,
+          reasoning_effort: "low",
+        },
+      },
+    ],
+  };
+  const request = toCreateRequest(
+    simulatorFormSchema.parse(toRerunValues(original)),
+    [],
+    original.rerun_of_simulation_id,
+  );
+  expect(request.execution_config).toBeNull();
+  expect(
+    request.models.map((model) => [
+      model.model_id,
+      model.execution_provider,
+      model.execution_config,
+    ]),
+  ).toEqual(
+    original.models.map((model) => [
+      model.model_id,
+      model.execution_provider,
+      model.execution_config,
+    ]),
+  );
 });
 
 test("Schema와 입력이 없던 실행은 빈 칸으로 되돌리고 이미지는 ID로 유지한다", () => {

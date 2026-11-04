@@ -200,7 +200,8 @@ test("확인 후 실행을 접수하고 주소에 실행 ID를 남겨 결과를 
     prompt_text: "요약해 주세요.",
     input_text: null,
     json_schema: null,
-    execution_config: {},
+    // 공통 설정은 처음에 꺼져 있어 null(공통 끔)을 보낸다
+    execution_config: null,
     models: [
       { model_id: 2, execution_provider: "DeepInfra", execution_config: {} },
       { model_id: 2, execution_provider: "DekaLLM", execution_config: {} },

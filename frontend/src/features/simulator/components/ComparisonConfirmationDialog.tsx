@@ -1,10 +1,14 @@
 import { Badge } from "../../../shared/components/ui/Badge";
 import { Button } from "../../../shared/components/ui/Button";
 import { inputSummary, unitPriceLabel } from "../lib/card-view";
-import { requestedSettings } from "../lib/comparisons";
 import type { SimulatorDraft } from "../lib/form";
 import { PARAMETER_LABELS, type ParameterKey } from "../lib/parameters";
-import type { ModelChoice, ScenarioChoice } from "../lib/presentation";
+import {
+  appliedSettings,
+  droppedSettingsNote,
+  type ModelChoice,
+  type ScenarioChoice,
+} from "../lib/presentation";
 import { SimulatorDialog } from "./SimulatorDialog";
 
 export function ComparisonConfirmationDialog({
@@ -51,16 +55,18 @@ export function ComparisonConfirmationDialog({
           const choice = choices.find(
             (item) => item.key === comparison.modelKey,
           );
-          const settings = requestedSettings(
-            comparison,
-            draft,
-            scenario?.defaults,
-          );
+          // 공통 끔과 받지 못해 빠지는 항목을 반영한, 실제로 보낼 값을 보여 준다.
+          const settings = choice
+            ? appliedSettings(comparison, draft, choice, scenario)
+            : {};
           const labels = (
             ["temperature", "maxTokens", "reasoningEffort"] as ParameterKey[]
           )
             .filter((key) => settings[key] !== undefined)
             .map((key) => `${PARAMETER_LABELS[key]} ${settings[key]}`);
+          const note = choice
+            ? droppedSettingsNote(comparison, draft, choice, scenario)
+            : undefined;
           const price = unitPriceLabel(choice?.price);
           return (
             <li
@@ -80,6 +86,9 @@ export function ComparisonConfirmationDialog({
                 <p className="mt-0.5 text-caption text-grey-600 tabular-nums">
                   {labels.length ? labels.join(" · ") : "기본값 사용"}
                 </p>
+                {note && (
+                  <p className="mt-0.5 text-caption text-grey-600">{note}</p>
+                )}
               </div>
               <span className="shrink-0 text-caption text-grey-600 tabular-nums">
                 {price ? (

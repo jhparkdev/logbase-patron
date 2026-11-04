@@ -144,6 +144,8 @@ test("접힌 공통 설정의 오류를 펼쳐서 보여주고 제출한 뒤에�
   fill();
   const toggle = screen.getByRole("button", { name: /^공통 설정 선택사항$/ });
   fireEvent.click(toggle);
+  // 공통값은 공통 설정을 켰을 때만 검사한다
+  fireEvent.click(screen.getByLabelText("공통 설정 사용"));
   fireEvent.change(screen.getByLabelText("공통 최대 출력 토큰"), {
     target: { value: "0" },
   });
