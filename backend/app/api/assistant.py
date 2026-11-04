@@ -118,7 +118,7 @@ async def validate_settings(
     if not settings.assistant_enabled:
         raise ApiError(503, ErrorCode.BAD_REQUEST, "AI 도우미가 비활성화되어 있어요.")
     try:
-        await validate_patch(session, catalog, request.simulator, request.patch)
+        return await validate_patch(session, catalog, request.simulator, request.patch)
     except InvalidSettingsError as error:
         raise ApiError(422, ErrorCode.VALIDATION_ERROR, str(error)) from None
     except OpenRouterUnavailableError, ModelNotOnOpenRouterError:
@@ -127,4 +127,3 @@ async def validate_settings(
             ErrorCode.BAD_REQUEST,
             "서버 업체 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.",
         ) from None
-    return request.patch

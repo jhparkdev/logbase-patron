@@ -357,6 +357,49 @@ async def test_settings_revalidation_checks_provider_support_and_preserves_omitt
     assert response.json() == {"execution_config": {"max_tokens": 512}}
 
 
+async def test_settings_revalidation_returns_the_real_provider_for_auto_cheapest(
+    app: FastAPI, client: AsyncClient, factory: Factory
+) -> None:
+    """화면은 돌려받은 초안을 그대로 적용하므로 자동 선택 값이 아니라 실제 업체 이름을 받아야 한다."""
+    await authenticate(client, factory)
+    settings = app.dependency_overrides[get_settings]().model_copy(
+        update={"assistant_enabled": True}
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    models = [
+        await factory.model(status="ACTIVE", supported_parameters=["max_tokens"])
+        for _ in range(2)
+    ]
+    app.dependency_overrides[get_endpoint_catalog] = lambda: FakeEndpointCatalog(
+        [
+            EndpointInfo(
+                provider_name="Test",
+                supported_parameters=["max_tokens"],
+                pricing={
+                    "prompt": Decimal("0.000001"),
+                    "completion": Decimal("0.000002"),
+                },
+            )
+        ]
+    )
+    selections = [
+        {"model_id": model["model_id"], "execution_provider": "AUTO_CHEAPEST"}
+        for model in models
+    ]
+    body = {
+        "simulator": {"execution_config": {"max_tokens": 512}},
+        "patch": {"models": selections},
+    }
+
+    response = await client.post("/api/assistant/settings/validate", json=body)
+
+    assert response.status_code == 200
+    assert [item["execution_provider"] for item in response.json()["models"]] == [
+        "Test",
+        "Test",
+    ]
+
+
 async def test_disabled_assistant_never_calls_ollama(
     client: AsyncClient, factory: Factory
 ) -> None:

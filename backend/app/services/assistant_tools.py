@@ -171,15 +171,14 @@ class AssistantTools:
                         "unchanged": True,
                         "message": "요청한 설정이 이미 같아요.",
                     }
-                await validate_patch(
+                self.patch = await validate_patch(
                     self.session, self.catalog, self.current, candidate
                 )
-                self.patch = candidate
                 self.failure_message = None
                 return {
                     "prepared": True,
                     "executed": False,
-                    "changes": candidate.model_dump(mode="json", exclude_unset=True),
+                    "changes": self.patch.model_dump(mode="json", exclude_unset=True),
                 }
             if isinstance(parsed, FindModels):
                 return await self.find_models(parsed)

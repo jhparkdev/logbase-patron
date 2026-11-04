@@ -236,3 +236,44 @@ async def test_provider_lists_carry_only_names_to_keep_the_model_context_small(
     result = await tools.execute("find_models", {})
 
     assert result["items"][0]["providers"] == [{"execution_provider": "업체A"}]
+
+
+async def test_prepared_patch_stores_the_real_provider_instead_of_auto_cheapest(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    models = [
+        await factory.model(status="ACTIVE", supported_parameters=["max_tokens"])
+        for _ in range(2)
+    ]
+    catalog = FakeEndpointCatalog(
+        [
+            EndpointInfo(
+                provider_name="업체A",
+                supported_parameters=["max_tokens"],
+                pricing={
+                    "prompt": Decimal("0.000001"),
+                    "completion": Decimal("0.000002"),
+                },
+            )
+        ]
+    )
+    tools = AssistantTools(db_session, catalog, T0, None)
+
+    result = await tools.execute(
+        "prepare_simulator_settings",
+        {
+            "max_tokens": 1024,
+            "models": [
+                {"model_id": model["model_id"], "execution_provider": "AUTO_CHEAPEST"}
+                for model in models
+            ],
+        },
+    )
+
+    assert result["prepared"] is True
+    assert [item["execution_provider"] for item in result["changes"]["models"]] == [
+        "업체A",
+        "업체A",
+    ]
+    assert tools.patch is not None and tools.patch.models is not None
+    assert {item.execution_provider for item in tools.patch.models} == {"업체A"}
