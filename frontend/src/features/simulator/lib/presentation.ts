@@ -19,7 +19,17 @@ export type ModelChoice = {
   supportsImages: boolean;
   supportedParameters: readonly string[];
   tuningParameters?: readonly TuningParameter[];
+  // 토큰당 단가(USD 문자열). 모르면 null이고 0으로 보여 주지 않는다.
+  price?: { input: string | null; output: string | null };
 };
+
+const STRUCTURED_OUTPUT_PARAMETERS = ["response_format", "structured_outputs"];
+
+export function supportsStructuredOutput(choice: ModelChoice): boolean {
+  return choice.supportedParameters.some((value) =>
+    STRUCTURED_OUTPUT_PARAMETERS.includes(value),
+  );
+}
 export type ScenarioChoice = {
   key: string;
   name: string;
@@ -103,20 +113,18 @@ export function selectionIssues(
       ? scenarios.find((item) => item.key === draft.scenarioKey)
       : undefined;
   if (draft.mode === "scenario" && !scenario)
-    issues.push("시나리오를 다시 선택하시기 바랍니다.");
+    issues.push("시나리오를 다시 골라 주세요.");
   if (draft.mode === "scenario" && scenario?.imageRequired && !hasImages)
-    issues.push("선택한 시나리오에 사용할 이미지를 추가하시기 바랍니다.");
+    issues.push("선택한 시나리오에 쓸 이미지를 추가해 주세요.");
   const seen = new Set<string>();
   for (const comparison of draft.comparisons) {
     const choice = choices.find((item) => item.key === comparison.modelKey);
     if (!choice?.selectable) {
-      issues.push(
-        "선택할 수 없는 모델이 있습니다. 모델을 다시 선택하시기 바랍니다.",
-      );
+      issues.push("고를 수 없는 모델이 있어요. 모델을 다시 골라 주세요.");
       continue;
     }
     if (hasImages && !choice.supportsImages)
-      issues.push(`${choice.name}은 이미지 입력을 지원하지 않습니다.`);
+      issues.push(`${choice.name}은 이미지 입력을 지원하지 않아요.`);
     const settings = requestedSettings(comparison, draft, scenario?.defaults);
     for (const key of [
       "temperature",
@@ -133,7 +141,7 @@ export function selectionIssues(
         !choice.supportedParameters.includes(PARAMETER_NAMES[key])
       )
         issues.push(
-          `${choice.name}은 ${PARAMETER_LABELS[key]} 지정을 지원하지 않습니다.`,
+          `${choice.name}은 ${PARAMETER_LABELS[key]} 지정을 지원하지 않아요.`,
         );
       if (
         comparison.settings.mode === "custom" &&
@@ -141,7 +149,7 @@ export function selectionIssues(
         !parameter
       )
         issues.push(
-          `${choice.name}의 모델별 설정 지원 정보를 확인할 수 없습니다.`,
+          `${choice.name}의 모델별 설정 지원 정보를 확인할 수 없어요.`,
         );
       if (
         key === "reasoningEffort" &&
@@ -149,7 +157,7 @@ export function selectionIssues(
         choice.supportedParameters.includes(PARAMETER_NAMES[key])
       )
         issues.push(
-          `${choice.name}의 추론 강도 지원 선택지를 확인할 수 없습니다. 모델을 다시 선택하거나 추론 강도 설정을 해제하시기 바랍니다.`,
+          `${choice.name}의 추론 강도 지원 선택지를 확인할 수 없어요. 모델을 다시 고르거나 추론 강도 설정을 해제해 주세요.`,
         );
       if (parameter) {
         const issue = parameterIssue(parameter, value);
@@ -159,17 +167,11 @@ export function selectionIssues(
     const fingerprint = JSON.stringify([comparison.modelKey, settings]);
     if (seen.has(fingerprint))
       issues.push(
-        "동일한 요청 설정을 가진 비교 항목이 있습니다. 설정을 변경하거나 항목을 제거하시기 바랍니다.",
+        "요청 설정이 같은 비교 항목이 있어요. 설정을 바꾸거나 항목을 제거해 주세요.",
       );
     seen.add(fingerprint);
-    if (
-      draft.jsonSchema.trim() &&
-      !choice.supportedParameters.some(
-        (value) =>
-          value === "response_format" || value === "structured_outputs",
-      )
-    )
-      issues.push(`${choice.name}은 구조화 출력 설정을 지원하지 않습니다.`);
+    if (draft.jsonSchema.trim() && !supportsStructuredOutput(choice))
+      issues.push(`${choice.name}은 구조화 출력 설정을 지원하지 않아요.`);
   }
   return [...new Set(issues)];
 }

@@ -47,7 +47,7 @@ test("과거 원문과 설정을 보존하고 비활성·누락 모델 자리를
       { comparisonId: "comparison-3", modelKey: "" },
     ],
   });
-  expect(restored.warnings.join(" ")).toContain("교체");
+  expect(restored.warnings.join(" ")).toContain("모델을 바꾸거나");
   expect(restored.warnings.join(" ")).toContain("2개");
   expect(source).toEqual(before);
 });
@@ -67,7 +67,7 @@ test("삭제된 시나리오는 저장된 원문을 유지하며 Custom으로 �
     scenarioKey: "",
     prompt: "이전 템플릿 원문",
   });
-  expect(restored.warnings.join(" ")).toContain("Custom");
+  expect(restored.warnings.join(" ")).toContain("직접 입력");
 });
 
 test("같은 대상의 비교 항목과 개별 설정을 서로 독립적으로 복원한다", () => {

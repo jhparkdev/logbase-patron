@@ -3,7 +3,7 @@ import { MAX_TOKENS, TEMPERATURE } from "./limits";
 
 export const comparisonSchema = z.object({
   comparisonId: z.string().min(1),
-  modelKey: z.string().min(1, "비교 모델을 선택하시기 바랍니다."),
+  modelKey: z.string().min(1, "비교 모델을 골라 주세요."),
   settings: z
     .object({
       mode: z.enum(["shared", "custom"]),
@@ -27,8 +27,8 @@ export const comparisonSchema = z.object({
             path: [key],
             message:
               key === "temperature"
-                ? `${TEMPERATURE.min}~${TEMPERATURE.max} 사이의 숫자를 입력하시기 바랍니다.`
-                : `1~${MAX_TOKENS.toLocaleString("ko-KR")} 사이의 정수를 입력하시기 바랍니다.`,
+                ? `${TEMPERATURE.min}~${TEMPERATURE.max} 사이의 숫자를 입력해 주세요.`
+                : `1~${MAX_TOKENS.toLocaleString("ko-KR")} 사이의 정수를 입력해 주세요.`,
           });
       }
     })

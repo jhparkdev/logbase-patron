@@ -87,11 +87,11 @@ export function ComparisonSettings({
           </label>
           <p className="mt-2 text-caption text-grey-600">
             {parameters.length
-              ? "비워 둔 항목은 위 ‘공통 설정’의 값을 사용합니다. 공통값도 없으면 시나리오 기본값, 모델 기본값 순으로 사용합니다."
-              : "모델별 설정 지원 정보를 확인할 수 없습니다. 위 ‘공통 설정’에서 값을 지정하거나 모델을 다시 선택하시기 바랍니다."}
+              ? "비워 둔 항목은 ‘공통 설정’ 값을 써요. 공통값도 없으면 시나리오 기본값, 모델 기본값 순이에요."
+              : "모델별 설정 지원 정보를 확인할 수 없어요. ‘공통 설정’에서 값을 정하거나 모델을 다시 골라 주세요."}
           </p>
           {mode === "custom" && parameters.length > 0 && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 flex flex-col gap-3">
               {parameters.map((parameter) => (
                 <TuningParameterField
                   key={parameter.key}

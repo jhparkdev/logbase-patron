@@ -3,7 +3,7 @@ import type { ResultSort, SlotView } from "./presentation";
 type Compare = (a: SlotView, b: SlotView) => number;
 
 /** 금액 문자열을 float으로 바꾸지 않고 자릿수를 맞춰 비교한다. */
-function compareAmount(a: string, b: string): number {
+export function compareAmount(a: string, b: string): number {
   const [aWhole, aFraction = ""] = a.split(".");
   const [bWhole, bFraction = ""] = b.split(".");
   const width = Math.max(aFraction.length, bFraction.length);

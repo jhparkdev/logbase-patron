@@ -10,9 +10,7 @@ test.each(dbMock.runs)(
   "기존 DB mock $key의 실행·비용·검증 상태 표시",
   (run) => {
     render(<SimulationResults view={{ kind: "ready", run }} />);
-    expect(
-      screen.getByRole("heading", { name: "시뮬레이션 결과 요약" }),
-    ).toBeDefined();
+    expect(screen.getByRole("heading", { name: "비교 결과" })).toBeDefined();
     expect(screen.getAllByText(run.status.label).length).toBeGreaterThan(0);
     for (const slot of run.slots) {
       expect(screen.getAllByText(slot.name).length).toBeGreaterThan(0);

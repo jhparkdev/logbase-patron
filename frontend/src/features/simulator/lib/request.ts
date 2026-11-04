@@ -50,7 +50,7 @@ export function toCreateRequest(
     execution_config: toExecutionConfig(draft),
     models: draft.comparisons.map((comparison) => {
       const selected = parseChoiceKey(comparison.modelKey);
-      if (!selected) throw new Error("서버 업체를 확인할 수 없는 모델입니다.");
+      if (!selected) throw new Error("서버 업체를 확인할 수 없는 모델이에요.");
       return {
         ...selected,
         execution_config: toExecutionConfig(comparison.settings),

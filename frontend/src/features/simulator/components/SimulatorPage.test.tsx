@@ -71,6 +71,15 @@ const choices: ModelChoice[] = [
     supportedParameters: [],
   },
 ];
+/** 추가 입력 칩을 켜야 그 입력 칸이 나온다. */
+function openExtra(name: "입력 텍스트" | "이미지" | "JSON Schema") {
+  const chip = screen.getByRole("button", { name: new RegExp(`^${name}`) });
+  if (chip.getAttribute("aria-pressed") !== "true") fireEvent.click(chip);
+}
+function imageInput() {
+  openExtra("이미지");
+  return screen.getByLabelText("이미지 파일 추가");
+}
 function fill() {
   fireEvent.change(screen.getByLabelText("Prompt"), {
     target: { value: "요약해 주세요." },
@@ -90,7 +99,7 @@ test("API 미연결 화면은 가짜 모델과 실행 결과를 만들지 않는
   expect(
     screen.getByRole("button", { name: "비교 실행" }).hasAttribute("disabled"),
   ).toBe(true);
-  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
   expect(screen.queryByText("모델 A")).toBeNull();
 });
 
@@ -144,9 +153,7 @@ test("접힌 공통 설정의 오류를 펼쳐서 보여주고 제출한 뒤에�
   await waitFor(() =>
     expect(toggle.getAttribute("aria-expanded")).toBe("true"),
   );
-  expect(
-    screen.getByText("1 이상의 정수를 입력하시기 바랍니다."),
-  ).toBeDefined();
+  expect(screen.getByText("1 이상의 정수를 입력해 주세요.")).toBeDefined();
 });
 
 test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번만 제출한다", async () => {
@@ -161,7 +168,7 @@ test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번
   fill();
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   expect(onRun).not.toHaveBeenCalled();
   const confirm = within(dialog).getByRole("button", { name: "실행하기" });
@@ -184,7 +191,7 @@ test("동일 모델의 서로 다른 Provider를 비교하며 확인 후 한 번
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "비교 실행" })).toBeDefined(),
   );
-  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
 });
 
 test("네 모델이 선택되어 있어도 검색으로 교체할 수 있고 하나만 남으면 실행을 막는다", () => {
@@ -224,7 +231,7 @@ test.each([1, 2])(
     fireEvent.click(
       screen.getByRole("button", { name: `비교 모델 ${removed} 제거` }),
     );
-    expect(screen.queryByRole("heading", { name: "비교 모델 2" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /^비교 모델 2/ })).toBeNull();
     const remaining = removed === 1 ? "a:p2" : "a:p1";
     const selected = screen.getByRole("list", { name: "선택한 비교 모델" });
     expect(
@@ -241,7 +248,7 @@ test.each([1, 2])(
     expect(onRun).not.toHaveBeenCalled();
 
     fireEvent.submit(run.closest("form") as HTMLFormElement);
-    await screen.findByText("비교 항목을 2개 이상 선택하시기 바랍니다.");
+    await screen.findByText("비교 항목을 2개 이상 골라 주세요.");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(onRun).not.toHaveBeenCalled();
 
@@ -257,7 +264,7 @@ test.each([1, 2])(
     expect(run.hasAttribute("disabled")).toBe(false);
     fireEvent.click(run);
     const dialog = await screen.findByRole("dialog", {
-      name: "비교를 실행합니다",
+      name: "비교를 실행할까요?",
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
     await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
@@ -277,9 +284,7 @@ test("이미지가 필요한 시나리오만 선택지 이름 뒤에 괄호로 �
       onRun={vi.fn()}
     />,
   );
-  fireEvent.change(screen.getByLabelText("테스트 유형"), {
-    target: { value: "scenario" },
-  });
+  fireEvent.click(screen.getByRole("radio", { name: "기본 시나리오" }));
   expect(
     screen.getByRole("option", { name: "상품 이미지·속성 분석(이미지 필요)" }),
   ).toBeDefined();
@@ -298,15 +303,14 @@ test("기존 DB 시나리오의 Prompt·Schema를 복원하고 공통 설정은 
   );
   const scenario = dbMock.scenarios.find((item) => !item.imageRequired);
   if (!scenario) throw new Error("기존 mock 시나리오가 필요합니다.");
-  fireEvent.change(screen.getByLabelText("테스트 유형"), {
-    target: { value: "scenario" },
-  });
+  fireEvent.click(screen.getByRole("radio", { name: "기본 시나리오" }));
   fireEvent.change(screen.getByLabelText("시나리오"), {
     target: { value: scenario.key },
   });
   expect((screen.getByLabelText("Prompt") as HTMLTextAreaElement).value).toBe(
     scenario.prompt,
   );
+  openExtra("JSON Schema");
   expect(
     (screen.getByLabelText(/JSON Schema/) as HTMLTextAreaElement).value,
   ).toBe(scenario.schemaText);
@@ -335,12 +339,18 @@ test("이미지를 지원하지 않는 모델은 실행 전 안내한다", async
     />,
   );
   fill();
-  fireEvent.change(screen.getByLabelText(/이미지 \(선택사항\)/), {
+  fireEvent.change(imageInput(), {
     target: { files: [new File(["png"], "image.png", { type: "image/png" })] },
   });
+  // 실행 전에도 카드가 충돌을 알리고, 실행하면 차단 사유로 막는다
+  expect(
+    screen.getAllByText(
+      "이미지 입력을 지원하지 않아요. 이미지를 빼거나 모델을 바꿔 주세요.",
+    ),
+  ).toHaveLength(2);
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   expect(
-    await screen.findByText("모델 A은 이미지 입력을 지원하지 않습니다."),
+    await screen.findByText("모델 A은 이미지 입력을 지원하지 않아요."),
   ).toBeDefined();
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(onRun).not.toHaveBeenCalled();
@@ -352,7 +362,7 @@ test("확인창을 연 뒤 모델이 비활성화되면 호출하지 않는다",
   fill();
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   page.rerender(
     <SimulatorPage
@@ -363,7 +373,7 @@ test("확인창을 연 뒤 모델이 비활성화되면 호출하지 않는다",
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   expect(
     await screen.findByText(
-      "선택할 수 없는 모델이 있습니다. 모델을 다시 선택하시기 바랍니다.",
+      "고를 수 없는 모델이 있어요. 모델을 다시 골라 주세요.",
     ),
   ).toBeDefined();
   expect(onRun).not.toHaveBeenCalled();
@@ -375,21 +385,21 @@ test("실행 요청 실패에서 내부 오류를 노출하거나 성공 결과�
   fill();
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   expect(
     await screen.findByText(
-      "실행 요청을 보내지 못했습니다. 잠시 후 다시 시도하시기 바랍니다.",
+      "실행 요청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.",
     ),
   ).toBeDefined();
   expect(screen.queryByText("internal-secret")).toBeNull();
-  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
 });
 
 test("이미지 형식 오류를 선택 즉시 알리고 목록에 추가하지 않는다", async () => {
   render(<SimulatorPage />);
-  const chooser = screen.getByLabelText(/이미지 \(선택사항\)/);
+  const chooser = imageInput();
   fireEvent.change(chooser, {
     target: {
       files: [new File(["svg"], "invalid.svg", { type: "image/svg+xml" })],
@@ -397,7 +407,7 @@ test("이미지 형식 오류를 선택 즉시 알리고 목록에 추가하지 
   });
   expect(await screen.findByRole("alert")).toHaveProperty(
     "textContent",
-    "JPG·PNG·WebP 파일을 선택하시기 바랍니다.",
+    "JPG·PNG·WebP 파일을 골라 주세요.",
   );
   expect(screen.queryByText("invalid.svg")).toBeNull();
   expect(chooser.getAttribute("aria-invalid")).toBe("true");
@@ -409,7 +419,7 @@ test.each([
   IMAGE_LIMITS.maxBytes + 1,
 ])("이미지 %i bytes를 선택 시 검증한다", async (size) => {
   render(<SimulatorPage />);
-  fireEvent.change(screen.getByLabelText(/이미지 \(선택사항\)/), {
+  fireEvent.change(imageInput(), {
     target: {
       files: [
         new File([new Uint8Array(size)], "boundary.png", { type: "image/png" }),
@@ -427,7 +437,7 @@ test.each([
 
 test("이미지 개수 초과 시 기존 선택을 보존하고 제거·재선택으로 오류를 해소한다", async () => {
   render(<SimulatorPage />);
-  const chooser = screen.getByLabelText(/이미지 \(선택사항\)/);
+  const chooser = imageInput();
   const png = (name: string) =>
     new File(["image"], name, { type: "image/png" });
   fireEvent.change(chooser, {
@@ -437,7 +447,7 @@ test("이미지 개수 초과 시 기존 선택을 보존하고 제거·재선�
     target: { files: [png("third.png"), png("fourth.png"), png("fifth.png")] },
   });
   expect(
-    await screen.findByText("이미지는 최대 4개까지 선택할 수 있습니다."),
+    await screen.findByText("이미지는 최대 4개까지 고를 수 있어요."),
   ).toBeDefined();
   expect(screen.getByText("first.png")).toBeDefined();
   expect(screen.getByText("second.png")).toBeDefined();
@@ -459,8 +469,9 @@ test.each(["prompt", "text"] as const)(
     const onRun = vi.fn();
     render(<SimulatorPage choices={choices} onRun={onRun} />);
     fill();
+    if (field === "text") openExtra("입력 텍스트");
     const input = screen.getByLabelText(
-      field === "prompt" ? "Prompt" : "입력 텍스트 (선택사항)",
+      field === "prompt" ? "Prompt" : "입력 텍스트",
     );
     const value = "가".repeat(TEXT_LIMIT + 1);
     fireEvent.change(input, { target: { value } });
@@ -468,9 +479,68 @@ test.each(["prompt", "text"] as const)(
     expect(screen.queryByRole("alert")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
     expect(
-      await screen.findByText("2,000자 이내로 입력하시기 바랍니다."),
+      await screen.findByText("2,000자 이내로 입력해 주세요."),
     ).toBeDefined();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(onRun).not.toHaveBeenCalled();
   },
 );
+
+test("모델이 모자라면 실행 버튼 옆에 몇 개 더 골라야 하는지 적는다", () => {
+  render(<SimulatorPage choices={choices} onRun={vi.fn()} />);
+  expect(
+    screen.getByText("모델을 2개 더 고르면 실행할 수 있어요"),
+  ).toBeDefined();
+  fireEvent.click(screen.getByRole("button", { name: "모델 검색" }));
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "모델 A · Provider 1" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "선택 적용" }));
+  expect(
+    screen.getByText("모델을 1개 더 고르면 실행할 수 있어요"),
+  ).toBeDefined();
+  fireEvent.click(screen.getByRole("button", { name: "모델 검색" }));
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "모델 A · Provider 2" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "선택 적용" }));
+  expect(screen.queryByText(/더 고르면 실행할 수 있어요/)).toBeNull();
+});
+
+test("이 화면에서 실행하면 폼이 실행 조건 요약으로 접히고 다시 펼칠 수 있다", async () => {
+  const onRun = vi.fn(() => Promise.resolve());
+  const page = render(<SimulatorPage choices={choices} onRun={onRun} />);
+  fill();
+  fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
+  const dialog = await screen.findByRole("dialog", {
+    name: "비교를 실행할까요?",
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
+  await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
+  page.rerender(
+    <SimulatorPage
+      choices={choices}
+      onRun={onRun}
+      view={{ kind: "ready", run: dbMock.runs[0] }}
+    />,
+  );
+  const summary = screen.getByRole("region", { name: "실행 조건" });
+  expect(within(summary).getByText(/요약해 주세요\./)).toBeDefined();
+  expect(screen.queryByLabelText("Prompt")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "조건 수정해 새 비교" }));
+  expect((screen.getByLabelText("Prompt") as HTMLTextAreaElement).value).toBe(
+    "요약해 주세요.",
+  );
+});
+
+test("주소로 결과만 열었을 때는 빈 폼을 접지 않는다", () => {
+  render(
+    <SimulatorPage
+      choices={choices}
+      onRun={vi.fn()}
+      view={{ kind: "ready", run: dbMock.runs[0] }}
+    />,
+  );
+  expect(screen.getByLabelText("Prompt")).toBeDefined();
+  expect(screen.queryByRole("region", { name: "실행 조건" })).toBeNull();
+});
