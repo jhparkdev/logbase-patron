@@ -64,15 +64,7 @@ async def list_models(
         "updated_at": ModelRegistry.updated_at,
     }
 
-    # %와 _는 검색 기호가 아니라 글자 그대로 찾는다(autoescape).
-    conditions: list[ColumnElement[bool]] = []
-    if q:
-        conditions.append(
-            or_(
-                ModelRegistry.display_name.icontains(q, autoescape=True),
-                ModelRegistry.openrouter_model_id.icontains(q, autoescape=True),
-            )
-        )
+    conditions = _search_conditions(q, statuses)
     if name:
         conditions.append(ModelRegistry.display_name.icontains(name, autoescape=True))
     if model_id:
@@ -82,9 +74,6 @@ async def list_models(
     # 제공사는 화면의 선택 상자에서 고른 이름이라, 글자 일부가 아니라 이름 전체가 같을 때만 찾는다.
     if provider:
         conditions.append(func.lower(ModelRegistry.provider) == provider.lower())
-    if statuses:
-        conditions.append(ModelRegistry.status.in_(statuses))
-
     total = await session.scalar(
         select(func.count()).select_from(ModelRegistry).where(*conditions)
     )
@@ -107,4 +96,35 @@ async def list_models(
     return ModelPage(
         items=[ModelListItem(model, current) for model, current in rows],
         total=total or 0,
+    )
+
+
+def _search_conditions(
+    q: str | None, statuses: Sequence[str]
+) -> list[ColumnElement[bool]]:
+    # 목록과 개수 조회에 같은 검색·상태 조건을 사용한다. %와 _는 문자 그대로 찾는다.
+    conditions: list[ColumnElement[bool]] = []
+    if q:
+        conditions.append(
+            or_(
+                ModelRegistry.display_name.icontains(q, autoescape=True),
+                ModelRegistry.openrouter_model_id.icontains(q, autoescape=True),
+            )
+        )
+    if statuses:
+        conditions.append(ModelRegistry.status.in_(statuses))
+    return conditions
+
+
+async def count_models(
+    session: AsyncSession, *, q: str | None, statuses: Sequence[str]
+) -> int:
+    """가격·업체·모델 행을 가져오지 않고 조건에 맞는 개수만 센다."""
+    return (
+        await session.scalar(
+            select(func.count())
+            .select_from(ModelRegistry)
+            .where(*_search_conditions(q, statuses))
+        )
+        or 0
     )
