@@ -38,6 +38,21 @@ TDS Badge의 Weak 형태다. 배경은 `*-weak`(같은 색 16%), 글자는 같�
 - 호출 내역 표(P-01 상세 API 호출 내역, P-02 사용 이력): 바탕 없이 아이콘 16px + 글자 13 Bold. 성공은 체크 원 `green-700`, 실패는 X 원 `red-600`, Timeout은 시계 `yellow-700`, 대기·실행 중·취소는 점선 원 `grey-600`. 글자색은 위 상태 배지와 같은 단계다. P-01은 실패 행 바탕을 `red-50` 60%, Timeout 행 바탕을 `yellow-50` 60%로 연하게 물들인다.
 - 시뮬레이션 상태(P-04 결과, P-05 이력): 테두리(`grey-200`)와 점. 점 색은 `green-500`, `red-500`, `yellow-800`, `grey-400`이다. 부분 성공이 있어 아이콘을 상태별로 따로 정하기 전까지 이 모양을 유지한다.
 
+## 제작사 배지
+P-04 모델 카드·선택 창·확인창에서 모델 이름 옆에 붙는 배지다. 상태 배지와 같은 S(24px) 크기지만, 상태가 아니라 제작사를 구분하는 색이므로 브랜드를 연상시키는 색으로 고정한다. 기본은 Weak 형태(배경은 같은 색 16%인 `*-weak` 또는 `*-500/16`, 글자는 같은 계열의 진한 색)이고, openai만 흰 배경에 검정 글자인 테두리형이다. `grey`(`neutral-weak` + `grey-700`)는 "제작사 미확인"에만 쓴다.
+
+| 제작사 | 색 | 연상 근거 |
+|---|---|---|
+| anthropic | `orange` (`orange-500/16` + `orange-900`) | Claude의 테라코타 |
+| openai | `white` (`white` + `grey-900`, 테두리 `grey-200`) | OpenAI의 흑백 브랜드 |
+| google | `blue` (`brand-weak` + `blue-600`) | Google·Gemini의 파랑 |
+| meta-llama | `purple` (`purple-500/16` + `purple-800`) | Meta AI 그라데이션의 보라 |
+| mistralai | `red` (`danger-weak` + `red-600`) | Mistral 로고의 빨강·주황 |
+| amazon | `yellow` (`warning-weak` + `yellow-900`) | Amazon 스마일의 노랑·주황 |
+| nvidia | `green` (`success-weak` + `green-700`) | NVIDIA의 초록 |
+
+고정 색이 없는 제작사는 Weak 형태 7색(`orange`, `teal`, `blue`, `purple`, `red`, `yellow`, `green`) 안에서 이름 해시로 색을 정한다. 같은 이름은 항상 같은 색이지만 다른 제작사와 겹칠 수 있다. 자주 보이는 제작사가 늘면 이 표에 고정 색을 추가한다. 정본은 `frontend/src/features/simulator/lib/creator.ts`다.
+
 ## 글자
 | 토큰 | 크기/줄 높이 | 쓰는 곳 |
 |---|---|---|
