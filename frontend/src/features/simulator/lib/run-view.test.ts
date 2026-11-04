@@ -35,19 +35,36 @@ test.each([
   ["0.1", null, "0.1"],
   [null, "0.2", "0.2"],
   [null, null, null],
-  // 합산은 서버의 일이다. 서버가 합계를 주지 않으므로 둘 다 있으면 합계를 만들지 않는다
-  ["0.1", "0.2", null],
-])("확정 %s·추정 %s의 합계는 %s다", (confirmed, estimated, total) => {
+  ["0.1", "0.2", "0.3"],
+])(
+  "확정 %s·추정 %s이면 서버 합계 %s를 그대로 쓴다",
+  (confirmed, estimated, total) => {
+    expect(
+      toRunView({
+        ...RUN_DETAIL,
+        summary: {
+          ...summary,
+          confirmed_cost_usd: confirmed,
+          estimated_cost_usd: estimated,
+          total_cost_usd: total,
+        },
+      }).totalCost,
+    ).toBe(total);
+  },
+);
+
+test("합계는 화면에서 다시 더하지 않고 서버 값을 쓴다", () => {
   expect(
     toRunView({
       ...RUN_DETAIL,
       summary: {
         ...summary,
-        confirmed_cost_usd: confirmed,
-        estimated_cost_usd: estimated,
+        confirmed_cost_usd: "0.1",
+        estimated_cost_usd: "0.2",
+        total_cost_usd: "0.300000000000",
       },
     }).totalCost,
-  ).toBe(total);
+  ).toBe("0.300000000000");
 });
 
 test("모델 칸의 성공 결과를 그대로 옮긴다", () => {

@@ -93,16 +93,6 @@ function toSlot(result: Result): SlotView {
   };
 }
 
-/** 합산은 서버의 일이다. 서버가 합계를 주지 않으므로 금액이 하나일 때만 합계로 쓴다. */
-function serverTotal(
-  confirmed: string | null,
-  estimated: string | null,
-): string | null {
-  return confirmed !== null && estimated !== null
-    ? null
-    : (confirmed ?? estimated);
-}
-
 export function toRunView(
   detail: Schemas["SimulationDetailResponse"],
 ): RunView {
@@ -119,10 +109,8 @@ export function toRunView(
     failureCount: summary.failure_count,
     confirmedCost: summary.confirmed_cost_usd,
     estimatedCost: summary.estimated_cost_usd,
-    totalCost: serverTotal(
-      summary.confirmed_cost_usd,
-      summary.estimated_cost_usd,
-    ),
+    // 합산은 서버의 일이다. 확정·추정을 화면에서 다시 더하지 않는다
+    totalCost: summary.total_cost_usd,
     unknownCostCount: summary.unknown_cost_count,
     slots: detail.results.map(toSlot),
   };
