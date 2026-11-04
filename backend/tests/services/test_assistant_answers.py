@@ -140,6 +140,7 @@ def test_models_only_show_providers_that_the_catalog_actually_returned() -> None
     answer = verified_answer(
         "find_models",
         {
+            "view": "providers",
             "total": 12,
             "items": [
                 {"name": "모델 A", "providers": []},
@@ -147,6 +148,7 @@ def test_models_only_show_providers_that_the_catalog_actually_returned() -> None
             ],
         },
     )
-    assert "전체 12개 중 2개" in answer
-    assert "모델 A · 서버 업체 정보 확인 불가" in answer
-    assert "모델 B · 실제 업체" in answer
+    assert "지금 사용 가능한 모델은 12개입니다." in answer
+    assert "1~2번째 모델을 표시했어요." in answer
+    assert "실행 업체: 확인하지 못했어요" in answer
+    assert "실행 업체: 실제 업체" in answer

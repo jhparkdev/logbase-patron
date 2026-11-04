@@ -18,6 +18,7 @@ from app.schemas.assistant_usage import CustomerUsageToolQuery, InternalUsageToo
 from app.schemas.simulation import MAX_TOKENS_LIMIT
 from app.schemas.simulation_history import SimulationHistoryQuery
 from app.services import model_list, simulation_detail, simulation_history
+from app.services.assistant_models import model_lookup_kind
 from app.services.assistant_settings import InvalidSettingsError, validate_patch
 from app.services.assistant_tool_schema import parameters_for, patch_arguments
 from app.services.assistant_usage import AssistantUsage, UsageQueryError
@@ -55,7 +56,7 @@ TOOL_SCHEMAS: dict[str, tuple[str, type[BaseModel]]] = {
         InternalUsageToolQuery,
     ),
     "find_models": (
-        "등록된 활성 모델과 실제 선택 가능한 서버 업체·지원 설정을 조회한다. 검색어는 모델명 또는 ID 일부이며 한 번에 5개씩 조회한다.",
+        "등록된 사용 중 모델을 조회한다. 검색어는 사용자가 지정한 모델명 또는 ID 일부이며 전체 모델 질문에는 q를 생략한다. 개수 질문은 전체 개수만 반환한다. 목록은 한 번에 5개이며 업체는 명시적으로 요청하거나 모델 선택에 필요할 때만 조회한다. 다음 페이지는 page를 늘리고 검색어를 유지한다.",
         FindModels,
     ),
     "list_simulations": (
@@ -107,6 +108,7 @@ class AssistantTools:
         self.failure_message: str | None = None
         self.preparation_blocked = False
         self.sources: list[AssistantSource] = []
+        self.model_view = model_lookup_kind(request_text, previous_user_requests)
         self.usage = AssistantUsage(
             session, now, page_context, request_text, previous_user_requests
         )
@@ -271,6 +273,12 @@ class AssistantTools:
         return SimulatorPatch.model_validate(changes) if changes else None
 
     async def find_models(self, query: FindModels) -> dict[str, Any]:
+        if self.model_view == "count":
+            total = await model_list.count_models(
+                self.session, q=query.q, statuses=[ModelStatus.ACTIVE]
+            )
+            self.sources.append(AssistantSource(title="등록 모델", kind="models"))
+            return {"view": "count", "q": query.q, "items": [], "total": total}
         page = await model_list.list_models(
             self.session,
             q=query.q,
@@ -289,14 +297,17 @@ class AssistantTools:
             support = parameter_support(
                 model.supported_parameters, model.openrouter_metadata
             )
-            try:
-                endpoints = await self.catalog.get(model.openrouter_model_id)
-            except OpenRouterUnavailableError, ModelNotOnOpenRouterError:
-                endpoints = []
+            endpoints = []
+            if self.model_view == "providers":
+                try:
+                    endpoints = await self.catalog.get(model.openrouter_model_id)
+                except OpenRouterUnavailableError, ModelNotOnOpenRouterError:
+                    endpoints = []
             items.append(
                 {
                     "model_id": model.model_id,
                     "name": model.display_name,
+                    "creator": model.provider,
                     "openrouter_model_id": model.openrouter_model_id,
                     "input_modalities": model.input_modalities,
                     "supported_parameters": model.supported_parameters,
@@ -329,4 +340,11 @@ class AssistantTools:
                 }
             )
         self.sources.append(AssistantSource(title="등록 모델", kind="models"))
-        return {"items": items, "total": page.total, "page": query.page, "page_size": 5}
+        return {
+            "view": self.model_view,
+            "q": query.q,
+            "items": items,
+            "total": page.total,
+            "page": query.page,
+            "page_size": 5,
+        }

@@ -3,6 +3,8 @@
 from decimal import Decimal
 from typing import Any
 
+from app.services.assistant_models import model_answer
+
 STATUS_LABELS = {
     "PENDING": "대기",
     "RUNNING": "실행 중",
@@ -81,21 +83,16 @@ def simulation_line(row: dict[str, Any]) -> str:
     return f"{row['requested_at']} · {state} · {money(row.get('total_cost_usd'))} ({row['cost_check_status']})"
 
 
+def intermediate_result(result: dict[str, Any]) -> bool:
+    """오류나 이름 목록처럼 답변 본문이 아니라 다음 조회를 위한 결과인지."""
+    return "error" in result or result.get("section") == "options"
+
+
 def verified_answer(name: str, result: dict[str, Any]) -> str | None:
     if name in {"get_customer_usage", "get_internal_usage"}:
         return usage_answer(name, result)
     if name == "find_models" and "items" in result:
-        rows = result["items"]
-        lines = []
-        for row in rows:
-            providers = ", ".join(
-                item["execution_provider"] for item in row["providers"]
-            )
-            lines.append(f"- {row['name']} · {providers or '서버 업체 정보 확인 불가'}")
-        return (
-            f"등록된 활성 모델 전체 {result['total']}개 중 {len(rows)}개예요.\n\n"
-            + ("\n".join(lines) if lines else "조건에 맞는 모델이 없어요.")
-        )
+        return model_answer(result)
     if name == "get_simulation" and "summary" in result:
         row = result["summary"]
         lines = [f"요청 시각·실행 상태·비용: {simulation_line(row)}", unknown_note(row)]

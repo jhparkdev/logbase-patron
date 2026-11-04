@@ -13,6 +13,70 @@ async def test_only_explicit_tools_are_callable(db_session: AsyncSession) -> Non
     assert tools.patch is None
 
 
+async def test_count_queries_do_not_fetch_models_or_execution_providers(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    for state in ("ACTIVE", "ACTIVE", "INACTIVE", "TESTING"):
+        await factory.model(status=state)
+    catalog = FakeEndpointCatalog([])
+    tools = AssistantTools(
+        db_session,
+        catalog,
+        T0,
+        None,
+        request_text="지금 사용 가능한 모델의 개수를 알려주세요",
+    )
+    result = await tools.execute("find_models", {})
+    assert result["view"] == "count"
+    assert result["total"] == 2
+    assert result["items"] == []
+    assert not catalog.asked
+
+
+async def test_plain_lists_include_creators_without_endpoint_fetches(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await factory.model(status="ACTIVE", provider="anthropic")
+    catalog = FakeEndpointCatalog([])
+    tools = AssistantTools(
+        db_session, catalog, T0, None, request_text="등록된 모델 목록을 알려줘"
+    )
+    result = await tools.execute("find_models", {})
+    assert result["view"] == "list"
+    assert result["items"][0]["creator"] == "anthropic"
+    assert not catalog.asked
+
+
+async def test_count_and_list_use_the_same_literal_search_and_active_status(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await factory.model(status="ACTIVE", display_name="모델 A%")
+    await factory.model(status="ACTIVE", display_name="모델 AB")
+    await factory.model(status="INACTIVE", display_name="과거 모델 A%")
+    count = AssistantTools(
+        db_session, FakeEndpointCatalog([]), T0, None, request_text="모델 개수"
+    )
+    listing = AssistantTools(
+        db_session, FakeEndpointCatalog([]), T0, None, request_text="모델 목록"
+    )
+    first = await count.execute("find_models", {"q": "A%"})
+    second = await listing.execute("find_models", {"q": "A%"})
+    assert first["total"] == second["total"] == 1
+    assert first["q"] == second["q"] == "A%"
+
+
+async def test_explicit_provider_queries_and_model_selection_still_fetch_endpoints(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    await factory.model(status="ACTIVE")
+    for question in ("모델의 실행 업체를 알려줘", "모델 두 개를 선택해줘"):
+        catalog = FakeEndpointCatalog([])
+        tools = AssistantTools(db_session, catalog, T0, None, request_text=question)
+        result = await tools.execute("find_models", {})
+        assert result["view"] == "providers"
+        assert len(catalog.asked) == 1
+
+
 async def test_history_sources_identify_actual_runs_and_keep_empty_history_link(
     db_session: AsyncSession, factory: Factory
 ) -> None:
