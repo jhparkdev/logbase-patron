@@ -10,6 +10,7 @@ Protocol은 객체를 만들거나 DB를 조회하는 구현이 아니라, 입�
 
 import uuid
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
@@ -113,3 +114,36 @@ class RequestResult(Protocol):
 
     @property
     def external_generation_id(self) -> str | None: ...
+
+
+@dataclass(frozen=True)
+class FinishedCall:
+    """이미 끝난 외부 호출 한 건(고객 서비스의 OpenRouter 호출)을 기록할 때의 값.
+
+    프롬프트·답변은 담지 않는다. 비용은 OpenRouter가 알려 준 값이 있을 때만 확정으로 기록하고,
+    없으면 미확인(NULL)이다. 실패·timeout 호출의 비용은 항상 미확인이다.
+    """
+
+    request_id: uuid.UUID
+    key_id: int
+    # 고객을 알 수 없는 호출(프로젝트 Key로 들어온 고객 호출)은 None 이고 미분류로 집계된다
+    customer_id: int | None
+    service_id: int
+    task_id: uuid.UUID
+    model_id: int | None
+    requested_model: str
+    actual_model: str | None
+    actual_provider: str | None
+    finish_reason: str | None
+    status: RequestStatus
+    error_type: ErrorType | None
+    http_status: int | None
+    input_tokens: int | None
+    output_tokens: int | None
+    cached_tokens: int | None
+    reasoning_tokens: int | None
+    cost_usd: Decimal | None
+    latency_ms: int | None
+    requested_at: datetime
+    completed_at: datetime | None
+    external_generation_id: str | None
