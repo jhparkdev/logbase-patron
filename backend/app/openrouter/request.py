@@ -1,0 +1,70 @@
+"""OpenRouter에 보낼 요청 본문을 만든다."""
+
+from typing import Any
+
+JSON_SCHEMA_NAME = "response"
+DATA_COLLECTION_DENY = "deny"
+AUTO_TOOL_CHOICE = "auto"
+
+
+def build_request_body(
+    *,
+    model_id: str,
+    messages: list[dict[str, Any]],
+    max_tokens: int,
+    json_schema: dict[str, Any] | None = None,
+    provider_order: list[str] | None = None,
+    allow_fallbacks: bool = False,
+    stream: bool = False,
+    temperature: float | None = None,
+    reasoning_effort: str | None = None,
+    cache_control: dict[str, str] | None = None,
+    tools: list[dict[str, Any]] | None = None,
+    deny_data_collection: bool = False,
+) -> dict[str, Any]:
+    # 업체 자동 전환은 기본으로 끈다. 비교 조건이 바뀌지 않게 하기 위해서다.
+    provider: dict[str, Any] = {"allow_fallbacks": allow_fallbacks}
+    if provider_order:
+        provider["order"] = provider_order
+    # 요청 데이터를 수집하는 업체로는 보내지 않는다.
+    if deny_data_collection:
+        provider["data_collection"] = DATA_COLLECTION_DENY
+
+    body: dict[str, Any] = {
+        "model": model_id,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "provider": provider,
+    }
+
+    if stream:
+        body["stream"] = True
+
+    # 값이 없는 것(None)만 보내지 않는다. 0도 유효한 값이라 `is not None`으로 구분한다.
+    if temperature is not None:
+        body["temperature"] = temperature
+    if reasoning_effort is not None:
+        body["reasoning"] = {"effort": reasoning_effort}
+    # 캐시를 켜야 하는 모델에만 호출하는 쪽이 넣는다(services/cache_policy). 받은 값은 복사해 담는다
+    if cache_control is not None:
+        body["cache_control"] = dict(cache_control)
+
+    if json_schema is not None:
+        body["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": JSON_SCHEMA_NAME,
+                "strict": True,
+                "schema": json_schema,
+            },
+        }
+        # Schema를 지원하지 않는 모델이 조용히 무시하지 않고 404로 실패하게 한다.
+        provider["require_parameters"] = True
+
+    if tools:
+        body["tools"] = tools
+        body["tool_choice"] = AUTO_TOOL_CHOICE
+        # 도구 호출을 지원하지 않는 업체가 도구를 무시하고 근거 없이 답하지 않게 한다.
+        provider["require_parameters"] = True
+
+    return body

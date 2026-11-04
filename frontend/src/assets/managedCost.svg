@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <!-- 뱃지 자리를 본체에서 도려낸다. 아이콘은 mask로 그려서 흰색 채우기로 가리면 꽉 찬 원이 된다 -->
+  <defs>
+    <mask id="cut">
+      <rect width="24" height="24" fill="white" />
+      <circle cx="17" cy="17" r="6" fill="black" />
+    </mask>
+  </defs>
+  <g mask="url(#cut)">
+    <!-- 영수증 메인 (지그재그 하단) -->
+    <path d="M4 2v19l2.5-1.5L9 21l2.5-1.5L14 21V2H4z" />
+    <!-- 영수증 텍스트/항목 선 -->
+    <line x1="7" y1="6" x2="11" y2="6" />
+    <line x1="7" y1="10" x2="11" y2="10" />
+  </g>
+  <!-- 확정 체크 뱃지 (우측 하단) -->
+  <circle cx="17" cy="17" r="4.5" />
+  <path d="M15 17l1.5 1.5 3-3" />
+</svg>

@@ -31,8 +31,8 @@ frontend/                   # React 19 · Vite · TypeScript SPA (pnpm). 화면 
 docker-compose.yml          # db(PostgreSQL 18), backend, frontend. 평소 개발은 db만 띄운다
 db/init/                    # db 컨테이너 첫 실행 시 테스트 DB(patron_test)를 만드는 스크립트
 .env.example                # 필요한 환경변수 목록 (값 없음)
-deploy/                     # GCP 최초 준비 절차 (README.md)
-.github/workflows/          # ci.yml(린트·테스트·빌드), deploy.yml(dev·main 배포)
+.github/workflows/          # ci.yml(PR의 린트·테스트·빌드). 배포는 하지 않는다
+cloudbuild.yml              # Cloud Build 배포(dev 병합 시 트리거): 빌드 → 푸시 → 마이그레이션 → backend → frontend
 ```
 
 ## 데이터 흐름
@@ -57,6 +57,11 @@ P-03 화면 → POST /api/models/{id}/test → AIRequest(usage_origin=SYSTEM_TES
 [조회]
 P-01/P-02 화면 → GET /api/usage/... (필터) → services/aggregation
   → 같은 필터로 요약·추이·그룹별 표·상세 목록 계산 → 화면 표시(UTC→KST 변환은 화면에서)
+
+[시뮬레이터 이미지]
+P-04 화면 → 이미지 업로드 → services/image_storage(ImageStorage)에 새 키로 저장(덮어쓰기 거절)
+  → InputAsset에 저장소 키·해시만 기록 → 실행 때 저장소에서 읽고 해시를 대조한 뒤 모델에 전달
+  → 저장소: 개발·테스트는 로컬 폴더, 배포는 GCS 버킷(컨테이너 디스크는 임시라 쓰지 않는다)
 ```
 
 API 계약의 정본은 백엔드 Pydantic 모델이다. `app/export_openapi.py`가 OpenAPI 문서를 `frontend/openapi.json`으로 내보내고, 프론트엔드는 그 문서에서 TypeScript 타입을 생성한다. 손으로 타입을 쓰지 않는다.

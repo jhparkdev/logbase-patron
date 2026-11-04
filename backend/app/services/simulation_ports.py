@@ -1,0 +1,403 @@
+"""비교 실행이 기대하는 외부 모듈의 모양.
+
+ModelCaller 는 openrouter/client.py 의 call_model 과 같은 모양이라 그대로 넘기면 된다.
+RequestRecorder 의 DB 구현은 simulation_recorders.py 이고 쓰기는 services/requests.py 에 맡긴다.
+테스트는 가짜 객체로 같은 모양을 흉내 내어 실행 흐름을 검증한다.
+"""
+
+import asyncio
+import uuid
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from datetime import datetime
+from decimal import Decimal
+from typing import Any, Protocol
+
+from app.models import (
+    CallPurpose,
+    CostSource,
+    CostStatus,
+    DataSource,
+    ErrorType,
+    InputType,
+    ModelStatus,
+    RequestStatus,
+    SimulationStatus,
+    TestType,
+    UsageOrigin,
+    ValidationStatus,
+)
+from app.openrouter.image_result import GeneratedImage, ImageCallResult
+from app.openrouter.lookup_result import EndpointInfo
+from app.openrouter.result import CallResult
+from app.schemas.simulation_output import OutputType
+from app.services.model_parameters import ParameterSupport
+from app.services.simulation_json_check import ValidationErrors
+
+
+@dataclass(frozen=True)
+class SlotRecord:
+    """모델 한 칸의 호출 결과에서 저장할 값. ai_requests 와 simulation_results 에 나뉘어 들어간다."""
+
+    status: RequestStatus
+    error_type: ErrorType | None
+    error_message: str | None  # 사용자에게 보여 줄 문구. 예외 원문이 아니다
+    http_status: int | None
+    finish_reason: str | None
+    response_text: str | None
+    input_tokens: int | None
+    output_tokens: int | None
+    cached_tokens: int | None
+    cache_write_tokens: int | None
+    reasoning_tokens: int | None
+    cost_usd: Decimal | None  # cost_status 가 UNKNOWN 이면 항상 None
+    cost_status: CostStatus
+    cost_source: CostSource | None  # 확정 비용의 근거. 미확인이면 None
+    actual_provider: str | None
+    actual_model: str | None
+    latency_ms: int | None
+    external_generation_id: str | None
+    json_parse_status: ValidationStatus
+    schema_validation_status: ValidationStatus
+    missing_required_fields: list[str] | None
+    validation_errors: ValidationErrors | None
+
+
+@dataclass(frozen=True)
+class SlotPlan:
+    """저장이 끝난 모델 한 칸. 이 칸을 호출하면 된다."""
+
+    slot_no: int
+    request_id: uuid.UUID
+    model_id: int
+    openrouter_model_id: str
+    execution_provider: str
+    # 이 칸에 실제로 적용할 설정(실행 공통 설정과 합친 값). max_tokens 는 항상 있다
+    execution_config: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ImageRef:
+    """올려 둔 이미지 한 장을 가리키는 값. 파일 내용은 저장소에 있고 여기에는 위치와 해시만 있다."""
+
+    asset_id: uuid.UUID
+    storage_path: str
+    mime_type: str
+    sha256: str
+
+
+@dataclass(frozen=True)
+class SimulationJob:
+    """실행할 비교 한 건. 모든 칸에 같은 입력을 보낸다.
+
+    messages 는 DB 에 남는 모양이다. 이미지는 내용이 아니라 참조(asset:<asset_id>)로 들어 있고,
+    모델을 부르기 직전에만 내용(data URL)으로 바꿔 보낸다. 이미지 내용이 DB 에 들어가지 않게 하기 위해서다.
+    """
+
+    simulation_id: uuid.UUID
+    slots: Sequence[SlotPlan]
+    messages: list[dict[str, Any]]
+    json_schema: dict[str, Any] | None
+    allow_fallbacks: bool
+    images: Sequence[ImageRef] = ()
+    # IMAGE 면 칸마다 이미지 생성(ImageGenerator)을 부르고, 올린 이미지는 참고 이미지로 보낸다
+    output_type: OutputType = OutputType.TEXT
+
+
+@dataclass(frozen=True)
+class ScenarioInfo:
+    """접수 때 읽는 시나리오. 기본 실행 설정과 기본 Schema 를 쓴다."""
+
+    scenario_id: int
+    is_active: bool
+    default_json_schema: dict[str, Any] | None
+    default_execution_config: Mapping[str, Any]
+    input_type: InputType = InputType.TEXT
+
+
+@dataclass(frozen=True)
+class ModelInfo:
+    """접수 때 읽는 모델. 이름과 상태는 실행 당시 값으로 결과에 복사해 둔다."""
+
+    model_id: int
+    openrouter_model_id: str
+    display_name: str
+    status: ModelStatus
+    supports_images: bool = False  # 입력 형식(input_modalities)에 image 가 있다
+    generates_images: bool = False  # 출력 형식(output_modalities)에 image 가 있다
+    # 받을 수 있는 설정. 기본값을 두지 않아 조회하는 쪽이 빠뜨리면 바로 드러난다
+    parameter_support: ParameterSupport = field(kw_only=True)
+
+
+@dataclass(frozen=True)
+class SimulatorContext:
+    """시뮬레이터 호출의 비용 귀속. 서버가 정하고 사용자는 보내지 않는다."""
+
+    project_id: int
+    key_id: int
+    service_id: int
+
+
+@dataclass(frozen=True)
+class NewRun:
+    """저장할 simulation_runs 한 행."""
+
+    simulation_id: uuid.UUID
+    rerun_of_simulation_id: uuid.UUID | None
+    test_type: TestType
+    scenario_id: int | None
+    prompt_text: str
+    input_text: str | None
+    json_schema: dict[str, Any] | None
+    execution_config: dict[str, Any]
+    routing_policy: dict[str, Any]
+    input_hash: str
+    model_count: int
+    project_id: int
+    key_id: int
+    executed_by: int
+    requested_at: datetime
+    data_source: DataSource
+
+
+@dataclass(frozen=True)
+class NewRequest:
+    """저장할 ai_requests 한 행(PENDING). 만드는 곳은 services/requests.py 의 create_pending 이다."""
+
+    request_id: uuid.UUID
+    simulation_id: uuid.UUID
+    usage_origin: UsageOrigin
+    call_purpose: CallPurpose
+    attempt_no: int
+    project_id: int
+    key_id: int
+    service_id: int
+    executed_by: int
+    model_id: int
+    requested_model: str  # OpenRouter 모델 ID
+    requested_provider: str
+    routing_policy: dict[str, Any]
+    execution_config: dict[str, Any]
+    input_hash: str
+    requested_at: datetime
+    data_source: DataSource
+
+
+@dataclass(frozen=True)
+class NewResult:
+    """저장할 simulation_results 한 행. 칸 번호와 실행 당시의 모델 이름·상태를 남긴다."""
+
+    simulation_id: uuid.UUID
+    request_id: uuid.UUID
+    slot_no: int
+    model_id: int
+    execution_provider: str
+    model_status_at_run: ModelStatus
+    model_display_name_at_run: str
+    # 같은 모델을 다른 Provider 로 넣은 칸이면 그 사실을 적는다. 아니면 None
+    comparability_note: str | None = None
+
+
+@dataclass(frozen=True)
+class SlotState:
+    """칸 하나의 현재 상태. 칸마다 최종 시도만 다룬다."""
+
+    request_id: uuid.UUID
+    slot_no: int
+    status: RequestStatus
+
+
+class ModelCaller(Protocol):
+    """openrouter/client.py 의 call_model 에서 시뮬레이터가 쓰는 인자. 실패해도 예외 없이 결과로 돌려준다."""
+
+    async def __call__(
+        self,
+        *,
+        request_id: uuid.UUID,
+        model_id: str,
+        messages: list[dict[str, Any]],
+        max_tokens: int,
+        timeout_seconds: float,
+        json_schema: dict[str, Any] | None,
+        provider_order: list[str],
+        allow_fallbacks: bool,
+        cancel: asyncio.Event,
+        temperature: float | None = None,
+        reasoning_effort: str | None = None,
+    ) -> CallResult: ...
+
+
+class ImageGenerator(Protocol):
+    """openrouter/client.py 의 generate_image 에서 시뮬레이터가 쓰는 인자. 실패해도 예외 없이 결과로 돌려준다."""
+
+    async def __call__(
+        self,
+        *,
+        request_id: uuid.UUID,
+        model_id: str,
+        prompt: str,
+        timeout_seconds: float,
+        input_image_urls: list[str] | None,
+        provider_order: list[str],
+        allow_fallbacks: bool,
+        cancel: asyncio.Event,
+        n: int | None = None,
+        resolution: str | None = None,
+        aspect_ratio: str | None = None,
+        quality: str | None = None,
+    ) -> ImageCallResult: ...
+
+
+class OutputImageStore(Protocol):
+    """이미지 생성 결과를 저장소와 output_assets 에 남긴다. 삭제하거나 덮어쓰지 않는다."""
+
+    async def save(
+        self, request_id: uuid.UUID, images: Sequence[GeneratedImage]
+    ) -> None:
+        """받은 순서대로 저장한다(sort_order 는 0부터). 하나라도 못 쓰면 예외를 던진다."""
+        ...
+
+
+class RequestRecorder(Protocol):
+    """services/requests.py 로 채울 수 있는 것. 상태 변경은 모두 조건부이고 바뀌었는지를 돌려준다."""
+
+    async def create_pending(self, request: NewRequest) -> None:
+        """호출 이력을 PENDING 으로 만든다. 호출 전에 Request ID 를 저장해 두는 것이 원칙이다."""
+        ...
+
+    async def cancel_if_open(self, request_id: uuid.UUID, now: datetime) -> bool:
+        """PENDING 이나 RUNNING 일 때만 CANCELLED 로 바꾼다. 이미 종료되었으면 False.
+
+        취소와 정상 완료가 거의 동시에 올 때 어느 쪽이 이길지를 DB 의 조건부 갱신이 정한다.
+        """
+        ...
+
+    async def mark_running(self, request_id: uuid.UUID, now: datetime) -> bool:
+        """PENDING 일 때만 RUNNING 으로 바꾼다. 이미 취소되었으면 False."""
+        ...
+
+    async def record_finished(
+        self, request_id: uuid.UUID, record: SlotRecord, now: datetime
+    ) -> bool:
+        """RUNNING 일 때만 종료 상태·토큰·비용·실제 업체 등을 기록한다. 이미 종료되었으면 False."""
+        ...
+
+    async def save_payload(
+        self,
+        request_id: uuid.UUID,
+        messages: list[dict[str, Any]],
+        response_text: str | None,
+    ) -> None: ...
+
+    async def keep_late_result(
+        self,
+        request_id: uuid.UUID,
+        messages: list[dict[str, Any]],
+        record: SlotRecord,
+    ) -> None:
+        """취소로 먼저 끝난 칸에 늦게 온 결과를 비용 대조용으로만 남긴다(J-03). 상태·비용은 그대로다."""
+        ...
+
+
+class SimulationStore(Protocol):
+    """simulation_runs·simulation_results 접근. 우리 몫이다."""
+
+    async def insert_run(self, run: NewRun) -> None: ...
+
+    async def insert_result(self, result: NewResult) -> None: ...
+
+    async def insert_run_assets(
+        self, simulation_id: uuid.UUID, asset_ids: Sequence[uuid.UUID]
+    ) -> None:
+        """실행에 쓴 이미지를 순서대로 연결한다(sort_order 는 1부터)."""
+        ...
+
+    async def mark_started(self, simulation_id: uuid.UUID, now: datetime) -> None: ...
+
+    async def touch_heartbeat(
+        self, simulation_id: uuid.UUID, now: datetime
+    ) -> None: ...
+
+    async def save_validation(
+        self, request_id: uuid.UUID, record: SlotRecord
+    ) -> None: ...
+
+    async def list_slots(self, simulation_id: uuid.UUID) -> list[SlotState] | None:
+        """칸 번호 순서로 칸마다 최종 시도의 상태. 없는 실행이면 None."""
+        ...
+
+    async def final_statuses(self, simulation_id: uuid.UUID) -> list[RequestStatus]:
+        """칸마다 최종 시도의 상태."""
+        ...
+
+    async def mark_finished(
+        self, simulation_id: uuid.UUID, status: SimulationStatus, now: datetime
+    ) -> None: ...
+
+
+class SimulationLookup(Protocol):
+    """접수 때 DB 에서 읽는 것. 읽기만 한다."""
+
+    async def find_scenario(self, scenario_id: int) -> ScenarioInfo | None: ...
+
+    async def find_models(self, model_ids: Sequence[int]) -> dict[int, ModelInfo]: ...
+
+    async def simulation_exists(self, simulation_id: uuid.UUID) -> bool: ...
+
+    async def find_images(
+        self, asset_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, ImageRef]: ...
+
+    async def simulator_context(self) -> SimulatorContext: ...
+
+
+class ImageSource(Protocol):
+    """저장된 이미지 내용을 모델에 보낼 모양(data URL)으로 읽어 온다."""
+
+    async def data_url(self, image: ImageRef) -> str: ...
+
+
+class ImageFiles(Protocol):
+    """저장소에 이미지 파일이 실제로 있는지 본다. 접수 때 읽기만 한다."""
+
+    async def exists(self, key: str) -> bool: ...
+
+
+class ProviderParameterLookup(Protocol):
+    """모델별 서버 업체가 받는 설정 이름. 접수 때 읽기만 한다."""
+
+    async def provider_parameters(
+        self, openrouter_model_id: str
+    ) -> Mapping[str, Sequence[str]] | None:
+        """업체 이름별 설정 이름 목록. 읽지 못하면 None 이다."""
+        ...
+
+    async def provider_endpoints(
+        self, openrouter_model_id: str
+    ) -> Sequence[EndpointInfo] | None:
+        """모델을 처리하는 서버 업체와 단가·상태. 읽지 못하면 None 이다."""
+        ...
+
+
+@dataclass(frozen=True)
+class IntakeDeps:
+    """요청 접수에 필요한 것. 현재 시각과 새 ID 는 주입한다."""
+
+    lookup: SimulationLookup
+    recorder: RequestRecorder
+    store: SimulationStore
+    image_files: ImageFiles
+    providers: ProviderParameterLookup
+    now: Callable[[], datetime]
+    new_id: Callable[[], uuid.UUID]
+
+
+@dataclass(frozen=True)
+class SimulationDeps:
+    caller: ModelCaller
+    recorder: RequestRecorder
+    store: SimulationStore
+    now: Callable[[], datetime]  # 현재 시각은 주입한다
+    images: ImageSource
+    image_generator: ImageGenerator
+    outputs: OutputImageStore

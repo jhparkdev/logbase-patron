@@ -55,7 +55,7 @@ tests/                 # 구현 코드와 분리한다. app/ 폴더 구조를 �
 - 모델은 `Mapped[...]`와 `mapped_column()`으로 타입을 명시한다. async에서는 지연 로딩이 오류를 내므로 관계는 `selectinload`로 명시적으로 불러온다.
 - 상태값은 PostgreSQL ENUM 대신 `String` 컬럼과 `CheckConstraint`로 표현한다. ENUM은 값을 추가할 때마다 별도 migration이 필요하다.
 - 불변조건은 DB 제약으로도 지킨다. 예: `cost_status='UNKNOWN'` ⇔ `cost_usd IS NULL` CHECK, `request_id`와 `openrouter_model_id` 고유 제약.
-- 금액과 단가는 `NUMERIC(20,12)`, 시각은 `DateTime(timezone=True)`(timestamptz), ID는 UUID, 테이블과 컬럼 이름은 `snake_case`다.
+- 금액과 단가는 `NUMERIC(30,18)`, 시각은 `DateTime(timezone=True)`(timestamptz), ID는 UUID, 테이블과 컬럼 이름은 `snake_case`다.
 - `MetaData(naming_convention=...)`로 제약 이름 규칙을 정해 두어 Alembic이 매번 같은 이름을 만들게 한다.
 - 쿼리는 SQLAlchemy 바인딩으로만 만든다. 문자열을 이어 붙여 SQL을 만들지 않는다.
 
@@ -98,6 +98,6 @@ tests/                 # 구현 코드와 분리한다. app/ 폴더 구조를 �
 - migration은 앱 시작 시 실행하지 않고 배포 전에 Cloud Run Job으로 한 번 실행한다. Job이 실패하면 배포를 멈춘다.
 - 비밀값은 Secret Manager에서 환경변수로 주입한다. 서비스마다 최소 권한의 서비스 계정을 쓴다.
 - backend는 `--max-instances=1 --no-cpu-throttling`으로 띄운다. 백그라운드 시뮬레이션 실행과 미완료 정리가 인스턴스 1대를 전제하기 때문이다.
-- 컨테이너 파일시스템은 임시 저장소다. 업로드 이미지는 DB의 InputBlob에 저장한다.
+- 컨테이너 파일시스템은 임시 저장소다. 배포의 업로드 이미지는 GCS 버킷에 `ImageStorage`의 GCS 구현으로 저장한다. backend 실행 계정에는 그 버킷의 객체 생성자·객체 뷰어 역할만 주어, 저장한 파일을 덮어쓰거나 지울 수 없게 한다. 키 파일 없이 실행 계정으로 인증한다.
 - 로그는 표준 출력에 JSON 한 줄로 남겨 Cloud Logging에서 검색할 수 있게 한다.
-- Claude Code는 `gcloud run deploy` 같은 배포 명령을 실행하지 않는다. 배포는 CI/CD와 `deploy/README.md` 절차로 한다.
+- Claude Code는 `gcloud run deploy` 같은 배포 명령을 실행하지 않는다. 배포는 Cloud Build 트리거(`cloudbuild.yml`)로만 한다.

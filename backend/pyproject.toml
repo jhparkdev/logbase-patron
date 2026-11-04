@@ -5,11 +5,13 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.20.1",
     "fastapi[standard]>=0.162.0",
+    "google-cloud-storage>=3.17.1",
     "httpx>=0.28.1",
+    "jsonschema>=4.26.0",
     "psycopg[binary]>=3.3.6",
     "pwdlib[argon2]>=0.3.1",
     "pydantic-settings>=2.16.1",
-    "sqlalchemy>=2",
+    "sqlalchemy[asyncio]>=2",
     "uuid6>=2025.0.1",
 ]
 

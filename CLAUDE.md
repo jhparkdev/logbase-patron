@@ -10,9 +10,9 @@
 ## 기술 스택
 - 백엔드: Python 3.14, uv, FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2.x(async), Alembic, httpx(async), Ruff, pytest(실제 PostgreSQL)
 - 프론트엔드: Node.js LTS(24 이상), pnpm, React 19, React Compiler, TypeScript, Vite, TanStack Router, TanStack Query, React Hook Form, Zod 4, Tailwind CSS v4, Recharts, Biome, Vitest
-- 디자인: 토스 디자인 원칙과 토스 디자인 시스템(TDS)을 적용한다. 세부 규칙은 `frontend/CLAUDE.md`를 따른다.
+- 디자인: TDS(토스 디자인 시스템)를 참고해 웹 대시보드용 디자인 시스템을 직접 만든다. TDS 패키지는 설치하지 않는다. 세부 규칙은 `frontend/CLAUDE.md`와 `docs/design/`을 따른다.
 - DB: PostgreSQL 18. AI 연동: OpenRouter API
-- 인프라: Docker, docker compose, GCP(Cloud Run·Cloud SQL·Artifact Registry·Secret Manager), GitHub Actions
+- 인프라: Docker, docker compose, GCP(Cloud Run·Cloud SQL·Cloud Storage·Artifact Registry·Secret Manager·Cloud Build), GitHub Actions(PR 검사), Cloud Build(배포, `cloudbuild.yml`)
 - 새 의존성, 새 패키지, 폴더 구조 변경, 배포 설정 변경은 사용자 승인 후 진행한다.
 
 ## pnpm과 uv를 함께 쓰는 방법
@@ -50,15 +50,15 @@ pnpm --dir frontend build                            # 프론트엔드 빌드
 - OpenRouter 호출은 `backend/app/openrouter/client.py`에서만 한다. 테스트에서는 가짜 클라이언트를 주입한다.
 - AIRequest 생성과 상태·비용 변경은 `backend/app/services/requests.py`만 한다.
 - P-01·P-02 집계는 `backend/app/services/aggregation.py`만 한다. 화면과 라우터에서 따로 합산하지 않는다.
-- 금액과 단가는 `Decimal`과 `NUMERIC(20,12)`로 다룬다. float을 쓰지 않는다. API에서는 금액을 문자열로 주고받는다. (OpenRouter 단가가 토큰당 소수 10자리까지 나오는 것을 검증으로 확인함)
+- 금액과 단가는 `Decimal`과 `NUMERIC(30,18)`로 다룬다. float을 쓰지 않는다. API에서는 금액을 문자열로 주고받는다. (OpenRouter 단가가 토큰당 소수 10자리까지 나오는 것을 검증으로 확인함)
 - 시각은 UTC(`timestamptz`)로 저장하고, KST 변환은 화면(`frontend/src/shared/lib`)에서 한다. 월 경계 집계는 서버에서 KST 기준으로 계산한다.
 - DB 스키마 변경은 Alembic 마이그레이션(`backend/migrations/`)으로만 한다.
 - 프론트엔드는 `/api`만 상대 경로로 호출한다. 개발은 Vite proxy가, 배포는 frontend 컨테이너(nginx)가 `/api/*`를 backend로 프록시한다. 조회 조건·정렬·페이지는 URL 검색 파라미터에 둔다.
-- 업로드 이미지는 DB의 InputBlob에 저장한다. 컨테이너 파일시스템은 임시 저장소라 쓰지 않는다.
-- 배포 설정(`backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf.template`, `docker-compose.yml`, `.github/workflows/`, `deploy/README.md`)은 다음 구성을 따른다. 컨테이너는 frontend(nginx)와 backend(FastAPI) 둘이고, nginx가 `/api/*`만 backend로 프록시한다. 배포 환경은 `dev` 브랜치가 개발, `main` 브랜치가 운영 둘이다. Claude Code로 GCP 리소스를 만들거나 배포 명령(`gcloud run deploy` 등)을 실행하지 않는다. 배포는 CI/CD와 `deploy/README.md` 절차로 한다. GCP를 조회할 일이 있으면 먼저 `gcloud auth list`와 `gcloud config get-value project`로 계정과 프로젝트를 확인한다.
+- 업로드 이미지 파일은 `backend/app/services/image_storage.py`의 `ImageStorage`로만 저장한다. 개발·테스트는 로컬 폴더(`LocalImageStorage`), 배포는 GCS 버킷이다. DB(`InputAsset`)에는 저장소 키(버킷·폴더 이름 없는 상대 경로)와 해시만 둔다. 컨테이너 파일시스템은 임시 저장소라 배포에서 쓰지 않는다. 저장한 파일은 덮어쓰거나 지우지 않는다.
+- 배포 설정(`backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf.template`, `docker-compose.yml`, `.github/workflows/`, `cloudbuild.yml`)은 다음 구성을 따른다. 컨테이너는 frontend(nginx)와 backend(FastAPI) 둘이고, nginx가 `/api/*`만 backend로 프록시한다. 배포는 `dev` 브랜치 기준으로만 하고, `main` 브랜치는 배포하지 않는다. GitHub Actions(`ci.yml`)는 PR 검사만 하고, 배포는 `dev`에 병합되면 Cloud Build 트리거가 `cloudbuild.yml`로 실행한다. Claude Code로 GCP 리소스를 만들거나 배포 명령(`gcloud run deploy` 등)을 실행하지 않는다. 배포는 Cloud Build 트리거로만 한다. GCP를 조회할 일이 있으면 먼저 `gcloud auth list`와 `gcloud config get-value project`로 계정과 프로젝트를 확인한다.
 - CRITICAL: OpenRouter Key와 Ingest 토큰 원문은 환경변수나 Secret Manager로만 받는다. DB, API 응답, 화면, 로그, 예외 메시지에 넣지 않는다. 이유: Key가 새면 외부 과금 사고가 난다.
 - CRITICAL: 다음 이력은 삭제하거나 덮어쓰지 않는다. 이유: 실패·과거 이력이 사라지면 비용 집계와 비교 결과를 검증할 수 없다.
-  - 대상: AIRequest, SimulationRun, SimulationResult, ModelRegistry, ModelPrice, InputBlob, User. User는 `is_active=false`로만 비활성화한다
+  - 대상: AIRequest, SimulationRun, SimulationResult, ModelRegistry, ModelPrice, InputAsset과 저장소의 이미지 파일, User. User는 `is_active=false`로만 비활성화한다
   - 재실행은 새 ID로 만든다. 가격 변경은 새 행으로 남긴다. 종료된 AIRequest의 실행 상태는 바꾸지 않는다.
   - 종료된 AIRequest의 비용은 OpenRouter 대조(reconcile)로만 갱신한다. 갱신할 때는 기존 값·새 값·근거·시각을 정정 이력으로 남기고 `reconciled_at`을 기록한다. 확정(CONFIRMED) 비용을 현재 가격으로 다시 계산하지 않는다.
 - CRITICAL: 비용 미확인을 0으로 기록하거나 0으로 표시하지 않는다(`cost_status=UNKNOWN` ⇔ `cost_usd IS NULL`). 과거 확정 비용을 현재 가격으로 다시 계산하지 않는다. 이유: 실제 지출을 축소하거나 왜곡해 보고하게 된다.
