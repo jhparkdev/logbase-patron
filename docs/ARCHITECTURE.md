@@ -31,9 +31,8 @@ frontend/                   # React 19 · Vite · TypeScript SPA (pnpm). 화면 
 docker-compose.yml          # db(PostgreSQL 18), backend, frontend. 평소 개발은 db만 띄운다
 db/init/                    # db 컨테이너 첫 실행 시 테스트 DB(patron_test)를 만드는 스크립트
 .env.example                # 필요한 환경변수 목록 (값 없음)
-deploy/                     # GCP 최초 준비 절차 (README.md)
 .github/workflows/          # ci.yml(PR의 린트·테스트·빌드). 배포는 하지 않는다
-cloudbuild.yml              # Cloud Build 배포(dev·main 병합 시 트리거): 빌드 → 푸시 → 마이그레이션 → backend → frontend
+cloudbuild.yml              # Cloud Build 배포(dev 병합 시 트리거): 빌드 → 푸시 → 마이그레이션 → backend → frontend
 ```
 
 ## 데이터 흐름

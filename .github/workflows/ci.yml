@@ -1,7 +1,7 @@
 # 로컬과 CI가 같은 명령을 돌린다.
 name: CI
 
-# 기능 브랜치에서 dev로 가는 PR과, 운영 배포 전 dev에서 main으로 가는 PR을 검사한다.
+# 기능 브랜치에서 dev로 가는 PR과, dev에서 main으로 가는 PR을 검사한다.
 on:
   pull_request:
     branches: [dev, main]
