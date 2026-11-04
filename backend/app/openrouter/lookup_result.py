@@ -64,8 +64,13 @@ class EndpointInfo(BaseModel):
     status: int | None = None
     # 최근 1일 가동률(%)
     uptime_last_1d: Decimal | None = None
+    # 최근 30분 가동률(%). 값의 정의는 OpenRouter 문서에 없다(5분·1일 값은 "시도의 80% 이상이 성공한 분의 비율")
+    uptime_last_30m: Decimal | None = None
     # 이 업체가 받는 설정 이름(OpenRouter의 supported_parameters). 읽지 못하면 빈 목록이다
     supported_parameters: list[str] = Field(default_factory=list)
+    # 이 업체의 토큰당 단가(USD). 이름은 OpenRouter 그대로(prompt, completion, input_cache_read,
+    # input_cache_write). 가격이 정해지지 않았거나(-1) 읽을 수 없는 단가는 빠진다
+    pricing: dict[str, Decimal] = Field(default_factory=dict)
 
 
 class GenerationInfo(BaseModel):

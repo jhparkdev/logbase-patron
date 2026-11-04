@@ -80,10 +80,10 @@ function tuningParameters(model: Model): TuningParameter[] {
   ];
 }
 
-/** 모델 하나를 서버 업체마다 고를 수 있는 항목으로 나눈다. 업체를 모르면 고를 수 없는 한 행으로 남긴다. */
+/** 모델 하나를 서버 업체마다 고를 수 있는 항목으로 나눈다. 순위에서 가장 싼 업체는 맨 위에 두고 최저가로 표시한다. 업체를 모르면 고를 수 없는 한 행으로 남긴다. */
 export function toModelChoices(
   model: Model,
-  state: { providers: readonly string[] } | { failed: true },
+  state: { providers: readonly string[]; cheapest?: string } | { failed: true },
 ): ModelChoice[] {
   const parameters = tuningParameters(model);
   const base = {
@@ -117,10 +117,20 @@ export function toModelChoices(
         unavailableReason: "서버 업체를 확인할 수 없어요",
       },
     ];
-  return providers.map((provider) => ({
+  // 가장 싼 업체를 맨 위로 올린다. 비교할 업체가 없으면 싸다고 할 수 없어 표시하지 않는다.
+  const ranked = "providers" in state ? state.cheapest : undefined;
+  const cheapest =
+    ranked && providers.length > 1 && providers.includes(ranked)
+      ? ranked
+      : undefined;
+  const ordered = cheapest
+    ? [cheapest, ...providers.filter((provider) => provider !== cheapest)]
+    : providers;
+  return ordered.map((provider) => ({
     ...base,
     key: choiceKey(model.model_id, provider),
     provider,
     selectable: true,
+    ...(provider === cheapest ? { cheapest: true } : {}),
   }));
 }

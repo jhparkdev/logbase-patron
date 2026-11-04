@@ -123,6 +123,13 @@ class Factory:
             },
         )
 
+    async def model_discovery(self, **values: Any) -> RowMapping:
+        n = self._next()
+        return await self.insert(
+            "model_discoveries",
+            {"openrouter_model_id": f"vendor/new-model-{n}", **values},
+        )
+
     async def user_session(self, **values: Any) -> RowMapping:
         n = self._next()
         if "user_id" not in values:

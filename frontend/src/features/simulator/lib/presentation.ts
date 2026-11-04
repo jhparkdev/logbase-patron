@@ -22,6 +22,8 @@ export type ModelChoice = {
   creator?: string;
   selectable: boolean;
   unavailableReason?: string;
+  // 같은 모델의 서버 업체 중 예상 비용이 가장 싼 업체
+  cheapest?: boolean;
   supportsImages: boolean;
   // 이미지 출력(output_modalities)을 만드는지. 모르면 이미지 출력에서 고를 수 없다.
   generatesImages?: boolean;

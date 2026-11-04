@@ -1,6 +1,7 @@
 """앱 설정. 환경변수(와 로컬 .env 파일)는 이 모듈 한 곳에서만 읽는다."""
 
 import json
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
@@ -52,6 +53,10 @@ class Settings(BaseSettings):
     # 기록 수신 API(X-Patron-Ingest-Token)의 비밀값. 로컬에서는 없어도 앱은 뜨고, 없으면 수신 API가
     # 모든 요청을 거절한다. 고객 서비스가 기록을 보낼 때 같은 값을 헤더에 넣는다.
     ingest_token: SecretStr | None = None
+    # 새 모델을 기본 모델과 실제 호출로 비교한다. 꺼져 있으면 새 모델을 기록만 한다.
+    new_model_compare_enabled: bool = False
+    # 최근 24시간 동안 새 모델 비교 호출에 쓸 수 있는 비용 상한(USD)
+    new_model_daily_cap_usd: Decimal = Decimal(1)
     # 로컬 에이전트 실험은 명시적으로 켠 환경에서만 제공한다.
     assistant_enabled: bool = False
     ollama_base_url: str = "http://127.0.0.1:11434"

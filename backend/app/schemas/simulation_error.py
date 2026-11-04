@@ -35,6 +35,7 @@ class SimulationErrorCode(StrEnum):
         "IMAGE_FILE_NOT_FOUND"  # 내려받을 이미지의 기록이나 파일이 없음
     )
     PROVIDER_NOT_AVAILABLE = "PROVIDER_NOT_AVAILABLE"
+    AUTO_PROVIDER_UNAVAILABLE = "AUTO_PROVIDER_UNAVAILABLE"
     PERIOD_INCOMPLETE = "PERIOD_INCOMPLETE"
     PERIOD_START_AFTER_END = "PERIOD_START_AFTER_END"
     PERIOD_TOO_LONG = "PERIOD_TOO_LONG"
@@ -110,6 +111,9 @@ ERROR_SPECS: dict[SimulationErrorCode, ErrorSpec] = {
     ),
     SimulationErrorCode.PROVIDER_NOT_AVAILABLE: ErrorSpec(
         422, "선택한 모델에서 사용할 수 없는 Provider 입니다."
+    ),
+    SimulationErrorCode.AUTO_PROVIDER_UNAVAILABLE: ErrorSpec(
+        422, "가장 싼 업체를 정할 수 없습니다. 서버 업체를 직접 골라 주세요."
     ),
     SimulationErrorCode.PERIOD_INCOMPLETE: ErrorSpec(
         422, "조회 기간은 시작일과 종료일을 함께 입력해야 합니다."

@@ -190,6 +190,8 @@ function replyFor(pathname: string, replies: Replies): Reply {
     return replies.scenarios ?? { status: 200, body: SCENARIOS };
   if (pathname.endsWith("/execution-providers"))
     return { status: 200, body: EXECUTION_PROVIDERS };
+  if (pathname.endsWith("/execution-providers/ranking"))
+    return { status: 200, body: { items: [], excluded: [] } };
   if (pathname.endsWith("/images/limits"))
     return {
       status: 200,

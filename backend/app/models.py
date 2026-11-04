@@ -130,6 +130,22 @@ class PriceSource(StrEnum):
     MANUAL = "MANUAL"
 
 
+class DiscoveryStatus(StrEnum):
+    """새 모델 비교 진행 상태."""
+
+    PENDING = "PENDING"
+    COMPARED = "COMPARED"
+    SKIPPED = "SKIPPED"
+    FAILED = "FAILED"
+
+
+class SkipReason(StrEnum):
+    """새 모델을 비교하지 않고 넘어간 이유."""
+
+    INITIAL = "INITIAL"
+    PRICE_TOO_HIGH = "PRICE_TOO_HIGH"
+
+
 class UsageOrigin(StrEnum):
     """호출 출처. 고객 사용량(CUSTOMER_SERVICE)과 나머지(내부·시뮬레이션·테스트·AI 도우미)를 섞지 않는다."""
 
@@ -668,6 +684,60 @@ class ModelPrice(Base):
     effective_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at_column()
+
+
+class ModelDiscovery(Base):
+    """5.3 새 모델 발견·비교 기록. 같은 모델을 두 번 비교하지 않는 기준."""
+
+    __tablename__ = "model_discoveries"
+    __table_args__ = (
+        in_check("model_discoveries", "status", DiscoveryStatus),
+        in_check("model_discoveries", "skip_reason", SkipReason),
+        column_check(
+            "model_discoveries",
+            "openrouter_model_id",
+            "openrouter_model_id <> '' AND openrouter_model_id = btrim(openrouter_model_id)",
+        ),
+        CheckConstraint(
+            f"(status = '{DiscoveryStatus.SKIPPED}') = (skip_reason IS NOT NULL)",
+            name="ck_model_discoveries_skip_reason",
+        ),
+        CheckConstraint(
+            f"status <> '{DiscoveryStatus.COMPARED}' OR "
+            "(compared_at IS NOT NULL AND base_model_id IS NOT NULL)",
+            name="ck_model_discoveries_compared",
+        ),
+        column_check("model_discoveries", "new_cost_usd", "new_cost_usd >= 0"),
+        column_check("model_discoveries", "base_cost_usd", "base_cost_usd >= 0"),
+        column_check("model_discoveries", "new_latency_ms", "new_latency_ms >= 0"),
+        column_check("model_discoveries", "base_latency_ms", "base_latency_ms >= 0"),
+        Index("ix_model_discoveries_discovered_at", "discovered_at"),
+        {
+            "comment": "새로 올라온 OpenRouter 모델과 기본 모델 비교 결과. 같은 모델을 두 번 비교하지 않는 기준"
+        },
+    )
+
+    discovery_id: Mapped[int] = bigint_identity_pk()
+    openrouter_model_id: Mapped[str] = mapped_column(Text, unique=True)
+    model_name: Mapped[str | None] = mapped_column(Text)
+    openrouter_created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    discovered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    status: Mapped[str] = mapped_column(
+        Text, server_default=DiscoveryStatus.PENDING.value
+    )
+    skip_reason: Mapped[str | None] = mapped_column(Text)
+    base_model_id: Mapped[int | None] = mapped_column(BigInteger, fk("models.model_id"))
+    compared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    new_cost_usd: Mapped[Decimal | None] = mapped_column(MONEY)
+    base_cost_usd: Mapped[Decimal | None] = mapped_column(MONEY)
+    new_latency_ms: Mapped[int | None] = mapped_column(Integer)
+    base_latency_ms: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = created_at_column()
+    updated_at: Mapped[datetime] = updated_at_column()
 
 
 # ===========================================================================

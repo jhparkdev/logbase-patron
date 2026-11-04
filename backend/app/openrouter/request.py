@@ -18,6 +18,7 @@ def build_request_body(
     stream: bool = False,
     temperature: float | None = None,
     reasoning_effort: str | None = None,
+    cache_control: dict[str, str] | None = None,
     tools: list[dict[str, Any]] | None = None,
     deny_data_collection: bool = False,
 ) -> dict[str, Any]:
@@ -44,6 +45,9 @@ def build_request_body(
         body["temperature"] = temperature
     if reasoning_effort is not None:
         body["reasoning"] = {"effort": reasoning_effort}
+    # 캐시를 켜야 하는 모델에만 호출하는 쪽이 넣는다(services/cache_policy). 받은 값은 복사해 담는다
+    if cache_control is not None:
+        body["cache_control"] = dict(cache_control)
 
     if json_schema is not None:
         body["response_format"] = {

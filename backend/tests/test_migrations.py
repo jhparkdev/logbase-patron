@@ -47,6 +47,7 @@ DESIGN_TABLES = {
     "change_logs",
     "user_model_favorites",
     "command_code_keys",
+    "model_discoveries",
 }
 DESIGN_VIEWS = {"v_request_facts", "v_simulation_summary"}
 # Alembic이 "어디까지 적용했는지" 기록하는 테이블
@@ -57,6 +58,7 @@ API_KEY_SERVICE_REVISION = "3f1c9a7e2b64"
 OUTPUT_ASSETS_REVISION = "a4d8e2c61f37"
 COMMAND_CODE_KEYS_REVISION = "404e6f91129f"
 ASSISTANT_ORIGIN_REVISION = "c5e1a9d3b702"
+MODEL_DISCOVERIES_REVISION = "d7a3b81f4c26"
 
 
 def _schema_objects(database_url: URL) -> tuple[set[str], set[str]]:
@@ -551,3 +553,43 @@ async def test_assistant_history_blocks_downgrade_without_changing_data_or_schem
         text(f"SELECT * FROM {table} WHERE {key} = :id"), {"id": row[key]}
     )
     assert preserved.mappings().one() == row
+
+
+def _run_model_discoveries_migration(
+    session: Session, config: Config, *, upgrade: bool
+) -> None:
+    revision = ScriptDirectory.from_config(config).get_revision(
+        MODEL_DISCOVERIES_REVISION
+    )
+    assert revision is not None
+    migrate = revision.module.upgrade if upgrade else revision.module.downgrade
+    with Operations.context(MigrationContext.configure(session.connection())):
+        migrate()
+
+
+async def test_model_discoveries_downgrade_drops_the_table_only_when_empty(
+    db_session: AsyncSession, alembic_config: Config
+) -> None:
+    await db_session.run_sync(
+        _run_model_discoveries_migration, alembic_config, upgrade=False
+    )
+    assert not await _table_exists(db_session, "model_discoveries")
+
+    await db_session.run_sync(
+        _run_model_discoveries_migration, alembic_config, upgrade=True
+    )
+    assert await _table_exists(db_session, "model_discoveries")
+
+
+async def test_model_discoveries_downgrade_stops_when_a_record_exists(
+    factory: Factory, db_session: AsyncSession, alembic_config: Config
+) -> None:
+    await factory.model_discovery()
+
+    with pytest.raises(DBAPIError, match="Cannot downgrade.*records") as caught:
+        async with db_session.begin_nested():
+            await db_session.run_sync(
+                _run_model_discoveries_migration, alembic_config, upgrade=False
+            )
+
+    assert caught.value.orig.sqlstate == "23514"
