@@ -1,9 +1,26 @@
 """모델 질문의 표시 범위와 조회로 확인된 답변을 정한다."""
 
 import re
+from decimal import Decimal
 from typing import Any, Literal
 
 ModelLookupKind = Literal["count", "list", "providers"]
+# 정렬해서 보여 준 목록이면 어떤 기준으로 골랐는지 답변에 남긴다. 이름순은 기본이라 적지 않는다.
+SORT_BASIS = {
+    "recent": "최근 등록순(이 콘솔에 등록한 날짜 기준)으로 정렬했어요. OpenRouter 출시일과는 다를 수 있어요.",
+    "price": "입력 단가 낮은순으로 정렬했어요. 모델 대표 단가이며 실제 실행 업체의 단가와 다를 수 있어요.",
+}
+# 토큰당 단가는 소수 자리가 길어 화면 표기처럼 100만 토큰당으로 보여 준다.
+PRICE_UNIT_TOKENS = Decimal(1_000_000)
+
+
+def _input_price(row: dict[str, Any]) -> str:
+    price = (row.get("price") or {}).get("input_usd_per_token")
+    if price is None:
+        return "입력 단가 미확인"
+    amount = format(Decimal(price) * PRICE_UNIT_TOKENS, "f")
+    amount = amount.rstrip("0").rstrip(".") if "." in amount else amount
+    return f"입력 {amount} USD / 100만 토큰"
 
 
 def model_lookup_kind(
@@ -60,10 +77,16 @@ def model_answer(result: dict[str, Any]) -> str:
         if result.get("q")
         else f"지금 사용 가능한 모델은 {total:,}개입니다."
     )
+    sort = result.get("sort")
     lines = [heading]
+    if sort in SORT_BASIS:
+        lines.append(SORT_BASIS[sort])
     show_providers = result.get("view") == "providers"
     for row in rows:
-        lines.append(f"- {row['name']} — 모델 제공사: {row.get('creator') or '미확인'}")
+        line = f"- {row['name']} — 모델 제공사: {row.get('creator') or '미확인'}"
+        if sort == "price":
+            line += f" · {_input_price(row)}"
+        lines.append(line)
         if show_providers:
             names = ", ".join(item["execution_provider"] for item in row["providers"])
             lines.append(f"실행 업체: {names or '확인하지 못했어요'}")

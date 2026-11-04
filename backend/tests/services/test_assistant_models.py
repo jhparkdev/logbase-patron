@@ -136,3 +136,44 @@ def test_explicit_omission_of_providers_does_not_trigger_endpoint_fetches(
     text: str, kind: str
 ) -> None:
     assert model_lookup_kind(text) == kind
+
+
+def model_row(name: str, price: str | None = None) -> dict:
+    return {
+        "name": name,
+        "creator": "vendor",
+        "providers": [],
+        "price": {"input_usd_per_token": price, "output_usd_per_token": price}
+        if price is not None
+        else None,
+    }
+
+
+def test_recent_sort_states_the_registration_order_basis() -> None:
+    answer = model_answer(
+        {"sort": "recent", "total": 1, "items": [model_row("새 모델")]}
+    )
+
+    assert "최근 등록순" in answer
+
+
+def test_price_sort_shows_input_price_per_million_tokens_and_unknown_prices() -> None:
+    answer = model_answer(
+        {
+            "sort": "price",
+            "total": 2,
+            "items": [model_row("싼 모델", "0.0000001"), model_row("미확인 모델")],
+        }
+    )
+
+    assert "입력 단가 낮은순" in answer
+    assert "싼 모델 — 모델 제공사: vendor · 입력 0.1 USD / 100만 토큰" in answer
+    # 가격을 모르는 모델을 0으로 보이지 않는다.
+    assert "미확인 모델 — 모델 제공사: vendor · 입력 단가 미확인" in answer
+
+
+def test_name_sort_does_not_add_a_basis_line() -> None:
+    answer = model_answer({"sort": "name", "total": 1, "items": [model_row("모델")]})
+
+    assert "등록순" not in answer
+    assert "단가" not in answer
