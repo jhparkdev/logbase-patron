@@ -26,6 +26,8 @@ substitutions:
   _OPENROUTER_SECRET: openrouter-key-dev:1
   # 구성원별 Command Code Key JSON. 구성원·Key를 바꾸면 Secret 새 버전을 만들고 여기 번호를 올린다.
   _COMMAND_CODE_SECRET: command-code-api-keys-dev:1
+  # 시뮬레이터 이미지 GCS 버킷. 비우면 backend가 컨테이너 임시 디스크에 저장해 재시작 때 파일이 사라지므로 배포에서는 꼭 넣는다.
+  _IMAGE_BUCKET: logb-patron-images-dev
 
 steps:
   # 필수 값이 비어 있거나 모드 값이 틀리면 잘못된 설정으로 진행하지 않도록 바로 멈춘다.
@@ -110,7 +112,7 @@ steps:
           --service-account="${_BACKEND_SA}" \
           --set-cloudsql-instances="${_CLOUDSQL_INSTANCE}" \
           --set-secrets="DATABASE_URL=${_DB_SECRET},OPENROUTER_API_KEY=${_OPENROUTER_SECRET},COMMAND_CODE_API_KEYS=${_COMMAND_CODE_SECRET}" \
-          --set-env-vars="APP_ENV=${_APP_ENV},ALLOWED_ORIGIN=https://${_FRONTEND_SERVICE}-$PROJECT_NUMBER.${_REGION}.run.app" \
+          --set-env-vars="APP_ENV=${_APP_ENV},ALLOWED_ORIGIN=https://${_FRONTEND_SERVICE}-$PROJECT_NUMBER.${_REGION}.run.app,IMAGE_STORAGE_BUCKET=${_IMAGE_BUCKET}" \
           --max-instances=1 \
           --no-cpu-throttling \
           --no-invoker-iam-check
