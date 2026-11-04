@@ -13,6 +13,10 @@ server {
         # 실행 환경에 따라 Backend 주소 변경
         set $backend "${BACKEND_URL}";
 
+        # 이미지 업로드 한도(backend MAX_IMAGE_BYTES, 5MiB)에 multipart 머리글 여유를 더한 값.
+        # nginx 기본값 1MB면 앱이 받는 크기도 413으로 막혀 앱의 안내 문구가 나오지 않는다.
+        client_max_body_size 6m;
+
         # 요청 경로(/api/...)를 유지하며 Backend로 전달
         proxy_pass $backend;
 
