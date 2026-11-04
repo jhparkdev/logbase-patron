@@ -2,6 +2,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
 import {
+  DISCOVERIES,
   NEW_MODELS,
   NO_NEW_MODELS,
   OPENROUTER,
@@ -181,4 +182,44 @@ test("알림을 불러오지 못해도 알리지 않고 모델 표는 그대로 
   );
   expect(screen.queryByText(/새 모델 .*개가 올라왔어요/)).toBeNull();
   expect(screen.queryByText("불러오지 못했어요")).toBeNull();
+});
+
+test("비교한 새 모델이 있으면 결과와 넘어간 이유를 보여 준다", async () => {
+  stubModelsApi({ discoveries: { status: 200, body: DISCOVERIES } });
+  renderAt("/models");
+
+  const section = await screen.findByRole("region", {
+    name: "새 모델 비교 결과",
+  });
+
+  expect(within(section).getByText("Acme: New")).toBeTruthy();
+  expect(within(section).getByText("확인해 볼 만해요")).toBeTruthy();
+  expect(
+    within(section).getByText("기본 모델 대비 비용 50.0% 저렴해요"),
+  ).toBeTruthy();
+  expect(
+    within(section).getByText(
+      "단가가 기본 모델보다 많이 비싸거나 알 수 없어 비교하지 않았어요",
+    ),
+  ).toBeTruthy();
+});
+
+test("비교한 새 모델이 없으면 비교 결과 구역을 그리지 않는다", async () => {
+  stubModelsApi();
+  renderAt("/models");
+  await screen.findByRole("table", { name: TABLE });
+
+  expect(
+    screen.queryByRole("region", { name: "새 모델 비교 결과" }),
+  ).toBeNull();
+});
+
+test("비교 결과를 불러오지 못해도 모델 목록은 그대로 보인다", async () => {
+  stubModelsApi({ discoveries: { status: 500, body: {} } });
+  renderAt("/models");
+
+  expect(await screen.findByRole("table", { name: TABLE })).toBeTruthy();
+  expect(
+    screen.queryByRole("region", { name: "새 모델 비교 결과" }),
+  ).toBeNull();
 });

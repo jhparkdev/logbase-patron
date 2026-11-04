@@ -151,6 +151,22 @@ export const newOpenRouterModelsQuery = queryOptions({
   retry: false,
 });
 
+const DISCOVERIES_LIMIT = 5;
+const DISCOVERIES_STALE_TIME_MS = 60_000;
+
+/** 새 모델과 기본 모델의 비교 결과. 서버가 주기적으로 쌓아 두므로 DB만 읽음. 알림과 같은 키 아래라서 등록하면 함께 다시 불러옴 */
+export const modelDiscoveriesQuery = queryOptions({
+  queryKey: [...OPENROUTER_MODELS_KEY, "discoveries"],
+  queryFn: async () =>
+    unwrap(
+      await api.GET("/api/models/openrouter/discoveries", {
+        params: { query: { limit: DISCOVERIES_LIMIT } },
+      }),
+    ),
+  staleTime: DISCOVERIES_STALE_TIME_MS,
+  retry: false,
+});
+
 /** 업체는 자주 바뀌지 않으므로 서버의 10분 보관에 맞춰 화면에서도 잠깐 캐시 */
 const RANKING_STALE_TIME_MS = 5 * 60_000;
 

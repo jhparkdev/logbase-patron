@@ -157,6 +157,49 @@ export const NO_NEW_MODELS: Schemas["OpenRouterNewModelsResponse"] = {
   items: [],
 };
 
+/** 비교한 새 모델이 없는 응답. 비교 결과 구역이 보이지 않는 것이 기본 상태다 */
+export const NO_DISCOVERIES: Schemas["ModelDiscoveriesResponse"] = {
+  items: [],
+};
+
+/** 싸고 빠른 모델 하나와 비교하지 않고 넘어간 모델 하나 */
+export const DISCOVERIES: Schemas["ModelDiscoveriesResponse"] = {
+  items: [
+    {
+      openrouter_model_id: "acme/new",
+      name: "Acme: New",
+      discovered_at: "2026-11-05T01:00:00Z",
+      status: "COMPARED",
+      skip_reason: null,
+      base_model_name: "GPT-4o mini",
+      new_cost_usd: "0.0005",
+      base_cost_usd: "0.001",
+      new_latency_ms: 800,
+      base_latency_ms: 1000,
+      cost_change_pct: "-50.0",
+      latency_change_pct: "-20.0",
+      cheaper: true,
+      faster: true,
+    },
+    {
+      openrouter_model_id: "acme/pricey",
+      name: "Acme: Pricey",
+      discovered_at: "2026-11-05T00:00:00Z",
+      status: "SKIPPED",
+      skip_reason: "PRICE_TOO_HIGH",
+      base_model_name: null,
+      new_cost_usd: null,
+      base_cost_usd: null,
+      new_latency_ms: null,
+      base_latency_ms: null,
+      cost_change_pct: null,
+      latency_change_pct: null,
+      cheaper: null,
+      faster: null,
+    },
+  ],
+};
+
 /** 업체 둘이 순위에 있고 하나는 가동률이 낮아 빠진 응답 */
 export const RANKING: Schemas["ProviderRankingResponse"] = {
   items: [
@@ -205,6 +248,7 @@ type Replies = {
   status?: Reply;
   openrouter?: Reply;
   newModels?: Reply;
+  discoveries?: Reply;
   ranking?: Reply;
   register?: Reply;
 };
@@ -219,6 +263,9 @@ function replyFor(request: Request, replies: Replies): Reply {
   const { pathname } = new URL(url);
   if (pathname === "/api/models" && request.method === "POST") {
     return replies.register ?? { status: 201, body: DETAIL };
+  }
+  if (pathname === "/api/models/openrouter/discoveries") {
+    return replies.discoveries ?? { status: 200, body: NO_DISCOVERIES };
   }
   if (pathname === "/api/models/openrouter/new") {
     return replies.newModels ?? { status: 200, body: NO_NEW_MODELS };

@@ -6,6 +6,7 @@ import { ModelDetailPanel } from "../../features/models/components/ModelDetailPa
 import { ModelFilters } from "../../features/models/components/ModelFilters";
 import { ModelRegisterPanel } from "../../features/models/components/ModelRegisterPanel";
 import { ModelTable } from "../../features/models/components/ModelTable";
+import { NewModelComparison } from "../../features/models/components/NewModelComparison";
 import { NewModelNotice } from "../../features/models/components/NewModelNotice";
 import { modelsSearchSchema } from "../../features/models/lib/search";
 import { Button } from "../../shared/components/ui/Button";
@@ -42,6 +43,7 @@ function ModelsPage() {
         </Button>
       </div>
       <NewModelNotice onRegister={() => setRegistering("new")} />
+      <NewModelComparison />
       <ModelFilters
         search={search}
         // 조건이 바뀌면 1페이지로 복귀
