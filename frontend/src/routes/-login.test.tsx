@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import { currentUserQueryOptions } from "../features/auth/api/auth";
 import { renderAt, TEST_USER } from "../test/renderAt";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -35,6 +36,43 @@ async function fillAndSubmit(email: string, password: string) {
   });
   fireEvent.click(screen.getByRole("button", { name: "로그인하기" }));
 }
+
+test("로그인 전에 시작한 세션 확인이 늦게 끝나도 새 로그인 상태를 덮어쓰지 않는다", async () => {
+  stubLoginResponse(200, TEST_USER);
+  const originalFetch = fetch;
+  let finish: ((value: Response) => void) | undefined;
+  vi.stubGlobal("fetch", (request: Request) => {
+    const path = new URL(request.url).pathname;
+    if (path === "/api/auth/me")
+      return new Promise<Response>((resolve) => {
+        finish = resolve;
+      });
+    if (path === "/api/models")
+      return Promise.resolve(
+        jsonResponse(200, { items: [], total: 0, page: 1, page_size: 10 }),
+      );
+    return originalFetch(request);
+  });
+  const router = renderAt("/login?redirect=%2Fmodels", { user: null });
+  await screen.findByRole("heading", { level: 1, name: "로그인" });
+  const queryClient = router.options.context.queryClient;
+  const pending = queryClient
+    .fetchQuery({ ...currentUserQueryOptions, staleTime: 0 })
+    .catch(() => undefined);
+  await waitFor(() => expect(finish).toBeDefined());
+  await fillAndSubmit("admin1@patron.dev", "secret");
+  await screen.findByRole("heading", { level: 1, name: "AI 모델 관리" });
+  await act(async () => {
+    finish?.(
+      jsonResponse(401, { code: "UNAUTHENTICATED", message: "로그인 필요" }),
+    );
+    await pending;
+  });
+  expect(queryClient.getQueryData(currentUserQueryOptions.queryKey)).toEqual(
+    TEST_USER,
+  );
+  expect(router.state.location.pathname).toBe("/models");
+});
 
 test("로그인하지 않은 상태로 보호된 화면에 들어가면 로그인 화면으로 보내고 원래 주소를 남긴다", async () => {
   const router = renderAt("/models?sort=status&order=desc", { user: null });

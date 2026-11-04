@@ -20,6 +20,15 @@ export function currentMonthPeriod(now: Date): Period {
   return { from: `${today.slice(0, 8)}01`, to: today };
 }
 
+/** 선택한 날짜가 속한 예산 월 전체. UTC 달력 계산으로 브라우저 시간대 영향을 피한다. */
+export function wholeMonthPeriod(day: string): Period {
+  const [year, month] = day.split("-").map(Number);
+  return {
+    from: `${day.slice(0, 7)}-01`,
+    to: new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10),
+  };
+}
+
 function toUtcMidnight(date: string): number {
   return Date.parse(`${date}T00:00:00Z`);
 }

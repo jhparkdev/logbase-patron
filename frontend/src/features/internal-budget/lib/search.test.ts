@@ -252,6 +252,13 @@ describe("subscriptionRowsQuery", () => {
 });
 
 describe("프로젝트·모델 조건", () => {
+  test("예산 목록 상태를 URL에서 검증하고 조회 API에 전달한다", () => {
+    const filtered = parse({ ...PERIOD, budgetStatus: "OVER" });
+    expect(projectRowsQuery(filtered).budget_status).toBe("OVER");
+    expect(
+      parse({ ...PERIOD, budgetStatus: "arbitrary" }).budgetStatus,
+    ).toBeUndefined();
+  });
   test("주소의 프로젝트·모델 번호는 1 이상의 정수만 받는다", () => {
     expect(parse({ ...PERIOD, project: 1, model: 20 })).toEqual({
       ...PERIOD,

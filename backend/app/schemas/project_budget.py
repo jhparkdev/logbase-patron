@@ -32,6 +32,7 @@ class ProjectRowsQuery(BaseModel):
     # 프로젝트나 모델을 고르면 요약과 같은 조건으로 사용액을 센다. 모델을 고르면 구독료는 뺀다
     project_id: RowId | None = None
     model_id: RowId | None = None
+    budget_status: BudgetStatus | None = None
     # 예산을 넘었거나 넘을 것 같은 프로젝트가 위에 오도록 기본은 사용률이다
     sort: ProjectRowSort = ProjectRowSort.USAGE
     order: SortOrder = SortOrder.DESC
