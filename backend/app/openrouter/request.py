@@ -3,6 +3,8 @@
 from typing import Any
 
 JSON_SCHEMA_NAME = "response"
+DATA_COLLECTION_DENY = "deny"
+AUTO_TOOL_CHOICE = "auto"
 
 
 def build_request_body(
@@ -17,11 +19,16 @@ def build_request_body(
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     cache_control: dict[str, str] | None = None,
+    tools: list[dict[str, Any]] | None = None,
+    deny_data_collection: bool = False,
 ) -> dict[str, Any]:
     # 업체 자동 전환은 기본으로 끈다. 비교 조건이 바뀌지 않게 하기 위해서다.
     provider: dict[str, Any] = {"allow_fallbacks": allow_fallbacks}
     if provider_order:
         provider["order"] = provider_order
+    # 요청 데이터를 수집하는 업체로는 보내지 않는다.
+    if deny_data_collection:
+        provider["data_collection"] = DATA_COLLECTION_DENY
 
     body: dict[str, Any] = {
         "model": model_id,
@@ -52,6 +59,12 @@ def build_request_body(
             },
         }
         # Schema를 지원하지 않는 모델이 조용히 무시하지 않고 404로 실패하게 한다.
+        provider["require_parameters"] = True
+
+    if tools:
+        body["tools"] = tools
+        body["tool_choice"] = AUTO_TOOL_CHOICE
+        # 도구 호출을 지원하지 않는 업체가 도구를 무시하고 근거 없이 답하지 않게 한다.
         provider["require_parameters"] = True
 
     return body

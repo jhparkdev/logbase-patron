@@ -27,6 +27,7 @@ export function ModelPickerDialog({
   unavailable,
   favorites = unavailableFavorites,
   imagesAttached = false,
+  imageOutput = false,
   onClose,
   onApply,
 }: {
@@ -37,6 +38,7 @@ export function ModelPickerDialog({
   favorites?: ModelFavoritesView;
   /** 이미지를 첨부한 상태면 이미지 지원 모델만 보는 필터를 제안한다 */
   imagesAttached?: boolean;
+  imageOutput?: boolean;
   onClose: () => void;
   onApply: (keys: string[]) => void;
 }) {
@@ -230,6 +232,7 @@ export function ModelPickerDialog({
               favorites={favorites}
               onToggle={toggle}
               counts={counts}
+              showSchema={!imageOutput}
             />
           ) : (
             <div className="py-8 text-center">

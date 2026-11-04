@@ -1,0 +1,26 @@
+# 의존성
+node_modules/
+
+# 빌드 결과물
+dist/
+.vite/
+*.tsbuildinfo
+.pnpm-store/
+coverage/
+
+# 환경 변수
+.env
+.env.*
+
+# Docker 설정 파일
+Dockerfile
+.dockerignore
+
+# 개발 도구
+.git/
+.gitignore
+.vscode/
+CLAUDE.md
+
+# macOS 파일
+.DS_Store

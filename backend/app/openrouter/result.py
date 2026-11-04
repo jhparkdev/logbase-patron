@@ -49,6 +49,17 @@ def check_cost_matches_status(
         raise ValueError("비용 상태가 CONFIRMED이면 cost_usd가 있어야 한다")
 
 
+class ToolCall(BaseModel):
+    """모델이 요청한 도구 호출 하나. 인자는 JSON 문자열을 객체로 읽은 값이다."""
+
+    model_config = ConfigDict(frozen=True)
+
+    # 도구 결과를 돌려보낼 때 tool_call_id로 그대로 쓴다.
+    id: str
+    name: str
+    arguments: dict[str, Any]
+
+
 class CallResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -60,6 +71,8 @@ class CallResult(BaseModel):
 
     content: str | None = None
     finish_reason: str | None = None
+    # 도구를 함께 보낸 호출에서만 채워진다. 본문 없이 도구 호출만 올 수 있다.
+    tool_calls: tuple[ToolCall, ...] = ()
 
     requested_model: str
     actual_model: str | None = None

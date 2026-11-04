@@ -31,6 +31,9 @@ credentials*.json
 alembic_schema.sql
 design_schema.sql
 
+# 로컬 compose(full 프로필) backend가 저장한 시뮬레이터 이미지
+backend/uploads/
+
 # DB 구축 가이드 (개인 참고용, 커밋하지 않음)
 docs/DB/
 

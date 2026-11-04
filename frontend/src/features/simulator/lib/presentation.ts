@@ -5,6 +5,7 @@ import {
   requestedSettings,
 } from "./comparisons";
 import type { SimulatorDraft } from "./form";
+import { imageOutputIssues } from "./output";
 import {
   PARAMETER_LABELS,
   PARAMETER_NAMES,
@@ -24,6 +25,8 @@ export type ModelChoice = {
   // 같은 모델의 서버 업체 중 예상 비용이 가장 싼 업체
   cheapest?: boolean;
   supportsImages: boolean;
+  // 이미지 출력(output_modalities)을 만드는지. 모르면 이미지 출력에서 고를 수 없다.
+  generatesImages?: boolean;
   supportedParameters: readonly string[];
   tuningParameters?: readonly TuningParameter[];
   // 토큰당 단가(USD 문자열). 모르면 null이고 0으로 보여 주지 않는다.
@@ -72,6 +75,8 @@ export type SlotView = {
   schemaValidation: string;
   missingFields?: string[];
   response: string | null;
+  // 이미지 출력 칸의 결과. 텍스트 출력 칸에는 없다.
+  images?: readonly { key: string; url: string; mimeType: string }[];
   errorMessage?: string;
   comparisonNote?: string | null;
   // 실행 당시의 모델 상태. 현재 상태와 다를 수 있다.
@@ -232,6 +237,8 @@ export function selectionIssues(
     }
     if (hasImages && !choice.supportsImages)
       issues.push(`${choice.name}은 이미지 입력을 지원하지 않아요.`);
+    // 이미지 생성 실행에는 텍스트 설정과 Schema를 보내지 않으므로 아래 검사는 imageOutputIssues가 대신한다
+    if (draft.outputType === "IMAGE") continue;
     const settings = appliedSettings(comparison, draft, choice, scenario);
     for (const key of SETTING_KEYS) {
       const value = settings[key];
@@ -268,5 +275,6 @@ export function selectionIssues(
     if (draft.jsonSchema.trim() && !supportsStructuredOutput(choice))
       issues.push(`${choice.name}은 구조화 출력 설정을 지원하지 않아요.`);
   }
+  issues.push(...imageOutputIssues(draft, choices));
   return [...new Set(issues)];
 }

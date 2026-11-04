@@ -46,7 +46,7 @@ class InternalRequestsQuery(InternalFilterQuery):
 class InternalRequestRow(BaseModel):
     request_id: UUID
     requested_at: datetime
-    usage_origin: UsageOrigin  # 개발, 시뮬레이션, 시스템 테스트 중 하나
+    usage_origin: UsageOrigin  # 개발, 시뮬레이션, 시스템 테스트, AI 도우미 중 하나
     project_id: int | None
     project_name: str | None
     service_id: int

@@ -70,6 +70,46 @@ def test_period_default_does_not_take_unrelated_screen_or_model_guessed_today() 
     assert actual.end.isoformat() == "2026-11-03"
 
 
+SCREEN = AssistantPageContext(
+    page="customer_usage", start_date="2026-10-01", end_date="2026-10-31"
+)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("10/12부터 10/15까지 비용", ("2026-10-12", "2026-10-15")),
+        ("2026/10/12~2026/10/15 비용", ("2026-10-12", "2026-10-15")),
+        ("2026.10.12부터 2026.10.15까지 비용", ("2026-10-12", "2026-10-15")),
+        ("10월 12일부터 15일까지 비용", ("2026-10-12", "2026-10-15")),
+        ("어제 비용", ("2026-11-02", "2026-11-02")),
+        ("1.5달러 넘는 호출 비용", ("2026-10-01", "2026-10-31")),
+    ],
+)
+def test_common_period_formats_are_read_from_the_user_request(
+    text: str, expected: tuple[str, str]
+) -> None:
+    actual = usage_period(CustomerUsageToolQuery(), SCREEN, NOW, text, internal=False)
+    assert (actual.start.isoformat(), actual.end.isoformat()) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["지난주 비용", "이번 주 비용", "올해 비용", "2025년 비용", "최근 3개월 비용"],
+)
+def test_unsupported_period_words_are_not_silently_replaced_by_the_screen(
+    text: str,
+) -> None:
+    with pytest.raises(UsageQueryError):
+        usage_period(
+            CustomerUsageToolQuery(start_date="2026-10-27", end_date="2026-11-02"),
+            SCREEN,
+            NOW,
+            text,
+            internal=False,
+        )
+
+
 def test_period_bounds_and_korean_midnight_are_preserved() -> None:
     query = CustomerUsageToolQuery()
     now = datetime(2026, 10, 31, 15, tzinfo=UTC)
@@ -157,6 +197,24 @@ async def test_user_named_customer_is_respected_even_if_model_omits_or_changes_i
     assert source.page_context.customer_id is None
     _, source = await tool.customer(CustomerUsageToolQuery(customer_name="가상고객A"))
     assert source.page_context.customer_id is None
+
+
+async def test_names_from_earlier_non_usage_questions_do_not_become_filters(
+    db_session: AsyncSession, factory: Factory
+) -> None:
+    customer = await factory.customer(name="가상고객A")
+    model = await factory.model(display_name="젬마 테스트")
+    await customer_call(factory, customer["customer_id"], model_id=model["model_id"])
+    price_question = ("젬마 테스트 가격 알려줘",)
+    tool = AssistantUsage(db_session, NOW, None, "이번 달 고객 비용", price_question)
+    _, source = await tool.customer(CustomerUsageToolQuery())
+    assert source.page_context.model_id is None
+    with pytest.raises(UsageQueryError):
+        await tool.customer(CustomerUsageToolQuery(model_name="젬마 테스트"))
+    usage_question = ("젬마 테스트 모델의 고객 비용 알려줘",)
+    tool = AssistantUsage(db_session, NOW, None, "지난달은?", usage_question)
+    _, source = await tool.customer(CustomerUsageToolQuery())
+    assert source.page_context.model_id == model["model_id"]
 
 
 async def test_budget_overrun_request_is_filtered_even_if_model_omits_status(

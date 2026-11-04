@@ -175,3 +175,13 @@ test("서버 업체를 모르면 최저가 표시도 하지 않는다", () => {
     expect(choices[0].selectable).toBe(false);
   }
 });
+
+test("출력 형식에 이미지가 있는 모델만 이미지를 만드는 모델로 본다", () => {
+  const [text] = toModelChoices(MODEL_ROW, { providers: ["DeepInfra"] });
+  const [image] = toModelChoices(
+    { ...MODEL_ROW, output_modalities: ["image", "text"] },
+    { providers: ["Google"] },
+  );
+  expect(text.generatesImages).toBe(false);
+  expect(image.generatesImages).toBe(true);
+});

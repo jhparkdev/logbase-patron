@@ -87,7 +87,13 @@ ALLOWED_VALUES: list[tuple[str, str, str, list[str], dict[str, Any], set[str]]] 
         "tasks",
         "task",
         "usage_origin",
-        ["CUSTOMER_SERVICE", "INTERNAL_DEVELOPMENT", "SIMULATION", "SYSTEM_TEST"],
+        [
+            "CUSTOMER_SERVICE",
+            "INTERNAL_DEVELOPMENT",
+            "SIMULATION",
+            "SYSTEM_TEST",
+            "ASSISTANT",
+        ],
         {"project_id": None},
         set(),
     ),
@@ -121,7 +127,13 @@ ALLOWED_VALUES: list[tuple[str, str, str, list[str], dict[str, Any], set[str]]] 
         "ai_requests",
         "ai_request",
         "usage_origin",
-        ["CUSTOMER_SERVICE", "INTERNAL_DEVELOPMENT", "SIMULATION", "SYSTEM_TEST"],
+        [
+            "CUSTOMER_SERVICE",
+            "INTERNAL_DEVELOPMENT",
+            "SIMULATION",
+            "SYSTEM_TEST",
+            "ASSISTANT",
+        ],
         {},
         set(),
     ),
@@ -786,7 +798,7 @@ async def test_executor_is_recorded_only_for_simulation_and_system_test(
             factory.ai_request(usage_origin=origin, executed_by=None),
             constraint="ck_ai_requests_executed_by",
         )
-    for origin in ("CUSTOMER_SERVICE", "INTERNAL_DEVELOPMENT"):
+    for origin in ("CUSTOMER_SERVICE", "INTERNAL_DEVELOPMENT", "ASSISTANT"):
         await expect_rejected(
             db_session,
             factory.ai_request(usage_origin=origin, executed_by=user_id),
@@ -1452,6 +1464,7 @@ async def test_budget_periods_do_not_overlap(
         ("INTERNAL_DEVELOPMENT", "INTERNAL"),
         ("SIMULATION", "POC"),
         ("SYSTEM_TEST", "POC"),
+        ("ASSISTANT", "POC"),
     ],
 )
 async def test_owner_type_is_derived_from_origin(

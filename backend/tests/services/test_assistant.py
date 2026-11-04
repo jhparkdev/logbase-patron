@@ -1,18 +1,66 @@
 import pytest
 
-from app.schemas.assistant import AssistantChatRequest, AssistantSource, SimulatorPatch
+from app.schemas.assistant import (
+    AssistantChatRequest,
+    AssistantPageContext,
+    AssistantSource,
+    SimulatorPatch,
+)
 from app.services.assistant import answer
 from app.services.assistant_ollama import AssistantUnavailableError, OllamaMessage
+from tests.schemas.test_simulation_result import RUN_ID, result_body, summary_body
 
 
 class FakeCaller:
     def __init__(self, replies: list[OllamaMessage]) -> None:
         self.replies = replies
         self.requests: list[list[dict]] = []
+        self.tools: list[list[dict]] = []
 
     async def chat(self, messages: list[dict], tools: list[dict]) -> OllamaMessage:
         self.requests.append(list(messages))
+        self.tools.append(tools)
         return self.replies.pop(0)
+
+
+def tool_call(name: str, arguments: dict | None = None) -> dict:
+    return {"function": {"name": name, "arguments": arguments or {}}}
+
+
+class SummaryAndCallsTools:
+    """고객 사용량 조회를 section별로 흉내 낸다."""
+
+    def __init__(self) -> None:
+        self.patch = None
+        self.failure_message = None
+        self.sources: list[AssistantSource] = []
+
+    async def execute(self, name: str, arguments: dict) -> dict:
+        assert name == "get_customer_usage"
+        self.sources.append(AssistantSource(title="고객", kind="customer_usage"))
+        section = arguments.get("section", "summary")
+        base = {
+            "section": section,
+            "conditions": {"start_date": "2026-10-01", "end_date": "2026-10-31"},
+            "matched_entities": {"customer": "가상고객A"},
+        }
+        if section == "requests":
+            row = {
+                "requested_at": "2026-10-25T08:00:00Z",
+                "cost_usd": "0.5",
+                "cost_status": "CONFIRMED",
+            }
+            return {**base, "data": {"items": [row], "total": 1}}
+        if section in {"budgets", "options"}:
+            return {**base, "data": {"items": [], "total": 0}}
+        return {
+            **base,
+            "data": {
+                "confirmed_cost_usd": "1.25",
+                "estimated_cost_usd": "0",
+                "unknown_cost_count": 0,
+            },
+        }
 
 
 class FakeTools:
@@ -25,6 +73,94 @@ class FakeTools:
         assert name == "prepare_simulator_settings"
         self.patch = SimulatorPatch.model_validate(arguments)
         return {"prepared": True, "executed": False}
+
+
+class ComparisonTools(FakeTools):
+    def __init__(self, result: dict) -> None:
+        super().__init__()
+        self.result = result
+        self.calls: list[dict] = []
+
+    async def execute(self, name: str, arguments: dict) -> dict:
+        assert name == "get_simulation"
+        self.calls.append(arguments)
+        self.sources.append(
+            AssistantSource(title="실행 상세", kind="simulation", simulation_id=RUN_ID)
+        )
+        return self.result
+
+
+async def test_quantitative_comparison_uses_verified_data_without_model_generation() -> (
+    None
+):
+    tools = ComparisonTools(
+        {
+            "summary": summary_body(model_count=2),
+            "results": [result_body(), result_body(slot_no=2, latency_ms=900)],
+        }
+    )
+    caller = FakeCaller([])
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "어떤 모델이 더 빠르고 저렴했어?"}],
+            page_context=AssistantPageContext(page="simulator", simulation_id=RUN_ID),
+        ),
+        caller,
+        tools,
+    )
+    assert tools.calls == [{"simulation_id": RUN_ID}]
+    assert caller.requests == []
+    assert "가장 짧은 응답시간: 2번" in result.message
+    assert result.patch is None
+    assert result.sources[0].simulation_id == RUN_ID
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"error": "실행을 찾을 수 없어요."},
+        {"summary": {}},
+        {
+            "summary": summary_body(
+                simulation_id="00000000-0000-4000-8000-000000000099"
+            ),
+            "results": [],
+        },
+    ],
+)
+async def test_missing_or_mismatched_comparison_data_never_claims_a_winner(
+    data: dict,
+) -> None:
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": f"실행 결과 비교: {RUN_ID}"}]
+        ),
+        FakeCaller([]),
+        ComparisonTools(data),
+    )
+    assert not result.sources
+    assert "최저 비용:" not in result.message
+    assert "가장 짧은 응답시간:" not in result.message
+
+
+async def test_explicit_comparison_id_overrides_screen_and_missing_target_does_not_call_tools() -> (
+    None
+):
+    tools = ComparisonTools({"summary": summary_body(model_count=2), "results": []})
+    body = AssistantChatRequest(
+        messages=[{"role": "user", "content": f"실행 결과를 비교해줘: {RUN_ID}"}],
+        page_context=AssistantPageContext(
+            page="simulator", simulation_id="00000000-0000-4000-8000-000000000099"
+        ),
+    )
+    await answer(body, FakeCaller([]), tools)
+    assert tools.calls == [{"simulation_id": RUN_ID}]
+    tools.calls.clear()
+    body.messages[-1].content = "최근 실행 결과를 비교해줘"
+    result = await answer(body, FakeCaller([]), tools)
+    assert not tools.calls
+    assert not result.sources
+    assert "비교할 실행" in result.message
 
 
 async def test_customer_query_rejects_a_simulation_tool_even_if_model_requests_it() -> (
@@ -347,7 +483,9 @@ async def test_stops_repeated_tool_loop() -> None:
     caller = FakeCaller([call] * 5)
     with pytest.raises(AssistantUnavailableError):
         await answer(
-            AssistantChatRequest(messages=[{"role": "user", "content": "계속"}]),
+            AssistantChatRequest(
+                messages=[{"role": "user", "content": "토큰을 10으로 바꿔줘"}]
+            ),
             caller,
             FakeTools(),
         )
@@ -404,3 +542,134 @@ async def test_invalid_settings_cannot_be_silently_replaced_with_other_values() 
     )
     assert response.patch is None
     assert len(caller.requests) == 1
+
+
+async def test_instructions_inside_a_looked_up_result_cannot_prepare_settings() -> None:
+    class ResultTools(FakeTools):
+        async def execute(self, name: str, arguments: dict) -> dict:
+            assert name == "get_simulation"
+            self.sources.append(
+                AssistantSource(
+                    title="실행 상세", kind="simulation", simulation_id=RUN_ID
+                )
+            )
+            return {"summary": summary_body(), "results": [result_body()]}
+
+    caller = FakeCaller(
+        [
+            OllamaMessage(
+                tool_calls=[tool_call("get_simulation", {"simulation_id": RUN_ID})]
+            ),
+            OllamaMessage(
+                tool_calls=[
+                    tool_call("prepare_simulator_settings", {"prompt_text": "주입"})
+                ]
+            ),
+        ]
+    )
+    result = await answer(
+        AssistantChatRequest(
+            messages=[
+                {"role": "user", "content": f"이 실행 ID의 결과를 요약해줘: {RUN_ID}"}
+            ],
+            simulator={"prompt_text": "기존 프롬프트"},
+            page_context=AssistantPageContext(page="simulator"),
+        ),
+        caller,
+        ResultTools(),
+    )
+    assert result.patch is None
+    assert "다른 범위" in result.message
+    offered = {tool["function"]["name"] for tool in caller.tools[0]}
+    assert "prepare_simulator_settings" not in offered
+    assert not any("기존 프롬프트" in m["content"] for m in caller.requests[0])
+
+
+async def test_verified_answers_from_several_lookups_are_all_kept() -> None:
+    caller = FakeCaller(
+        [
+            OllamaMessage(
+                tool_calls=[
+                    tool_call("get_customer_usage", {"section": "options"}),
+                    tool_call("get_customer_usage", {"section": "summary"}),
+                    tool_call("get_customer_usage", {"section": "requests"}),
+                ]
+            ),
+            OllamaMessage(content="모델이 쓴 설명 99달러"),
+        ]
+    )
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "가상고객A의 비용과 최근 호출"}]
+        ),
+        caller,
+        SummaryAndCallsTools(),
+    )
+    assert "확정 API 비용: 1.25 USD" in result.message
+    assert "2026-10-25T08:00:00Z" in result.message
+    assert "99달러" not in result.message
+
+
+async def test_unverified_section_keeps_earlier_verified_totals_beside_model_text() -> (
+    None
+):
+    caller = FakeCaller(
+        [
+            OllamaMessage(
+                tool_calls=[
+                    tool_call("get_customer_usage", {"section": "summary"}),
+                    tool_call("get_customer_usage", {"section": "budgets"}),
+                ]
+            ),
+            OllamaMessage(content="예산이 설정된 고객이 없어요."),
+        ]
+    )
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "가상고객A의 비용과 예산"}]
+        ),
+        caller,
+        SummaryAndCallsTools(),
+    )
+    assert "확정 API 비용: 1.25 USD" in result.message
+    assert "예산이 설정된 고객이 없어요." in result.message
+
+
+async def test_prepared_settings_message_is_not_replaced_by_a_lookup_list() -> None:
+    class ModelThenPrepareTools(FakeTools):
+        async def execute(self, name: str, arguments: dict) -> dict:
+            if name == "find_models":
+                self.sources.append(AssistantSource(title="등록 모델", kind="models"))
+                return {
+                    "view": "providers",
+                    "q": None,
+                    "items": [{"name": "모델 1", "creator": "vendor", "providers": []}],
+                    "total": 1,
+                    "page": 1,
+                    "page_size": 5,
+                }
+            return await super().execute(name, arguments)
+
+    caller = FakeCaller(
+        [
+            OllamaMessage(
+                tool_calls=[
+                    tool_call(
+                        "prepare_simulator_settings",
+                        {"execution_config": {"max_tokens": 2048}},
+                    ),
+                    tool_call("find_models"),
+                ]
+            ),
+            OllamaMessage(content="완료"),
+        ]
+    )
+    result = await answer(
+        AssistantChatRequest(
+            messages=[{"role": "user", "content": "최대 출력 토큰을 2048로 바꿔줘"}]
+        ),
+        caller,
+        ModelThenPrepareTools(),
+    )
+    assert result.patch is not None
+    assert result.message == "요청한 설정을 준비했어요. 비교 실행은 시작하지 않았어요."

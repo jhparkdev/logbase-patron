@@ -7,6 +7,7 @@ import type { SimulatorDraft, SimulatorFormValues } from "../lib/form";
 import { fileKey } from "../lib/images";
 import { controlClass, type ImageLimits, TEXT_LIMIT } from "../lib/limits";
 import type { ScenarioChoice } from "../lib/presentation";
+import { OutputTypeField } from "./OutputTypeField";
 import { StepHeading } from "./StepHeading";
 
 type Extra = "text" | "images" | "schema";
@@ -319,6 +320,7 @@ export function InputFields({
           </div>
         )}
       </div>
+      <OutputTypeField />
     </section>
   );
 }

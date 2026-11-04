@@ -129,3 +129,48 @@ test("서버 업체를 알 수 없는 칸이 있으면 요청을 만들지 않�
     ),
   ).toThrow();
 });
+
+test("이미지 출력은 이미지 옵션만 보내고 텍스트 설정과 Schema는 빼서 보낸다", () => {
+  const [first, second] = createComparisons(["6:Google", "7:Google"]);
+  const request = toCreateRequest(
+    draft({
+      outputType: "IMAGE",
+      imageCount: "2",
+      imageQuality: "high",
+      commonEnabled: true,
+      temperature: "0.5",
+      jsonSchema: '{"type":"object"}',
+      existingAssetIds: [ASSET],
+      comparisons: [
+        first,
+        {
+          ...second,
+          settings: {
+            mode: "custom",
+            temperature: "0.9",
+            maxTokens: "",
+            reasoningEffort: "",
+          },
+        },
+      ],
+    }),
+    [],
+  );
+  expect(request).toMatchObject({
+    output_type: "IMAGE",
+    image_config: { n: 2, quality: "high" },
+    execution_config: null,
+    json_schema: null,
+    asset_ids: [ASSET],
+  });
+  expect(request.models).toEqual([
+    { model_id: 6, execution_provider: "Google", execution_config: {} },
+    { model_id: 7, execution_provider: "Google", execution_config: {} },
+  ]);
+});
+
+test("이미지 옵션을 비우면 빈 이미지 옵션으로 모델 기본값을 쓴다", () => {
+  expect(
+    toCreateRequest(draft({ outputType: "IMAGE" }), []).image_config,
+  ).toEqual({});
+});
