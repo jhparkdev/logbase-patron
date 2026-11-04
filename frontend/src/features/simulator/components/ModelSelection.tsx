@@ -161,11 +161,16 @@ export function ModelSelection({
           모델 검색
         </Button>
       </StepHeading>
-      <p className="text-caption text-grey-600">
-        모델 카드의 설정이 실제로 전송돼요. 개별 설정이 공통 설정보다 우선하고,
-        둘 다 비우면 시나리오·모델 기본값 순으로 써요.
-      </p>
-      {settings}
+      {/* 이미지 생성 실행에는 텍스트 설정을 보내지 않으므로 설정 안내와 공통 설정을 숨긴다 */}
+      {!imageOutput && (
+        <>
+          <p className="text-caption text-grey-600">
+            모델 카드의 설정이 실제로 전송돼요. 개별 설정이 공통 설정보다
+            우선하고, 둘 다 비우면 시나리오·모델 기본값 순으로 써요.
+          </p>
+          {settings}
+        </>
+      )}
       {notice}
       {fields.length ? (
         // 빈 칸은 목록 항목이 아니라서 ul 밖에 두고, contents로 같은 격자에 올린다
