@@ -91,12 +91,10 @@ export function ModelCatalogTable({
                   )}
                 </th>
                 <td className="p-3 text-grey-700">
-                  {choice.provider}
-                  {choice.cheapest && (
-                    <div className="mt-1">
-                      <Badge tone="green">최저가</Badge>
-                    </div>
-                  )}
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {choice.provider}
+                    {choice.cheapest && <Badge tone="green">최저가</Badge>}
+                  </span>
                 </td>
                 <td className="p-3">
                   <SupportTags choice={choice} showSchema={showSchema} />

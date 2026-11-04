@@ -229,7 +229,7 @@ test("카탈로그 준비 전에는 검색을 막고 유실된 복원 모델은 
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-test("가장 싼 업체에는 실제 업체 이름 아래에 최저가 배지를 붙인다", () => {
+test("가장 싼 업체에는 실제 업체 이름 옆에 최저가 배지를 붙인다", () => {
   const catalog: ModelChoice[] = [
     { ...choices[0], provider: "DeepInfra", cheapest: true },
     { ...choices[1], key: "model-0:other", provider: "Io Net" },
