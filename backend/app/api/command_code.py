@@ -1,7 +1,4 @@
-"""구성원별 Command Code 사용량(P-02) 경로. 입력 검증과 응답 변환만 하고, 조회는 services가 한다.
-
-로그인 검사는 팀 결정으로 뒤로 미뤘다(main.py). 복구할 때 이 라우터도 함께 대상이 된다.
-"""
+"""구성원별 Command Code 사용량(P-02) 경로. 입력 검증과 응답 변환만 하고, 조회는 services가 한다."""
 
 from fastapi import APIRouter
 

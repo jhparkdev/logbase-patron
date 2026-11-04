@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, status
 from fastapi.responses import JSONResponse
 
 from app.api import model_execution_providers, model_manage, model_openrouter
-from app.api.deps import DevUserDep, NowDep
+from app.api.deps import CurrentUserDep, NowDep
 from app.api.model_common import (
     ModelIdPath,
     model_not_found,
@@ -88,7 +88,7 @@ async def register_model(
     body: ModelCreate,
     catalog: CatalogDep,
     session: SessionDep,
-    user: DevUserDep,
+    user: CurrentUserDep,
     now: NowDep,
 ) -> ModelDetailRead | JSONResponse:
     try:

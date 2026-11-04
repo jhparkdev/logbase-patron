@@ -1,14 +1,11 @@
-"""월 구독료(P-02) 경로. 입력 검증과 응답 변환만 하고, 규칙은 services/subscriptions가 한다.
-
-로그인 검사는 팀 결정으로 뒤로 미뤘다(main.py). 복구할 때 이 라우터도 함께 대상이 된다.
-"""
+"""월 구독료(P-02) 경로. 입력 검증과 응답 변환만 하고, 규칙은 services/subscriptions가 한다."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, status
 from fastapi.responses import JSONResponse
 
-from app.api.deps import DevUserDep, NowDep
+from app.api.deps import CurrentUserDep, NowDep
 from app.api.errors import ApiError
 from app.api.internal_budget import period_of
 from app.api.usage import DETAIL_ERRORS, QUERY_ERRORS
@@ -91,7 +88,7 @@ async def read_subscription(
     responses=CREATE_ERRORS,
 )
 async def create_subscription(
-    body: SubscriptionCreate, session: SessionDep, user: DevUserDep
+    body: SubscriptionCreate, session: SessionDep, user: CurrentUserDep
 ) -> SubscriptionRow | JSONResponse:
     try:
         # dict(body)는 값을 그대로 꺼낸다. model_dump()는 Month를 "YYYY-MM" 문자열로 바꾼다
@@ -116,7 +113,7 @@ async def update_subscription(
     subscription_id: SubscriptionIdPath,
     body: SubscriptionUpdate,
     session: SessionDep,
-    user: DevUserDep,
+    user: CurrentUserDep,
 ) -> SubscriptionRow:
     try:
         return await subscriptions.update_subscription(

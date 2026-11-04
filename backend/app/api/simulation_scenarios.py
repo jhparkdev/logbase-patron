@@ -2,9 +2,8 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Query, status
 
-from app.api.deps import get_current_user
 from app.api.simulation_errors import SimulationRoute
 from app.db import SessionDep
 from app.schemas.simulation_error import SimulationRequestErrorResponse
@@ -15,12 +14,8 @@ from app.schemas.simulation_scenario import (
 )
 from app.services.simulation_scenarios import list_scenarios
 
-# main.py 는 라우터 단위 로그인 검사를 하지 않으므로, 시뮬레이터 라우터와 같게 여기서 세션을 요구한다.
 router = APIRouter(
-    prefix="/scenarios",
-    tags=["simulations"],
-    route_class=SimulationRoute,
-    dependencies=[Depends(get_current_user)],
+    prefix="/scenarios", tags=["simulations"], route_class=SimulationRoute
 )
 
 

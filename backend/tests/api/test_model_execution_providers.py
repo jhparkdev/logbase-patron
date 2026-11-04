@@ -16,6 +16,9 @@ from app.services.openrouter_catalog import OpenRouterUnavailableError
 from tests.api.model_helpers import FakeEndpointCatalog
 from tests.db_helpers import Factory
 
+# 로그인한 사용자만 부를 수 있는 API다. 로그인 경계는 tests/test_main.py 에서 확인한다
+pytestmark = pytest.mark.usefixtures("signed_in")
+
 MODELS = "/api/models"
 UPTIME = Decimal("99.51388888888889")
 

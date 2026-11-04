@@ -17,6 +17,7 @@ from app.schemas.model_register import (
     MAX_PURPOSE_LENGTH,
 )
 from tests.api.model_helpers import FakeCatalog, info
+from tests.api.test_auth import log_in, make_user
 from tests.db_helpers import Factory
 
 MODELS = "/api/models"
@@ -31,9 +32,11 @@ def catalog(app: FastAPI) -> FakeCatalog:
 
 
 @pytest.fixture(autouse=True)
-async def admin(factory: Factory) -> int:
-    """등록자로 기록되는 첫 활성 계정(DevUserDep)."""
-    return (await factory.user())["user_id"]
+async def admin(client: AsyncClient, factory: Factory) -> int:
+    """등록자로 기록되는 계정. 로그인한 계정이 기록되므로 이 계정으로 로그인해 둔다."""
+    user = await make_user(factory)
+    assert (await log_in(client, user["email"])).status_code == 200
+    return int(user["user_id"])
 
 
 def body(**overrides: Any) -> dict[str, Any]:

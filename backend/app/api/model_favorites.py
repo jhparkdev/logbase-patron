@@ -2,9 +2,9 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Query, Response, status
 
-from app.api.deps import CurrentUserDep, get_current_user
+from app.api.deps import CurrentUserDep
 from app.api.errors import VALIDATION_MESSAGE, ApiError
 from app.db import SessionDep
 from app.schemas.common import ErrorCode, ErrorResponse
@@ -16,19 +16,10 @@ from app.schemas.model_favorite import (
 from app.services import model_favorites
 from app.services.model_favorites import FavoriteModelNotFoundError
 
-# main.py 는 라우터 단위 로그인 검사를 하지 않으므로, 시뮬레이터 라우터와 같게 여기서 세션을 요구한다.
-router = APIRouter(
-    prefix="/model-favorites",
-    tags=["model-favorites"],
-    dependencies=[Depends(get_current_user)],
-)
+router = APIRouter(prefix="/model-favorites", tags=["model-favorites"])
 
 
-# 받는 값은 없지만 세션 쿠키를 읽으므로 FastAPI 가 422 를 문서에 넣는다. 실제 형식({code, message})으로 적는다
-@router.get(
-    "",
-    responses={status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorResponse}},
-)
+@router.get("")
 async def list_model_favorites(
     user: CurrentUserDep, session: SessionDep
 ) -> ModelFavoriteList:

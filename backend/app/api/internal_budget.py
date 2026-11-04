@@ -1,14 +1,11 @@
-"""내부 AI 예산 관리(P-02) 경로. 입력 검증과 응답 변환만 하고, 집계는 services/internal_usage가 한다.
-
-로그인 검사는 팀 결정으로 뒤로 미뤘다(main.py). 복구할 때 이 라우터도 함께 대상이 된다.
-"""
+"""내부 AI 예산 관리(P-02) 경로. 입력 검증과 응답 변환만 하고, 집계는 services/internal_usage가 한다."""
 
 from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, status
 
-from app.api.deps import DevUserDep, NowDep
+from app.api.deps import CurrentUserDep, NowDep
 from app.api.errors import ApiError
 from app.api.usage import (
     BUDGET_CONFLICT_MESSAGE,
@@ -132,7 +129,7 @@ async def save_budget(
     project_id: ProjectIdPath,
     body: ProjectBudgetSave,
     session: SessionDep,
-    user: DevUserDep,
+    user: CurrentUserDep,
 ) -> ProjectBudgetRead:
     try:
         budget = await project_budget_save.save_project_budget(
