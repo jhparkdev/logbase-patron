@@ -19,15 +19,18 @@ beforeAll(() => {
   };
 });
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
 
 test("새 모델이 있으면 개수와 기간만 알리고 모델 이름은 보이지 않는다", async () => {
   stubModelsApi({ newModels: { status: 200, body: NEW_MODELS } });
   renderAt("/models");
 
-  expect(await screen.findByText("새 모델 5개가 올라왔어요")).toBeTruthy();
+  expect(await screen.findByText("새로운 모델이 나왔어요")).toBeTruthy();
   expect(
-    screen.getByText("최근 5일 안에 OpenRouter에 올라왔어요."),
+    screen.getByText("아직 등록하지 않은 모델 5개가 있어요."),
   ).toBeTruthy();
   expect(screen.queryByText(/Acme/)).toBeNull();
 });
@@ -36,7 +39,7 @@ test("알림은 파랑이 아니라 노랑(경고) 색으로 보인다", async (
   stubModelsApi({ newModels: { status: 200, body: NEW_MODELS } });
   renderAt("/models");
 
-  const title = await screen.findByText("새 모델 5개가 올라왔어요");
+  const title = await screen.findByText("새로운 모델이 나왔어요");
 
   const box = title.closest("div.rounded-2xl");
   expect(box?.classList.contains("bg-yellow-50")).toBe(true);
@@ -48,7 +51,7 @@ test("최근 5일과 개수만 알면 되므로 모델은 1개만 서버에 요�
     newModels: { status: 200, body: NEW_MODELS },
   });
   renderAt("/models");
-  await screen.findByText("새 모델 5개가 올라왔어요");
+  await screen.findByText("새로운 모델이 나왔어요");
 
   const request = requests.find(({ url }) => url.pathname === NEW_PATH);
   expect(Object.fromEntries(request?.url.searchParams ?? [])).toEqual({
@@ -60,7 +63,7 @@ test("최근 5일과 개수만 알면 되므로 모델은 1개만 서버에 요�
 test("등록하러 가기를 누르면 신규 모델 등록 패널이 열린다", async () => {
   stubModelsApi({ newModels: { status: 200, body: NEW_MODELS } });
   renderAt("/models");
-  await screen.findByText("새 모델 5개가 올라왔어요");
+  await screen.findByText("새로운 모델이 나왔어요");
 
   fireEvent.click(screen.getByRole("button", { name: "등록하러 가기" }));
 
@@ -94,7 +97,7 @@ test("알림의 등록하러 가기로 열면 최근 5일 새 모델만 보고 �
     openrouter: { status: 200, body: NEW_ONLY },
   });
   renderAt("/models");
-  await screen.findByText("새 모델 5개가 올라왔어요");
+  await screen.findByText("새로운 모델이 나왔어요");
 
   fireEvent.click(screen.getByRole("button", { name: "등록하러 가기" }));
 
@@ -116,7 +119,7 @@ test("전체 모델 보기를 누르면 새 모델 조건을 빼고 전체를 �
     openrouter: { status: 200, body: NEW_ONLY },
   });
   renderAt("/models");
-  await screen.findByText("새 모델 5개가 올라왔어요");
+  await screen.findByText("새로운 모델이 나왔어요");
   fireEvent.click(screen.getByRole("button", { name: "등록하러 가기" }));
   const dialog = await screen.findByRole("dialog", { name: "신규 모델 등록" });
   await within(dialog).findByText("Acme: Fresh");
@@ -139,7 +142,7 @@ test("신규 모델 등록 버튼으로 열면 새 모델 조건 없이 전체�
     newModels: { status: 200, body: NEW_MODELS },
   });
   renderAt("/models");
-  await screen.findByText("새 모델 5개가 올라왔어요");
+  await screen.findByText("새로운 모델이 나왔어요");
 
   fireEvent.click(screen.getByRole("button", { name: "신규 모델 등록" }));
 
@@ -222,4 +225,46 @@ test("비교 결과를 불러오지 못해도 모델 목록은 그대로 보인�
   expect(
     screen.queryByRole("region", { name: "새 모델 비교 결과" }),
   ).toBeNull();
+});
+
+const SEEN_KEY = "patron.newModelsSeenAt";
+const LATEST = NEW_MODELS.items[0].created_at;
+
+function modelsMenu() {
+  return screen
+    .getByRole("navigation", { name: "주 메뉴" })
+    .querySelector('a[href="/models"]') as HTMLElement;
+}
+
+test("확인하지 않은 새 모델이 있으면 다른 화면에서도 모델 관리 메뉴에 표시한다", async () => {
+  stubModelsApi({ newModels: { status: 200, body: NEW_MODELS } });
+  renderAt("/internal-budget");
+
+  await waitFor(() =>
+    expect(
+      within(modelsMenu()).getByRole("img", { name: "새로운 모델이 나왔어요" }),
+    ).toBeTruthy(),
+  );
+});
+
+test("가장 새 모델까지 확인했으면 메뉴에 표시하지 않는다", async () => {
+  localStorage.setItem(SEEN_KEY, LATEST ?? "");
+  const { requests } = stubModelsApi({
+    newModels: { status: 200, body: NEW_MODELS },
+  });
+  renderAt("/internal-budget");
+
+  await waitFor(() =>
+    expect(requests.some(({ url }) => url.pathname === NEW_PATH)).toBe(true),
+  );
+  expect(within(modelsMenu()).queryByRole("img")).toBeNull();
+});
+
+test("모델 관리 화면을 열면 지금 새 모델까지 확인한 것으로 남기고 표시를 지운다", async () => {
+  stubModelsApi({ newModels: { status: 200, body: NEW_MODELS } });
+  renderAt("/models");
+
+  await screen.findByText("새로운 모델이 나왔어요");
+  await waitFor(() => expect(localStorage.getItem(SEEN_KEY)).toBe(LATEST));
+  expect(within(modelsMenu()).queryByRole("img")).toBeNull();
 });

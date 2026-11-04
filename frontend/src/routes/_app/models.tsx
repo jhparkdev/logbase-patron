@@ -8,6 +8,7 @@ import { ModelRegisterPanel } from "../../features/models/components/ModelRegist
 import { ModelTable } from "../../features/models/components/ModelTable";
 import { NewModelComparison } from "../../features/models/components/NewModelComparison";
 import { NewModelNotice } from "../../features/models/components/NewModelNotice";
+import { useMarkNewModelsSeen } from "../../features/models/hooks/useNewModelAlert";
 import { modelsSearchSchema } from "../../features/models/lib/search";
 import { Button } from "../../shared/components/ui/Button";
 import { PageHeader } from "../../shared/components/ui/PageHeader";
@@ -30,6 +31,7 @@ function ModelsPage() {
   const shown = useDeferredValue(search);
   // 등록 패널: 닫힘, 전체 모델, 알림에서 열어 새 모델만
   const [registering, setRegistering] = useState<"all" | "new">();
+  useMarkNewModelsSeen();
 
   return (
     <>

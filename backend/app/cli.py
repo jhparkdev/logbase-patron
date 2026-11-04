@@ -275,6 +275,9 @@ async def run_price_sync() -> provider_price_sync.SyncSummary:
 async def run_new_models_check() -> model_discovery.DiscoverySummary:
     settings = get_settings()
     key = settings.openrouter_api_key
+    # .env에 이름만 있고 값이 비어 있어도 키가 없는 것으로 본다
+    if key is not None and not key.get_secret_value().strip():
+        key = None
     if settings.new_model_compare_enabled and key is None:
         raise CommandRefusedError("비교 호출에는 OPENROUTER_API_KEY가 필요합니다.")
     async with httpx.AsyncClient() as http_client:

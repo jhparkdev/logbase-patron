@@ -39,7 +39,8 @@ export function DataTable<T>({
   rowClassName,
 }: DataTableProps<T>) {
   return (
-    <div className="overflow-x-auto rounded-b-2xl">
+    // relative: 칸 안의 sr-only(absolute) 글자가 이 상자 밖 카드를 넓히지 않게 상자 안에 가둔다
+    <div className="relative overflow-x-auto rounded-b-2xl">
       <table className="w-full min-w-max text-body-sm tabular-nums">
         <caption className="sr-only">{caption}</caption>
         <thead className="bg-grey-50 text-label text-grey-600">

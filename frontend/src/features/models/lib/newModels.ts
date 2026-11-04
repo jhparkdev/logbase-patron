@@ -1,7 +1,6 @@
 import { formatCount } from "../../../shared/lib/format";
 
 type NewModelsBody = {
-  days: number;
   total: number;
 };
 
@@ -16,7 +15,17 @@ export function newModelsNotice(
 ): NewModelNoticeText | null {
   if (body.total <= 0) return null;
   return {
-    title: `새 모델 ${formatCount(body.total)}개가 올라왔어요`,
-    description: `최근 ${body.days}일 안에 OpenRouter에 올라왔어요.`,
+    title: "새로운 모델이 나왔어요",
+    description: `아직 등록하지 않은 모델 ${formatCount(body.total)}개가 있어요.`,
   };
+}
+
+/** 가장 새 모델이 마지막으로 확인한 시각보다 뒤에 올라왔는지. 확인한 값을 읽을 수 없으면 아직 안 본 것으로 본다 */
+export function hasUnseenNewModels(
+  latest: string | null,
+  seen: string | null,
+): boolean {
+  if (latest === null) return false;
+  const seenAt = seen === null ? Number.NaN : Date.parse(seen);
+  return Number.isNaN(seenAt) || Date.parse(latest) > seenAt;
 }

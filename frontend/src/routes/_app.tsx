@@ -10,8 +10,11 @@ import { currentUserQueryOptions } from "../features/auth/api/auth";
 import { LogoutButton } from "../features/auth/components/LogoutButton";
 import { useLogout } from "../features/auth/hooks/useLogout";
 import { useSessionWatch } from "../features/auth/hooks/useSessionWatch";
+import { useHasUnseenNewModels } from "../features/models/hooks/useNewModelAlert";
 import { Sidebar } from "../shared/components/ui/Sidebar";
 import { AssistantProvider } from "../shared/lib/assistant";
+
+const NEW_MODEL_ALERT = "새로운 모델이 나왔어요";
 
 // 로그인 화면을 뺀 모든 화면이 쓰는 틀. 주소에는 나타나지 않는다.
 export const Route = createFileRoute("/_app")({
@@ -54,10 +57,13 @@ function AppLayout() {
     }),
   });
   const pageContext = assistantPageContext(page.path, page.search);
+  const hasNewModels = useHasUnseenNewModels();
   return (
     <AssistantProvider>
       <div className="flex min-h-screen">
-        <Sidebar />
+        <Sidebar
+          alerts={hasNewModels ? { "/models": NEW_MODEL_ALERT } : undefined}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex h-16 items-center gap-1 border-b border-grey-200 bg-white px-8 text-body-sm">
             <span className="font-semibold">LOGBASE Patron</span>

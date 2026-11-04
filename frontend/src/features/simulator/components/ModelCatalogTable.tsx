@@ -80,7 +80,7 @@ export function ModelCatalogTable({
                   />
                 </td>
                 <th scope="row" className="p-3 font-semibold">
-                  <span className="flex flex-wrap items-center gap-1.5">
+                  <span className="flex flex-col items-start gap-1">
                     {choice.name}
                     <ModelCreatorBadge creator={choice.creator} />
                   </span>
@@ -91,7 +91,7 @@ export function ModelCatalogTable({
                   )}
                 </th>
                 <td className="p-3 text-grey-700">
-                  <span className="flex flex-wrap items-center gap-1.5">
+                  <span className="flex flex-col items-start gap-1">
                     {choice.provider}
                     {choice.cheapest && <Badge tone="green">최저가</Badge>}
                   </span>

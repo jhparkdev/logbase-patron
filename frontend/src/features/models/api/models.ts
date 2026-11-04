@@ -31,6 +31,8 @@ const OPENROUTER_STALE_TIME_MS = 60_000;
 const NEW_MODELS_STALE_TIME_MS = 5 * 60_000;
 /** 이 일수 안에 OpenRouter에 올라온 모델을 새 모델로 봄 */
 export const NEW_MODELS_DAYS = 5;
+/** 화면을 켜 둔 동안 새 모델을 다시 확인하는 간격. 서버가 목록을 10분 보관하므로 더 짧게 하지 않음 */
+const NEW_MODELS_POLL_MS = 5 * 60_000;
 /** 개수(total)만 알면 되므로 모델은 서버가 허용하는 최소 1개만 받음 */
 const NEW_MODELS_LIMIT = 1;
 
@@ -148,6 +150,7 @@ export const newOpenRouterModelsQuery = queryOptions({
       }),
     ),
   staleTime: NEW_MODELS_STALE_TIME_MS,
+  refetchInterval: NEW_MODELS_POLL_MS,
   retry: false,
 });
 
@@ -164,6 +167,7 @@ export const modelDiscoveriesQuery = queryOptions({
       }),
     ),
   staleTime: DISCOVERIES_STALE_TIME_MS,
+  refetchInterval: DISCOVERIES_STALE_TIME_MS,
   retry: false,
 });
 
