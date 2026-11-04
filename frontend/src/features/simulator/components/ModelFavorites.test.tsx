@@ -69,7 +69,7 @@ test("즐겨찾기는 모델·Provider별로 구별하며 저장 이벤트와 �
   );
   expect(onSet).toHaveBeenLastCalledWith("a:p0", false);
   page.rerender(picker({ kind: "ready", keys: [], onSet }));
-  expect(screen.getByText("아직 즐겨찾기한 모델이 없습니다")).toBeDefined();
+  expect(screen.getByText("아직 즐겨찾기한 모델이 없어요")).toBeDefined();
   fireEvent.click(screen.getByRole("button", { name: "선택 적용" }));
   expect(onApply).toHaveBeenCalledWith(["a:p0", "a:p1"]);
 });
@@ -94,8 +94,8 @@ test("즐겨찾기 목록에서도 검색하고 결과 없음과 빈 즐겨찾�
   fireEvent.change(screen.getByRole("searchbox"), {
     target: { value: "없는 모델" },
   });
-  expect(await screen.findByText("검색 결과가 없습니다")).toBeDefined();
-  expect(screen.queryByText("아직 즐겨찾기한 모델이 없습니다")).toBeNull();
+  expect(await screen.findByText("검색 결과가 없어요")).toBeDefined();
+  expect(screen.queryByText("아직 즐겨찾기한 모델이 없어요")).toBeNull();
 });
 
 test("저장 중인 즐겨찾기만 비활성화하고 비교 선택과 다른 즐겨찾기는 유지한다", () => {
@@ -123,7 +123,7 @@ test("변경 실패를 해당 모델에 안내하고 다시 누르면 동일한 
     picker({ kind: "ready", keys: ["a:p0"], failedKeys: ["a:p0"], onSet }),
   );
   expect(screen.getByRole("alert").textContent).toContain(
-    "즐겨찾기를 변경하지 못했습니다",
+    "즐겨찾기를 바꾸지 못했어요",
   );
   fireEvent.click(
     screen.getByRole("button", { name: "모델 A · Provider 0 즐겨찾기" }),
@@ -147,8 +147,8 @@ test.each(["loading", "unavailable"] as const)(
     expect(
       screen.getByText(
         kind === "loading"
-          ? "즐겨찾기를 불러오고 있습니다"
-          : "즐겨찾기를 준비하고 있습니다",
+          ? "즐겨찾기를 불러오고 있어요"
+          : "즐겨찾기를 준비하고 있어요",
       ),
     ).toBeDefined();
     expect(screen.queryByRole("checkbox")).toBeNull();
@@ -159,7 +159,7 @@ test("조회 실패는 빈 목록과 구별하고 다시 시도할 수 있다", 
   const onRetry = vi.fn();
   render(picker({ kind: "error", onRetry }));
   favoriteList();
-  expect(screen.getByText("즐겨찾기를 불러오지 못했습니다")).toBeDefined();
+  expect(screen.getByText("즐겨찾기를 불러오지 못했어요")).toBeDefined();
   fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
   expect(onRetry).toHaveBeenCalledTimes(1);
 });
@@ -179,4 +179,40 @@ test("즐겨찾기 해제는 비활성 모델에서도 가능하고 모달 닫�
   fireEvent.click(screen.getByRole("button", { name: "닫기" }));
   expect(onSet).toHaveBeenCalledExactlyOnceWith("a:p2", false);
   expect(onClose).toHaveBeenCalledOnce();
+});
+
+test("이미지를 첨부했을 때만 이미지 지원 모델 필터를 제안하고 선택은 유지한다", () => {
+  const catalog = choices.map((item, index) => ({
+    ...item,
+    supportsImages: index === 1,
+  }));
+  const page = render(
+    <ModelPickerDialog
+      choices={catalog}
+      selections={["a:p0"]}
+      unavailable={false}
+      onApply={onApply}
+      onClose={onClose}
+    />,
+  );
+  expect(screen.queryByRole("button", { name: /이미지 지원만/ })).toBeNull();
+  page.rerender(
+    <ModelPickerDialog
+      choices={catalog}
+      selections={["a:p0"]}
+      unavailable={false}
+      imagesAttached
+      onApply={onApply}
+      onClose={onClose}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /이미지 지원만/ }));
+  expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+  expect(
+    screen.getByRole("checkbox", { name: "모델 A · Provider 1" }),
+  ).toBeDefined();
+  // 목록에서 가려져도 이미 고른 모델은 선택 띠에 남는다
+  expect(
+    screen.getByRole("button", { name: "모델 A · Provider 0 선택 해제" }),
+  ).toBeDefined();
 });

@@ -13,6 +13,7 @@ type Model = Pick<
   | "temperature_supported"
   | "reasoning_efforts"
   | "supports_json_schema"
+  | "current_price"
 >;
 
 const AUTO_CHEAPEST: Schemas["AutoProvider"] = "AUTO_CHEAPEST";
@@ -95,6 +96,15 @@ export function toModelChoices(
       ...parameters.map((parameter) => PARAMETER_NAMES[parameter.key]),
       ...(model.supports_json_schema ? [STRUCTURED_OUTPUT_PARAMETER] : []),
     ],
+    // 단가가 없는 모델은 price 자체를 두지 않아 화면이 미확인으로 보여 준다
+    ...(model.current_price
+      ? {
+          price: {
+            input: model.current_price.input_price_per_token,
+            output: model.current_price.output_price_per_token,
+          },
+        }
+      : {}),
   };
   const providers = "providers" in state ? state.providers : [];
   if (!providers.length)
@@ -104,7 +114,7 @@ export function toModelChoices(
         key: choiceKey(model.model_id, ""),
         provider: "확인 불가",
         selectable: false,
-        unavailableReason: "서버 업체를 확인할 수 없습니다",
+        unavailableReason: "서버 업체를 확인할 수 없어요",
       },
     ];
   return [

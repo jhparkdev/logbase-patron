@@ -127,9 +127,9 @@ test("같은 대상을 복제한 뒤 다른 설정으로 제출하고 항목 ID�
   });
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
-  expect(within(dialog).getByText(/Temperature: 0.7/)).toBeDefined();
+  expect(within(dialog).getByText(/Temperature 0.7/)).toBeDefined();
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   await waitFor(() => expect(onRun).toHaveBeenCalledOnce());
   const submitted = onRun.mock.calls[0][0].comparisons;
@@ -141,8 +141,27 @@ test("같은 대상을 복제한 뒤 다른 설정으로 제출하고 항목 ID�
   });
 });
 
+test("공통 설정을 켠 채 복제하면 복제 칸이 모델별 설정이라 공통 설정을 끄고 잠근다", () => {
+  show();
+  fireEvent.click(screen.getByRole("button", { name: /^공통 설정 선택사항$/ }));
+  const common = screen.getByLabelText("공통 설정 사용") as HTMLInputElement;
+  fireEvent.click(common);
+  expect(common.checked).toBe(true);
+  fireEvent.click(
+    screen.getByRole("button", { name: "비교 모델 1 다른 설정으로 비교" }),
+  );
+  expect(common.checked).toBe(false);
+  expect(common.disabled).toBe(true);
+});
+
 test("설정을 바꾸지 않은 복제 항목은 확인창에 진행하지 않고 숫자 표기만 다른 중복도 막는다", async () => {
   const { onRun } = show();
+  // 모델별 설정을 쓰면 공통 설정은 꺼지므로, 원본 칸에 직접 넣은 값과 복제 칸의 값을 비교한다.
+  const own = settings(1);
+  fireEvent.click(own.getByLabelText("모델별 설정 사용"));
+  fireEvent.change(own.getByLabelText("Temperature"), {
+    target: { value: "0.3" },
+  });
   fireEvent.click(
     screen.getByRole("button", { name: "비교 모델 1 다른 설정으로 비교" }),
   );
@@ -150,7 +169,7 @@ test("설정을 바꾸지 않은 복제 항목은 확인창에 진행하지 않�
     target: { value: "0.30" },
   });
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
-  expect(await screen.findByText(/동일한 요청 설정/)).toBeDefined();
+  expect(await screen.findByText(/요청 설정이 같은/)).toBeDefined();
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(onRun).not.toHaveBeenCalled();
 });
@@ -196,7 +215,7 @@ test("앞 항목을 제거해도 남은 항목의 ID·설정을 유지하고 카
   ).toBe("0.8");
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   await waitFor(() => expect(onRun).toHaveBeenCalledOnce());
@@ -217,7 +236,7 @@ test("카탈로그 선택 제한은 서로 다른 모델 수가 아닌 복제를
     />,
   );
   fireEvent.click(screen.getByRole("checkbox", { name: "모델 C · p" }));
-  expect(screen.getByText("선택한 비교 항목 4/4개")).toBeDefined();
+  expect(screen.getByText("선택 4 / 4")).toBeDefined();
   expect(
     screen
       .getByRole("checkbox", { name: "모델 D · p" })
@@ -233,6 +252,7 @@ test("확인창이 열린 뒤 지원 범위가 바뀌면 실행을 막고 다시
       onRun={onRun}
       initialValues={{
         prompt: "작업",
+        commonEnabled: true,
         temperature: "0.3",
         comparisons: createComparisons(["a:p", "b:p"]),
       }}
@@ -240,7 +260,7 @@ test("확인창이 열린 뒤 지원 범위가 바뀌면 실행을 막고 다시
   );
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   const updated = choices.map((choice) => ({
     ...choice,
@@ -281,15 +301,16 @@ test("한 모델을 먼저 고른 뒤 복제해 같은 대상의 설정 비교�
   });
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
-  expect(within(dialog).getByText("요청 설정: Temperature: 0")).toBeDefined();
+  expect(within(dialog).getByText("Temperature 0")).toBeDefined();
 });
 
-test("공통 effort를 보존하고 개별값을 우선해 확인·제출한다", async () => {
+test("공통 effort는 접었다 펴도 보존하고, 모델별 설정을 켜면 공통값 없이 개별값만 확인·제출한다", async () => {
   const { onRun } = show();
   const toggle = screen.getByRole("button", { name: /^공통 설정 선택사항$/ });
   fireEvent.click(toggle);
+  fireEvent.click(screen.getByLabelText("공통 설정 사용"));
   fireEvent.change(screen.getByLabelText("공통 추론 강도 (effort)"), {
     target: { value: "high" },
   });
@@ -306,23 +327,31 @@ test("공통 effort를 보존하고 개별값을 우선해 확인·제출한다"
   });
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
-  expect(within(dialog).getByText(/추론 강도: high/)).toBeDefined();
-  expect(within(dialog).getByText(/추론 강도: low/)).toBeDefined();
+  // 모델별 설정을 켜는 순간 공통 설정이 꺼지므로 공통 effort(high)는 어느 칸에도 가지 않는다.
+  expect(within(dialog).queryByText(/추론 강도 high/)).toBeNull();
+  expect(within(dialog).getByText(/추론 강도 low/)).toBeDefined();
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
   await waitFor(() => expect(onRun).toHaveBeenCalledOnce());
   expect(onRun.mock.calls[0][0]).toMatchObject({
-    reasoningEffort: "high",
+    commonEnabled: false,
     comparisons: [
       { settings: { mode: "shared" } },
       { settings: { reasoningEffort: "low" } },
     ],
   });
+  // 다시 켤 때를 위해 공통 입력칸 값은 남는다
+  expect(
+    (screen.getByLabelText("공통 추론 강도 (effort)") as HTMLSelectElement)
+      .value,
+  ).toBe("high");
 });
 
+// 물려받은 effort를 받지 못하는 모델은 서버처럼 그 칸에서만 빼고 실행한다(temperature와 같은 규칙).
+// 선택지를 화면이 모르는(unknown) 모델은 서버가 판단하도록 값을 그대로 둔다.
 test.each(["unsupported", "unknown", "low-only"])(
-  "공통 effort와 %s 모델이 함께 있으면 요청을 보내지 않는다",
+  "공통 effort와 %s 모델이 함께 있으면 막지 않고 실행한다",
   async (kind) => {
     const catalog = choices.map((choice, index) =>
       index !== 1
@@ -352,24 +381,27 @@ test.each(["unsupported", "unknown", "low-only"])(
     fireEvent.click(
       screen.getByRole("button", { name: /^공통 설정 선택사항$/ }),
     );
+    fireEvent.click(screen.getByLabelText("공통 설정 사용"));
     fireEvent.change(screen.getByLabelText("공통 추론 강도 (effort)"), {
       target: { value: "high" },
     });
     fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
-    expect(await screen.findByRole("alert")).toHaveProperty(
-      "textContent",
-      expect.stringContaining("모델 B"),
-    );
-    expect(screen.getByRole("alert").textContent).toContain("추론 강도");
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(onRun).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("공통 추론 강도 (effort)"), {
-      target: { value: "" },
+    const dialog = await screen.findByRole("dialog", {
+      name: "비교를 실행할까요?",
     });
-    fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
-    expect(
-      await screen.findByRole("dialog", { name: "비교를 실행합니다" }),
-    ).toBeDefined();
+    expect(screen.queryByRole("alert")).toBeNull();
+    const [first, second] = within(dialog).getAllByRole("listitem");
+    expect(first.textContent).toContain("추론 강도 high");
+    expect(second.textContent?.includes("추론 강도 high")).toBe(
+      kind === "unknown",
+    );
+    // 빠진 칸에만 공통 설정이 적용되지 않는다는 안내가 붙는다
+    expect(first.textContent).not.toContain("받지 않아");
+    expect(second.textContent?.includes("추론 강도를 받지 않아")).toBe(
+      kind !== "unknown",
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
+    await waitFor(() => expect(onRun).toHaveBeenCalledOnce());
   },
 );
 
@@ -394,7 +426,7 @@ test("공통값 초기화는 effort도 지우고 모델별 지정값은 유지�
   );
 });
 
-test("확인 중 effort 지원 정보가 사라지면 실행을 막고 공통값은 해제할 때까지 보존한다", async () => {
+test("확인 중 effort 선택지 정보가 사라져도 공통 effort는 서버 판단에 맡기고 실행한다", async () => {
   const onRun = vi.fn();
   const page = render(
     <SimulatorPage
@@ -402,6 +434,7 @@ test("확인 중 effort 지원 정보가 사라지면 실행을 막고 공통값
       onRun={onRun}
       initialValues={{
         prompt: "작업",
+        commonEnabled: true,
         reasoningEffort: "high",
         comparisons: createComparisons(["a:p", "b:p"]),
       }}
@@ -409,7 +442,7 @@ test("확인 중 effort 지원 정보가 사라지면 실행을 막고 공통값
   );
   fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
   const dialog = await screen.findByRole("dialog", {
-    name: "비교를 실행합니다",
+    name: "비교를 실행할까요?",
   });
   page.rerender(
     <SimulatorPage
@@ -418,18 +451,9 @@ test("확인 중 effort 지원 정보가 사라지면 실행을 막고 공통값
     />,
   );
   fireEvent.click(within(dialog).getByRole("button", { name: "실행하기" }));
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  expect(screen.getByRole("alert").textContent).toContain("선택지");
-  expect(onRun).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: /^공통 설정 선택사항$/ }));
-  const input = screen.getByLabelText(
-    "공통 추론 강도 (effort)",
-  ) as HTMLSelectElement;
-  expect(input.value).toBe("high");
-  expect(input.disabled).toBe(false);
-  fireEvent.change(input, { target: { value: "" } });
-  fireEvent.click(screen.getByRole("button", { name: "비교 실행" }));
-  expect(
-    await screen.findByRole("dialog", { name: "비교를 실행합니다" }),
-  ).toBeDefined();
+  await waitFor(() => expect(onRun).toHaveBeenCalledOnce());
+  expect(onRun.mock.calls[0][0]).toMatchObject({
+    commonEnabled: true,
+    reasoningEffort: "high",
+  });
 });

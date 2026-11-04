@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # OpenRouter Key 원문. 로컬에서는 작업할 때만 넣고 끝나면 지우므로 없어도 앱은 뜬다.
     # 없으면 비교 실행 접수만 거절한다(app/api/simulation_deps.py).
     openrouter_api_key: SecretStr | None = None
+    # 기록 수신 API(X-Patron-Ingest-Token)의 비밀값. 로컬에서는 없어도 앱은 뜨고, 없으면 수신 API가
+    # 모든 요청을 거절한다. 고객 서비스가 기록을 보낼 때 같은 값을 헤더에 넣는다.
+    ingest_token: SecretStr | None = None
     # 로컬 에이전트 실험은 명시적으로 켠 환경에서만 제공한다.
     assistant_enabled: bool = False
     ollama_base_url: str = "http://127.0.0.1:11434"

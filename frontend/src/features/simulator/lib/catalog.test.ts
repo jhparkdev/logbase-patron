@@ -80,8 +80,30 @@ test.each([
     key: "3:",
     provider: "확인 불가",
     selectable: false,
-    unavailableReason: "서버 업체를 확인할 수 없습니다",
+    unavailableReason: "서버 업체를 확인할 수 없어요",
   });
+});
+
+test("현재 단가를 토큰당 문자열 그대로 옮기고 없으면 두지 않는다", () => {
+  const current = MODEL_ROW.current_price;
+  if (!current) throw new Error("단가가 있는 모델 fixture가 필요합니다.");
+  const [priced] = toModelChoices(
+    {
+      ...MODEL_ROW,
+      current_price: {
+        ...current,
+        input_price_per_token: "0.00000015",
+        output_price_per_token: null,
+      },
+    },
+    { providers: ["DeepInfra"] },
+  );
+  expect(priced.price).toEqual({ input: "0.00000015", output: null });
+  const [unpriced] = toModelChoices(
+    { ...MODEL_ROW, current_price: null },
+    { providers: ["DeepInfra"] },
+  );
+  expect(unpriced.price).toBeUndefined();
 });
 
 test.each([

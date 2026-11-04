@@ -17,12 +17,16 @@ import { ModelCatalogTable } from "./ModelCatalogTable";
 import { ModelCreatorBadge } from "./ModelCreatorBadge";
 import { ModelFavoritesNotice } from "./ModelFavoritesNotice";
 
+const SEGMENT_CLASS =
+  "h-8 rounded-lg px-3 text-label font-semibold text-grey-600 aria-pressed:bg-white aria-pressed:text-grey-900 aria-pressed:shadow-sm focus-visible:outline-2 focus-visible:outline-brand";
+
 export function ModelPickerDialog({
   choices,
   selections,
   counts = {},
   unavailable,
   favorites = unavailableFavorites,
+  imagesAttached = false,
   onClose,
   onApply,
 }: {
@@ -31,20 +35,24 @@ export function ModelPickerDialog({
   counts?: Readonly<Record<string, number>>;
   unavailable: boolean;
   favorites?: ModelFavoritesView;
+  /** 이미지를 첨부한 상태면 이미지 지원 모델만 보는 필터를 제안한다 */
+  imagesAttached?: boolean;
   onClose: () => void;
   onApply: (keys: string[]) => void;
 }) {
   const [pending, setPending] = useState(() => selectedModelKeys(selections));
   const [query, setQuery] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [imagesOnly, setImagesOnly] = useState(false);
   const matches = searchFavoriteModels(
     choices,
     query,
     favoritesOnly,
     favorites,
-  );
+  ).filter((choice) => !imagesOnly || choice.supportsImages);
   const empty = emptyCatalogMessage(query, favoritesOnly, favorites);
   const count = selectedComparisonCount(pending, counts);
+  const remaining = MODEL_LIMITS.max - count;
   const canApply = !unavailable && canApplyModels(pending, choices, counts);
   const remove = (key: string) =>
     setPending((keys) => keys.filter((value) => value !== key));
@@ -78,57 +86,79 @@ export function ModelPickerDialog({
         </Button>
       }
     >
-      <p className="mb-4 text-body-sm text-grey-600">
-        모델을 1개부터 선택해 적용할 수 있습니다. 실행에는 비교 항목{" "}
-        {MODEL_LIMITS.min}~{MODEL_LIMITS.max}개가 필요합니다. 같은 모델의 다른
-        설정은 선택 후 ‘다른 설정으로 비교’에서 추가할 수 있습니다.
+      <p className="text-caption text-grey-600">
+        {MODEL_LIMITS.min}~{MODEL_LIMITS.max}개를 고르면 실행할 수 있어요. 같은
+        모델을 다른 설정으로 비교하려면 적용한 뒤 카드에서 ‘복제’해요.
       </p>
-      <SearchField
-        label="모델 검색어"
-        placeholder="모델명·제작사·Provider 검색"
-        value={query}
-        onSearch={setQuery}
-      />
-      <fieldset aria-label="모델 목록 범위" className="mt-3 flex gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          aria-label="전체 모델 목록"
-          aria-pressed={!favoritesOnly}
-          className="aria-pressed:bg-brand-weak aria-pressed:text-blue-600"
-          onClick={() => setFavoritesOnly(false)}
+      <div className="mt-4 flex flex-wrap items-center gap-2.5">
+        <fieldset
+          aria-label="모델 목록 범위"
+          className="flex rounded-xl bg-grey-100 p-1"
         >
-          전체 모델
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          aria-label="즐겨찾기 목록"
-          aria-pressed={favoritesOnly}
-          className="aria-pressed:bg-brand-weak aria-pressed:text-blue-600"
-          onClick={() => setFavoritesOnly(true)}
-        >
-          즐겨찾기
-          {favorites.kind === "ready" && (
-            <span className="tabular-nums">
-              {" "}
-              {new Set(favorites.keys).size}
+          <button
+            type="button"
+            aria-label="전체 모델 목록"
+            aria-pressed={!favoritesOnly}
+            className={SEGMENT_CLASS}
+            onClick={() => setFavoritesOnly(false)}
+          >
+            전체 모델{" "}
+            <span className="font-normal text-grey-600 tabular-nums">
+              {choices.length}
             </span>
-          )}
-        </Button>
-      </fieldset>
-      <p className="mt-2 text-caption text-grey-600">
-        별 버튼으로 즐겨찾기를 관리합니다. 즐겨찾기 변경은 선택 적용·닫기와
-        별도로 처리됩니다.
-      </p>
-      <div className="my-4 rounded-control bg-grey-50 p-3">
-        <p role="status" className="text-label font-semibold tabular-nums">
-          선택한 비교 항목 {count}/{MODEL_LIMITS.max}개
+          </button>
+          <button
+            type="button"
+            aria-label="즐겨찾기 목록"
+            aria-pressed={favoritesOnly}
+            className={SEGMENT_CLASS}
+            onClick={() => setFavoritesOnly(true)}
+          >
+            즐겨찾기
+            {favorites.kind === "ready" && (
+              <span className="font-normal text-grey-600 tabular-nums">
+                {" "}
+                {new Set(favorites.keys).size}
+              </span>
+            )}
+          </button>
+        </fieldset>
+        <SearchField
+          label="모델 검색어"
+          placeholder="모델명·제작사·Provider 검색"
+          value={query}
+          onSearch={setQuery}
+        />
+        {imagesAttached && (
+          <button
+            type="button"
+            aria-pressed={imagesOnly}
+            onClick={() => setImagesOnly(!imagesOnly)}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-label font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+              imagesOnly
+                ? "border-brand bg-blue-50 text-blue-600"
+                : "border-grey-200 bg-white text-grey-700 hover:bg-grey-50"
+            }`}
+          >
+            <span aria-hidden="true">{imagesOnly ? "✓" : "+"}</span>
+            이미지 지원만
+            <span className="font-normal text-grey-600">
+              이미지를 첨부했어요
+            </span>
+          </button>
+        )}
+      </div>
+      <div
+        role="status"
+        className="my-4 flex flex-wrap items-center gap-2 rounded-control bg-grey-50 p-3"
+      >
+        <p className="text-label font-semibold tabular-nums">
+          선택 {count} / {MODEL_LIMITS.max}
         </p>
         {pending.length > 0 ? (
           <ul
             aria-label="모달에서 선택한 모델"
-            className="mt-2 flex flex-wrap gap-2"
+            className="flex flex-wrap gap-2"
           >
             {pending.map((key) => {
               const choice = choices.find((item) => item.key === key);
@@ -140,13 +170,14 @@ export function ModelPickerDialog({
                   <Button
                     variant="secondary"
                     size="sm"
+                    className="bg-white ring-1 ring-grey-200"
                     aria-label={`${label} 선택 해제`}
                     onClick={() => remove(key)}
                   >
                     <ModelCreatorBadge creator={choice?.creator} />
                     {label}
                     {(counts[key] ?? 1) > 1 && (
-                      <span className="tabular-nums">
+                      <span className="font-normal tabular-nums">
                         ({counts[key]}개 항목)
                       </span>
                     )}
@@ -157,27 +188,27 @@ export function ModelPickerDialog({
             })}
           </ul>
         ) : (
-          <p className="mt-1 text-caption text-grey-600">
-            아래 목록에서 비교할 모델을 선택하시기 바랍니다.
+          <p className="text-caption text-grey-600">
+            아래 목록에서 비교할 모델을 골라 주세요.
           </p>
         )}
+        <p className="ml-auto text-caption text-grey-600 tabular-nums">
+          {remaining > 0
+            ? `${remaining}개 더 고를 수 있어요`
+            : "더 고를 수 없어요. 바꾸려면 하나를 해제해 주세요"}
+        </p>
         {pending.some(
           (key) =>
             !choices.some((choice) => choice.key === key && choice.selectable),
         ) && (
-          <p role="alert" className="mt-2 text-caption text-red-600">
-            선택할 수 없는 모델을 해제하고 다시 선택하시기 바랍니다.
+          <p role="alert" className="basis-full text-caption text-red-600">
+            고를 수 없는 모델을 해제하고 다시 골라 주세요.
           </p>
         )}
         {Object.values(counts).some((value) => value > 1) && (
-          <p className="mt-2 text-caption text-grey-600">
-            같은 모델의 비교 항목은 함께 선택·해제합니다. 개별 항목은 본문에서
-            제거할 수 있습니다.
-          </p>
-        )}
-        {count >= MODEL_LIMITS.max && (
-          <p className="mt-2 text-caption text-grey-600">
-            다른 모델을 고르려면 선택한 모델을 먼저 해제하시기 바랍니다.
+          <p className="basis-full text-caption text-grey-600">
+            같은 모델의 비교 항목은 함께 선택·해제돼요. 항목 하나만 빼려면 본문
+            카드에서 제거해요.
           </p>
         )}
       </div>
@@ -210,6 +241,9 @@ export function ModelPickerDialog({
           )}
         </>
       )}
+      <p className="mt-3 text-caption text-grey-600">
+        별은 즐겨찾기예요. 누르는 즉시 저장되고 선택 적용·닫기와 상관없어요.
+      </p>
     </Dialog>,
     document.body,
   );

@@ -87,7 +87,7 @@ export function useSimulatorForm({
       setIssues([
         error instanceof ApiError
           ? error.message
-          : "실행 요청을 보내지 못했습니다. 잠시 후 다시 시도하시기 바랍니다.",
+          : "실행 요청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.",
       ]);
     } finally {
       sending.current = false;

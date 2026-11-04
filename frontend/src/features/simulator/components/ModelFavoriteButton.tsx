@@ -32,7 +32,7 @@ export function ModelFavoriteButton({
               ? selected
                 ? "즐겨찾기 해제"
                 : "즐겨찾기 등록"
-              : "즐겨찾기를 불러온 뒤 사용할 수 있습니다"
+              : "즐겨찾기를 불러온 뒤 쓸 수 있어요"
         }
         disabled={!ready || saving}
         onClick={() => {
@@ -53,7 +53,7 @@ export function ModelFavoriteButton({
       </Button>
       {failed && (
         <p id={errorId} role="alert" className="mt-1 text-caption text-red-600">
-          즐겨찾기를 변경하지 못했습니다. 다시 누르시기 바랍니다.
+          즐겨찾기를 바꾸지 못했어요. 다시 눌러 주세요.
         </p>
       )}
     </>

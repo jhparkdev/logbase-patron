@@ -47,10 +47,11 @@ export function toCreateRequest(
     prompt_text: draft.prompt,
     input_text: draft.text || null,
     json_schema: draft.jsonSchema.trim() ? JSON.parse(draft.jsonSchema) : null,
-    execution_config: toExecutionConfig(draft),
+    // null은 공통 끔이다. 서버는 시나리오 기본값과 공통값을 쓰지 않고 칸에 넣은 값만 보낸다.
+    execution_config: draft.commonEnabled ? toExecutionConfig(draft) : null,
     models: draft.comparisons.map((comparison) => {
       const selected = parseChoiceKey(comparison.modelKey);
-      if (!selected) throw new Error("서버 업체를 확인할 수 없는 모델입니다.");
+      if (!selected) throw new Error("서버 업체를 확인할 수 없는 모델이에요.");
       return {
         ...selected,
         execution_config: toExecutionConfig(comparison.settings),
