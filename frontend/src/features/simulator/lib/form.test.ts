@@ -1,12 +1,55 @@
 import { describe, expect, test } from "vitest";
-import { createComparisons } from "./comparisons";
+import { commonSettings, createComparisons } from "./comparisons";
 import { createDefaultValues, simulatorFormSchema } from "./form";
 import { IMAGE_LIMITS, TEXT_LIMIT } from "./limits";
 
+// 공통 값 검증을 확인하는 테스트가 많아 공통 설정을 켠 입력을 기준으로 둔다.
 const valid = () => ({
   ...createDefaultValues(),
   prompt: "원문을 보존해 주세요. ",
+  commonEnabled: true,
   comparisons: createComparisons(["a", "b"]),
+});
+
+describe("공통 설정 켬·끔", () => {
+  test("처음에는 꺼져 있다", () => {
+    expect(createDefaultValues().commonEnabled).toBe(false);
+    expect(
+      simulatorFormSchema.parse({ ...valid(), commonEnabled: undefined })
+        .commonEnabled,
+    ).toBe(false);
+  });
+  test("끄면 남아 있는 공통값은 검사하지 않고 제출하지도 않는다", () => {
+    const values = {
+      ...valid(),
+      commonEnabled: false,
+      temperature: "3",
+      maxTokens: "0",
+      reasoningEffort: "high",
+    };
+    const result = simulatorFormSchema.parse(values);
+    expect(result.commonEnabled).toBe(false);
+    // 끄면 칸 계산에 공통값을 쓰지 않는다. 요청의 null은 request.test.ts에서 검사한다
+    expect(commonSettings(result)).toBeNull();
+    // 다시 켤 때를 위해 입력칸 값은 보관한다
+    expect(createDefaultValues(values).temperature).toBe("3");
+  });
+  test("공통값 항목 스키마는 입력칸 문자열을 숫자로 바꾼다(AI 도우미가 같은 변환을 쓴다)", () => {
+    expect(simulatorFormSchema.shape.temperature.parse("0.3")).toBe(0.3);
+    expect(simulatorFormSchema.shape.temperature.parse("")).toBeUndefined();
+    expect(simulatorFormSchema.shape.maxTokens.parse("512")).toBe(512);
+  });
+  test("켜면 잘못된 공통값의 오류를 해당 입력칸에 표시한다", () => {
+    const result = simulatorFormSchema.safeParse({
+      ...valid(),
+      temperature: "3",
+      maxTokens: "0",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.path.join("."))).toEqual(
+      expect.arrayContaining(["temperature", "maxTokens"]),
+    );
+  });
 });
 
 describe("시뮬레이터 입력 경계", () => {

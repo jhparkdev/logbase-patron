@@ -13,7 +13,7 @@ export function useCancellation() {
       await action();
     } catch {
       setError(
-        "취소 요청을 보내지 못했습니다. 실행 상태를 확인한 뒤 다시 시도하시기 바랍니다.",
+        "취소 요청을 보내지 못했어요. 실행 상태를 확인한 뒤 다시 시도해 주세요.",
       );
     } finally {
       locks.current.delete(key);

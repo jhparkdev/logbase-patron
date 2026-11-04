@@ -53,8 +53,7 @@ test("P-04의 입력·모델 선택·결과를 같은 mock 실행 한 건으로 
     previewData.initialValues.prompt,
   );
   expect(
-    (screen.getByLabelText("입력 텍스트 (선택사항)") as HTMLTextAreaElement)
-      .value,
+    (screen.getByLabelText("입력 텍스트") as HTMLTextAreaElement).value,
   ).toBe(previewData.initialValues.text);
   const selected = within(
     screen.getByRole("list", { name: "선택한 비교 모델" }),
@@ -68,9 +67,7 @@ test("P-04의 입력·모델 선택·결과를 같은 mock 실행 한 건으로 
     expect(within(selected[index]).getByText(choice.name)).toBeDefined();
     expect(within(selected[index]).getByText(choice.provider)).toBeDefined();
   }
-  expect(
-    screen.getByRole("heading", { name: "시뮬레이션 결과 요약" }),
-  ).toBeDefined();
+  expect(screen.getByRole("heading", { name: "비교 결과" })).toBeDefined();
   expect(screen.getByText(/2026-10-22 10:00:00/)).toBeDefined();
   expect(screen.queryByLabelText("검토할 실행")).toBeNull();
   expect(screen.queryByLabelText("실행 상태")).toBeNull();
@@ -123,11 +120,12 @@ test("미리보기를 열어도 실제 서비스 페이지의 초기 데이터�
   expect((screen.getByLabelText("Prompt") as HTMLTextAreaElement).value).toBe(
     "",
   );
+  // 빈 화면에서는 추가 입력 칩을 켜야 입력 텍스트 칸이 나온다
+  fireEvent.click(screen.getByRole("button", { name: "입력 텍스트" }));
   expect(
-    (screen.getByLabelText("입력 텍스트 (선택사항)") as HTMLTextAreaElement)
-      .value,
+    (screen.getByLabelText("입력 텍스트") as HTMLTextAreaElement).value,
   ).toBe("");
-  expect(screen.getByText("아직 실행 결과가 없습니다")).toBeDefined();
+  expect(screen.getByText("아직 실행 결과가 없어요")).toBeDefined();
 });
 
 test("미리보기 즐겨찾기는 모달을 닫아도 유지하며 실제 조회·저장을 하지 않는다", () => {

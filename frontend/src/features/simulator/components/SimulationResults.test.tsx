@@ -237,11 +237,73 @@ test.each(["loading", "error", "empty"] as const)(
     expect(
       screen.getByText(
         kind === "loading"
-          ? "실행 결과를 불러오고 있습니다"
+          ? "실행 결과를 불러오고 있어요"
           : kind === "error"
-            ? "실행 결과를 불러오지 못했습니다"
-            : "아직 실행 결과가 없습니다",
+            ? "실행 결과를 불러오지 못했어요"
+            : "아직 실행 결과가 없어요",
       ),
     ).toBeDefined();
   },
 );
+
+test("진행 중인 칸의 비용은 미확인이 아니라 응답 후 집계로 구분한다", () => {
+  render(
+    <SimulationResults
+      view={{
+        kind: "ready",
+        run: run([
+          slot({
+            status: { label: "진행 중", tone: "grey", ongoing: true },
+            cost: { kind: "unknown", amount: null },
+            response: null,
+          }),
+          slot({
+            key: "slot-2",
+            name: "끝난 모델",
+            status: { label: "시간 초과", tone: "yellow" },
+            cost: { kind: "unknown", amount: null },
+          }),
+        ]),
+      }}
+    />,
+  );
+  const [running, finished] = screen.getAllByRole("article");
+  expect(within(running).getByText("응답 후 집계")).toBeDefined();
+  expect(within(running).queryByText("미확인")).toBeNull();
+  expect(within(finished).queryByText("응답 후 집계")).toBeNull();
+  expect(screen.getAllByText("미확인").length).toBeGreaterThan(0);
+});
+
+test("실행이 끝나면 성공한 칸 중 최단·최저를 표에 표시하고 진행 중엔 표시하지 않는다", () => {
+  const slots = [
+    slot({
+      key: "a",
+      name: "빠른 모델",
+      durationMs: 100,
+      cost: { kind: "confirmed", amount: "0.5" },
+    }),
+    slot({
+      key: "b",
+      name: "싼 모델",
+      durationMs: 900,
+      cost: { kind: "confirmed", amount: "0.1" },
+    }),
+  ];
+  const page = render(
+    <SimulationResults view={{ kind: "ready", run: run(slots) }} />,
+  );
+  expect(screen.getByText("최단").closest("tr")?.textContent).toContain(
+    "빠른 모델",
+  );
+  expect(screen.getByText("최저").closest("tr")?.textContent).toContain(
+    "싼 모델",
+  );
+  // 배지는 값 앞에 온다. 오른쪽 정렬 숫자 열에서 끝자리가 흔들리지 않게 하기 위함.
+  expect(screen.getByText("최단").closest("td")?.textContent).toMatch(/^최단/);
+  expect(screen.getByText("최저").closest("td")?.textContent).toMatch(/^최저/);
+  const ongoing = run(slots);
+  ongoing.status = { label: "진행 중", tone: "grey", ongoing: true };
+  page.rerender(<SimulationResults view={{ kind: "ready", run: ongoing }} />);
+  expect(screen.queryByText("최단")).toBeNull();
+  expect(screen.getByText(/2개 중 2개/)).toBeDefined();
+});

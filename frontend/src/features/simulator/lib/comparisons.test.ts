@@ -1,6 +1,8 @@
 import { expect, test } from "vitest";
 import {
+  commonSettings,
   createComparison,
+  hasCustomComparison,
   reconcileComparisons,
   requestedSettings,
   selectedComparisonCount,
@@ -28,6 +30,7 @@ const choice: ModelChoice = {
     },
   ],
 };
+// 공통 켬 + 모델별 설정이 섞인 경우다. 화면은 이 조합을 막지만 서버는 받으므로 lib는 서버 규칙대로 계산한다.
 function draft(secondTemperature = "0.7") {
   const first = createComparison(choice.key, "first");
   const second = createComparison(choice.key, "second");
@@ -40,6 +43,7 @@ function draft(secondTemperature = "0.7") {
   return simulatorFormSchema.parse({
     ...createDefaultValues(),
     prompt: "작업",
+    commonEnabled: true,
     temperature: "0.3",
     comparisons: [first, second],
   });
@@ -48,7 +52,7 @@ function draft(secondTemperature = "0.7") {
 test("같은 모델·Provider라도 요청 설정이 다르면 비교하고 숫자 표기만 다른 중복은 막는다", () => {
   expect(selectionIssues(draft(), [choice], [])).toEqual([]);
   expect(selectionIssues(draft("0.30"), [choice], []).join(" ")).toContain(
-    "동일한 요청 설정",
+    "요청 설정이 같은",
   );
 });
 
@@ -72,6 +76,42 @@ test("모델별 지정값, 공통 설정, 시나리오 기본값 순으로 요�
       { temperature: 0.1, maxTokens: 512 },
     ),
   ).toEqual({ temperature: 0.3, maxTokens: 512 });
+});
+
+test("공통 끔이면 공통값과 시나리오 기본값을 물려주지 않고 직접 넣은 값만 쓴다", () => {
+  const custom = draft().comparisons[1];
+  const shared = {
+    ...custom,
+    settings: { ...custom.settings, mode: "shared" as const },
+  };
+  expect(
+    requestedSettings(shared, null, { temperature: 0.1, maxTokens: 512 }),
+  ).toEqual({});
+  expect(requestedSettings(custom, null, { maxTokens: 512 })).toEqual({
+    temperature: 0.7,
+  });
+});
+
+test("공통 설정을 켰을 때만 공통값을 돌려준다", () => {
+  const values = simulatorFormSchema.parse({
+    ...createDefaultValues(),
+    prompt: "작업",
+    temperature: "0.3",
+    comparisons: [createComparison("a:p", "a"), createComparison("b:p", "b")],
+  });
+  expect(values.commonEnabled).toBe(false);
+  expect(commonSettings(values)).toBeNull();
+  expect(
+    commonSettings({ ...values, commonEnabled: true, temperature: 0.3 }),
+  ).toEqual({ temperature: 0.3 });
+});
+
+test("모델별 설정을 켠 칸이 하나라도 있으면 공통 설정을 잠근다", () => {
+  const first = createComparison("a:p", "a");
+  const second = createComparison("b:p", "b");
+  expect(hasCustomComparison([first, second])).toBe(false);
+  second.settings.mode = "custom";
+  expect(hasCustomComparison([first, second])).toBe(true);
 });
 
 test("검색 모달을 다시 적용해도 기존 식별자·개별 설정·복제 항목을 보존한다", () => {
@@ -166,6 +206,7 @@ test("공통 effort는 항목별로 상속하고 개별 지정한 값만 우선�
   const values = simulatorFormSchema.parse({
     ...createDefaultValues(),
     prompt: "작업",
+    commonEnabled: true,
     reasoningEffort: "high",
     comparisons: [
       createComparison("a:p", "first"),
@@ -182,10 +223,11 @@ test("공통 effort는 항목별로 상속하고 개별 지정한 값만 우선�
   });
 });
 
-test("공통 effort 미지원·선택지 미확인·허용하지 않는 값은 실행하지 않는다", () => {
+test("공통 effort를 받지 못하거나 허용하지 않는 모델은 그 칸에서만 빼고 실행한다", () => {
   const input = simulatorFormSchema.parse({
     ...createDefaultValues(),
     prompt: "작업",
+    commonEnabled: true,
     reasoningEffort: "high",
     comparisons: [
       createComparison("a:p", "first"),
@@ -199,6 +241,7 @@ test("공통 effort 미지원·선택지 미확인·허용하지 않는 값은 �
       [],
     ),
   ).toEqual([]);
+  // 서버가 그 칸에서만 effort를 빼고 호출하므로 막지 않는다.
   expect(
     selectionIssues(
       input,
@@ -212,15 +255,17 @@ test("공통 effort 미지원·선택지 미확인·허용하지 않는 값은 �
         },
       ],
       [],
-    ).join(" "),
-  ).toContain("추론 강도");
+    ),
+  ).toEqual([]);
+  // 선택지를 화면이 모르면 서버가 판단한다(받으면 보내고, 아니면 그 칸에서 뺀다).
   expect(
     selectionIssues(
       input,
       [choice, { ...choice, key: "b:p", tuningParameters: [] }],
       [],
-    ).join(" "),
-  ).toContain("선택지");
+    ),
+  ).toEqual([]);
+  // 허용 목록에 없는 공통 effort도 서버가 그 칸에서만 뺀다.
   expect(
     selectionIssues(
       input,
@@ -239,6 +284,39 @@ test("공통 effort 미지원·선택지 미확인·허용하지 않는 값은 �
         },
       ],
       [],
-    ).join(" "),
-  ).toContain("추론 강도");
+    ),
+  ).toEqual([]);
+});
+
+test("모델별 설정에 직접 고른 effort가 허용 목록에 없으면 막는다", () => {
+  const input = simulatorFormSchema.parse({
+    ...createDefaultValues(),
+    prompt: "작업",
+    comparisons: [
+      createComparison("a:p", "first"),
+      {
+        ...createComparison("b:p", "second"),
+        settings: {
+          mode: "custom",
+          temperature: "",
+          maxTokens: "",
+          reasoningEffort: "high",
+        },
+      },
+    ],
+  });
+  const lowOnly: ModelChoice = {
+    ...choice,
+    key: "b:p",
+    tuningParameters: [
+      {
+        key: "reasoningEffort",
+        kind: "choice",
+        options: [{ value: "low", label: "낮음" }],
+      },
+    ],
+  };
+  expect(selectionIssues(input, [choice, lowOnly], []).join(" ")).toContain(
+    "추론 강도",
+  );
 });

@@ -1,7 +1,7 @@
 import { Badge } from "../../../shared/components/ui/Badge";
 import { formatKstDateTime } from "../../../shared/lib/format";
+import { formatPricePerMillion } from "../../../shared/lib/price";
 import type { ModelRow } from "../api/models";
-import { formatPricePerMillion } from "../lib/price";
 import { testResultView } from "../lib/view";
 
 const NO_TEST_LABEL = "미실행";

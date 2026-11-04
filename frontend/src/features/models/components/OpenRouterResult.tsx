@@ -1,7 +1,7 @@
 import { Badge } from "../../../shared/components/ui/Badge";
 import { formatCount } from "../../../shared/lib/format";
+import { formatPricePerMillion } from "../../../shared/lib/price";
 import type { OpenRouterModel } from "../api/models";
-import { formatPricePerMillion } from "../lib/price";
 import { modalitiesFlow, releasedLabel } from "../lib/view";
 
 const UNKNOWN_LABEL = "미확인";
