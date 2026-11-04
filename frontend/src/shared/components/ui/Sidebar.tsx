@@ -27,10 +27,15 @@ const NAV_ITEMS = [
   },
 ] as const;
 
+type NavTo = (typeof NAV_ITEMS)[number]["to"];
+
 export function Sidebar({
   activeTo,
+  alerts = {},
 }: {
-  activeTo?: (typeof NAV_ITEMS)[number]["to"];
+  activeTo?: NavTo;
+  /** 메뉴 옆에 점으로 알릴 것. 값은 화면 낭독기가 읽는 문구 */
+  alerts?: Partial<Record<NavTo, string>>;
 } = {}) {
   return (
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col gap-6 bg-grey-900 px-3 py-4">
@@ -60,6 +65,13 @@ export function Sidebar({
           >
             <Icon src={item.icon} className="size-4.5" />
             {item.label}
+            {alerts[item.to] && (
+              <span
+                role="img"
+                aria-label={alerts[item.to]}
+                className="ml-auto size-2 rounded-full bg-red-500"
+              />
+            )}
           </Link>
         ))}
       </nav>
