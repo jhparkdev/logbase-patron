@@ -5,7 +5,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request, Response, status
 
-from app.api.deps import DevUserDep, NowDep
+from app.api.deps import CurrentUserDep, NowDep
 from app.api.model_deps import EndpointCatalogDep
 from app.api.simulation_deps import (
     CancelDepsDep,
@@ -81,7 +81,7 @@ async def create_simulation_run(
     body: SimulationCreateRequest,
     request: Request,
     response: Response,
-    user: DevUserDep,
+    user: CurrentUserDep,
     session: SessionDep,
     now: NowDep,
     manager: SimulationManagerDep,

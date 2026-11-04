@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api import simulation_deps
@@ -24,6 +24,7 @@ from app.models import (
     SimulationResult,
     SimulationRun,
     SimulationStatus,
+    User,
 )
 from app.openrouter.lookup_result import EndpointInfo
 from app.services.simulation_manager import SimulationManager
@@ -37,7 +38,14 @@ from tests.api.simulation_helpers import (
     count,
     create_body,
 )
-from tests.api.test_auth import log_in, make_user
+from tests.api.test_auth import (
+    LOGOUT,
+    cookie_value,
+    log_in,
+    make_user,
+    session_cookie_header,
+    with_token,
+)
 from tests.conftest import TEST_BASE_URL, TEST_ORIGIN
 from tests.db_helpers import T0, Factory
 from tests.services.simulation_fakes import (
@@ -46,6 +54,7 @@ from tests.services.simulation_fakes import (
     FakeImageSource,
     FakeOutputStore,
 )
+from tests.test_main import api_routes, concrete_path
 
 TEMPLATE = "다음 상품 정보로 작성하세요.\n{{product_info}}"
 
@@ -138,6 +147,78 @@ async def test_a_request_without_login_is_refused_and_nothing_happens(
     assert response.json()["code"] == "UNAUTHENTICATED"
     assert manager.jobs == []
     assert await count(db_session, SimulationRun) == 0
+
+
+# --- 로그인 경계 ---
+
+
+async def test_every_simulation_route_refuses_a_request_without_a_session(
+    app: FastAPI, client: AsyncClient, factory: Factory
+) -> None:
+    # 활성 계정이 있어도 세션이 없으면 거절해야 한다. 계정이 없어서 거절되는 경우와 구분한다
+    await make_user(factory)
+    routes = [
+        (method, path)
+        for method, path in api_routes(app)
+        if path == CREATE or path.startswith(f"{CREATE}/")
+    ]
+    assert routes
+
+    for method, path in routes:
+        response = await client.request(method, concrete_path(path))
+
+        assert response.status_code == 401, (method, path)
+        assert response.json()["code"] == "UNAUTHENTICATED"
+
+
+async def test_a_session_ended_by_logout_cannot_read_runs(
+    client: AsyncClient, factory: Factory
+) -> None:
+    await make_user(factory)
+    user = await make_user(factory)
+    token = cookie_value(session_cookie_header(await log_in(client, user["email"])))
+    await client.post(LOGOUT)
+
+    # 로그아웃 전에 복사해 둔 토큰을 다시 보내도 DB 세션이 지워져 거절된다
+    response = await client.get(CREATE, headers=with_token(token))
+
+    assert response.status_code == 401
+
+
+async def test_a_deactivated_account_cannot_read_runs_with_its_session(
+    client: AsyncClient, factory: Factory, db_session: AsyncSession
+) -> None:
+    await make_user(factory)
+    user = await make_user(factory)
+    await log_in(client, user["email"])
+
+    await db_session.execute(
+        update(User).where(User.user_id == user["user_id"]).values(is_active=False)
+    )
+
+    assert (await client.get(CREATE)).status_code == 401
+
+
+@pytest.mark.usefixtures("poc_setup")
+async def test_the_run_is_recorded_under_the_signed_in_account(
+    client: AsyncClient,
+    manager: FakeManager,
+    models: list[int],
+    factory: Factory,
+    db_session: AsyncSession,
+) -> None:
+    # 먼저 만든 계정이 아니라 실제로 로그인한 계정이 실행자로 남아야 한다
+    await make_user(factory)
+    user = await make_user(factory)
+    await log_in(client, user["email"])
+
+    response = await client.post(CREATE, json=create_body(models))
+
+    run = await db_session.get(
+        SimulationRun, uuid.UUID(response.json()["simulation_id"])
+    )
+    assert run is not None
+    assert run.executed_by == user["user_id"]
 
 
 @pytest.mark.usefixtures("poc_setup", "signed_in")

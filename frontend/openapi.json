@@ -404,14 +404,14 @@
             "description": "Unauthorized"
           },
           "422": {
-            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -463,14 +463,14 @@
             "description": "Unauthorized"
           },
           "422": {
-            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -483,6 +483,24 @@
         "summary": "Create Simulation Run",
         "description": "비교 실행을 접수하고 바로 돌려준다. 모델 호출은 응답 뒤 백그라운드에서 진행한다.",
         "operationId": "create_simulation_run_api_simulations_post",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -504,15 +522,15 @@
               }
             }
           },
-          "403": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OriginNotAllowedResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -523,6 +541,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OriginNotAllowedResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "500": {
             "content": {
@@ -683,6 +711,22 @@
               ],
               "title": "Simulation Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -695,6 +739,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -727,6 +781,22 @@
               "format": "uuid",
               "title": "Simulation Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -740,15 +810,15 @@
               }
             }
           },
-          "404": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -759,6 +829,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         }
       }
@@ -781,6 +861,22 @@
               "format": "uuid",
               "title": "Simulation Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -794,15 +890,15 @@
               }
             }
           },
-          "404": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -813,6 +909,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         }
       }
@@ -835,6 +941,22 @@
               "format": "uuid",
               "title": "Simulation Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -847,6 +969,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationRequestErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           },
           "403": {
             "content": {
@@ -867,16 +1009,6 @@
               }
             },
             "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SimulationRequestErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
           }
         }
       }
@@ -908,6 +1040,22 @@
               "type": "integer",
               "title": "Slot No"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -920,6 +1068,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationRequestErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           },
           "403": {
             "content": {
@@ -940,16 +1108,6 @@
               }
             },
             "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SimulationRequestErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
           }
         }
       }
@@ -963,15 +1121,33 @@
         "summary": "Upload Simulation Image",
         "description": "이미지 한 장을 올린다. 파일은 저장소에 두고 DB 에는 경로·해시만 남긴다.",
         "operationId": "upload_simulation_image_api_simulations_images_post",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_upload_simulation_image_api_simulations_images_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -984,45 +1160,55 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OriginNotAllowedResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
-          },
-          "413": {
-            "description": "Content Too Large",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SimulationErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Unsupported Media Type",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SimulationErrorResponse"
-                }
-              }
-            }
+            },
+            "description": "Unauthorized"
           },
           "422": {
-            "description": "Unprocessable Content",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SimulationRequestErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unprocessable Content"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OriginNotAllowedResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
           }
         }
       }
@@ -1036,6 +1222,24 @@
         "summary": "Read Image Limits",
         "description": "이미지 입력 한도. 화면이 숫자를 따로 정하지 않고 이 값을 쓴다.",
         "operationId": "read_image_limits_api_simulations_images_limits_get",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1046,6 +1250,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationRequestErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -1069,6 +1293,22 @@
               "format": "uuid",
               "title": "Asset Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -1080,15 +1320,15 @@
               "image/webp": {}
             }
           },
-          "404": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -1099,6 +1339,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         }
       }
@@ -1122,6 +1372,22 @@
               "format": "uuid",
               "title": "Output Asset Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -1133,15 +1399,15 @@
               "image/webp": {}
             }
           },
-          "404": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -1152,6 +1418,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         }
       }
@@ -1293,6 +1569,22 @@
               "default": 20,
               "title": "Page Size"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -1334,6 +1626,24 @@
         ],
         "summary": "Register Model",
         "operationId": "register_model_api_models_post",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1365,6 +1675,24 @@
             },
             "description": "Unauthorized"
           },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ModelErrorResponse"
+                    }
+                  ],
+                  "title": "Response 422 Register Model Api Models Post"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
           "403": {
             "content": {
               "application/json": {
@@ -1384,24 +1712,6 @@
               }
             },
             "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/ErrorResponse"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ModelErrorResponse"
-                    }
-                  ],
-                  "title": "Response 422 Register Model Api Models Post"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
           },
           "502": {
             "content": {
@@ -1423,6 +1733,24 @@
         ],
         "summary": "List Model Providers",
         "operationId": "list_model_providers_api_models_providers_get",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1433,6 +1761,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -1506,6 +1854,22 @@
               "default": 20,
               "title": "Page Size"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -1518,6 +1882,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -1575,6 +1949,22 @@
               "default": 5,
               "title": "Limit"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -1587,6 +1977,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -1632,6 +2032,22 @@
               "default": 10,
               "title": "Limit"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -1644,6 +2060,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -1677,6 +2103,22 @@
               "minimum": 1,
               "title": "Model Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -1689,6 +2131,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           },
           "404": {
             "content": {
@@ -1707,16 +2169,6 @@
               }
             },
             "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
           },
           "502": {
             "content": {
@@ -1811,6 +2263,22 @@
               "default": "90",
               "title": "Min Uptime"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -1823,6 +2291,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           },
           "404": {
             "content": {
@@ -1841,16 +2329,6 @@
               }
             },
             "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
           },
           "502": {
             "content": {
@@ -1883,6 +2361,22 @@
               "maximum": 9223372036854775807,
               "minimum": 1,
               "title": "Model Id"
+            }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
             }
           }
         ],
@@ -1917,6 +2411,16 @@
             },
             "description": "Unauthorized"
           },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
           "403": {
             "content": {
               "application/json": {
@@ -1936,16 +2440,6 @@
               }
             },
             "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
           }
         }
       },
@@ -1966,6 +2460,22 @@
               "minimum": 1,
               "title": "Model Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -1979,7 +2489,7 @@
               }
             }
           },
-          "404": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
@@ -1987,7 +2497,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -1998,6 +2508,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         }
       }
@@ -2020,6 +2540,22 @@
               "maximum": 9223372036854775807,
               "minimum": 1,
               "title": "Model Id"
+            }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
             }
           }
         ],
@@ -2054,6 +2590,16 @@
             },
             "description": "Unauthorized"
           },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
           "403": {
             "content": {
               "application/json": {
@@ -2073,16 +2619,6 @@
               }
             },
             "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
           },
           "409": {
             "content": {
@@ -2117,6 +2653,22 @@
               "minimum": 1,
               "title": "Model Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "requestBody": {
@@ -2150,6 +2702,16 @@
             },
             "description": "Unauthorized"
           },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
           "403": {
             "content": {
               "application/json": {
@@ -2169,16 +2731,6 @@
               }
             },
             "description": "Not Found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
           },
           "503": {
             "content": {
@@ -2200,6 +2752,24 @@
         ],
         "summary": "Read Options",
         "operationId": "read_options_api_usage_customers_options_get",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2210,6 +2780,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -2309,6 +2899,22 @@
               ],
               "title": "Model Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -2321,6 +2927,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -2430,6 +3046,22 @@
               ],
               "title": "Model Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -2442,6 +3074,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -2619,6 +3261,22 @@
               ],
               "title": "Budget Status"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -2631,6 +3289,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -2792,6 +3460,22 @@
               "$ref": "#/components/schemas/RequestRowSort",
               "default": "requestedAt"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -2804,6 +3488,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -2846,6 +3540,22 @@
               "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
               "title": "Month"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -2859,7 +3569,7 @@
               }
             }
           },
-          "404": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
@@ -2867,7 +3577,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -2878,6 +3588,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         }
       }
@@ -2899,6 +3619,22 @@
               "maximum": 9223372036854775807,
               "minimum": 1,
               "title": "Customer Id"
+            }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
             }
           }
         ],
@@ -2923,6 +3659,26 @@
               }
             }
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -2942,6 +3698,55 @@
               }
             },
             "description": "Conflict"
+          }
+        }
+      }
+    },
+    "/api/model-favorites": {
+      "get": {
+        "tags": [
+          "model-favorites"
+        ],
+        "summary": "List Model Favorites",
+        "operationId": "list_model_favorites_api_model_favorites_get",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelFavoriteList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -2954,27 +3759,6 @@
             "description": "Unprocessable Content"
           }
         }
-      }
-    },
-    "/api/model-favorites": {
-      "get": {
-        "tags": [
-          "model-favorites"
-        ],
-        "summary": "List Model Favorites",
-        "operationId": "list_model_favorites_api_model_favorites_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ModelFavoriteList"
-                }
-              }
-            }
-          }
-        }
       },
       "post": {
         "tags": [
@@ -2983,6 +3767,24 @@
         "summary": "Add Model Favorite",
         "description": "등록한다. 이미 있으면 200 으로 같은 항목을 돌려줘 화면이 두 번 눌러도 안전하다.",
         "operationId": "add_model_favorite_api_model_favorites_post",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -3004,15 +3806,15 @@
               }
             }
           },
-          "200": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ModelFavoriteRead"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "OK"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -3023,6 +3825,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelFavoriteRead"
+                }
+              }
+            },
+            "description": "OK"
           }
         }
       },
@@ -3052,21 +3864,47 @@
               "minLength": 1,
               "title": "Execution Provider"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
           "204": {
             "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -3148,6 +3986,22 @@
               ],
               "title": "Model Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -3160,6 +4014,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -3251,6 +4115,22 @@
               ],
               "title": "Model Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -3263,6 +4143,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -3424,6 +4314,22 @@
               "default": 10,
               "title": "Page Size"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -3436,6 +4342,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -3457,6 +4373,24 @@
         ],
         "summary": "Read Options",
         "operationId": "read_options_api_usage_internal_options_get",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3467,6 +4401,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -3592,6 +4546,22 @@
               "default": 10,
               "title": "Page Size"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -3604,6 +4574,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -3646,6 +4626,22 @@
               "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
               "title": "Month"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -3659,7 +4655,7 @@
               }
             }
           },
-          "404": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3667,7 +4663,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -3678,6 +4674,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         }
       }
@@ -3699,6 +4705,22 @@
               "maximum": 9223372036854775807,
               "minimum": 1,
               "title": "Project Id"
+            }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
             }
           }
         ],
@@ -3723,6 +4745,26 @@
               }
             }
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3742,16 +4784,6 @@
               }
             },
             "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
           }
         }
       }
@@ -3764,6 +4796,24 @@
         "summary": "Get Command Code Usage",
         "description": "결제 기간 기준의 구성원별 사용량. 조회 기간을 받지 않고 비용 합계에도 더하지 않는다.",
         "operationId": "get_command_code_usage_api_usage_internal_command_code_get",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3774,6 +4824,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -3889,6 +4959,22 @@
               "default": 10,
               "title": "Page Size"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -3901,6 +4987,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -3920,6 +5016,24 @@
         ],
         "summary": "Create Subscription",
         "operationId": "create_subscription_api_subscriptions_post",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -3941,15 +5055,15 @@
               }
             }
           },
-          "409": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SubscriptionErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -3960,6 +5074,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         }
       }
@@ -3971,6 +5095,24 @@
         ],
         "summary": "Read Options",
         "operationId": "read_options_api_subscriptions_options_get",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3981,6 +5123,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -4003,6 +5165,22 @@
               "minimum": 1,
               "title": "Subscription Id"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -4016,7 +5194,7 @@
               }
             }
           },
-          "404": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
@@ -4024,7 +5202,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -4035,6 +5213,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         }
       },
@@ -4054,6 +5242,22 @@
               "maximum": 9223372036854775807,
               "minimum": 1,
               "title": "Subscription Id"
+            }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
             }
           }
         ],
@@ -4078,7 +5282,7 @@
               }
             }
           },
-          "404": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
@@ -4086,7 +5290,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Unauthorized"
           },
           "422": {
             "content": {
@@ -4097,6 +5301,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         }
       }
@@ -4108,15 +5322,33 @@
         ],
         "summary": "Create Project",
         "operationId": "create_project_api_projects_post",
+        "parameters": [
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ProjectCreate"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -4129,25 +5361,35 @@
               }
             }
           },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProjectDuplicateResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Content",
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDuplicateResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         }
       }
@@ -4169,6 +5411,22 @@
               "default": false,
               "title": "Include Inactive"
             }
+          },
+          {
+            "name": "patron_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patron Session"
+            }
           }
         ],
         "responses": {
@@ -4181,6 +5439,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "422": {
             "content": {

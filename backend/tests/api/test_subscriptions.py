@@ -11,7 +11,11 @@ from sqlalchemy import select
 
 from app.models import ChangeLog
 from app.schemas.models import MAX_MODEL_ID
+from tests.api.test_auth import log_in, make_user
 from tests.db_helpers import Factory
+
+# 로그인한 사용자만 부를 수 있는 API다. 로그인 경계는 tests/test_main.py 에서 확인한다
+pytestmark = pytest.mark.usefixtures("signed_in")
 
 BASE = "/api/subscriptions"
 OCTOBER = {"start_date": "2026-10-01", "end_date": "2026-10-31"}
@@ -361,11 +365,12 @@ async def test_앞뒤_공백은_지우고_저장한다(
     assert item["tool_name"] == "CC"
 
 
-async def test_등록은_첫_사용자_계정과_이력을_남긴다(
+async def test_등록은_로그인한_계정과_이력을_남긴다(
     client: AsyncClient, factory: Factory
 ) -> None:
-    # 로그인 검사를 뒤로 미룬 팀 결정에 따라 시뮬레이터와 같은 임시 실행자를 쓴다
-    user = await factory.user()
+    # 먼저 만든 계정(signed_in)이 아니라 지금 로그인한 계정이 기록돼야 한다
+    user = await make_user(factory)
+    assert (await log_in(client, user["email"])).status_code == 200
 
     created = (await client.post(BASE, json=await body_with_project(factory))).json()
 
@@ -703,11 +708,12 @@ async def test_다른_프로젝트로_바꾸는_수정은_된다(
     assert response.json()["project_name"] == "둘"
 
 
-async def test_수정은_첫_사용자_계정과_이력을_남긴다(
+async def test_수정은_로그인한_계정과_이력을_남긴다(
     client: AsyncClient, factory: Factory
 ) -> None:
-    # 로그인 검사를 뒤로 미룬 팀 결정에 따라 시뮬레이터와 같은 임시 실행자를 쓴다
-    user = await factory.user()
+    # 먼저 만든 계정(signed_in)이 아니라 지금 로그인한 계정이 기록돼야 한다
+    user = await make_user(factory)
+    assert (await log_in(client, user["email"])).status_code == 200
     created = await factory.subscription_cost(amount=Decimal(10))
 
     await client.patch(

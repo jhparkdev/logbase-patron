@@ -16,6 +16,9 @@ from tests.image_samples import png, webp
 IMAGES = "/api/simulations/images"
 OUTPUT_IMAGES = "/api/simulations/output-images"
 
+# 이미지 파일도 로그인한 사용자에게만 내려 준다. 로그인 경계는 test_simulations.py 에서 확인한다
+pytestmark = pytest.mark.usefixtures("signed_in")
+
 
 async def stored_output(
     factory: Factory, storage: LocalImageStorage, data: bytes, mime_type: str

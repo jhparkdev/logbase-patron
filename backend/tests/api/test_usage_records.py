@@ -227,6 +227,7 @@ async def test_a_generation_id_used_by_another_request_is_rejected(
 # 고객 사용량 화면에 나오는 모양
 
 
+@pytest.mark.usefixtures("signed_in")
 async def test_success_failed_and_timeout_records_show_up_in_the_customer_usage_summary(
     client: AsyncClient, factory: Factory, with_token: None
 ) -> None:

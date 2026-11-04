@@ -10,8 +10,12 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.models import Budget
+from tests.api.test_auth import log_in, make_user
 from tests.db_helpers import Factory
 from tests.internal_budget_helpers import internal_call
+
+# 로그인한 사용자만 부를 수 있는 API다. 로그인 경계는 tests/test_main.py 에서 확인한다
+pytestmark = pytest.mark.usefixtures("signed_in")
 
 BASE = "/api/usage/internal/projects"
 OCTOBER = {"month": "2026-10"}
@@ -138,11 +142,12 @@ async def test_예산을_저장하면_상세에서_읽을_수_있다(
     assert read.json()["budget"]["status"] == "NORMAL"
 
 
-async def test_예산_저장은_첫_사용자_계정을_기록한다(
+async def test_예산_저장은_로그인한_계정을_기록한다(
     client: AsyncClient, factory: Factory
 ) -> None:
-    # 로그인 검사를 뒤로 미룬 팀 결정에 따라 시뮬레이터와 같은 임시 실행자를 쓴다
-    user = await factory.user()
+    # 먼저 만든 계정(signed_in)이 아니라 지금 로그인한 계정이 기록돼야 한다
+    user = await make_user(factory)
+    assert (await log_in(client, user["email"])).status_code == 200
     project = await factory.project()
 
     await client.put(f"{BASE}/{project['project_id']}/budget", json=budget_body())

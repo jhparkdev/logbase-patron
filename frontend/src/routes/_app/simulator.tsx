@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { activeModelsQuery } from "../../features/simulator/api/simulator";
 import { SimulatorPage } from "../../features/simulator/components/SimulatorPage";
 import { SimulatorRestore } from "../../features/simulator/components/SimulatorRestore";
+import { useModelFavorites } from "../../features/simulator/hooks/useModelFavorites";
 import { useSimulatorData } from "../../features/simulator/hooks/useSimulatorData";
 import { simulatorSearchSchema } from "../../features/simulator/lib/search";
 
@@ -29,6 +30,7 @@ function SimulatorRoute() {
       });
     },
   });
+  const favorites = useModelFavorites();
   const page = {
     catalogState: data.catalogState,
     onRetryCatalog: data.onRetryCatalog,
@@ -53,6 +55,7 @@ function SimulatorRoute() {
         sourceKey={search.sourceRun}
         view={data.restore}
         onRetry={data.retryDraft}
+        favorites={favorites}
         page={page}
       />
     );
@@ -60,6 +63,7 @@ function SimulatorRoute() {
     <SimulatorPage
       choices={data.choices}
       scenarios={data.scenarios}
+      favorites={favorites}
       {...page}
     />
   );

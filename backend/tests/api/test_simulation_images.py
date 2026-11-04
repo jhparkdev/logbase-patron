@@ -15,6 +15,7 @@ from app.models import InputAsset, SimulationRun, SimulationRunAsset
 from app.schemas.simulation_image import MAX_IMAGE_BYTES, MAX_IMAGE_COUNT
 from app.services.image_storage import LocalImageStorage
 from tests.api.simulation_helpers import FakeManager, count, create_body
+from tests.api.test_auth import log_in, make_user
 from tests.db_helpers import Factory
 from tests.image_samples import GIF_HEAD, jpeg, png
 
@@ -71,6 +72,21 @@ async def test_the_uploader_is_recorded(
 
     row = await db_session.get(InputAsset, uuid.UUID(response.json()["asset_id"]))
     assert row is not None and row.uploaded_by is not None
+
+
+@pytest.mark.usefixtures("image_storage")
+async def test_the_uploader_is_the_signed_in_account_not_the_first_one(
+    client: AsyncClient, db_session: AsyncSession, factory: Factory
+) -> None:
+    await make_user(factory)
+    user = await make_user(factory)
+    await log_in(client, user["email"])
+
+    response = await upload(client, png())
+
+    row = await db_session.get(InputAsset, uuid.UUID(response.json()["asset_id"]))
+    assert row is not None
+    assert row.uploaded_by == user["user_id"]
 
 
 @pytest.mark.usefixtures("signed_in", "image_storage")
@@ -166,6 +182,7 @@ async def test_the_same_file_uploaded_twice_gets_two_separate_assets(
     assert first != second
 
 
+@pytest.mark.usefixtures("signed_in")
 async def test_the_limits_endpoint_serves_the_policy_values(
     client: AsyncClient,
 ) -> None:

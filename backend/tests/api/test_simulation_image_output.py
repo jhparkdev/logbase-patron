@@ -154,7 +154,7 @@ async def test_an_image_run_with_a_model_that_cannot_make_images_is_422(
         ("FAILED", "UNKNOWN_ERROR"),
     ],
 )
-@pytest.mark.usefixtures("image_storage")
+@pytest.mark.usefixtures("image_storage", "signed_in")
 async def test_images_of_a_slot_that_did_not_succeed_are_not_shown(
     client: AsyncClient, factory: Factory, status: str, error_type: str | None
 ) -> None:

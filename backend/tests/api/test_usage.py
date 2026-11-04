@@ -10,7 +10,11 @@ from sqlalchemy import select
 
 from app.models import Budget
 from app.services.budget_policy import WARNING_PCT
+from tests.api.test_auth import log_in, make_user
 from tests.db_helpers import Factory
+
+# 로그인한 사용자만 부를 수 있는 API다. 로그인 경계는 tests/test_main.py 에서 확인한다
+pytestmark = pytest.mark.usefixtures("signed_in")
 
 BASE = "/api/usage/customers"
 OCTOBER = {"start_date": "2026-10-01", "end_date": "2026-10-31"}
@@ -224,11 +228,12 @@ async def test_budget_can_be_saved_and_then_read(
     assert Decimal(read.json()["budget"]["monthly_amount_usd"]) == Decimal("10.50")
 
 
-async def test_saving_a_budget_records_the_first_active_account(
+async def test_saving_a_budget_records_the_signed_in_account(
     client: AsyncClient, factory: Factory
 ) -> None:
-    # 로그인 검사를 뒤로 미룬 팀 결정에 따라 시뮬레이터와 같은 임시 실행자를 쓴다
-    user = await factory.user()
+    # 먼저 만든 계정(signed_in)이 아니라 지금 로그인한 계정이 기록돼야 한다
+    user = await make_user(factory)
+    assert (await log_in(client, user["email"])).status_code == 200
     customer = await factory.customer()
 
     await client.put(f"{BASE}/{customer['customer_id']}/budget", json=budget_body())
